@@ -105,8 +105,8 @@ struct modified_mooney_rivlin_tet10_isoparametric_reference_data {
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data = {
-    "modified_mooney_rivlin_tet10_tet10_objective_soa",
+static const KernelDiagnostics modified_mooney_rivlin_tet10_objective_soa_diagnostics_data = {
+    "modified_mooney_rivlin_tet10_objective_soa",
     "TET10",
     3,
     11,
@@ -152,87 +152,81 @@ static const KernelDiagnostics modified_mooney_rivlin_tet10_tet10_objective_soa_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics(void) {
-    return &sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_tet10_objective_soa_diagnostics(void) {
+    return &sfem::codegen::modified_mooney_rivlin_tet10_objective_soa_diagnostics_data;
 }
 
-extern "C" double modified_mooney_rivlin_tet10_tet10_objective_soa_arithmetic_intensity(
+extern "C" double modified_mooney_rivlin_tet10_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_tet10_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_objective_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_tet10_tet10_objective_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_objective_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_objective_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_tet10_tet10_objective_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_objective_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_objective_affine_mesh_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_objective_affine_mesh_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -241,7 +235,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa_impl(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_objective_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -353,7 +347,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -376,10 +370,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa(
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, value);
+    return sfem::codegen::modified_mooney_rivlin_tet10_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -402,7 +396,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa_floa
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, value);
+    return sfem::codegen::modified_mooney_rivlin_tet10_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, value);
 }
 
 
@@ -410,7 +404,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_objective_steps_affine_mesh_soa_impl(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -544,7 +538,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_objective_steps_affine
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -573,10 +567,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_affine_mesh_so
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -605,13 +599,13 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_affine_mesh_so
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_packed_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -771,7 +765,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_packed_affine_
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -939,7 +933,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1141,7 +1135,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_objective_isoparametri
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1155,10 +1149,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_s
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
+    return sfem::codegen::modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1172,7 +1166,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_s
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
+    return sfem::codegen::modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
 }
 
 
@@ -1180,7 +1174,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_objective_steps_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1404,7 +1398,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_objective_steps_isopar
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1424,10 +1418,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_isoparametric_
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1447,13 +1441,13 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_isoparametric_
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1701,7 +1695,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_packed_isopara
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1956,8 +1950,8 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_objective_steps_packed_isopara
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data = {
-    "modified_mooney_rivlin_tet10_tet10_gradient_soa",
+static const KernelDiagnostics modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data = {
+    "modified_mooney_rivlin_tet10_gradient_soa",
     "TET10",
     3,
     11,
@@ -2003,87 +1997,81 @@ static const KernelDiagnostics modified_mooney_rivlin_tet10_tet10_gradient_soa_d
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics(void) {
-    return &sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_tet10_gradient_soa_diagnostics(void) {
+    return &sfem::codegen::modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data;
 }
 
-extern "C" double modified_mooney_rivlin_tet10_tet10_gradient_soa_arithmetic_intensity(
+extern "C" double modified_mooney_rivlin_tet10_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_gradient_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_tet10_tet10_gradient_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_gradient_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_gradient_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_tet10_tet10_gradient_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_gradient_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_gradient_affine_mesh_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_gradient_affine_mesh_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -2092,7 +2080,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa_impl(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2221,7 +2209,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_s
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2247,10 +2235,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::modified_mooney_rivlin_tet10_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2276,13 +2264,13 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa_float
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::modified_mooney_rivlin_tet10_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2453,7 +2441,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_affine_mesh_so
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2624,7 +2612,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_affine_mesh_so
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2812,7 +2800,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_two_pass_affin
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3008,7 +2996,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3227,7 +3215,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_gradient_isoparametric
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3244,10 +3232,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_so
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3264,13 +3252,13 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_so
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3529,7 +3517,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_isoparametric_
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3788,7 +3776,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_isoparametric_
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4064,7 +4052,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_two_pass_isopa
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4347,8 +4335,8 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_gradient_packed_two_pass_isopa
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data = {
-    "modified_mooney_rivlin_tet10_tet10_apply_soa",
+static const KernelDiagnostics modified_mooney_rivlin_tet10_apply_soa_diagnostics_data = {
+    "modified_mooney_rivlin_tet10_apply_soa",
     "TET10",
     3,
     11,
@@ -4394,87 +4382,81 @@ static const KernelDiagnostics modified_mooney_rivlin_tet10_tet10_apply_soa_diag
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics(void) {
-    return &sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_tet10_apply_soa_diagnostics(void) {
+    return &sfem::codegen::modified_mooney_rivlin_tet10_apply_soa_diagnostics_data;
 }
 
-extern "C" double modified_mooney_rivlin_tet10_tet10_apply_soa_arithmetic_intensity(
+extern "C" double modified_mooney_rivlin_tet10_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_tet10_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_apply_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_tet10_tet10_apply_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_apply_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_apply_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_tet10_tet10_apply_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_apply_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_apply_affine_mesh_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_apply_affine_mesh_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa",
+            &sfem::codegen::modified_mooney_rivlin_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_float",
+            &sfem::codegen::modified_mooney_rivlin_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -4483,7 +4465,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_impl(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4623,7 +4605,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4653,10 +4635,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::modified_mooney_rivlin_tet10_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4686,13 +4668,13 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::modified_mooney_rivlin_tet10_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4879,7 +4861,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_affine_mesh_soa(
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5066,7 +5048,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_affine_mesh_soa_f
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5270,7 +5252,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_two_pass_affine_m
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5477,78 +5459,12 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_two_pass_affine_m
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_bsr_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    return modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int modified_mooney_rivlin_tet10_tet10_bsr_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    return modified_mooney_rivlin_tet10_tet10_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5778,7 +5694,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_apply_isoparametric_me
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5799,10 +5715,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5823,13 +5739,13 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_f
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -6104,7 +6020,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_isoparametric_mes
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -6379,7 +6295,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_isoparametric_mes
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -6671,7 +6587,7 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_two_pass_isoparam
     return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -6966,59 +6882,11 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_apply_packed_two_pass_isoparam
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_bsr_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    return modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int modified_mooney_rivlin_tet10_tet10_bsr_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    return modified_mooney_rivlin_tet10_tet10_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
 
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_find_cols(
+static SFEM_INLINE void modified_mooney_rivlin_tet10_hessian_isoparametric_mesh_soa_find_cols(
         const idx_t *const SFEM_RESTRICT targets,
         const idx_t *const SFEM_RESTRICT row,
         const int lenrow,
@@ -7036,7 +6904,7 @@ static SFEM_INLINE void modified_mooney_rivlin_tet10_tet10_hessian_isoparametric
 }
 
 template <typename scalar_t>
-static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(
+static SFEM_INLINE int modified_mooney_rivlin_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(
         const idx_t *const SFEM_RESTRICT ev,
         const scalar_t *const SFEM_RESTRICT element_matrix,
         const count_t *const SFEM_RESTRICT rowptr,
@@ -7052,11 +6920,11 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_
         const count_t row_begin = rowptr[dof_i];
         const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
         const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
-        modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
+        modified_mooney_rivlin_tet10_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
         for (int j = 0; j < N_SHAPE; ++j) {
             if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {
                 if (valid_block_graph) {
-                    std::fprintf(stderr, "modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_scatter_bsr missing block graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
+                    std::fprintf(stderr, "modified_mooney_rivlin_tet10_hessian_isoparametric_mesh_soa_scatter_bsr missing block graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
                 }
                 entries[i * N_SHAPE + j] = row_begin;
                 valid_block_graph = false;
@@ -7083,7 +6951,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_
 }
 
 template <typename scalar_t, typename geometry_t, int FORMAT>
-static int modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
+static int modified_mooney_rivlin_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -7292,17 +7160,9 @@ static int modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_ass
         }
 
         if constexpr (FORMAT == 1) {
-            invalid_matrix_graph |= (modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
-        } else if constexpr (FORMAT == 0) {
-            invalid_matrix_graph |= (modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
-        } else if constexpr (FORMAT == 2) {
-            invalid_matrix_graph |= (modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values) != SFEM_SUCCESS);
-        } else if constexpr (FORMAT == 3) {
-            invalid_matrix_graph |= (modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_scatter_coo(ev, element_matrix, coo_nnz, coo_rows, coo_cols, values) != SFEM_SUCCESS);
-        } else if constexpr (FORMAT == 5) {
-            modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_scatter_coo_triplets(ev, element_matrix, element, coo_triplet_rows, coo_triplet_cols, values);
+            invalid_matrix_graph |= (modified_mooney_rivlin_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
         } else {
-            invalid_matrix_graph |= (modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_scatter_patch(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
+            invalid_matrix_graph |= 1;
         }
     }
 
@@ -7312,7 +7172,7 @@ static int modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_ass
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -7328,10 +7188,10 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_hessian_bsr_isoparametric_mesh
         const idx_t *const SFEM_RESTRICT colidx,
         double *const SFEM_RESTRICT values
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    return sfem::codegen::modified_mooney_rivlin_tet10_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
 
-extern "C" int modified_mooney_rivlin_tet10_tet10_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_tet10_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -7347,5 +7207,5 @@ extern "C" int modified_mooney_rivlin_tet10_tet10_hessian_bsr_isoparametric_mesh
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 ) {
-    return sfem::codegen::modified_mooney_rivlin_tet10_tet10_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    return sfem::codegen::modified_mooney_rivlin_tet10_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }

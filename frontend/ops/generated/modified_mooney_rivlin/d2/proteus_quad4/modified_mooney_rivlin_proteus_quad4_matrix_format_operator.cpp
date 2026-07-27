@@ -15,7 +15,6 @@ static const MatrixAssemblyDiagnostics modified_mooney_rivlin_proteus_quad4_bsr_
     "requires_node_block_graph",
     "atomic_add",
     0,
-    1,
     2,
     2,
     2,

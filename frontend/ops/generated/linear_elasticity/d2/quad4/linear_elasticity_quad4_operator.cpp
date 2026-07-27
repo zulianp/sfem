@@ -1,141 +1,123 @@
 #include "../../op/sfem_GeneratedLinearElasticity_c_abi.hpp"
 
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_proteus_quad4_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_quad4_apply_soa_diagnostics(
         void
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_proteus_quad4_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_quad4_gradient_soa_diagnostics(
         void
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_proteus_quad4_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_quad4_objective_soa_diagnostics(
         void
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_print_rate(
+extern "C" void linear_elasticity_proteus_quad4_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -153,7 +135,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_s
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -171,7 +153,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_s
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -185,7 +167,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -199,7 +181,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -224,7 +206,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_affine
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -249,7 +231,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_affine
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -270,7 +252,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_isopar
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -291,7 +273,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_isopar
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -322,7 +304,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pa
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -353,7 +335,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pa
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -380,7 +362,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pa
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -407,7 +389,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pa
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -425,7 +407,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mes
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -443,7 +425,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mes
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -457,7 +439,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparamet
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -471,7 +453,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparamet
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -496,7 +478,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_aff
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -521,7 +503,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_aff
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -542,7 +524,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_iso
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -563,7 +545,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_iso
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -594,7 +576,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -625,7 +607,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -652,7 +634,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -679,7 +661,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -695,7 +677,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_me
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -711,7 +693,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_me
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -723,7 +705,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparame
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -735,7 +717,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparame
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -756,7 +738,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_aff
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -777,7 +759,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_aff
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -794,7 +776,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_iso
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -811,7 +793,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_iso
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -839,7 +821,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_pac
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -867,7 +849,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_pac
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -891,7 +873,7 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_pac
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -916,214 +898,196 @@ extern "C" int linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_pac
         float *const SFEM_RESTRICT value
 );
 
-extern "C" void linear_elasticity_quad4_quad4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_apply_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_quad4_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_quad4_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double linear_elasticity_quad4_quad4_apply_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_quad4_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return linear_elasticity_proteus_quad4_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_quad4_quad4_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_quad4_apply_soa_diagnostics(
         void
 ) {
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_diagnostics();
+    return linear_elasticity_proteus_quad4_apply_soa_diagnostics();
 }
 
-extern "C" void linear_elasticity_quad4_quad4_apply_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_apply_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_apply_soa_print_rate(
+extern "C" void linear_elasticity_quad4_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_apply_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_apply_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_gradient_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_quad4_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_quad4_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double linear_elasticity_quad4_quad4_gradient_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_quad4_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return linear_elasticity_proteus_quad4_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_quad4_quad4_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_quad4_gradient_soa_diagnostics(
         void
 ) {
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_diagnostics();
+    return linear_elasticity_proteus_quad4_gradient_soa_diagnostics();
 }
 
-extern "C" void linear_elasticity_quad4_quad4_gradient_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_gradient_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_gradient_soa_print_rate(
+extern "C" void linear_elasticity_quad4_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_gradient_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_gradient_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_objective_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_quad4_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_quad4_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double linear_elasticity_quad4_quad4_objective_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_quad4_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return linear_elasticity_proteus_quad4_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_quad4_quad4_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_quad4_objective_soa_diagnostics(
         void
 ) {
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_diagnostics();
+    return linear_elasticity_proteus_quad4_objective_soa_diagnostics();
 }
 
-extern "C" void linear_elasticity_quad4_quad4_objective_soa_float_print_rate(
+extern "C" void linear_elasticity_quad4_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_objective_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_quad4_quad4_objective_soa_print_rate(
+extern "C" void linear_elasticity_quad4_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_quad4_proteus_quad4_objective_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_quad4_objective_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1147,10 +1111,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1174,10 +1138,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1197,10 +1161,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1220,10 +1184,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1254,10 +1218,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_packed_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1288,10 +1252,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_packed_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1318,10 +1282,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_packed_isoparametric_mesh_soa
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1348,10 +1312,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_packed_isoparametric_mesh_soa
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1388,10 +1352,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_packed_two_pass_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1428,10 +1392,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_packed_two_pass_affine_mesh_s
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1464,10 +1428,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_packed_two_pass_isoparametric
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1500,10 +1464,10 @@ extern "C" int linear_elasticity_quad4_quad4_apply_packed_two_pass_isoparametric
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1527,10 +1491,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1554,10 +1518,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1577,10 +1541,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1600,10 +1564,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa_flo
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1634,10 +1598,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_packed_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1668,10 +1632,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_packed_affine_mesh_soa_flo
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1698,10 +1662,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_packed_isoparametric_mesh_
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1728,10 +1692,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_packed_isoparametric_mesh_
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1768,10 +1732,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_packed_two_pass_affine_mes
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1808,10 +1772,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_packed_two_pass_affine_mes
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1844,10 +1808,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_packed_two_pass_isoparamet
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1880,10 +1844,10 @@ extern "C" int linear_elasticity_quad4_quad4_gradient_packed_two_pass_isoparamet
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return linear_elasticity_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1905,10 +1869,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
+    return linear_elasticity_proteus_quad4_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1930,10 +1894,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
+    return linear_elasticity_proteus_quad4_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1951,10 +1915,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
+    return linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1972,10 +1936,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa_fl
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
+    return linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_steps_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2002,10 +1966,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_steps_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_steps_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2032,10 +1996,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_steps_affine_mesh_soa_flo
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2058,10 +2022,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_steps_isoparametric_mesh_
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return linear_elasticity_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2084,10 +2048,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_steps_isoparametric_mesh_
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return linear_elasticity_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_steps_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_quad4_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2121,10 +2085,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_steps_packed_affine_mesh_
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return linear_elasticity_proteus_quad4_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2158,10 +2122,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_steps_packed_affine_mesh_
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return linear_elasticity_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_quad4_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2191,10 +2155,10 @@ extern "C" int linear_elasticity_quad4_quad4_objective_steps_packed_isoparametri
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return linear_elasticity_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_quad4_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2224,5 +2188,5 @@ extern "C" int linear_elasticity_quad4_quad4_objective_steps_packed_isoparametri
         elements[3],
         elements[2]
     };
-    return linear_elasticity_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return linear_elasticity_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }

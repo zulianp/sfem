@@ -105,8 +105,8 @@ struct linear_elasticity_tet10_isoparametric_reference_data {
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics linear_elasticity_tet10_tet10_objective_soa_diagnostics_data = {
-    "linear_elasticity_tet10_tet10_objective_soa",
+static const KernelDiagnostics linear_elasticity_tet10_objective_soa_diagnostics_data = {
+    "linear_elasticity_tet10_objective_soa",
     "TET10",
     3,
     11,
@@ -152,87 +152,81 @@ static const KernelDiagnostics linear_elasticity_tet10_tet10_objective_soa_diagn
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_tet10_objective_soa_diagnostics(void) {
-    return &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_objective_soa_diagnostics(void) {
+    return &sfem::codegen::linear_elasticity_tet10_objective_soa_diagnostics_data;
 }
 
-extern "C" double linear_elasticity_tet10_tet10_objective_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_tet10_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_tet10_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void linear_elasticity_tet10_tet10_objective_soa_print_rate(
+extern "C" void linear_elasticity_tet10_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "linear_elasticity_tet10_tet10_objective_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_objective_soa",
+            &sfem::codegen::linear_elasticity_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_objective_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "linear_elasticity_tet10_tet10_objective_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_objective_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_objective_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet10_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "linear_elasticity_tet10_tet10_objective_affine_mesh_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_objective_affine_mesh_soa",
+            &sfem::codegen::linear_elasticity_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_objective_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "linear_elasticity_tet10_tet10_objective_affine_mesh_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_objective_affine_mesh_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet10_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_objective_isoparametric_mesh_soa",
+            &sfem::codegen::linear_elasticity_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_objective_isoparametric_mesh_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -241,7 +235,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int linear_elasticity_tet10_tet10_objective_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet10_objective_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -352,7 +346,7 @@ static SFEM_INLINE int linear_elasticity_tet10_tet10_objective_affine_mesh_soa_i
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet10_tet10_objective_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -374,10 +368,10 @@ extern "C" int linear_elasticity_tet10_tet10_objective_affine_mesh_soa(
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
+    return sfem::codegen::linear_elasticity_tet10_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int linear_elasticity_tet10_tet10_objective_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -399,7 +393,7 @@ extern "C" int linear_elasticity_tet10_tet10_objective_affine_mesh_soa_float(
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
+    return sfem::codegen::linear_elasticity_tet10_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
 
@@ -407,7 +401,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet10_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -540,7 +534,7 @@ static SFEM_INLINE int linear_elasticity_tet10_tet10_objective_steps_affine_mesh
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -568,10 +562,10 @@ extern "C" int linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa(
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::linear_elasticity_tet10_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -599,13 +593,13 @@ extern "C" int linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa_flo
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::linear_elasticity_tet10_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet10_tet10_objective_steps_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -764,7 +758,7 @@ extern "C" int linear_elasticity_tet10_tet10_objective_steps_packed_affine_mesh_
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -931,7 +925,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet10_objective_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1132,7 +1126,7 @@ static SFEM_INLINE int linear_elasticity_tet10_tet10_objective_isoparametric_mes
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1145,10 +1139,10 @@ extern "C" int linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa(
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
+    return sfem::codegen::linear_elasticity_tet10_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1161,7 +1155,7 @@ extern "C" int linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_fl
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
+    return sfem::codegen::linear_elasticity_tet10_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
 
@@ -1169,7 +1163,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1392,7 +1386,7 @@ static SFEM_INLINE int linear_elasticity_tet10_tet10_objective_steps_isoparametr
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1411,10 +1405,10 @@ extern "C" int linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1433,13 +1427,13 @@ extern "C" int linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return sfem::codegen::linear_elasticity_tet10_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet10_tet10_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1686,7 +1680,7 @@ extern "C" int linear_elasticity_tet10_tet10_objective_steps_packed_isoparametri
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1940,8 +1934,8 @@ extern "C" int linear_elasticity_tet10_tet10_objective_steps_packed_isoparametri
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data = {
-    "linear_elasticity_tet10_tet10_gradient_soa",
+static const KernelDiagnostics linear_elasticity_tet10_gradient_soa_diagnostics_data = {
+    "linear_elasticity_tet10_gradient_soa",
     "TET10",
     3,
     11,
@@ -1987,87 +1981,81 @@ static const KernelDiagnostics linear_elasticity_tet10_tet10_gradient_soa_diagno
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_tet10_gradient_soa_diagnostics(void) {
-    return &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_gradient_soa_diagnostics(void) {
+    return &sfem::codegen::linear_elasticity_tet10_gradient_soa_diagnostics_data;
 }
 
-extern "C" double linear_elasticity_tet10_tet10_gradient_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_tet10_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_tet10_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void linear_elasticity_tet10_tet10_gradient_soa_print_rate(
+extern "C" void linear_elasticity_tet10_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "linear_elasticity_tet10_tet10_gradient_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_gradient_soa",
+            &sfem::codegen::linear_elasticity_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_gradient_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "linear_elasticity_tet10_tet10_gradient_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_gradient_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet10_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "linear_elasticity_tet10_tet10_gradient_affine_mesh_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_gradient_affine_mesh_soa",
+            &sfem::codegen::linear_elasticity_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_gradient_affine_mesh_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet10_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_gradient_isoparametric_mesh_soa",
+            &sfem::codegen::linear_elasticity_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_gradient_isoparametric_mesh_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -2076,7 +2064,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet10_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2204,7 +2192,7 @@ static SFEM_INLINE int linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_im
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2229,10 +2217,10 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::linear_elasticity_tet10_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2257,13 +2245,13 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::linear_elasticity_tet10_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2433,7 +2421,7 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_packed_affine_mesh_soa(
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2603,7 +2591,7 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_packed_affine_mesh_soa_flo
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2790,7 +2778,7 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_packed_two_pass_affine_mes
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2985,7 +2973,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet10_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3203,7 +3191,7 @@ static SFEM_INLINE int linear_elasticity_tet10_tet10_gradient_isoparametric_mesh
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3219,10 +3207,10 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::linear_elasticity_tet10_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3238,13 +3226,13 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_flo
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return sfem::codegen::linear_elasticity_tet10_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3502,7 +3490,7 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_packed_isoparametric_mesh_
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3760,7 +3748,7 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_packed_isoparametric_mesh_
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4035,7 +4023,7 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_packed_two_pass_isoparamet
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4317,8 +4305,8 @@ extern "C" int linear_elasticity_tet10_tet10_gradient_packed_two_pass_isoparamet
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics linear_elasticity_tet10_tet10_apply_soa_diagnostics_data = {
-    "linear_elasticity_tet10_tet10_apply_soa",
+static const KernelDiagnostics linear_elasticity_tet10_apply_soa_diagnostics_data = {
+    "linear_elasticity_tet10_apply_soa",
     "TET10",
     3,
     11,
@@ -4364,87 +4352,81 @@ static const KernelDiagnostics linear_elasticity_tet10_tet10_apply_soa_diagnosti
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_tet10_apply_soa_diagnostics(void) {
-    return &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *linear_elasticity_tet10_apply_soa_diagnostics(void) {
+    return &sfem::codegen::linear_elasticity_tet10_apply_soa_diagnostics_data;
 }
 
-extern "C" double linear_elasticity_tet10_tet10_apply_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_tet10_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::linear_elasticity_tet10_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void linear_elasticity_tet10_tet10_apply_soa_print_rate(
+extern "C" void linear_elasticity_tet10_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "linear_elasticity_tet10_tet10_apply_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_apply_soa",
+            &sfem::codegen::linear_elasticity_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_apply_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "linear_elasticity_tet10_tet10_apply_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_apply_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_apply_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet10_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "linear_elasticity_tet10_tet10_apply_affine_mesh_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_apply_affine_mesh_soa",
+            &sfem::codegen::linear_elasticity_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_apply_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "linear_elasticity_tet10_tet10_apply_affine_mesh_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_apply_affine_mesh_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_tet10_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa",
-            &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_apply_isoparametric_mesh_soa",
+            &sfem::codegen::linear_elasticity_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_tet10_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_float",
-            &sfem::codegen::linear_elasticity_tet10_tet10_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "linear_elasticity_tet10_apply_isoparametric_mesh_soa_float",
+            &sfem::codegen::linear_elasticity_tet10_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -4453,7 +4435,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int linear_elasticity_tet10_tet10_apply_affine_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet10_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4581,7 +4563,7 @@ static SFEM_INLINE int linear_elasticity_tet10_tet10_apply_affine_mesh_soa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet10_tet10_apply_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4606,10 +4588,10 @@ extern "C" int linear_elasticity_tet10_tet10_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::linear_elasticity_tet10_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_tet10_tet10_apply_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4634,13 +4616,13 @@ extern "C" int linear_elasticity_tet10_tet10_apply_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::linear_elasticity_tet10_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet10_tet10_apply_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4810,7 +4792,7 @@ extern "C" int linear_elasticity_tet10_tet10_apply_packed_affine_mesh_soa(
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_apply_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4980,7 +4962,7 @@ extern "C" int linear_elasticity_tet10_tet10_apply_packed_affine_mesh_soa_float(
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_tet10_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5167,7 +5149,7 @@ extern "C" int linear_elasticity_tet10_tet10_apply_packed_two_pass_affine_mesh_s
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5362,7 +5344,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int linear_elasticity_tet10_apply_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5580,7 +5562,7 @@ static SFEM_INLINE int linear_elasticity_tet10_tet10_apply_isoparametric_mesh_so
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5596,10 +5578,10 @@ extern "C" int linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::linear_elasticity_tet10_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5615,13 +5597,13 @@ extern "C" int linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 ) {
-    return sfem::codegen::linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return sfem::codegen::linear_elasticity_tet10_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int linear_elasticity_tet10_tet10_apply_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5879,7 +5861,7 @@ extern "C" int linear_elasticity_tet10_tet10_apply_packed_isoparametric_mesh_soa
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -6137,7 +6119,7 @@ extern "C" int linear_elasticity_tet10_tet10_apply_packed_isoparametric_mesh_soa
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -6412,7 +6394,7 @@ extern "C" int linear_elasticity_tet10_tet10_apply_packed_two_pass_isoparametric
     return SFEM_SUCCESS;
 }
 
-extern "C" int linear_elasticity_tet10_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,

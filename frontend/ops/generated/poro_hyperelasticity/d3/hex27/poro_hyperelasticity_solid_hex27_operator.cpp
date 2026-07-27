@@ -1,2327 +1,308 @@
 #include "../../op/sfem_GeneratedPoroHyperelasticity_c_abi.hpp"
 
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_soa_float_print_rate(
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
-) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_apply_affine_mesh_soa_print_rate(
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
-) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_apply_isoparametric_mesh_soa_float_print_rate(
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
-) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_apply_isoparametric_mesh_soa_print_rate(
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
+);
+extern "C" double poro_hyperelasticity_solid_proteus_hex27_apply_soa_arithmetic_intensity(
+        const ptrdiff_t nelements,
+        const size_t scalar_bytes,
+        const size_t real_bytes,
+        const size_t accumulator_bytes
+);
+extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_proteus_hex27_apply_soa_diagnostics(
+        void
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_apply_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_apply_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_gradient_affine_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" double poro_hyperelasticity_solid_proteus_hex27_gradient_soa_arithmetic_intensity(
+        const ptrdiff_t nelements,
+        const size_t scalar_bytes,
+        const size_t real_bytes,
+        const size_t accumulator_bytes
+);
+extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_proteus_hex27_gradient_soa_diagnostics(
+        void
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_gradient_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_gradient_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_objective_affine_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_objective_affine_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" double poro_hyperelasticity_solid_proteus_hex27_objective_soa_arithmetic_intensity(
+        const ptrdiff_t nelements,
+        const size_t scalar_bytes,
+        const size_t real_bytes,
+        const size_t accumulator_bytes
+);
+extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_proteus_hex27_objective_soa_diagnostics(
+        void
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_objective_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+extern "C" void poro_hyperelasticity_solid_proteus_hex27_objective_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+);
+
+extern "C" void poro_hyperelasticity_solid_hex27_apply_affine_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double poro_hyperelasticity_solid_hex27_hex27_apply_soa_arithmetic_intensity(
+extern "C" void poro_hyperelasticity_solid_hex27_apply_affine_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+) {
+    poro_hyperelasticity_solid_proteus_hex27_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
+}
+
+extern "C" void poro_hyperelasticity_solid_hex27_apply_isoparametric_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+) {
+    poro_hyperelasticity_solid_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
+}
+
+extern "C" void poro_hyperelasticity_solid_hex27_apply_isoparametric_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs
+) {
+    poro_hyperelasticity_solid_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
+}
+
+extern "C" double poro_hyperelasticity_solid_hex27_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return poro_hyperelasticity_solid_proteus_hex27_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_hex27_hex27_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_hex27_apply_soa_diagnostics(
         void
 ) {
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_soa_diagnostics();
+    return poro_hyperelasticity_solid_proteus_hex27_apply_soa_diagnostics();
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_apply_soa_float_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_apply_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_apply_soa_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_apply_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_apply_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_bsr_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_bsr_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_bsr_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_bsr_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_bsr_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_bsr_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_bsr_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_bsr_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_dia_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_dia_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_dia_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_dia_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_dia_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_dia_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_dia_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_dia_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_gradient_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_gradient_affine_mesh_soa_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double poro_hyperelasticity_solid_hex27_hex27_gradient_soa_arithmetic_intensity(
+extern "C" double poro_hyperelasticity_solid_hex27_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return poro_hyperelasticity_solid_proteus_hex27_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_hex27_hex27_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_hex27_gradient_soa_diagnostics(
         void
 ) {
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_soa_diagnostics();
+    return poro_hyperelasticity_solid_proteus_hex27_gradient_soa_diagnostics();
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_gradient_soa_float_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_gradient_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_gradient_soa_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_gradient_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_gradient_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, rowptr, colidx, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, rowptr, colidx, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_coo_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t nnz,
-        const idx_t *const SFEM_RESTRICT rows,
-        const idx_t *const SFEM_RESTRICT cols,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_coo_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, nnz, rows, cols, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_coo_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t nnz,
-        const idx_t *const SFEM_RESTRICT rows,
-        const idx_t *const SFEM_RESTRICT cols,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_coo_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, nnz, rows, cols, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_coo_triplet_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_coo_triplet_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, rows, cols, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_coo_triplet_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_coo_triplet_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, rows, cols, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, rowptr, colidx, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, rowptr, colidx, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, diag_offsets, ndiag, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, diag_offsets, ndiag, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_patch_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_patch_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, rowptr, colidx, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_hessian_patch_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_hessian_patch_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, rowptr, colidx, values);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, value);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, value);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_objective_affine_mesh_soa_float_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_objective_affine_mesh_soa_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, value);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, value);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double poro_hyperelasticity_solid_hex27_hex27_objective_soa_arithmetic_intensity(
+extern "C" double poro_hyperelasticity_solid_hex27_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return poro_hyperelasticity_solid_proteus_hex27_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_hex27_hex27_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * poro_hyperelasticity_solid_hex27_objective_soa_diagnostics(
         void
 ) {
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_soa_diagnostics();
+    return poro_hyperelasticity_solid_proteus_hex27_objective_soa_diagnostics();
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_objective_soa_float_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    poro_hyperelasticity_solid_proteus_hex27_objective_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void poro_hyperelasticity_solid_hex27_hex27_objective_soa_print_rate(
+extern "C" void poro_hyperelasticity_solid_hex27_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_soa_print_rate(elapsed, nelements, ndofs, repeat);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_steps_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_patch_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_patch_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_patch_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_patch_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_patch_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double mu,
-        const double lmbda,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_patch_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_hex27_patch_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return poro_hyperelasticity_solid_proteus_hex27_proteus_hex27_patch_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, mu, lmbda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" void poro_hyperelasticity_solid_hex27_matrix_assembly_print_variant(
-        const int variant,
-        const ptrdiff_t nelements
-) {
-    poro_hyperelasticity_solid_proteus_hex27_matrix_assembly_print_variant(variant, nelements);
-}
-
-extern "C" const sfem_MatrixAssemblyDiagnostics * poro_hyperelasticity_solid_hex27_matrix_assembly_variant(
-        const int variant
-) {
-    return poro_hyperelasticity_solid_proteus_hex27_matrix_assembly_variant(variant);
-}
-
-extern "C" int poro_hyperelasticity_solid_hex27_matrix_assembly_variant_count(
-        void
-) {
-    return poro_hyperelasticity_solid_proteus_hex27_matrix_assembly_variant_count();
+    poro_hyperelasticity_solid_proteus_hex27_objective_soa_print_rate(elapsed, nelements, ndofs);
 }

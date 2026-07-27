@@ -260,7 +260,6 @@ class MatrixAssemblyVariantPlan:
     mesh_layout: MatrixMeshLayout = MatrixMeshLayout.STANDARD
     packed_pass: PackedAssemblyPass = PackedAssemblyPass.NONE
     node_index_filter: bool = False
-    format_aware_apply: bool = False
     row_dofs_per_element: int = 0
     column_dofs_per_element: int = 0
     entries_per_element: int = 0
@@ -275,7 +274,6 @@ class MatrixAssemblyVariantPlan:
         mesh_layout = MatrixMeshLayout(self.mesh_layout)
         packed_pass = PackedAssemblyPass(self.packed_pass)
         node_index_filter = bool(self.node_index_filter)
-        format_aware_apply = bool(self.format_aware_apply)
         if mesh_layout is MatrixMeshLayout.STANDARD and packed_pass is not PackedAssemblyPass.NONE:
             raise ValueError("standard matrix assembly cannot request packed passes")
         if mesh_layout is MatrixMeshLayout.PACKED and packed_pass is PackedAssemblyPass.NONE:
@@ -295,7 +293,6 @@ class MatrixAssemblyVariantPlan:
         object.__setattr__(self, "mesh_layout", mesh_layout)
         object.__setattr__(self, "packed_pass", packed_pass)
         object.__setattr__(self, "node_index_filter", node_index_filter)
-        object.__setattr__(self, "format_aware_apply", format_aware_apply)
 
     @property
     def name(self):
@@ -317,7 +314,6 @@ class MatrixAssemblyVariantPlan:
             "mesh_layout": self.mesh_layout.value,
             "packed_pass": self.packed_pass.value,
             "node_index_filter": self.node_index_filter,
-            "format_aware_apply": self.format_aware_apply,
             "row_dofs_per_element": self.row_dofs_per_element,
             "column_dofs_per_element": self.column_dofs_per_element,
             "entries_per_element": self.entries_per_element,
@@ -387,7 +383,6 @@ def matrix_format_plan_from_request(
                                 matrix_format,
                                 patch_node_index_filter,
                             ),
-                            format_aware_apply=_uses_format_aware_apply(matrix_format),
                         )
                     )
             else:
@@ -400,7 +395,6 @@ def matrix_format_plan_from_request(
                             matrix_format,
                             patch_node_index_filter,
                         ),
-                        format_aware_apply=_uses_format_aware_apply(matrix_format),
                     )
                 )
     return MatrixFormatPlan(tuple(variants))
@@ -499,10 +493,6 @@ def _as_tokens(values):
 
 def _uses_node_index_filter(matrix_format, patch_node_index_filter):
     return False
-
-
-def _uses_format_aware_apply(matrix_format):
-    return matrix_format in (MatrixFormat.BSR, MatrixFormat.DIA, MatrixFormat.PATCH)
 
 
 def _element_dof_layouts(unit, context):

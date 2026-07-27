@@ -1,141 +1,123 @@
 #include "../../op/sfem_GeneratedSaintVenantKirchhoff_c_abi.hpp"
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_quad4_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_proteus_quad4_apply_soa_diagnostics(
         void
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_quad4_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_proteus_quad4_gradient_soa_diagnostics(
         void
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_quad4_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_proteus_quad4_objective_soa_diagnostics(
         void
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -156,7 +138,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_m
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -177,7 +159,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_m
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -194,7 +176,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparam
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -211,7 +193,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparam
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -239,7 +221,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_a
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -267,7 +249,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_a
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -291,7 +273,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_i
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -315,7 +297,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_i
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -349,7 +331,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_t
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -383,7 +365,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_t
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -413,7 +395,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_t
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -443,83 +425,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_t
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_bsr_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_bsr_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-);
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_bsr_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_bsr_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-);
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -537,7 +443,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affin
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -555,7 +461,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affin
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -569,7 +475,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isopa
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -583,7 +489,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isopa
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -608,7 +514,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packe
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -633,7 +539,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packe
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -654,7 +560,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packe
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -675,7 +581,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packe
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -706,7 +612,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packe
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -737,7 +643,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packe
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -764,7 +670,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packe
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -791,7 +697,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packe
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -805,7 +711,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_hessian_bsr_is
         const idx_t *const SFEM_RESTRICT colidx,
         double *const SFEM_RESTRICT values
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -819,7 +725,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_hessian_bsr_is
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -835,7 +741,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affi
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -851,7 +757,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affi
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -863,7 +769,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isop
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -875,7 +781,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isop
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -896,7 +802,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_step
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -917,7 +823,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_step
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -934,7 +840,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_step
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -951,7 +857,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_step
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -979,7 +885,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_step
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1007,7 +913,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_step
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1031,7 +937,7 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_step
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1056,214 +962,196 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_step
         float *const SFEM_RESTRICT value
 );
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double saint_venant_kirchhoff_quad4_quad4_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_quad4_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return saint_venant_kirchhoff_proteus_quad4_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_quad4_quad4_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_quad4_apply_soa_diagnostics(
         void
 ) {
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_diagnostics();
+    return saint_venant_kirchhoff_proteus_quad4_apply_soa_diagnostics();
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_apply_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_apply_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double saint_venant_kirchhoff_quad4_quad4_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_quad4_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_quad4_quad4_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_quad4_gradient_soa_diagnostics(
         void
 ) {
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_diagnostics();
+    return saint_venant_kirchhoff_proteus_quad4_gradient_soa_diagnostics();
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_gradient_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_gradient_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double saint_venant_kirchhoff_quad4_quad4_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_quad4_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return saint_venant_kirchhoff_proteus_quad4_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_quad4_quad4_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * saint_venant_kirchhoff_quad4_objective_soa_diagnostics(
         void
 ) {
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_diagnostics();
+    return saint_venant_kirchhoff_proteus_quad4_objective_soa_diagnostics();
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_objective_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    saint_venant_kirchhoff_proteus_quad4_objective_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1290,10 +1178,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1320,10 +1208,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_affine_mesh_soa_float(
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1346,10 +1234,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_isoparametric_mesh_soa(
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1372,10 +1260,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_isoparametric_mesh_soa_f
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1409,10 +1297,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1446,10 +1334,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_affine_mesh_soa_f
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1479,10 +1367,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_isoparametric_mes
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1512,10 +1400,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_isoparametric_mes
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1555,10 +1443,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_two_pass_affine_m
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1598,10 +1486,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_two_pass_affine_m
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1637,10 +1525,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_two_pass_isoparam
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1676,122 +1564,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_apply_packed_two_pass_isoparam
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_bsr_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_bsr_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-}
-
-extern "C" int saint_venant_kirchhoff_quad4_quad4_bsr_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_bsr_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-}
-
-extern "C" int saint_venant_kirchhoff_quad4_quad4_bsr_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_bsr_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-}
-
-extern "C" int saint_venant_kirchhoff_quad4_quad4_bsr_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_bsr_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-}
-
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1815,10 +1591,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1842,10 +1618,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_affine_mesh_soa_float
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1865,10 +1641,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_isoparametric_mesh_so
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1888,10 +1664,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_isoparametric_mesh_so
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1922,10 +1698,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_affine_mesh_so
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1956,10 +1732,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_affine_mesh_so
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1986,10 +1762,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_isoparametric_
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2016,10 +1792,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_isoparametric_
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2056,10 +1832,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_two_pass_affin
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2096,10 +1872,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_two_pass_affin
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2132,10 +1908,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_two_pass_isopa
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2168,10 +1944,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_gradient_packed_two_pass_isopa
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return saint_venant_kirchhoff_proteus_quad4_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2191,10 +1967,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_hessian_bsr_isoparametric_mesh
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
+    return saint_venant_kirchhoff_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2214,10 +1990,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_hessian_bsr_isoparametric_mesh
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
+    return saint_venant_kirchhoff_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2239,10 +2015,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_affine_mesh_soa(
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2264,10 +2040,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_affine_mesh_soa_floa
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2285,10 +2061,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_isoparametric_mesh_s
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2306,10 +2082,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_isoparametric_mesh_s
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2336,10 +2112,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_affine_mesh_so
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2366,10 +2142,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_affine_mesh_so
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2392,10 +2168,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_isoparametric_
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2418,10 +2194,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_isoparametric_
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2455,10 +2231,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_packed_affine_
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2492,10 +2268,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_packed_affine_
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_quad4_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2525,10 +2301,10 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_packed_isopara
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_quad4_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2558,5 +2334,5 @@ extern "C" int saint_venant_kirchhoff_quad4_quad4_objective_steps_packed_isopara
         elements[3],
         elements[2]
     };
-    return saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return saint_venant_kirchhoff_proteus_quad4_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }

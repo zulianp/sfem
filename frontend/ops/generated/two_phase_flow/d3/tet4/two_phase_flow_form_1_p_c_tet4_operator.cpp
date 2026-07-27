@@ -1,9 +1,11 @@
 #include <type_traits>
 #include <cstdint>
 #include <cstdlib>
+#include <string.h>
 #include "../two_phase_flow_form_1_p_c_d3_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
+#include "../../../packed_thread_scratch.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -169,72 +171,66 @@ extern "C" double two_phase_flow_form_1_p_c_tet4_residual_element_soa_arithmetic
 extern "C" void two_phase_flow_form_1_p_c_tet4_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_residual_element_soa",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_residual_element_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_c_tet4_residual_affine_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_c_tet4_residual_isoparametric_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_c_tet4_residual_isoparametric_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -305,24 +301,22 @@ extern "C" double two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_w_arithmetic_int
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_w_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_w",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_w_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_w_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -393,24 +387,22 @@ extern "C" double two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_c_arithmetic_int
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_c_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_c",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_c_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_c_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_p_w_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -481,24 +473,22 @@ extern "C" double two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_w_arithmetic_int
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_w_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_w",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_w_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_w_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -569,24 +559,22 @@ extern "C" double two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_c_arithmetic_int
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_c_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_c",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_c_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_c_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_p_c_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -657,72 +645,66 @@ extern "C" double two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_ari
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_c_tet4_jacobian_action_affine_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_c_tet4_jacobian_action_affine_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_c_tet4_jacobian_action_isoparametric_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_c_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_c_tet4_jacobian_action_isoparametric_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_c_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 

@@ -42,8 +42,8 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_objective_b
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 3],
         scalar_t *const SFEM_RESTRICT value
 ) {
@@ -122,8 +122,8 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_gradient_bl
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 3],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 3]
 ) {
@@ -249,8 +249,8 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_apply_block
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 3],
         const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * 3],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 3]

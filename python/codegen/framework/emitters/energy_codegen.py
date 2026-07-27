@@ -3510,14 +3510,6 @@ def _sfem_soa_mesh_operator_function(
                 source_builder=source_builder,
             )
         )
-    if form.name == "apply":
-        lines.extend(
-            _sfem_soa_format_aware_apply_public_wrappers(
-                function_name,
-                wrapper_params,
-                matrix_format_plan,
-            )
-        )
     return lines
 
 
@@ -4072,51 +4064,6 @@ def _sfem_soa_packed_apply_public_wrappers(
                 )
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
-    return lines
-
-
-def _format_aware_apply_formats_from_plan(matrix_format_plan):
-    if matrix_format_plan is None or getattr(matrix_format_plan, "is_empty", True):
-        return ()
-    formats = []
-    for variant in matrix_format_plan.variants:
-        if not getattr(variant, "format_aware_apply", False):
-            continue
-        value = getattr(variant.matrix_format, "value", str(variant.matrix_format)).lower()
-        if value not in formats:
-            formats.append(value)
-    return tuple(formats)
-
-
-def _sfem_soa_format_aware_apply_public_wrappers(function_name, wrapper_params, matrix_format_plan):
-    formats = _format_aware_apply_formats_from_plan(matrix_format_plan)
-    if not formats:
-        return []
-
-    wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
-    lines = []
-    for matrix_format in formats:
-        formatted_name = function_name.replace(
-            "_apply_",
-            "_%s_apply_" % matrix_format,
-        )
-        if formatted_name == function_name:
-            continue
-        for scalar_type, suffix in (("double", ""), ("float", "_float")):
-            concrete_params = _sfem_soa_concrete_scalar_params(wrapper_params, scalar_type)
-            lines.append('extern "C" int %s%s(' % (formatted_name, suffix))
-            for idx, param in enumerate(concrete_params):
-                comma = "," if idx + 1 < len(concrete_params) else ""
-                lines.append("        %s%s" % (param, comma))
-            lines.extend(
-                [
-                    ") {",
-                    "    return %s%s(%s);"
-                    % (function_name, suffix, ", ".join(wrapper_args)),
-                    "}",
-                    "",
-                ]
-            )
     return lines
 
 
@@ -4956,19 +4903,11 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "            }",
             "        }",
             "",
-            "        if constexpr (FORMAT == 1) {",
-            "            invalid_matrix_graph |= (%s_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);" % function_base,
-            "        } else if constexpr (FORMAT == 0) {",
-            "            invalid_matrix_graph |= (%s_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);" % function_base,
-            "        } else if constexpr (FORMAT == 2) {",
-            "            invalid_matrix_graph |= (%s_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values) != SFEM_SUCCESS);" % function_base,
-            "        } else if constexpr (FORMAT == 3) {",
-            "            invalid_matrix_graph |= (%s_scatter_coo(ev, element_matrix, coo_nnz, coo_rows, coo_cols, values) != SFEM_SUCCESS);" % function_base,
-            "        } else if constexpr (FORMAT == 5) {",
-            "            %s_scatter_coo_triplets(ev, element_matrix, element, coo_triplet_rows, coo_triplet_cols, values);" % function_base,
-            "        } else {",
-            "            invalid_matrix_graph |= (%s_scatter_patch(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);" % function_base,
-            "        }",
+        ]
+    )
+    lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "        "))
+    lines.extend(
+        [
             "    }",
             "",
             "    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;",
@@ -5378,10 +5317,78 @@ def _packed_crs_passes(matrix_format_plan):
     return tuple(passes)
 
 
+def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
+    cases = (
+        (
+            "bsr",
+            1,
+            "invalid_matrix_graph |= (%s_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);"
+            % function_base,
+        ),
+        (
+            "crs",
+            0,
+            "invalid_matrix_graph |= (%s_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);"
+            % function_base,
+        ),
+        (
+            "dia",
+            2,
+            "invalid_matrix_graph |= (%s_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values) != SFEM_SUCCESS);"
+            % function_base,
+        ),
+        (
+            "coo",
+            3,
+            "invalid_matrix_graph |= (%s_scatter_coo(ev, element_matrix, coo_nnz, coo_rows, coo_cols, values) != SFEM_SUCCESS);"
+            % function_base,
+        ),
+        (
+            "coo",
+            5,
+            "%s_scatter_coo_triplets(ev, element_matrix, element, coo_triplet_rows, coo_triplet_cols, values);"
+            % function_base,
+        ),
+        (
+            "patch",
+            4,
+            "invalid_matrix_graph |= (%s_scatter_patch(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);"
+            % function_base,
+        ),
+    )
+
+    lines = []
+    first = True
+    for matrix_format, format_id, statement in cases:
+        if matrix_format not in formats:
+            continue
+        keyword = "if" if first else "} else if"
+        lines.append("%s%s constexpr (FORMAT == %d) {" % (indent, keyword, format_id))
+        lines.append("%s    %s" % (indent, statement))
+        first = False
+    if first:
+        lines.append("%sinvalid_matrix_graph |= 1;" % indent)
+        return lines
+    lines.extend(
+        [
+            "%s} else {" % indent,
+            "%s    invalid_matrix_graph |= 1;" % indent,
+            "%s}" % indent,
+        ]
+    )
+    return lines
+
+
 def _sfem_soa_hessian_matrix_public_function_base(prefix, quadrature_rule, geometry_mode):
+    element = quadrature_rule.element_type.lower()
+    if _sfem_soa_prefix_has_element_suffix(prefix, element):
+        return "%s_hessian_%s_mesh_soa" % (
+            prefix,
+            geometry_mode,
+        )
     return "%s_%s_hessian_%s_mesh_soa" % (
         prefix,
-        quadrature_rule.element_type.lower(),
+        element,
         geometry_mode,
     )
 
@@ -6451,18 +6458,16 @@ def _sfem_soa_diagnostics_header(
         "        const double elapsed,",
         "        const ptrdiff_t nelements,",
         "        const ptrdiff_t ndofs,",
-        "        const int repeat,",
         "        const double ai,",
         "        const double total_flops) {",
-        "    const double seconds_per_call = repeat > 0 ? elapsed / (double)repeat : 0.0;",
-        "    const double element_rate = seconds_per_call > 0.0 ? 1e-6 * (double)nelements / seconds_per_call : 0.0;",
-        "    const double dof_rate = seconds_per_call > 0.0 ? 1e-6 * (double)ndofs / seconds_per_call : 0.0;",
-        "    const double gflops = seconds_per_call > 0.0",
-        "            ? 1e-9 * total_flops / seconds_per_call",
+        "    const double element_rate = elapsed > 0.0 ? 1e-6 * (double)nelements / elapsed : 0.0;",
+        "    const double dof_rate = elapsed > 0.0 ? 1e-6 * (double)ndofs / elapsed : 0.0;",
+        "    const double gflops = elapsed > 0.0",
+        "            ? 1e-9 * total_flops / elapsed",
         "            : 0.0;",
         '    printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f\\n",',
         "           name ? name : d->kernel_name,",
-        "           seconds_per_call, element_rate, dof_rate, ai, gflops);",
+        "           elapsed, element_rate, dof_rate, ai, gflops);",
         "}",
         "",
         "static %s void %s_print_rate(" % (inline_qualifier, struct_name),
@@ -6471,14 +6476,13 @@ def _sfem_soa_diagnostics_header(
         "        const double elapsed,",
         "        const ptrdiff_t nelements,",
         "        const ptrdiff_t ndofs,",
-        "        const int repeat,",
         "        const size_t scalar_bytes,",
         "        const size_t real_bytes,",
         "        const size_t accumulator_bytes) {",
         "    const double ai = %s_arithmetic_intensity(" % struct_name,
         "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
         "    const double total_flops = %s_total_flops(d, nelements);" % struct_name,
-        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);" % struct_name,
+        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
         "}",
         "",
         "static %s void %s_print_rate_affine_mesh(" % (inline_qualifier, struct_name),
@@ -6487,14 +6491,13 @@ def _sfem_soa_diagnostics_header(
         "        const double elapsed,",
         "        const ptrdiff_t nelements,",
         "        const ptrdiff_t ndofs,",
-        "        const int repeat,",
         "        const size_t scalar_bytes,",
         "        const size_t real_bytes,",
         "        const size_t accumulator_bytes) {",
         "    const double ai = %s_arithmetic_intensity_affine_mesh(" % struct_name,
         "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
         "    const double total_flops = %s_total_flops_affine_mesh(d, nelements);" % struct_name,
-        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);" % struct_name,
+        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
         "}",
         "",
         "static %s void %s_print_rate_isoparametric_mesh(" % (inline_qualifier, struct_name),
@@ -6503,14 +6506,13 @@ def _sfem_soa_diagnostics_header(
         "        const double elapsed,",
         "        const ptrdiff_t nelements,",
         "        const ptrdiff_t ndofs,",
-        "        const int repeat,",
         "        const size_t scalar_bytes,",
         "        const size_t real_bytes,",
         "        const size_t accumulator_bytes) {",
         "    const double ai = %s_arithmetic_intensity_isoparametric_mesh(" % struct_name,
         "            d, nelements, scalar_bytes, real_bytes, accumulator_bytes);",
         "    const double total_flops = %s_total_flops_isoparametric_mesh(d, nelements);" % struct_name,
-        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);" % struct_name,
+        "    %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
         "}",
         "",
         "} // namespace codegen",
@@ -6533,12 +6535,11 @@ def _sfem_soa_diagnostic_print_wrapper_lines(
         'extern "C" void %s(' % public_name,
         "        const double elapsed,",
         "        const ptrdiff_t nelements,",
-        "        const ptrdiff_t ndofs,",
-        "        const int repeat) {",
+        "        const ptrdiff_t ndofs) {",
         "    sfem::codegen::%s(" % print_rate_helper,
         '            "%s%s",' % (function_name, suffix),
         "            &sfem::codegen::%s," % variable_name,
-        "            elapsed, nelements, ndofs, repeat,",
+        "            elapsed, nelements, ndofs,",
         "            sizeof(%s), sizeof(%s), sizeof(%s));"
         % (scalar_type, scalar_type, scalar_type),
         "}",
@@ -6992,9 +6993,12 @@ def _sfem_soa_mesh_reference_alias_lines(
 def _sfem_soa_public_function_name(prefix, form_name, quadrature_rule):
     if quadrature_rule is None:
         return "%s_%s_soa" % (prefix, form_name)
+    element = quadrature_rule.element_type.lower()
+    if _sfem_soa_prefix_has_element_suffix(prefix, element):
+        return "%s_%s_soa" % (prefix, form_name)
     return "%s_%s_%s_soa" % (
         prefix,
-        quadrature_rule.element_type.lower(),
+        element,
         form_name,
     )
 
@@ -7002,9 +7006,12 @@ def _sfem_soa_public_function_name(prefix, form_name, quadrature_rule):
 def _sfem_soa_isoparametric_public_function_name(prefix, form_name, quadrature_rule):
     if quadrature_rule is None:
         return "%s_%s_isoparametric_soa" % (prefix, form_name)
+    element = quadrature_rule.element_type.lower()
+    if _sfem_soa_prefix_has_element_suffix(prefix, element):
+        return "%s_%s_isoparametric_soa" % (prefix, form_name)
     return "%s_%s_%s_isoparametric_soa" % (
         prefix,
-        quadrature_rule.element_type.lower(),
+        element,
         form_name,
     )
 
@@ -7012,12 +7019,19 @@ def _sfem_soa_isoparametric_public_function_name(prefix, form_name, quadrature_r
 def _sfem_soa_mesh_public_function_name(prefix, form_name, quadrature_rule, geometry_mode):
     if quadrature_rule is None:
         return "%s_%s_%s_mesh_soa" % (prefix, form_name, geometry_mode)
+    element = quadrature_rule.element_type.lower()
+    if _sfem_soa_prefix_has_element_suffix(prefix, element):
+        return "%s_%s_%s_mesh_soa" % (prefix, form_name, geometry_mode)
     return "%s_%s_%s_%s_mesh_soa" % (
         prefix,
-        quadrature_rule.element_type.lower(),
+        element,
         form_name,
         geometry_mode,
     )
+
+
+def _sfem_soa_prefix_has_element_suffix(prefix, element):
+    return str(prefix).lower().endswith("_%s" % str(element).lower())
 
 
 def _cpp_scalar_initializer_list(values, scalar_type="real_t"):

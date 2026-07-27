@@ -16,7 +16,6 @@ struct sfem_MatrixAssemblyDiagnostics {
     const char *structural_compatibility;
     const char *reduction_policy;
     int node_index_filter;
-    int format_aware_apply;
     int row_block_size;
     int column_block_size;
     int block_size;
@@ -60,7 +59,7 @@ static inline void MatrixAssemblyDiagnostics_print(
         const MatrixAssemblyDiagnostics *const d,
         const ptrdiff_t nelements) {
     std::printf(
-            "%s format=%s mesh=%s pass=%s access=%s layout=%s index=%s values=%s accum=%s compat=%s reduce=%s indexed=%d apply=%d block=%d rows=%td cols=%td entries=%td bytes=%zu ai=%g\n",
+            "%s format=%s mesh=%s pass=%s access=%s layout=%s index=%s values=%s accum=%s compat=%s reduce=%s indexed=%d block=%d rows=%td cols=%td entries=%td bytes=%zu ai=%g\n",
             name,
             d->format,
             d->mesh_layout,
@@ -73,7 +72,6 @@ static inline void MatrixAssemblyDiagnostics_print(
             d->structural_compatibility,
             d->reduction_policy,
             d->node_index_filter,
-            d->format_aware_apply,
             d->block_size,
             d->row_dofs_per_element,
             d->column_dofs_per_element,

@@ -15,7 +15,6 @@ static const MatrixAssemblyDiagnostics saint_venant_kirchhoff_quad4_bsr_standard
     "requires_node_block_graph",
     "atomic_add",
     0,
-    1,
     2,
     2,
     2,

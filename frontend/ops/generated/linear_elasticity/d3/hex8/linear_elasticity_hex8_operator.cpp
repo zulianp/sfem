@@ -1,141 +1,123 @@
 #include "../../op/sfem_GeneratedLinearElasticity_c_abi.hpp"
 
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_proteus_hex8_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_hex8_apply_soa_diagnostics(
         void
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_proteus_hex8_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_hex8_gradient_soa_diagnostics(
         void
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_proteus_hex8_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_proteus_hex8_objective_soa_diagnostics(
         void
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_float_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_print_rate(
+extern "C" void linear_elasticity_proteus_hex8_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -160,7 +142,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -185,7 +167,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -201,7 +183,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_m
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -217,7 +199,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_m
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -249,7 +231,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_affine_m
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -281,7 +263,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_affine_m
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -304,7 +286,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_isoparam
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -327,7 +309,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_isoparam
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -365,7 +347,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -403,7 +385,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -432,7 +414,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -461,7 +443,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -486,7 +468,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -511,7 +493,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -527,7 +509,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametri
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -543,7 +525,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametri
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -575,7 +557,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_affin
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -607,7 +589,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_affin
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -630,7 +612,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_isopa
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -653,7 +635,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_isopa
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -691,7 +673,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_p
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -729,7 +711,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_p
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -758,7 +740,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_p
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -787,7 +769,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_p
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -809,7 +791,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -831,7 +813,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -844,7 +826,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametr
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -857,7 +839,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametr
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -885,7 +867,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affin
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -913,7 +895,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affin
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -932,7 +914,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isopa
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -951,7 +933,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isopa
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -986,7 +968,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packe
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1021,7 +1003,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packe
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1047,7 +1029,7 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packe
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1074,214 +1056,196 @@ extern "C" int linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packe
         float *const SFEM_RESTRICT value
 );
 
-extern "C" void linear_elasticity_hex8_hex8_apply_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_apply_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_hex8_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_hex8_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double linear_elasticity_hex8_hex8_apply_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_hex8_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return linear_elasticity_proteus_hex8_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_hex8_hex8_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_hex8_apply_soa_diagnostics(
         void
 ) {
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics();
+    return linear_elasticity_proteus_hex8_apply_soa_diagnostics();
 }
 
-extern "C" void linear_elasticity_hex8_hex8_apply_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_apply_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_apply_soa_print_rate(
+extern "C" void linear_elasticity_hex8_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_apply_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_gradient_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_hex8_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_hex8_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double linear_elasticity_hex8_hex8_gradient_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_hex8_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return linear_elasticity_proteus_hex8_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_hex8_hex8_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_hex8_gradient_soa_diagnostics(
         void
 ) {
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics();
+    return linear_elasticity_proteus_hex8_gradient_soa_diagnostics();
 }
 
-extern "C" void linear_elasticity_hex8_hex8_gradient_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_gradient_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_gradient_soa_print_rate(
+extern "C" void linear_elasticity_hex8_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_gradient_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_objective_affine_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_objective_affine_mesh_soa_print_rate(
+extern "C" void linear_elasticity_hex8_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void linear_elasticity_hex8_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double linear_elasticity_hex8_hex8_objective_soa_arithmetic_intensity(
+extern "C" double linear_elasticity_hex8_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return linear_elasticity_proteus_hex8_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_hex8_hex8_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * linear_elasticity_hex8_objective_soa_diagnostics(
         void
 ) {
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics();
+    return linear_elasticity_proteus_hex8_objective_soa_diagnostics();
 }
 
-extern "C" void linear_elasticity_hex8_hex8_objective_soa_float_print_rate(
+extern "C" void linear_elasticity_hex8_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_objective_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void linear_elasticity_hex8_hex8_objective_soa_print_rate(
+extern "C" void linear_elasticity_hex8_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    linear_elasticity_proteus_hex8_objective_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1316,10 +1280,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_affine_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1354,10 +1318,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_affine_mesh_soa_float(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1383,10 +1347,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1412,10 +1376,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa_float(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1457,10 +1421,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_packed_affine_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1502,10 +1466,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_packed_affine_mesh_soa_float(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1538,10 +1502,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_packed_isoparametric_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1574,10 +1538,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_packed_isoparametric_mesh_soa_f
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1625,10 +1589,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_packed_two_pass_affine_mesh_soa
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1676,10 +1640,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_packed_two_pass_affine_mesh_soa
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1718,10 +1682,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_packed_two_pass_isoparametric_m
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1760,10 +1724,10 @@ extern "C" int linear_elasticity_hex8_hex8_apply_packed_two_pass_isoparametric_m
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1798,10 +1762,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_affine_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1836,10 +1800,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_affine_mesh_soa_float(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1865,10 +1829,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1894,10 +1858,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa_float
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1939,10 +1903,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_packed_affine_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1984,10 +1948,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_packed_affine_mesh_soa_float
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2020,10 +1984,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_packed_isoparametric_mesh_so
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2056,10 +2020,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_packed_isoparametric_mesh_so
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2107,10 +2071,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_packed_two_pass_affine_mesh_
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2158,10 +2122,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_packed_two_pass_affine_mesh_
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2200,10 +2164,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_packed_two_pass_isoparametri
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2242,10 +2206,10 @@ extern "C" int linear_elasticity_hex8_hex8_gradient_packed_two_pass_isoparametri
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return linear_elasticity_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2277,10 +2241,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_affine_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
+    return linear_elasticity_proteus_hex8_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2312,10 +2276,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_affine_mesh_soa_float(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
+    return linear_elasticity_proteus_hex8_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2338,10 +2302,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
+    return linear_elasticity_proteus_hex8_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2364,10 +2328,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa_floa
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
+    return linear_elasticity_proteus_hex8_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_steps_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2405,10 +2369,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_steps_affine_mesh_soa(
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_steps_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2446,10 +2410,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_steps_affine_mesh_soa_float
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_steps_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2478,10 +2442,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_steps_isoparametric_mesh_so
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return linear_elasticity_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2510,10 +2474,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_steps_isoparametric_mesh_so
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return linear_elasticity_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_steps_packed_affine_mesh_soa(
+extern "C" int linear_elasticity_hex8_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2558,10 +2522,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_steps_packed_affine_mesh_so
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return linear_elasticity_proteus_hex8_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2606,10 +2570,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_steps_packed_affine_mesh_so
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return linear_elasticity_proteus_hex8_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int linear_elasticity_hex8_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2645,10 +2609,10 @@ extern "C" int linear_elasticity_hex8_hex8_objective_steps_packed_isoparametric_
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return linear_elasticity_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int linear_elasticity_hex8_hex8_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int linear_elasticity_hex8_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2684,5 +2648,5 @@ extern "C" int linear_elasticity_hex8_hex8_objective_steps_packed_isoparametric_
         elements[7],
         elements[6]
     };
-    return linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return linear_elasticity_proteus_hex8_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }

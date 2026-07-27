@@ -97,8 +97,8 @@ struct saint_venant_kirchhoff_tri6_isoparametric_reference_data {
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data = {
-    "saint_venant_kirchhoff_tri6_tri6_objective_soa",
+static const KernelDiagnostics saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data = {
+    "saint_venant_kirchhoff_tri6_objective_soa",
     "TRI6",
     2,
     6,
@@ -144,87 +144,81 @@ static const KernelDiagnostics saint_venant_kirchhoff_tri6_tri6_objective_soa_di
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics(void) {
-    return &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_objective_soa_diagnostics(void) {
+    return &sfem::codegen::saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data;
 }
 
-extern "C" double saint_venant_kirchhoff_tri6_tri6_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri6_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "saint_venant_kirchhoff_tri6_tri6_objective_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_objective_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "saint_venant_kirchhoff_tri6_tri6_objective_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_objective_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_objective_affine_mesh_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_objective_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -233,7 +227,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_impl(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -322,7 +316,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_so
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -338,10 +332,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa(
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -357,7 +351,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_float(
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
 
@@ -365,7 +359,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_objective_steps_affine_mesh_soa_impl(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_objective_steps_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -475,7 +469,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_objective_steps_affine_m
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -496,10 +490,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_affine_mesh_soa(
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -520,13 +514,13 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_affine_mesh_soa_
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -662,7 +656,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_packed_affine_me
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -806,7 +800,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -947,7 +941,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -959,10 +953,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa
         const double *const SFEM_RESTRICT uy,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -974,7 +968,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa
         const float *const SFEM_RESTRICT uy,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value);
 }
 
 
@@ -982,7 +976,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_objective_steps_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_objective_steps_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1144,7 +1138,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_objective_steps_isoparam
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1161,10 +1155,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_isoparametric_me
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1181,13 +1175,13 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_isoparametric_me
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1373,7 +1367,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_packed_isoparame
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1566,8 +1560,8 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_objective_steps_packed_isoparame
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data = {
-    "saint_venant_kirchhoff_tri6_tri6_gradient_soa",
+static const KernelDiagnostics saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data = {
+    "saint_venant_kirchhoff_tri6_gradient_soa",
     "TRI6",
     2,
     6,
@@ -1613,87 +1607,81 @@ static const KernelDiagnostics saint_venant_kirchhoff_tri6_tri6_gradient_soa_dia
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics(void) {
-    return &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_gradient_soa_diagnostics(void) {
+    return &sfem::codegen::saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data;
 }
 
-extern "C" double saint_venant_kirchhoff_tri6_tri6_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri6_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "saint_venant_kirchhoff_tri6_tri6_gradient_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_gradient_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "saint_venant_kirchhoff_tri6_tri6_gradient_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_gradient_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_gradient_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -1702,7 +1690,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_impl(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1807,7 +1795,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1825,10 +1813,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1846,13 +1834,13 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1999,7 +1987,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_affine_mesh_soa(
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2146,7 +2134,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_affine_mesh_soa_
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2310,7 +2298,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_two_pass_affine_
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2482,7 +2470,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2639,7 +2627,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_m
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2653,10 +2641,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2670,13 +2658,13 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2873,7 +2861,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_isoparametric_me
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3070,7 +3058,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_isoparametric_me
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3284,7 +3272,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_two_pass_isopara
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3505,8 +3493,8 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_gradient_packed_two_pass_isopara
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data = {
-    "saint_venant_kirchhoff_tri6_tri6_apply_soa",
+static const KernelDiagnostics saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data = {
+    "saint_venant_kirchhoff_tri6_apply_soa",
     "TRI6",
     2,
     6,
@@ -3552,87 +3540,81 @@ static const KernelDiagnostics saint_venant_kirchhoff_tri6_tri6_apply_soa_diagno
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics(void) {
-    return &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_apply_soa_diagnostics(void) {
+    return &sfem::codegen::saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data;
 }
 
-extern "C" double saint_venant_kirchhoff_tri6_tri6_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri6_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "saint_venant_kirchhoff_tri6_tri6_apply_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_apply_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
-            "saint_venant_kirchhoff_tri6_tri6_apply_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_apply_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_apply_affine_mesh_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_float",
-            &sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            "saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_float",
+            &sfem::codegen::saint_venant_kirchhoff_tri6_apply_soa_diagnostics_data,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -3641,7 +3623,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_impl(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3756,7 +3738,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_im
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3777,10 +3759,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3801,13 +3783,13 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3969,7 +3951,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_affine_mesh_soa(
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4131,7 +4113,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_affine_mesh_soa_flo
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4310,7 +4292,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_two_pass_affine_mes
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4492,60 +4474,12 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_two_pass_affine_mes
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_bsr_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-) {
-    return saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-}
-
-extern "C" int saint_venant_kirchhoff_tri6_tri6_bsr_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-) {
-    return saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-}
-
 
 namespace sfem {
 namespace codegen {
 
 template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_impl(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4712,7 +4646,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4729,10 +4663,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -4749,13 +4683,13 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_flo
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -4967,7 +4901,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_isoparametric_mesh_
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5179,7 +5113,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_isoparametric_mesh_
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5408,7 +5342,7 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_two_pass_isoparamet
     return SFEM_SUCCESS;
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -5640,51 +5574,11 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_apply_packed_two_pass_isoparamet
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_bsr_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-) {
-    return saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-}
-
-extern "C" int saint_venant_kirchhoff_tri6_tri6_bsr_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-) {
-    return saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-}
-
 
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_find_cols(
+static SFEM_INLINE void saint_venant_kirchhoff_tri6_hessian_isoparametric_mesh_soa_find_cols(
         const idx_t *const SFEM_RESTRICT targets,
         const idx_t *const SFEM_RESTRICT row,
         const int lenrow,
@@ -5702,7 +5596,7 @@ static SFEM_INLINE void saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_m
 }
 
 template <typename scalar_t>
-static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_scatter_bsr(
+static SFEM_INLINE int saint_venant_kirchhoff_tri6_hessian_isoparametric_mesh_soa_scatter_bsr(
         const idx_t *const SFEM_RESTRICT ev,
         const scalar_t *const SFEM_RESTRICT element_matrix,
         const count_t *const SFEM_RESTRICT rowptr,
@@ -5718,11 +5612,11 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_me
         const count_t row_begin = rowptr[dof_i];
         const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
         const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
-        saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
+        saint_venant_kirchhoff_tri6_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
         for (int j = 0; j < N_SHAPE; ++j) {
             if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {
                 if (valid_block_graph) {
-                    std::fprintf(stderr, "saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_scatter_bsr missing block graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
+                    std::fprintf(stderr, "saint_venant_kirchhoff_tri6_hessian_isoparametric_mesh_soa_scatter_bsr missing block graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
                 }
                 entries[i * N_SHAPE + j] = row_begin;
                 valid_block_graph = false;
@@ -5749,7 +5643,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_me
 }
 
 template <typename scalar_t, typename geometry_t, int FORMAT>
-static int saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_assemble_impl(
+static int saint_venant_kirchhoff_tri6_hessian_isoparametric_mesh_soa_assemble_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5897,17 +5791,9 @@ static int saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_assem
         }
 
         if constexpr (FORMAT == 1) {
-            invalid_matrix_graph |= (saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
-        } else if constexpr (FORMAT == 0) {
-            invalid_matrix_graph |= (saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
-        } else if constexpr (FORMAT == 2) {
-            invalid_matrix_graph |= (saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values) != SFEM_SUCCESS);
-        } else if constexpr (FORMAT == 3) {
-            invalid_matrix_graph |= (saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_scatter_coo(ev, element_matrix, coo_nnz, coo_rows, coo_cols, values) != SFEM_SUCCESS);
-        } else if constexpr (FORMAT == 5) {
-            saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_scatter_coo_triplets(ev, element_matrix, element, coo_triplet_rows, coo_triplet_cols, values);
+            invalid_matrix_graph |= (saint_venant_kirchhoff_tri6_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
         } else {
-            invalid_matrix_graph |= (saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_scatter_patch(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
+            invalid_matrix_graph |= 1;
         }
     }
 
@@ -5917,7 +5803,7 @@ static int saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_assem
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int saint_venant_kirchhoff_tri6_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5931,10 +5817,10 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_hessian_bsr_isoparametric_mesh_s
         const idx_t *const SFEM_RESTRICT colidx,
         double *const SFEM_RESTRICT values
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
 
-extern "C" int saint_venant_kirchhoff_tri6_tri6_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int saint_venant_kirchhoff_tri6_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -5948,5 +5834,5 @@ extern "C" int saint_venant_kirchhoff_tri6_tri6_hessian_bsr_isoparametric_mesh_s
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 ) {
-    return sfem::codegen::saint_venant_kirchhoff_tri6_tri6_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    return sfem::codegen::saint_venant_kirchhoff_tri6_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }

@@ -761,196 +761,6 @@ extern "C" int saint_venant_kirchhoff_apply_packed_two_pass_3d_isoparametric_mes
         float *const SFEM_RESTRICT outz
 );
 
-extern "C" int saint_venant_kirchhoff_bsr_apply_2d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-
-extern "C" int saint_venant_kirchhoff_bsr_apply_2d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-);
-
-extern "C" int saint_venant_kirchhoff_bsr_apply_2d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-
-extern "C" int saint_venant_kirchhoff_bsr_apply_2d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-);
-
-extern "C" int saint_venant_kirchhoff_bsr_apply_3d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-
-extern "C" int saint_venant_kirchhoff_bsr_apply_3d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-
-extern "C" int saint_venant_kirchhoff_bsr_apply_3d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-
-extern "C" int saint_venant_kirchhoff_bsr_apply_3d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-
 extern "C" int saint_venant_kirchhoff_gradient_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
         const ptrdiff_t nelements,
@@ -1663,137 +1473,81 @@ extern "C" int saint_venant_kirchhoff_hessian_bsr_3d_isoparametric_mesh_soa_floa
         float *const SFEM_RESTRICT values
 );
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_hex27_hex27_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_hex27_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex27_hex27_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex27_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_hex27_hex27_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_hex27_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex27_hex27_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex27_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex27_hex27_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_hex27_hex27_objective_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_hex27_hex27_objective_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_hex27_hex27_objective_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_hex27_hex27_objective_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" double saint_venant_kirchhoff_hex27_hex27_objective_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes);
-
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex27_hex27_objective_soa_diagnostics(void);
-
-extern "C" void saint_venant_kirchhoff_hex27_hex27_objective_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_hex27_hex27_objective_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -1801,143 +1555,163 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_hex27_ma
 
 extern "C" int saint_venant_kirchhoff_hex27_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_hex8_hex8_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_hex27_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex8_hex8_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex27_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex27_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_hex8_hex8_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_hex8_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex8_hex8_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex8_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_hex8_hex8_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_hex8_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex8_hex8_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex8_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_hex8_hex8_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_hex8_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_hex8_matrix_assembly_variant(const int variant);
 
 extern "C" int saint_venant_kirchhoff_hex8_matrix_assembly_variant_count();
+
+extern "C" void saint_venant_kirchhoff_hex8_objective_affine_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_hex8_objective_affine_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_hex8_objective_isoparametric_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_hex8_objective_isoparametric_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" double saint_venant_kirchhoff_hex8_objective_soa_arithmetic_intensity(
+        const ptrdiff_t nelements,
+        const size_t scalar_bytes,
+        const size_t real_bytes,
+        const size_t accumulator_bytes);
+
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_hex8_objective_soa_diagnostics(void);
+
+extern "C" void saint_venant_kirchhoff_hex8_objective_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_hex8_objective_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
 
 extern "C" int saint_venant_kirchhoff_objective_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -2509,143 +2283,201 @@ extern "C" int saint_venant_kirchhoff_objective_steps_packed_3d_isoparametric_me
         float *const SFEM_RESTRICT value
 );
 
+extern "C" void saint_venant_kirchhoff_proteus_hex27_apply_affine_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_apply_affine_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" double saint_venant_kirchhoff_proteus_hex27_apply_soa_arithmetic_intensity(
+        const ptrdiff_t nelements,
+        const size_t scalar_bytes,
+        const size_t real_bytes,
+        const size_t accumulator_bytes);
+
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex27_apply_soa_diagnostics(void);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_apply_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_apply_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_gradient_affine_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" double saint_venant_kirchhoff_proteus_hex27_gradient_soa_arithmetic_intensity(
+        const ptrdiff_t nelements,
+        const size_t scalar_bytes,
+        const size_t real_bytes,
+        const size_t accumulator_bytes);
+
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex27_gradient_soa_diagnostics(void);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_gradient_soa_float_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
+extern "C" void saint_venant_kirchhoff_proteus_hex27_gradient_soa_print_rate(
+        const double elapsed,
+        const ptrdiff_t nelements,
+        const ptrdiff_t ndofs);
+
 extern "C" void saint_venant_kirchhoff_proteus_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_proteus_hex27_matrix_assembly_variant(const int variant);
 
 extern "C" int saint_venant_kirchhoff_proteus_hex27_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex27_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex27_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex27_proteus_hex27_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_hex27_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex27_proteus_hex27_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex27_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex27_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex27_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex27_proteus_hex27_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_hex64_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex27_proteus_hex27_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex64_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex27_proteus_hex27_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_hex64_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex27_proteus_hex27_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex64_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex27_proteus_hex27_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_proteus_hex64_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -2653,137 +2485,119 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_proteus_
 
 extern "C" int saint_venant_kirchhoff_proteus_hex64_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex64_proteus_hex64_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_hex64_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex64_proteus_hex64_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex64_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex64_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex64_proteus_hex64_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_hex8_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex64_proteus_hex64_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex8_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex64_proteus_hex64_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_hex8_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex64_proteus_hex64_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex8_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex64_proteus_hex64_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -2791,137 +2605,119 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_proteus_
 
 extern "C" int saint_venant_kirchhoff_proteus_hex8_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex8_proteus_hex8_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_hex8_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex8_proteus_hex8_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex8_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_hex8_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex8_proteus_hex8_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_quad4_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex8_proteus_hex8_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_quad4_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_hex8_proteus_hex8_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_quad4_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_hex8_proteus_hex8_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_quad4_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_hex8_proteus_hex8_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -2929,137 +2725,119 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_proteus_
 
 extern "C" int saint_venant_kirchhoff_proteus_quad4_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_proteus_quad4_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_quad4_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_proteus_quad4_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_quad4_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_quad4_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_quad4_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_quad4_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_proteus_quad4_proteus_quad4_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -3067,137 +2845,119 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_quad4_ma
 
 extern "C" int saint_venant_kirchhoff_quad4_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_quad4_quad4_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_quad4_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_quad4_quad4_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_quad4_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_quad4_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_quad4_quad4_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tet10_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_quad4_quad4_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet10_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_quad4_quad4_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tet10_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_quad4_quad4_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet10_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_quad4_quad4_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -3205,137 +2965,119 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_tet10_ma
 
 extern "C" int saint_venant_kirchhoff_tet10_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tet10_tet10_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tet10_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet10_tet10_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet10_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet10_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tet10_tet10_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tet4_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet10_tet10_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet4_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tet10_tet10_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tet4_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet10_tet10_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet4_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet10_tet10_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -3343,137 +3085,119 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_tet4_mat
 
 extern "C" int saint_venant_kirchhoff_tet4_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tet4_tet4_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tet4_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet4_tet4_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet4_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tet4_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tet4_tet4_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri3_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet4_tet4_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri3_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tet4_tet4_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri3_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tet4_tet4_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri3_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tet4_tet4_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -3481,137 +3205,119 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_tri3_mat
 
 extern "C" int saint_venant_kirchhoff_tri3_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tri3_tri3_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri3_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri3_tri3_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri3_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri3_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_gradient_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tri3_tri3_gradient_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri6_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri3_tri3_gradient_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_apply_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_gradient_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_gradient_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_objective_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_objective_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tri3_tri3_objective_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri6_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri3_tri3_objective_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_gradient_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_objective_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri3_tri3_objective_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void saint_venant_kirchhoff_tri6_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
@@ -3619,134 +3325,40 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *saint_venant_kirchhoff_tri6_mat
 
 extern "C" int saint_venant_kirchhoff_tri6_matrix_assembly_variant_count();
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_affine_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" double saint_venant_kirchhoff_tri6_tri6_apply_soa_arithmetic_intensity(
+extern "C" double saint_venant_kirchhoff_tri6_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes);
 
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_tri6_apply_soa_diagnostics(void);
+extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_objective_soa_diagnostics(void);
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_soa_float_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
-extern "C" void saint_venant_kirchhoff_tri6_tri6_apply_soa_print_rate(
+extern "C" void saint_venant_kirchhoff_tri6_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" double saint_venant_kirchhoff_tri6_tri6_gradient_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes);
-
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_tri6_gradient_soa_diagnostics(void);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_gradient_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" double saint_venant_kirchhoff_tri6_tri6_objective_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes);
-
-extern "C" const sfem::codegen::KernelDiagnostics *saint_venant_kirchhoff_tri6_tri6_objective_soa_diagnostics(void);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
-
-extern "C" void saint_venant_kirchhoff_tri6_tri6_objective_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);

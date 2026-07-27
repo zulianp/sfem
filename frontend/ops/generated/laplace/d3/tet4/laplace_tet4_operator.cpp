@@ -173,72 +173,66 @@ extern "C" double laplace_tet4_residual_element_soa_arithmetic_intensity(
 extern "C" void laplace_tet4_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "laplace_tet4_residual_element_soa",
             &sfem::codegen::laplace_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void laplace_tet4_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "laplace_tet4_residual_element_soa_float",
             &sfem::codegen::laplace_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void laplace_tet4_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "laplace_tet4_residual_affine_mesh_soa",
             &sfem::codegen::laplace_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void laplace_tet4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "laplace_tet4_residual_affine_mesh_soa_float",
             &sfem::codegen::laplace_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void laplace_tet4_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "laplace_tet4_residual_isoparametric_mesh_soa",
             &sfem::codegen::laplace_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void laplace_tet4_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "laplace_tet4_residual_isoparametric_mesh_soa_float",
             &sfem::codegen::laplace_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -309,24 +303,22 @@ extern "C" double laplace_tet4_jacobian_u_u_arithmetic_intensity(
 extern "C" void laplace_tet4_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "laplace_tet4_jacobian_u_u",
             &sfem::codegen::laplace_tet4_jacobian_u_u_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void laplace_tet4_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "laplace_tet4_jacobian_u_u_float",
             &sfem::codegen::laplace_tet4_jacobian_u_u_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -397,72 +389,66 @@ extern "C" double laplace_tet4_jacobian_action_element_soa_arithmetic_intensity(
 extern "C" void laplace_tet4_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "laplace_tet4_jacobian_action_element_soa",
             &sfem::codegen::laplace_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void laplace_tet4_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "laplace_tet4_jacobian_action_element_soa_float",
             &sfem::codegen::laplace_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void laplace_tet4_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "laplace_tet4_jacobian_action_affine_mesh_soa",
             &sfem::codegen::laplace_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void laplace_tet4_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "laplace_tet4_jacobian_action_affine_mesh_soa_float",
             &sfem::codegen::laplace_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void laplace_tet4_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "laplace_tet4_jacobian_action_isoparametric_mesh_soa",
             &sfem::codegen::laplace_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void laplace_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "laplace_tet4_jacobian_action_isoparametric_mesh_soa_float",
             &sfem::codegen::laplace_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 

@@ -1,9 +1,11 @@
 #include <type_traits>
 #include <cstdint>
 #include <cstdlib>
+#include <string.h>
 #include "../two_phase_flow_d3_tensor_product_local.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
+#include "../../../packed_thread_scratch.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -153,72 +155,66 @@ extern "C" double two_phase_flow_proteus_hex8_residual_element_soa_arithmetic_in
 extern "C" void two_phase_flow_proteus_hex8_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_residual_element_soa",
             &sfem::codegen::two_phase_flow_proteus_hex8_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_residual_element_soa_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_proteus_hex8_residual_affine_mesh_soa",
             &sfem::codegen::two_phase_flow_proteus_hex8_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_proteus_hex8_residual_affine_mesh_soa_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa",
             &sfem::codegen::two_phase_flow_proteus_hex8_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_proteus_hex8_residual_isoparametric_mesh_soa_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -289,24 +285,22 @@ extern "C" double two_phase_flow_proteus_hex8_jacobian_p_w_p_w_arithmetic_intens
 extern "C" void two_phase_flow_proteus_hex8_jacobian_p_w_p_w_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_p_w_p_w",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_p_w_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_p_w_p_w_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_p_w_p_w_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_p_w_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -377,24 +371,22 @@ extern "C" double two_phase_flow_proteus_hex8_jacobian_p_w_p_c_arithmetic_intens
 extern "C" void two_phase_flow_proteus_hex8_jacobian_p_w_p_c_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_p_w_p_c",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_p_w_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_p_w_p_c_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_p_w_p_c_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_p_w_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -465,24 +457,22 @@ extern "C" double two_phase_flow_proteus_hex8_jacobian_p_c_p_w_arithmetic_intens
 extern "C" void two_phase_flow_proteus_hex8_jacobian_p_c_p_w_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_p_c_p_w",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_p_c_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_p_c_p_w_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_p_c_p_w_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_p_c_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -553,24 +543,22 @@ extern "C" double two_phase_flow_proteus_hex8_jacobian_p_c_p_c_arithmetic_intens
 extern "C" void two_phase_flow_proteus_hex8_jacobian_p_c_p_c_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_p_c_p_c",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_p_c_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_p_c_p_c_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_p_c_p_c_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_p_c_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -641,72 +629,66 @@ extern "C" double two_phase_flow_proteus_hex8_jacobian_action_element_soa_arithm
 extern "C" void two_phase_flow_proteus_hex8_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_action_element_soa",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_proteus_hex8_jacobian_action_element_soa_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_proteus_hex8_jacobian_action_affine_mesh_soa",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_proteus_hex8_jacobian_action_affine_mesh_soa_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_soa",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float",
             &sfem::codegen::two_phase_flow_proteus_hex8_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -1834,592 +1816,4 @@ extern "C" int two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_ao
         float *const SFEM_RESTRICT output
 ) {
     return two_phase_flow_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9], parameters[10], parameters[11], parameters[12], parameters[13], parameters[14], parameters[15], parameters[16], parameters[17], parameters[18], parameters[19], parameters[20], parameters[21], parameters[22], parameters[23], parameters[24], parameters[25], 2, current + 0, current + 1, 2, direction + 0, direction + 1, 2, output + 0, output + 1);
-}
-
-namespace sfem {
-namespace codegen {
-
-static SFEM_INLINE void two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_find_cols(
-        const idx_t *const SFEM_RESTRICT targets,
-        const idx_t *const SFEM_RESTRICT row,
-        const int lenrow,
-        idx_t *const SFEM_RESTRICT ks) {
-#pragma unroll(8)
-    for (int d = 0; d < 8; ++d) {
-        ks[d] = 0;
-    }
-    for (int k = 0; k < lenrow; ++k) {
-#pragma unroll(8)
-        for (int d = 0; d < 8; ++d) {
-            ks[d] += row[k] < targets[d];
-        }
-    }
-}
-
-template <typename scalar_t>
-static SFEM_INLINE int two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_scatter_crs(
-        const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t *const SFEM_RESTRICT element_matrix,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        scalar_t *const SFEM_RESTRICT values) {
-    static constexpr int N_SHAPE = 8;
-    static constexpr int N_FIELDS = 2;
-    static constexpr int N_ROW_STREAMS = 16;
-    static constexpr int N_COL_STREAMS = 16;
-    static constexpr int ROW_COMPONENT[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1};
-    static constexpr int ROW_SHAPE[16] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7};
-    static constexpr int COL_COMPONENT[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1};
-    static constexpr int COL_SHAPE[16] = {0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7};
-    count_t entries[N_SHAPE * N_SHAPE];
-    idx_t ks[N_SHAPE];
-    bool valid_graph = true;
-    for (int i = 0; i < N_SHAPE; ++i) {
-        const count_t row_begin = rowptr[ev[i]];
-        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);
-        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
-        two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
-        for (int j = 0; j < N_SHAPE; ++j) {
-            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {
-                if (valid_graph) {
-                    std::fprintf(stderr, "two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_scatter_crs missing graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
-                }
-                entries[i * N_SHAPE + j] = row_begin;
-                valid_graph = false;
-            } else {
-                entries[i * N_SHAPE + j] = row_begin + ks[j];
-            }
-        }
-    }
-    if (!valid_graph) return SFEM_FAILURE;
-    for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {
-        const int row_shape = ROW_SHAPE[row_stream];
-        const int bi = ROW_COMPONENT[row_stream];
-        for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {
-            const int col_shape = COL_SHAPE[col_stream];
-            const int bj = COL_COMPONENT[col_stream];
-            scalar_t *const block = &values[entries[row_shape * N_SHAPE + col_shape] * N_FIELDS * N_FIELDS];
-#pragma omp atomic update
-            block[bi * N_FIELDS + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];
-        }
-    }
-    return SFEM_SUCCESS;
-}
-
-template <typename scalar_t>
-static SFEM_INLINE int two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t C_ka1,
-        const scalar_t C_ka2,
-        const scalar_t C_kw1,
-        const scalar_t K_0,
-        const scalar_t K_1,
-        const scalar_t K_2,
-        const scalar_t K_3,
-        const scalar_t K_4,
-        const scalar_t K_5,
-        const scalar_t K_6,
-        const scalar_t K_7,
-        const scalar_t K_8,
-        const scalar_t M_c,
-        const scalar_t P_r,
-        const scalar_t R,
-        const scalar_t S_res,
-        const scalar_t T,
-        const scalar_t Z,
-        const scalar_t dt,
-        const scalar_t kappa_T,
-        const scalar_t m,
-        const scalar_t mu_c,
-        const scalar_t mu_w,
-        const scalar_t p_wr,
-        const scalar_t porosity,
-        const scalar_t rho_w0,
-        const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT p_w,
-        const scalar_t *const SFEM_RESTRICT p_c,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        scalar_t *const SFEM_RESTRICT values
-) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 8;
-    static constexpr int N_FIELDS = 2;
-    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
-    static constexpr int VECTOR_SIZE = 1;
-    (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::two_phase_flow_proteus_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::two_phase_flow_proteus_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::two_phase_flow_proteus_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
-
-    int invalid_matrix_graph = 0;
-#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)
-    for (ptrdiff_t element = 0; element < nelements; ++element) {
-        const ptrdiff_t evbegin = element;
-        const int nelems = 1;
-        idx_t ev[N_SHAPE];
-        scalar_t element_matrix[256];
-        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_current[N_STREAMS][VECTOR_SIZE];
-        scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
-        scalar_t block_output[N_STREAMS][VECTOR_SIZE];
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t node = elements[shape][element];
-            const idx_t coordinate_node = elements[shape][element];
-            ev[shape] = node;
-            for (int d = 0; d < DIM; ++d) {
-                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
-            }
-            block_current[0 * N_SHAPE + shape][0] = p_w[node * current_stride];
-            block_current[1 * N_SHAPE + shape][0] = p_c[node * current_stride];
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
-        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-
-        for (int entry = 0; entry < 256; ++entry) {
-            element_matrix[entry] = scalar_t(0);
-        }
-        for (int trial_local = 0; trial_local < 16; ++trial_local) {
-            const int trial = trial_local;
-            for (int stream = 0; stream < N_STREAMS; ++stream) {
-                block_direction[stream][0] = scalar_t(0);
-                block_output[stream][0] = scalar_t(0);
-            }
-            block_direction[trial][0] = scalar_t(1);
-            two_phase_flow_d3_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current, block_direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output);
-            for (int test_local = 0; test_local < 16; ++test_local) {
-                const int test = test_local;
-                element_matrix[test_local * 16 + trial_local] = block_output[test][0];
-            }
-        }
-
-        invalid_matrix_graph |= (two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
-    }
-
-    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double C_ka1,
-        const double C_ka2,
-        const double C_kw1,
-        const double K_0,
-        const double K_1,
-        const double K_2,
-        const double K_3,
-        const double K_4,
-        const double K_5,
-        const double K_6,
-        const double K_7,
-        const double K_8,
-        const double M_c,
-        const double P_r,
-        const double R,
-        const double S_res,
-        const double T,
-        const double Z,
-        const double dt,
-        const double kappa_T,
-        const double m,
-        const double mu_c,
-        const double mu_w,
-        const double p_wr,
-        const double porosity,
-        const double rho_w0,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, rowptr, colidx, values);
-}
-
-extern "C" int two_phase_flow_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double C_ka1,
-        const double C_ka2,
-        const double C_kw1,
-        const double K_0,
-        const double K_1,
-        const double K_2,
-        const double K_3,
-        const double K_4,
-        const double K_5,
-        const double K_6,
-        const double K_7,
-        const double K_8,
-        const double M_c,
-        const double P_r,
-        const double R,
-        const double S_res,
-        const double T,
-        const double Z,
-        const double dt,
-        const double kappa_T,
-        const double m,
-        const double mu_c,
-        const double mu_w,
-        const double p_wr,
-        const double porosity,
-        const double rho_w0,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, rowptr, colidx, values);
-}
-
-extern "C" int two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float C_ka1,
-        const float C_ka2,
-        const float C_kw1,
-        const float K_0,
-        const float K_1,
-        const float K_2,
-        const float K_3,
-        const float K_4,
-        const float K_5,
-        const float K_6,
-        const float K_7,
-        const float K_8,
-        const float M_c,
-        const float P_r,
-        const float R,
-        const float S_res,
-        const float T,
-        const float Z,
-        const float dt,
-        const float kappa_T,
-        const float m,
-        const float mu_c,
-        const float mu_w,
-        const float p_wr,
-        const float porosity,
-        const float rho_w0,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, rowptr, colidx, values);
-}
-
-extern "C" int two_phase_flow_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float C_ka1,
-        const float C_ka2,
-        const float C_kw1,
-        const float K_0,
-        const float K_1,
-        const float K_2,
-        const float K_3,
-        const float K_4,
-        const float K_5,
-        const float K_6,
-        const float K_7,
-        const float K_8,
-        const float M_c,
-        const float P_r,
-        const float R,
-        const float S_res,
-        const float T,
-        const float Z,
-        const float dt,
-        const float kappa_T,
-        const float m,
-        const float mu_c,
-        const float mu_w,
-        const float p_wr,
-        const float porosity,
-        const float rho_w0,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::two_phase_flow_proteus_hex8_hessian_crs_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, rowptr, colidx, values);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t>
-static SFEM_INLINE void two_phase_flow_proteus_hex8_hessian_coo_triplet_isoparametric_mesh_soa_scatter_coo_triplets(
-        const idx_t *const SFEM_RESTRICT ev,
-        const ptrdiff_t out_stride,
-        const scalar_t *const SFEM_RESTRICT element_matrix,
-        const ptrdiff_t element,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        scalar_t *const SFEM_RESTRICT values) {
-    static constexpr int N_SHAPE = 8;
-    static constexpr int N_FIELDS = 2;
-    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
-    const ptrdiff_t element_offset = element * N_STREAMS * N_STREAMS;
-    for (int row_field = 0; row_field < N_FIELDS; ++row_field) {
-        for (int row_shape = 0; row_shape < N_SHAPE; ++row_shape) {
-            const int row_stream = row_field * N_SHAPE + row_shape;
-            const idx_t global_row = ev[row_shape] * out_stride + row_field;
-            for (int col_field = 0; col_field < N_FIELDS; ++col_field) {
-                for (int col_shape = 0; col_shape < N_SHAPE; ++col_shape) {
-                    const int col_stream = col_field * N_SHAPE + col_shape;
-                    const ptrdiff_t entry = element_offset + row_stream * N_STREAMS + col_stream;
-                    rows[entry] = global_row;
-                    cols[entry] = ev[col_shape] * out_stride + col_field;
-                    values[entry] = element_matrix[row_stream * N_STREAMS + col_stream];
-                }
-            }
-        }
-    }
-}
-
-template <typename scalar_t>
-static SFEM_INLINE int two_phase_flow_proteus_hex8_hessian_coo_triplet_isoparametric_mesh_soa_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t C_ka1,
-        const scalar_t C_ka2,
-        const scalar_t C_kw1,
-        const scalar_t K_0,
-        const scalar_t K_1,
-        const scalar_t K_2,
-        const scalar_t K_3,
-        const scalar_t K_4,
-        const scalar_t K_5,
-        const scalar_t K_6,
-        const scalar_t K_7,
-        const scalar_t K_8,
-        const scalar_t M_c,
-        const scalar_t P_r,
-        const scalar_t R,
-        const scalar_t S_res,
-        const scalar_t T,
-        const scalar_t Z,
-        const scalar_t dt,
-        const scalar_t kappa_T,
-        const scalar_t m,
-        const scalar_t mu_c,
-        const scalar_t mu_w,
-        const scalar_t p_wr,
-        const scalar_t porosity,
-        const scalar_t rho_w0,
-        const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT p_w,
-        const scalar_t *const SFEM_RESTRICT p_c,
-        const ptrdiff_t out_stride,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        scalar_t *const SFEM_RESTRICT values
-) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 8;
-    static constexpr int N_FIELDS = 2;
-    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
-    static constexpr int VECTOR_SIZE = 1;
-    (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::two_phase_flow_proteus_hex8_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::two_phase_flow_proteus_hex8_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::two_phase_flow_proteus_hex8_isoparametric_reference_data<scalar_t>::q_weight_1d();
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t element = 0; element < nelements; ++element) {
-        const ptrdiff_t evbegin = element;
-        const int nelems = 1;
-        idx_t ev[N_SHAPE];
-        scalar_t element_matrix[N_STREAMS * N_STREAMS];
-        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_current[N_STREAMS][VECTOR_SIZE];
-        scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
-        scalar_t block_output[N_STREAMS][VECTOR_SIZE];
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t node = elements[shape][element];
-            const idx_t coordinate_node = elements[shape][element];
-            ev[shape] = node;
-            for (int d = 0; d < DIM; ++d) {
-                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
-            }
-            block_current[0 * N_SHAPE + shape][0] = p_w[node * current_stride];
-            block_current[1 * N_SHAPE + shape][0] = p_c[node * current_stride];
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
-        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
-
-        for (int entry = 0; entry < N_STREAMS * N_STREAMS; ++entry) {
-            element_matrix[entry] = scalar_t(0);
-        }
-        static constexpr int TENSOR_STREAMS[N_STREAMS] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-        for (int trial = 0; trial < N_STREAMS; ++trial) {
-            const int tensor_trial = TENSOR_STREAMS[trial];
-            for (int stream = 0; stream < N_STREAMS; ++stream) {
-                block_direction[stream][0] = scalar_t(0);
-                block_output[stream][0] = scalar_t(0);
-            }
-            block_direction[tensor_trial][0] = scalar_t(1);
-            two_phase_flow_d3_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current, block_direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, block_output);
-            for (int test = 0; test < N_STREAMS; ++test) {
-                const int tensor_test = TENSOR_STREAMS[test];
-                element_matrix[test * N_STREAMS + trial] = block_output[tensor_test][0];
-            }
-        }
-
-        two_phase_flow_proteus_hex8_hessian_coo_triplet_isoparametric_mesh_soa_scatter_coo_triplets(ev, out_stride, element_matrix, element, rows, cols, values);
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int two_phase_flow_proteus_hex8_hessian_coo_triplet_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double C_ka1,
-        const double C_ka2,
-        const double C_kw1,
-        const double K_0,
-        const double K_1,
-        const double K_2,
-        const double K_3,
-        const double K_4,
-        const double K_5,
-        const double K_6,
-        const double K_7,
-        const double K_8,
-        const double M_c,
-        const double P_r,
-        const double R,
-        const double S_res,
-        const double T,
-        const double Z,
-        const double dt,
-        const double kappa_T,
-        const double m,
-        const double mu_c,
-        const double mu_w,
-        const double p_wr,
-        const double porosity,
-        const double rho_w0,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT p_w,
-        const double *const SFEM_RESTRICT p_c,
-        const ptrdiff_t out_stride,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        double *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::two_phase_flow_proteus_hex8_hessian_coo_triplet_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, out_stride, rows, cols, values);
-}
-
-extern "C" int two_phase_flow_proteus_hex8_hessian_coo_triplet_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float C_ka1,
-        const float C_ka2,
-        const float C_kw1,
-        const float K_0,
-        const float K_1,
-        const float K_2,
-        const float K_3,
-        const float K_4,
-        const float K_5,
-        const float K_6,
-        const float K_7,
-        const float K_8,
-        const float M_c,
-        const float P_r,
-        const float R,
-        const float S_res,
-        const float T,
-        const float Z,
-        const float dt,
-        const float kappa_T,
-        const float m,
-        const float mu_c,
-        const float mu_w,
-        const float p_wr,
-        const float porosity,
-        const float rho_w0,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT p_w,
-        const float *const SFEM_RESTRICT p_c,
-        const ptrdiff_t out_stride,
-        idx_t *const SFEM_RESTRICT rows,
-        idx_t *const SFEM_RESTRICT cols,
-        float *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::two_phase_flow_proteus_hex8_hessian_coo_triplet_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, out_stride, rows, cols, values);
 }

@@ -33,14 +33,12 @@ typedef double geom_t;
 extern "C" void laplace_hex27_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_hex27_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -53,26 +51,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_hex27_jacobian_action
 extern "C" void laplace_hex27_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_hex27_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -85,26 +79,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_hex27_jacobian_u_u_di
 extern "C" void laplace_hex27_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_hex27_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -117,38 +107,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_hex27_residual_elemen
 extern "C" void laplace_hex27_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex27_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_hex8_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -161,26 +145,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_hex8_jacobian_action_
 extern "C" void laplace_hex8_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_hex8_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -193,26 +173,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_hex8_jacobian_u_u_dia
 extern "C" void laplace_hex8_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_hex8_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -225,26 +201,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_hex8_residual_element
 extern "C" void laplace_hex8_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_hex8_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" int laplace_jacobian_action_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -805,14 +777,12 @@ extern "C" int laplace_jacobian_action_packed_two_pass_3d_isoparametric_mesh_soa
 extern "C" void laplace_proteus_hex125_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex125_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -825,26 +795,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex125_jacobi
 extern "C" void laplace_proteus_hex125_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex125_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -857,26 +823,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex125_jacobi
 extern "C" void laplace_proteus_hex125_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex125_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -889,38 +851,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex125_residu
 extern "C" void laplace_proteus_hex125_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex125_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex27_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -933,26 +889,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex27_jacobia
 extern "C" void laplace_proteus_hex27_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex27_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -965,26 +917,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex27_jacobia
 extern "C" void laplace_proteus_hex27_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex27_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -997,38 +945,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex27_residua
 extern "C" void laplace_proteus_hex27_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex27_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex64_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1041,26 +983,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex64_jacobia
 extern "C" void laplace_proteus_hex64_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex64_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1073,26 +1011,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex64_jacobia
 extern "C" void laplace_proteus_hex64_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex64_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1105,38 +1039,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex64_residua
 extern "C" void laplace_proteus_hex64_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex64_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex729_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1149,26 +1077,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex729_jacobi
 extern "C" void laplace_proteus_hex729_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex729_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1181,26 +1105,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex729_jacobi
 extern "C" void laplace_proteus_hex729_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex729_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1213,38 +1133,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex729_residu
 extern "C" void laplace_proteus_hex729_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex729_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex8_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1257,26 +1171,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex8_jacobian
 extern "C" void laplace_proteus_hex8_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex8_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1289,26 +1199,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex8_jacobian
 extern "C" void laplace_proteus_hex8_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_hex8_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1321,38 +1227,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_hex8_residual
 extern "C" void laplace_proteus_hex8_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_hex8_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_quad4_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1365,26 +1265,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_jacobia
 extern "C" void laplace_proteus_quad4_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_quad4_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1397,26 +1293,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_jacobia
 extern "C" void laplace_proteus_quad4_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_proteus_quad4_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1429,38 +1321,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_residua
 extern "C" void laplace_proteus_quad4_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_proteus_quad4_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_quad4_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1473,26 +1359,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_quad4_jacobian_action
 extern "C" void laplace_quad4_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_quad4_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1505,26 +1387,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_quad4_jacobian_u_u_di
 extern "C" void laplace_quad4_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_quad4_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1537,26 +1415,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_quad4_residual_elemen
 extern "C" void laplace_quad4_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_quad4_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" int laplace_residual_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
@@ -1827,14 +1701,12 @@ extern "C" int laplace_residual_3d_isoparametric_mesh_soa_float(
 extern "C" void laplace_tet10_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tet10_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1847,26 +1719,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet10_jacobian_action
 extern "C" void laplace_tet10_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tet10_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1879,26 +1747,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet10_jacobian_u_u_di
 extern "C" void laplace_tet10_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tet10_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1911,38 +1775,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet10_residual_elemen
 extern "C" void laplace_tet10_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet10_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tet4_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1955,26 +1813,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet4_jacobian_action_
 extern "C" void laplace_tet4_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tet4_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -1987,26 +1841,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet4_jacobian_u_u_dia
 extern "C" void laplace_tet4_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tet4_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -2019,38 +1869,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tet4_residual_element
 extern "C" void laplace_tet4_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tet4_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tri3_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -2063,26 +1907,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tri3_jacobian_action_
 extern "C" void laplace_tri3_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tri3_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -2095,26 +1935,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tri3_jacobian_u_u_dia
 extern "C" void laplace_tri3_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tri3_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -2127,38 +1963,32 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tri3_residual_element
 extern "C" void laplace_tri3_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri3_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tri6_jacobian_action_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -2171,26 +2001,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tri6_jacobian_action_
 extern "C" void laplace_tri6_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tri6_jacobian_u_u_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -2203,26 +2029,22 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tri6_jacobian_u_u_dia
 extern "C" void laplace_tri6_jacobian_u_u_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_jacobian_u_u_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" double laplace_tri6_residual_element_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
@@ -2235,23 +2057,19 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_tri6_residual_element
 extern "C" void laplace_tri6_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);
 
 extern "C" void laplace_tri6_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat);
+        const ptrdiff_t ndofs);

@@ -15,7 +15,6 @@ static const MatrixAssemblyDiagnostics saint_venant_kirchhoff_hex27_bsr_standard
     "requires_node_block_graph",
     "atomic_add",
     0,
-    1,
     3,
     3,
     3,

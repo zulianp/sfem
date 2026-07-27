@@ -157,18 +157,16 @@ static SFEM_INLINE void KernelDiagnostics_print_rate_with_ai(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
-        const int repeat,
         const double ai,
         const double total_flops) {
-    const double seconds_per_call = repeat > 0 ? elapsed / (double)repeat : 0.0;
-    const double element_rate = seconds_per_call > 0.0 ? 1e-6 * (double)nelements / seconds_per_call : 0.0;
-    const double dof_rate = seconds_per_call > 0.0 ? 1e-6 * (double)ndofs / seconds_per_call : 0.0;
-    const double gflops = seconds_per_call > 0.0
-            ? 1e-9 * total_flops / seconds_per_call
+    const double element_rate = elapsed > 0.0 ? 1e-6 * (double)nelements / elapsed : 0.0;
+    const double dof_rate = elapsed > 0.0 ? 1e-6 * (double)ndofs / elapsed : 0.0;
+    const double gflops = elapsed > 0.0
+            ? 1e-9 * total_flops / elapsed
             : 0.0;
     printf("%-72s %12.6e %16.3f %13.3f %10.3f %13.3f\n",
            name ? name : d->kernel_name,
-           seconds_per_call, element_rate, dof_rate, ai, gflops);
+           elapsed, element_rate, dof_rate, ai, gflops);
 }
 
 static SFEM_INLINE void KernelDiagnostics_print_rate(
@@ -177,14 +175,13 @@ static SFEM_INLINE void KernelDiagnostics_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
-        const int repeat,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
     const double ai = KernelDiagnostics_arithmetic_intensity(
             d, nelements, scalar_bytes, real_bytes, accumulator_bytes);
     const double total_flops = KernelDiagnostics_total_flops(d, nelements);
-    KernelDiagnostics_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);
+    KernelDiagnostics_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);
 }
 
 static SFEM_INLINE void KernelDiagnostics_print_rate_affine_mesh(
@@ -193,14 +190,13 @@ static SFEM_INLINE void KernelDiagnostics_print_rate_affine_mesh(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
-        const int repeat,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
     const double ai = KernelDiagnostics_arithmetic_intensity_affine_mesh(
             d, nelements, scalar_bytes, real_bytes, accumulator_bytes);
     const double total_flops = KernelDiagnostics_total_flops_affine_mesh(d, nelements);
-    KernelDiagnostics_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);
+    KernelDiagnostics_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);
 }
 
 static SFEM_INLINE void KernelDiagnostics_print_rate_isoparametric_mesh(
@@ -209,14 +205,13 @@ static SFEM_INLINE void KernelDiagnostics_print_rate_isoparametric_mesh(
         const double elapsed,
         const ptrdiff_t nelements,
         const ptrdiff_t ndofs,
-        const int repeat,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes) {
     const double ai = KernelDiagnostics_arithmetic_intensity_isoparametric_mesh(
             d, nelements, scalar_bytes, real_bytes, accumulator_bytes);
     const double total_flops = KernelDiagnostics_total_flops_isoparametric_mesh(d, nelements);
-    KernelDiagnostics_print_rate_with_ai(name, d, elapsed, nelements, ndofs, repeat, ai, total_flops);
+    KernelDiagnostics_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);
 }
 
 } // namespace codegen

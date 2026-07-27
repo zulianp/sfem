@@ -1,141 +1,123 @@
 #include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
 
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_proteus_hex27_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_hex27_apply_soa_diagnostics(
         void
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_proteus_hex27_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_hex27_gradient_soa_diagnostics(
         void
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" double neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_proteus_hex27_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 );
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_hex27_objective_soa_diagnostics(
         void
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_float_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" void neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_print_rate(
+extern "C" void neohookean_ogden_proteus_hex27_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -164,7 +146,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_so
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -193,7 +175,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_so
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -213,7 +195,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -233,7 +215,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -269,7 +251,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_affine_
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -305,7 +287,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_affine_
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -332,7 +314,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_isopara
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -359,7 +341,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_isopara
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -401,7 +383,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pas
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -443,7 +425,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pas
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -476,7 +458,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pas
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -509,105 +491,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pas
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_bsr_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_bsr_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_bsr_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_bsr_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -632,7 +516,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -657,7 +541,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -673,7 +557,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametr
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -689,7 +573,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametr
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -721,7 +605,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_affi
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -753,7 +637,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_affi
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -776,7 +660,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_isop
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -799,7 +683,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_isop
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -837,7 +721,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -875,7 +759,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -904,7 +788,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -933,7 +817,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -948,7 +832,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_hessian_bsr_isoparam
         const idx_t *const SFEM_RESTRICT colidx,
         double *const SFEM_RESTRICT values
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -963,7 +847,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_hessian_bsr_isoparam
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -985,7 +869,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mes
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1007,7 +891,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mes
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1020,7 +904,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparamet
         const double *const SFEM_RESTRICT uz,
         double *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1033,7 +917,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparamet
         const float *const SFEM_RESTRICT uz,
         float *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1061,7 +945,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_affi
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1089,7 +973,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_affi
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1108,7 +992,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_isop
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1127,7 +1011,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_isop
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1162,7 +1046,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_pack
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1197,7 +1081,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_pack
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1223,7 +1107,7 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_pack
         const double *const SFEM_RESTRICT steps,
         double *const SFEM_RESTRICT value
 );
-extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1250,214 +1134,196 @@ extern "C" int neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_pack
         float *const SFEM_RESTRICT value
 );
 
-extern "C" void neohookean_ogden_hex27_hex27_apply_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_apply_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_apply_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_apply_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_apply_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_apply_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double neohookean_ogden_hex27_hex27_apply_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_hex27_apply_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return neohookean_ogden_proteus_hex27_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_hex27_hex27_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_hex27_apply_soa_diagnostics(
         void
 ) {
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_diagnostics();
+    return neohookean_ogden_proteus_hex27_apply_soa_diagnostics();
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_apply_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_apply_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_apply_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_apply_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_apply_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_apply_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_apply_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_gradient_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_gradient_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_gradient_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double neohookean_ogden_hex27_hex27_gradient_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_hex27_gradient_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return neohookean_ogden_proteus_hex27_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_hex27_hex27_gradient_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_hex27_gradient_soa_diagnostics(
         void
 ) {
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_diagnostics();
+    return neohookean_ogden_proteus_hex27_gradient_soa_diagnostics();
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_gradient_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_gradient_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_gradient_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_gradient_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_gradient_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_gradient_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_gradient_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_objective_affine_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_objective_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_objective_affine_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_objective_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_objective_isoparametric_mesh_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_objective_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_objective_isoparametric_mesh_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_objective_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" double neohookean_ogden_hex27_hex27_objective_soa_arithmetic_intensity(
+extern "C" double neohookean_ogden_hex27_objective_soa_arithmetic_intensity(
         const ptrdiff_t nelements,
         const size_t scalar_bytes,
         const size_t real_bytes,
         const size_t accumulator_bytes
 ) {
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
+    return neohookean_ogden_proteus_hex27_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_hex27_hex27_objective_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_hex27_objective_soa_diagnostics(
         void
 ) {
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_diagnostics();
+    return neohookean_ogden_proteus_hex27_objective_soa_diagnostics();
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_objective_soa_float_print_rate(
+extern "C" void neohookean_ogden_hex27_objective_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_float_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_objective_soa_float_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" void neohookean_ogden_hex27_hex27_objective_soa_print_rate(
+extern "C" void neohookean_ogden_hex27_objective_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat
+        const ptrdiff_t ndofs
 ) {
-    neohookean_ogden_proteus_hex27_proteus_hex27_objective_soa_print_rate(elapsed, nelements, ndofs, repeat);
+    neohookean_ogden_proteus_hex27_objective_soa_print_rate(elapsed, nelements, ndofs);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1515,10 +1381,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_affine_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1576,10 +1442,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_affine_mesh_soa_float(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1628,10 +1494,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1680,10 +1546,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_isoparametric_mesh_soa_float(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_apply_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1748,10 +1614,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_packed_affine_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_apply_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1816,10 +1682,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_packed_affine_mesh_soa_float(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_apply_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1875,10 +1741,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_packed_isoparametric_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_apply_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -1934,10 +1800,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_packed_isoparametric_mesh_soa_
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_packed_two_pass_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_apply_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2008,10 +1874,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_packed_two_pass_affine_mesh_so
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_packed_two_pass_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_apply_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2082,10 +1948,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_packed_two_pass_affine_mesh_so
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_apply_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2147,10 +2013,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_packed_two_pass_isoparametric_
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_apply_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_apply_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2212,236 +2078,10 @@ extern "C" int neohookean_ogden_hex27_hex27_apply_packed_two_pass_isoparametric_
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_bsr_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_bsr_apply_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int neohookean_ogden_hex27_hex27_bsr_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_bsr_apply_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int neohookean_ogden_hex27_hex27_bsr_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_bsr_apply_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int neohookean_ogden_hex27_hex27_bsr_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    idx_t *proteus_elements[27] = {
-        elements[0],
-        elements[8],
-        elements[1],
-        elements[11],
-        elements[24],
-        elements[9],
-        elements[3],
-        elements[10],
-        elements[2],
-        elements[16],
-        elements[20],
-        elements[17],
-        elements[23],
-        elements[26],
-        elements[21],
-        elements[19],
-        elements[22],
-        elements[18],
-        elements[4],
-        elements[12],
-        elements[5],
-        elements[15],
-        elements[25],
-        elements[13],
-        elements[7],
-        elements[14],
-        elements[6]
-    };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_bsr_apply_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2495,10 +2135,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2552,10 +2192,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_affine_mesh_soa_float(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2600,10 +2240,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2648,10 +2288,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_isoparametric_mesh_soa_floa
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_gradient_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2712,10 +2352,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_affine_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_gradient_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2776,10 +2416,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_affine_mesh_soa_floa
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_gradient_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2831,10 +2471,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_isoparametric_mesh_s
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_gradient_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2886,10 +2526,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_isoparametric_mesh_s
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_two_pass_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_gradient_packed_two_pass_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -2956,10 +2596,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_two_pass_affine_mesh
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_two_pass_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_gradient_packed_two_pass_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3026,10 +2666,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_two_pass_affine_mesh
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_two_pass_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_gradient_packed_two_pass_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3087,10 +2727,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_two_pass_isoparametr
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_gradient_packed_two_pass_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3148,10 +2788,10 @@ extern "C" int neohookean_ogden_hex27_hex27_gradient_packed_two_pass_isoparametr
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    return neohookean_ogden_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3195,10 +2835,10 @@ extern "C" int neohookean_ogden_hex27_hex27_hessian_bsr_isoparametric_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+    return neohookean_ogden_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_hessian_bsr_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3242,10 +2882,10 @@ extern "C" int neohookean_ogden_hex27_hex27_hessian_bsr_isoparametric_mesh_soa_f
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+    return neohookean_ogden_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_objective_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3296,10 +2936,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_affine_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
+    return neohookean_ogden_proteus_hex27_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_objective_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3350,10 +2990,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_affine_mesh_soa_float(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
+    return neohookean_ogden_proteus_hex27_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3395,10 +3035,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_isoparametric_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
+    return neohookean_ogden_proteus_hex27_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_objective_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3440,10 +3080,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_isoparametric_mesh_soa_flo
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
+    return neohookean_ogden_proteus_hex27_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_steps_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3500,10 +3140,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_steps_affine_mesh_soa(
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return neohookean_ogden_proteus_hex27_objective_steps_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_steps_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3560,10 +3200,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_steps_affine_mesh_soa_floa
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return neohookean_ogden_proteus_hex27_objective_steps_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_steps_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3611,10 +3251,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_steps_isoparametric_mesh_s
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return neohookean_ogden_proteus_hex27_objective_steps_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3662,10 +3302,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_steps_isoparametric_mesh_s
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return neohookean_ogden_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_steps_packed_affine_mesh_soa(
+extern "C" int neohookean_ogden_hex27_objective_steps_packed_affine_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3729,10 +3369,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_steps_packed_affine_mesh_s
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return neohookean_ogden_proteus_hex27_objective_steps_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_steps_packed_affine_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_objective_steps_packed_affine_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3796,10 +3436,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_steps_packed_affine_mesh_s
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return neohookean_ogden_proteus_hex27_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_steps_packed_isoparametric_mesh_soa(
+extern "C" int neohookean_ogden_hex27_objective_steps_packed_isoparametric_mesh_soa(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3854,10 +3494,10 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_steps_packed_isoparametric
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return neohookean_ogden_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }
 
-extern "C" int neohookean_ogden_hex27_hex27_objective_steps_packed_isoparametric_mesh_soa_float(
+extern "C" int neohookean_ogden_hex27_objective_steps_packed_isoparametric_mesh_soa_float(
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
@@ -3912,5 +3552,5 @@ extern "C" int neohookean_ogden_hex27_hex27_objective_steps_packed_isoparametric
         elements[14],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex27_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    return neohookean_ogden_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
 }

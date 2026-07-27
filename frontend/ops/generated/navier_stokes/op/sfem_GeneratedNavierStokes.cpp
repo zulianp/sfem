@@ -1,6 +1,8 @@
 #include "sfem_GeneratedNavierStokes.hpp"
 #include "sfem_GeneratedNavierStokes_c_abi.hpp"
 
+
+
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -186,6 +188,16 @@ namespace sfem {
             return 0;
         }
 
+        int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+                                       const smesh::Mesh::Block &block) {
+            for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+                if (packed.block_name(i) == block.name()) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        }
+
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
             std::shared_ptr<smesh::FFF> metric_soa;
@@ -269,6 +281,7 @@ namespace sfem {
                     return 0;
             }
         }
+
     }  // namespace
 
     class GeneratedNavierStokes::Impl {
@@ -277,6 +290,7 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
+
         std::shared_ptr<Buffer<real_t>> previous_buffer;
         const real_t *previous{nullptr};
         const real_t *current{nullptr};
@@ -485,12 +499,14 @@ namespace sfem {
                 (impl_->residual_uses_affine && false) ||
                 (impl_->jacobian_action_uses_affine && false);
         if (needs_affine_jacobian || needs_affine_metric) {
-            return cache_affine_geometry(impl_->space,
-                                         *impl_->domains,
-                                         needs_affine_jacobian,
-                                         needs_affine_metric_soa,
-                                         needs_affine_metric_aos);
+            const int status = cache_affine_geometry(impl_->space,
+                                                     *impl_->domains,
+                                                     needs_affine_jacobian,
+                                                     needs_affine_metric_soa,
+                                                     needs_affine_metric_aos);
+            if (status != SFEM_SUCCESS) return status;
         }
+
         return SFEM_SUCCESS;
     }
 
@@ -562,42 +578,35 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
             const real_t *const previous = impl_->previous;
-            switch (domain.element_type) {
-                case smesh::TRI6: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 3;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     const real_t *const SFEM_RESTRICT u_data[2] = {state + 0, state + 1};
                     const real_t *const SFEM_RESTRICT p_data = state + 2;
                     const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
                     const real_t *const SFEM_RESTRICT p_old_data = previous + 2;
                     real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
                     real_t *const SFEM_RESTRICT p_out = out + 2;
-                    return impl_->residual_uses_affine ? navier_stokes_tri6_tri3_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out) : navier_stokes_tri6_tri3_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
+                if (impl_->residual_uses_affine) {
+                    return navier_stokes_residual_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
                 }
-                case smesh::TET10: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 4;
-                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
-                    const real_t *const SFEM_RESTRICT p_data = state + 3;
-                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                    const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
-                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                    real_t *const SFEM_RESTRICT p_out = out + 3;
-                    return impl_->residual_uses_affine ? navier_stokes_tet10_tet4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out) : navier_stokes_tet10_tet4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
-                }
-                case smesh::HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 4;
-                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
-                    const real_t *const SFEM_RESTRICT p_data = state + 3;
-                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                    const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
-                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                    real_t *const SFEM_RESTRICT p_out = out + 3;
-                    return impl_->residual_uses_affine ? navier_stokes_hex27_hex8_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out) : navier_stokes_hex27_hex8_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
-                }
-                default:
-                    SFEM_ERROR("GeneratedNavierStokes does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+                return navier_stokes_residual_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 4;
+                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
+                    const real_t *const SFEM_RESTRICT p_data = state + 3;
+                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+                    const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
+                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
+                    real_t *const SFEM_RESTRICT p_out = out + 3;
+                if (impl_->residual_uses_affine) {
+                    return navier_stokes_residual_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
+                }
+                return navier_stokes_residual_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
+            }
+            SFEM_ERROR("navier_stokes residual does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -612,6 +621,7 @@ namespace sfem {
         }
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
@@ -656,42 +666,35 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
             const real_t *const previous = impl_->previous;
-            switch (domain.element_type) {
-                case smesh::TRI6: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 3;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
                     const real_t *const SFEM_RESTRICT p_old_data = previous + 2;
                     const real_t *const SFEM_RESTRICT u_direction_data[2] = {direction + 0, direction + 1};
                     const real_t *const SFEM_RESTRICT p_direction_data = direction + 2;
                     real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
                     real_t *const SFEM_RESTRICT p_out = out + 2;
-                    return impl_->jacobian_action_uses_affine ? navier_stokes_tri6_tri3_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[4], storage[5], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out) : navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[4], storage[5], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
+                if (impl_->jacobian_action_uses_affine) {
+                    return navier_stokes_jacobian_action_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[4], storage[5], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
                 }
-                case smesh::TET10: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 4;
-                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                    const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
-                    const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
-                    const real_t *const SFEM_RESTRICT p_direction_data = direction + 3;
-                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                    real_t *const SFEM_RESTRICT p_out = out + 3;
-                    return impl_->jacobian_action_uses_affine ? navier_stokes_tet10_tet4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out) : navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
-                }
-                case smesh::HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 4;
-                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                    const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
-                    const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
-                    const real_t *const SFEM_RESTRICT p_direction_data = direction + 3;
-                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                    real_t *const SFEM_RESTRICT p_out = out + 3;
-                    return impl_->jacobian_action_uses_affine ? navier_stokes_hex27_hex8_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out) : navier_stokes_hex27_hex8_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
-                }
-                default:
-                    SFEM_ERROR("GeneratedNavierStokes does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+                return navier_stokes_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[4], storage[5], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 4;
+                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+                    const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
+                    const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
+                    const real_t *const SFEM_RESTRICT p_direction_data = direction + 3;
+                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
+                    real_t *const SFEM_RESTRICT p_out = out + 3;
+                if (impl_->jacobian_action_uses_affine) {
+                    return navier_stokes_jacobian_action_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
+                }
+                return navier_stokes_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
+            }
+            SFEM_ERROR("navier_stokes jacobian_action does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -826,7 +829,7 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int GeneratedNavierStokes::hessian_dia(const real_t *const,
+    int GeneratedNavierStokes::hessian_dia(const real_t *const state,
                             const int *const diag_offsets,
                             const ptrdiff_t ndiag,
                             real_t *const values) {

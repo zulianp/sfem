@@ -15,7 +15,6 @@ static const MatrixAssemblyDiagnostics saint_venant_kirchhoff_tri3_bsr_standard_
     "requires_node_block_graph",
     "atomic_add",
     0,
-    1,
     2,
     2,
     2,
