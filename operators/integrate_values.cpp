@@ -4,6 +4,7 @@
 #include "sfem_defs.hpp"
 
 #include "edgeshell2_integrate_values.hpp"
+#include "edgeshell3_integrate_values.hpp"
 #include "quadshell4_integrate_values.hpp"
 #include "trishell3_integrate_values.hpp"
 #include "trishell6_integrate_values.hpp"
@@ -28,6 +29,10 @@ int integrate_value(const int                    element_type,
         }
         case smesh::EDGESHELL2: {
             return edgeshell2_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
+        }
+        case smesh::EDGE3:
+        case smesh::EDGESHELL3: {
+            return edgeshell3_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
         }
         case smesh::TRISHELL3: {
             return trishell3_integrate_value(nelements, nnodes, elems, xyz, value, block_size, component, out);
@@ -65,6 +70,10 @@ int integrate_values(const int                         element_type,
         }
         case smesh::EDGESHELL2: {
             return edgeshell2_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
+        }
+        case smesh::EDGE3:
+        case smesh::EDGESHELL3: {
+            return edgeshell3_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
         }
         case smesh::TRISHELL3: {
             return trishell3_integrate_values(nelements, nnodes, elems, xyz, scale_factor, values, block_size, component, out);
