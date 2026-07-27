@@ -13,6 +13,7 @@ import sympy as sp
 
 import codegen.framework as framework
 from sfem import gen
+from sfem._gen_op import _dispatch_sources
 from codegen.framework.backends.cuda import CUDASoABackend
 from codegen.framework.plans.diagnostics import KernelDiagnosticsEntryPlan, KernelDiagnosticsPlan
 from codegen.framework.plans.emission import ElementEmissionPlan
@@ -962,6 +963,9 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("kernel_diagnostics.hpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden.cpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp", names)
+            self.assertIn("op/sfem_GeneratedNeoHookeanOgden_affine_dispatch.cpp", names)
+            self.assertIn("op/sfem_GeneratedNeoHookeanOgden_isoparametric_dispatch.cpp", names)
+            self.assertNotIn("op/sfem_GeneratedNeoHookeanOgden_dispatch.cpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_manifest.json", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_registration.cpp", names)
             wrapper = os.path.join(
@@ -1106,6 +1110,57 @@ class GenApiTest(unittest.TestCase):
             ) as stream:
                 registration = stream.read()
             self.assertIn('Factory::register_op("GeneratedNeoHookeanOgden"', registration)
+
+    def test_generated_op_dispatch_sources_split_by_geometry_layout(self):
+        class Material:
+            name = "demo"
+            op_name = "GeneratedDemo"
+
+        kernel_sources = {
+            "d2/tri3/demo_tri3_operator.cpp": """
+extern "C" int demo_tri3_apply_isoparametric_mesh_soa(ptrdiff_t n, idx_t **elements) { return 0; }
+extern "C" int demo_tri3_apply_affine_mesh_soa(ptrdiff_t n, idx_t **elements) { return 0; }
+extern "C" int demo_tri3_apply_packed_isoparametric_mesh_soa(ptrdiff_t n, idx_t **elements) { return 0; }
+extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **elements) { return 0; }
+""",
+        }
+
+        files = _dispatch_sources(
+            Material(),
+            ("TRI3",),
+            "sfem_GeneratedDemo_c_abi.hpp",
+            kernel_sources,
+        )
+
+        self.assertEqual(
+            set(files),
+            {
+                "op/sfem_GeneratedDemo_isoparametric_dispatch.cpp",
+                "op/sfem_GeneratedDemo_affine_dispatch.cpp",
+                "op/sfem_GeneratedDemo_packed_isoparametric_dispatch.cpp",
+                "op/sfem_GeneratedDemo_packed_affine_dispatch.cpp",
+            },
+        )
+        self.assertIn(
+            "demo_apply_2d_isoparametric_mesh_soa",
+            files["op/sfem_GeneratedDemo_isoparametric_dispatch.cpp"],
+        )
+        self.assertIn(
+            "demo_apply_2d_affine_mesh_soa",
+            files["op/sfem_GeneratedDemo_affine_dispatch.cpp"],
+        )
+        self.assertIn(
+            "demo_apply_packed_2d_isoparametric_mesh_soa",
+            files["op/sfem_GeneratedDemo_packed_isoparametric_dispatch.cpp"],
+        )
+        self.assertIn(
+            "demo_apply_packed_2d_affine_mesh_soa",
+            files["op/sfem_GeneratedDemo_packed_affine_dispatch.cpp"],
+        )
+        self.assertNotIn(
+            "demo_tri3_apply_affine_mesh_soa",
+            files["op/sfem_GeneratedDemo_isoparametric_dispatch.cpp"],
+        )
 
     def test_energy_kernel_signatures_prune_unused_material_parameters(self):
         mu = gen.material_parameter("mu")

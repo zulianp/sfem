@@ -366,6 +366,26 @@ foreach(DRIVER ${DRIVERS})
     endif()
 endforeach()
 
+if(SFEM_ENABLE_CUDA)
+    add_executable(bench_packed_laplacian_cuda
+        bench/cuda/bench_packed_laplacian.cpp
+        bench/cuda/bench_packed_laplacian.cu)
+    target_link_libraries(bench_packed_laplacian_cuda PRIVATE sfem)
+    # if(SFEM_ENABLE_OPENMP)
+    #     if(OPENMP_DIR)
+    #         target_compile_options(bench_packed_laplacian_cuda PRIVATE
+    #             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+    #     elseif(OpenMP_CXX_FLAGS)
+    #         separate_arguments(SFEM_OPENMP_CXX_OPTIONS NATIVE_COMMAND "${OpenMP_CXX_FLAGS}")
+    #         foreach(SFEM_OPENMP_CXX_OPTION ${SFEM_OPENMP_CXX_OPTIONS})
+    #             target_compile_options(bench_packed_laplacian_cuda PRIVATE
+    #                 $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${SFEM_OPENMP_CXX_OPTION}>)
+    #         endforeach()
+    #     endif()
+    # endif()
+    list(APPEND SFEM_TARGETS bench_packed_laplacian_cuda)
+endif()
+
 # if(TARGET bench_hyperelasticity)
 #     target_sources(
 #         bench_hyperelasticity
