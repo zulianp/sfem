@@ -4233,6 +4233,15 @@ def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
     if not groups:
         return {}
 
+    sources = {}
+    for kind, grouped in _dispatch_groups_by_source_kind(groups):
+        sources[
+            "op/sfem_%s_%s_dispatch.cpp" % (material.op_name, kind)
+        ] = _dispatch_source(c_abi_header, grouped)
+    return sources
+
+
+def _dispatch_source(c_abi_header, groups):
     lines = [
         '#include "%s"' % c_abi_header,
         "#include <cstdio>",
@@ -4259,7 +4268,49 @@ def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
     for group in groups:
         lines.extend(_dispatch_function_lines(group))
 
-    return {"op/sfem_%s_dispatch.cpp" % material.op_name: "\n".join(lines) + "\n"}
+    return "\n".join(lines) + "\n"
+
+
+def _dispatch_groups_by_source_kind(groups):
+    grouped = {kind: [] for kind in _DISPATCH_SOURCE_KIND_ORDER}
+    for group in groups:
+        kind = _dispatch_source_kind(group["name"])
+        if kind not in grouped:
+            grouped[kind] = []
+        grouped[kind].append(group)
+
+    ordered = []
+    for kind in _DISPATCH_SOURCE_KIND_ORDER:
+        if grouped[kind]:
+            ordered.append((kind, tuple(grouped[kind])))
+    for kind in sorted(kind for kind in grouped if kind not in _DISPATCH_SOURCE_KIND_ORDER):
+        ordered.append((kind, tuple(grouped[kind])))
+    return tuple(ordered)
+
+
+_DISPATCH_SOURCE_KIND_ORDER = (
+    "isoparametric",
+    "affine",
+    "packed_isoparametric",
+    "packed_affine",
+)
+
+
+def _dispatch_source_kind(function_name):
+    packed = "_packed_" in function_name
+    affine = "_affine_" in function_name
+    isoparametric = "_isoparametric_" in function_name
+    if packed and isoparametric:
+        return "packed_isoparametric"
+    if packed and affine:
+        return "packed_affine"
+    if isoparametric:
+        return "isoparametric"
+    if affine:
+        return "affine"
+    if "_sideset_" in function_name:
+        return "sideset"
+    return "other"
 
 
 def _dispatch_groups(material, elements, declarations):
