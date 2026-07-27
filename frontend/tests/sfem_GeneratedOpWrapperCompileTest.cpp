@@ -6,6 +6,8 @@
 
 #include "sfem_GeneratedNeoHookeanOgden.hpp"
 #include "sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
+#include "generated/modified_mooney_rivlin/op/sfem_GeneratedModifiedMooneyRivlin.hpp"
+#include "generated/modified_mooney_rivlin/op/sfem_GeneratedModifiedMooneyRivlin_c_abi.hpp"
 #include "sfem_GeneratedTwoPhaseFlow.hpp"
 #include "sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
 #include "generated/neumann/op/sfem_GeneratedNeumann.hpp"
@@ -14,6 +16,8 @@
 #include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral_c_abi.hpp"
 #include "generated/poro_hyperelasticity/op/sfem_GeneratedPoroHyperelasticity.hpp"
 #include "generated/poro_hyperelasticity/op/sfem_GeneratedPoroHyperelasticity_c_abi.hpp"
+#include "generated/saint_venant_kirchhoff/op/sfem_GeneratedSaintVenantKirchhoff.hpp"
+#include "generated/saint_venant_kirchhoff/op/sfem_GeneratedSaintVenantKirchhoff_c_abi.hpp"
 #include "generated/stokes/op/sfem_GeneratedStokes.hpp"
 #include "generated/stokes/op/sfem_GeneratedStokes_c_abi.hpp"
 #include "smesh_sideset.hpp"
@@ -57,6 +61,8 @@ namespace {
 
 int test_generated_wrapper_headers_compile() {
     require_op_type<sfem::GeneratedNeoHookeanOgden>();
+    require_op_type<sfem::GeneratedSaintVenantKirchhoff>();
+    require_op_type<sfem::GeneratedModifiedMooneyRivlin>();
     require_op_type<sfem::GeneratedTwoPhaseFlow>();
     require_op_type<sfem::GeneratedPoroHyperelasticity>();
     require_op_type<sfem::GeneratedStokes>();
@@ -67,6 +73,8 @@ int test_generated_wrapper_headers_compile() {
 
 int test_generated_wrapper_factory_registration() {
     SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(3), "GeneratedNeoHookeanOgden") != nullptr);
+    SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(3), "GeneratedSaintVenantKirchhoff") != nullptr);
+    SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(3), "GeneratedModifiedMooneyRivlin") != nullptr);
     SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(2), "GeneratedTwoPhaseFlow") != nullptr);
     SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(4), "GeneratedPoroHyperelasticity") != nullptr);
     SFEM_TEST_ASSERT(sfem::Factory::create_op(hex8_space(4), "GeneratedStokes") != nullptr);
@@ -98,6 +106,39 @@ int test_generated_energy_wrapper_executes() {
     SFEM_TEST_ASSERT(op->apply(state->data(), direction->data(), action->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(finite_vector(gradient->data(), ndofs));
     SFEM_TEST_ASSERT(finite_vector(action->data(), ndofs));
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_generated_new_hyperelastic_wrappers_execute() {
+    auto space = hex8_space(3);
+    const char *names[] = {"GeneratedSaintVenantKirchhoff", "GeneratedModifiedMooneyRivlin"};
+
+    const ptrdiff_t ndofs = space->n_dofs();
+    auto state = sfem::create_host_buffer<real_t>(ndofs);
+    auto direction = sfem::create_host_buffer<real_t>(ndofs);
+    auto gradient = sfem::create_host_buffer<real_t>(ndofs);
+    auto action = sfem::create_host_buffer<real_t>(ndofs);
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        state->data()[i] = 1e-4 * ((i % 7) + 1);
+        direction->data()[i] = 2e-5 * ((i % 5) + 1);
+    }
+
+    for (const char *const name : names) {
+        auto op = sfem::Factory::create_op(space, name);
+        SFEM_TEST_ASSERT(op != nullptr);
+        op->set_option("assume_affine", true);
+        std::fill(gradient->data(), gradient->data() + ndofs, real_t(0));
+        std::fill(action->data(), action->data() + ndofs, real_t(0));
+
+        real_t value = 0;
+        SFEM_TEST_ASSERT(op->value(state->data(), &value) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(std::isfinite(value));
+        SFEM_TEST_ASSERT(op->gradient(state->data(), gradient->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(op->apply(state->data(), direction->data(), action->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(finite_vector(gradient->data(), ndofs));
+        SFEM_TEST_ASSERT(finite_vector(action->data(), ndofs));
+    }
+
     return SFEM_TEST_SUCCESS;
 }
 
@@ -195,6 +236,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_generated_wrapper_headers_compile);
     SFEM_RUN_TEST(test_generated_wrapper_factory_registration);
     SFEM_RUN_TEST(test_generated_energy_wrapper_executes);
+    SFEM_RUN_TEST(test_generated_new_hyperelastic_wrappers_execute);
     SFEM_RUN_TEST(test_generated_residual_wrapper_executes);
     SFEM_RUN_TEST(test_generated_coupled_wrapper_executes);
     SFEM_RUN_TEST(test_generated_boundary_wrapper_executes);
