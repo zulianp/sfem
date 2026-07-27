@@ -2,6 +2,7 @@
 
 #include <map>
 #include "sfem_BoundaryMass.hpp"
+#include "sfem_BDF2InertiaPotential.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "generated/sfem_generated_ops_registration.hpp"
@@ -43,6 +44,8 @@ namespace sfem {
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
             instance_.private_register_op("ss:KelvinVoigtNewmark", KelvinVoigtNewmark::create);
+            instance_.private_register_op("BDF2InertiaPotential", BDF2InertiaPotential::create);
+            instance_.private_register_op("ss:BDF2InertiaPotential", BDF2InertiaPotential::create);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("ss:LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
