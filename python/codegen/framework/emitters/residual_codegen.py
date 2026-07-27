@@ -1771,7 +1771,11 @@ def generate_coupled_residual_sfem_files(
     family = emission_plan.basis_family
     geometry_family = emission_plan.geometry_family
     local_prefix = "%s_d%d_%s" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
-    element_prefix = "%s_%s" % (prefix, element_type.lower()) if operator_prefix is None else str(operator_prefix)
+    element_prefix = (
+        _single_element_operator_prefix(prefix, element_type)
+        if operator_prefix is None
+        else str(operator_prefix)
+    )
     if reference_data_plan is not None:
         validate_reference_data_plan(
             reference_data_plan,
@@ -1835,6 +1839,14 @@ def generate_coupled_residual_sfem_files(
         GeneratedKernelFile(local_name, local_source),
         GeneratedKernelFile(operator_name, operator_source),
     )
+
+
+def _single_element_operator_prefix(prefix, element_type):
+    element = str(element_type).lower()
+    prefix = str(prefix)
+    if prefix.lower().endswith("_%s" % element):
+        return prefix
+    return "%s_%s" % (prefix, element)
 
 
 def generate_mixed_residual_sfem_files(

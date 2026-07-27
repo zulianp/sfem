@@ -27,7 +27,7 @@ def generate_op_files(material, elements, kernel_sources=None):
     equations = _representative_equations(systems_by_dim)
     if len(equations) > 1:
         header, source = _coupled_energy_residual_op(
-            material, elements, c_abi_header, systems_by_dim
+            material, elements, c_abi_header, systems_by_dim, abi_sources
         )
     elif not equations:
         raise ValueError("generated Op wrappers require at least one equation")
@@ -450,11 +450,8 @@ def _hyperelastic_op(
             )
             dependencies_by_dim[dim] = dependencies
         objective_dependencies, gradient_dependencies, apply_dependencies = dependencies
-        stem = "%s_%s_%s" % (
-            material.name,
-            _element_name(element).lower(),
-            _element_name(element).lower(),
-        )
+        element_label = _element_name(element).lower()
+        stem = "%s_%s" % (material.name, element_label)
         performance_cases["value"].append(
             _performance_case(
                 element,
@@ -3114,7 +3111,13 @@ namespace sfem {
 """ % {"op": material.op_name}
 
 
-def _coupled_energy_residual_op(material, elements, c_abi_header=None, systems_by_dim=None):
+def _coupled_energy_residual_op(
+    material,
+    elements,
+    c_abi_header=None,
+    systems_by_dim=None,
+    kernel_sources=None,
+):
     if systems_by_dim is None:
         systems_by_dim = _systems_by_dim(material, elements)
     equations_by_dim = {
@@ -3146,12 +3149,14 @@ def _coupled_energy_residual_op(material, elements, c_abi_header=None, systems_b
         energy_name,
         residual_name,
         parameter_index,
+        kernel_sources or {},
     )
     dependency_flags = _coupled_dependency_flags(
         systems_by_dim,
         energy_name,
         residual_name,
     )
+    declarations = _extract_c_abi_declarations(kernel_sources or {}, public_only=False)
     max_parameters = max(1, len(material.parameter_defaults))
     source = """#include "sfem_%(op)s.hpp"
 %(c_abi_include)s
@@ -3539,7 +3544,7 @@ namespace sfem {
 """ % {
         "op": material.op_name,
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
-        "declaration_block": "",
+        "declaration_block": "\n".join(declarations),
         "max_parameters": max_parameters,
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
@@ -3637,9 +3642,18 @@ def _coupled_apply_state_check(op_name, uses_current, uses_previous):
     )
 
 
-def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_name, parameter_index):
+def _coupled_cases(
+    material,
+    elements,
+    systems_by_dim,
+    energy_name,
+    residual_name,
+    parameter_index,
+    kernel_sources=None,
+):
     from codegen.framework.symbolic.forms import FormOrder
 
+    kernel_sources = kernel_sources or {}
     cases = {
         "gradient": [],
         "apply": [],
@@ -3659,35 +3673,84 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         energy_element = _compatible_element_for_field(element, energy_field)
         energy_label = energy_element.lower()
         mixed_label = _element_name(element).lower()
-        energy_stem = "%s_%s_%s_%s" % (material.name, energy_name, energy_label, energy_label)
+        energy_stem = "%s_%s_%s" % (material.name, energy_name, energy_label)
         residual_stem = "%s_%s_%s" % (material.name, residual_name, mixed_label)
-        cases["performance"]["value"].append(
-            _performance_case(
-                element,
-                ("%s_objective_soa_diagnostics" % energy_stem,),
-                affine_flags=("objective_uses_affine",),
+        has_objective = (
+            _c_abi_function_defined(
+                kernel_sources,
+                "%s_objective_affine_mesh_soa" % energy_stem,
+            )
+            and _c_abi_function_defined(
+                kernel_sources,
+                "%s_objective_isoparametric_mesh_soa" % energy_stem,
             )
         )
-        cases["performance"]["gradient"].append(
-            _performance_case(
-                element,
-                (
-                    "%s_gradient_soa_diagnostics" % energy_stem,
-                    "%s_residual_element_soa_diagnostics" % residual_stem,
-                ),
-                affine_flags=("gradient_uses_affine", "residual_uses_affine"),
+        has_gradient = (
+            _c_abi_function_defined(
+                kernel_sources,
+                "%s_gradient_affine_mesh_soa" % energy_stem,
+            )
+            and _c_abi_function_defined(
+                kernel_sources,
+                "%s_gradient_isoparametric_mesh_soa" % energy_stem,
+            )
+            and _c_abi_function_defined(
+                kernel_sources,
+                "%s_residual_affine_mesh_soa" % residual_stem,
+            )
+            and _c_abi_function_defined(
+                kernel_sources,
+                "%s_residual_isoparametric_mesh_soa" % residual_stem,
             )
         )
-        cases["performance"]["apply"].append(
-            _performance_case(
-                element,
-                (
-                    "%s_apply_soa_diagnostics" % energy_stem,
-                    "%s_jacobian_action_element_soa_diagnostics" % residual_stem,
-                ),
-                affine_flags=("apply_uses_affine", "jacobian_action_uses_affine"),
+        has_apply = (
+            _c_abi_function_defined(
+                kernel_sources,
+                "%s_apply_affine_mesh_soa" % energy_stem,
+            )
+            and _c_abi_function_defined(
+                kernel_sources,
+                "%s_apply_isoparametric_mesh_soa" % energy_stem,
+            )
+            and _c_abi_function_defined(
+                kernel_sources,
+                "%s_jacobian_action_affine_mesh_soa" % residual_stem,
+            )
+            and _c_abi_function_defined(
+                kernel_sources,
+                "%s_jacobian_action_isoparametric_mesh_soa" % residual_stem,
             )
         )
+        if has_objective:
+            cases["performance"]["value"].append(
+                _performance_case(
+                    element,
+                    ("%s_objective_soa_diagnostics" % energy_stem,),
+                    affine_flags=("objective_uses_affine",),
+                )
+            )
+        if has_gradient:
+            cases["performance"]["gradient"].append(
+                _performance_case(
+                    element,
+                    (
+                        "%s_gradient_soa_diagnostics" % energy_stem,
+                        "%s_residual_element_soa_diagnostics" % residual_stem,
+                    ),
+                    affine_flags=("gradient_uses_affine", "residual_uses_affine"),
+                )
+            )
+        if has_apply:
+            cases["performance"]["apply"].append(
+                _performance_case(
+                    element,
+                    (
+                        "%s_apply_soa_diagnostics" % energy_stem,
+                        "%s_jacobian_action_element_soa_diagnostics" % residual_stem,
+                    ),
+                    affine_flags=("apply_uses_affine", "jacobian_action_uses_affine"),
+                )
+            )
         energy_objective_dependencies = energy_collection.form_metadata(FormOrder.ZERO).dependencies
         energy_gradient_dependencies = energy_collection.form_metadata(FormOrder.ONE).dependencies
         energy_apply_dependencies = energy_collection.form_metadata(FormOrder.TWO).dependencies
@@ -3762,18 +3825,19 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         residual_grad_iso = "%s_residual_isoparametric_mesh_soa(%s, %s)" % (
             residual_stem, common_iso, residual_args_common
         )
-        cases["gradient"].append(
-            _coupled_case(
-                element,
-                block_size,
-                residual_gradient_setup,
-                (
-                    "                    int status = impl_->gradient_uses_affine ? %s : %s;\n"
-                    "                    if (status != SFEM_SUCCESS) return status;\n"
-                    "                    return impl_->residual_uses_affine ? %s : %s;"
-                ) % (energy_grad_affine, energy_grad_iso, residual_grad_affine, residual_grad_iso),
+        if has_gradient:
+            cases["gradient"].append(
+                _coupled_case(
+                    element,
+                    block_size,
+                    residual_gradient_setup,
+                    (
+                        "                    int status = impl_->gradient_uses_affine ? %s : %s;\n"
+                        "                    if (status != SFEM_SUCCESS) return status;\n"
+                        "                    return impl_->residual_uses_affine ? %s : %s;"
+                    ) % (energy_grad_affine, energy_grad_iso, residual_grad_affine, residual_grad_iso),
+                )
             )
-        )
 
         energy_apply_args = ", ".join(
             _nonempty(
@@ -3818,18 +3882,19 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         residual_apply_iso = "%s_jacobian_action_isoparametric_mesh_soa(%s, %s)" % (
             residual_stem, common_iso, residual_apply_args_common
         )
-        cases["apply"].append(
-            _coupled_case(
-                element,
-                block_size,
-                residual_apply_setup,
-                (
-                    "                    int status = impl_->apply_uses_affine ? %s : %s;\n"
-                    "                    if (status != SFEM_SUCCESS) return status;\n"
-                    "                    return impl_->jacobian_action_uses_affine ? %s : %s;"
-                ) % (energy_apply_affine, energy_apply_iso, residual_apply_affine, residual_apply_iso),
+        if has_apply:
+            cases["apply"].append(
+                _coupled_case(
+                    element,
+                    block_size,
+                    residual_apply_setup,
+                    (
+                        "                    int status = impl_->apply_uses_affine ? %s : %s;\n"
+                        "                    if (status != SFEM_SUCCESS) return status;\n"
+                        "                    return impl_->jacobian_action_uses_affine ? %s : %s;"
+                    ) % (energy_apply_affine, energy_apply_iso, residual_apply_affine, residual_apply_iso),
+                )
             )
-        )
 
         energy_objective_args = ", ".join(
             _nonempty(
@@ -3847,15 +3912,16 @@ def _coupled_cases(material, elements, systems_by_dim, energy_name, residual_nam
         energy_objective_iso = "%s_objective_isoparametric_mesh_soa(%s%s, %s)" % (
             energy_stem, common_iso, energy_objective_params, energy_objective_args
         )
-        cases["objective"].append(
-            """                case smesh::%(element)s:
+        if has_objective:
+            cases["objective"].append(
+                """                case smesh::%(element)s:
                     status = impl_->objective_uses_affine ? %(affine)s : %(isoparametric)s;
                     break;""" % {
-                "element": _mesh_element_name(element),
-                "affine": energy_objective_affine,
-                "isoparametric": energy_objective_iso,
-            }
-        )
+                    "element": _mesh_element_name(element),
+                    "affine": energy_objective_affine,
+                    "isoparametric": energy_objective_iso,
+                }
+            )
     return cases
 
 
@@ -4546,6 +4612,51 @@ def _c_abi_function_exists(kernel_sources, function_name, public_only=False):
         return False
     for declaration in _extract_c_abi_declarations(kernel_sources, public_only=public_only):
         if _c_abi_function_name(declaration) == function_name:
+            return True
+    return False
+
+
+def _c_abi_function_defined(kernel_sources, function_name):
+    if not kernel_sources:
+        return False
+    pattern = re.compile(
+        r'extern\s+"C"\s+[A-Za-z_][A-Za-z0-9_:<>\s\*&]*\b'
+        + re.escape(function_name)
+        + r"\s*\([^;{}]*\)\s*\{",
+        re.S,
+    )
+    for path, source in kernel_sources.items():
+        normalized = str(path).replace("\\", "/")
+        basename = os.path.basename(normalized)
+        if basename.startswith("sfem_Generated") and basename.endswith(".cpp"):
+            continue
+        if _is_replaced_tensor_product_source(normalized, kernel_sources):
+            continue
+        if pattern.search(source):
+            return True
+    return False
+
+
+def _is_replaced_tensor_product_source(path, kernel_sources):
+    if not path.endswith(("_operator.cpp", "_boundary_operator.cpp")):
+        return False
+    keys = {str(key).replace("\\", "/") for key in kernel_sources}
+    aliases = (
+        ("d2/quad4/", "d2/proteus_quad4/", "_quad4_", "_proteus_quad4_"),
+        ("d3/hex8/", "d3/proteus_hex8/", "_hex8_", "_proteus_hex8_"),
+        ("d3/hex27/", "d3/proteus_hex27/", "_hex27_", "_proteus_hex27_"),
+    )
+    for source_prefix, target_prefix, source_suffix, target_suffix in aliases:
+        prefix_index = path.find(source_prefix)
+        if prefix_index < 0:
+            continue
+        relative = path[prefix_index:]
+        proteus_relative = relative.replace(source_prefix, target_prefix, 1)
+        proteus_relative = proteus_relative.replace(source_suffix, target_suffix, 1)
+        proteus_path = path[:prefix_index] + proteus_relative
+        if proteus_path in keys or proteus_relative in keys:
+            return True
+        if any(key.endswith("/%s" % proteus_relative) for key in keys):
             return True
     return False
 
