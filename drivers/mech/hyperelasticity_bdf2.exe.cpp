@@ -234,7 +234,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
     auto mesh = sfem::Mesh::create_from_file(comm, mesh_path);
     if (promote_to_p2) {
-        if (mesh->spatial_dimension() != 3) {
+        if (mesh->spatial_dimension() == 3) {
             mesh = smesh::promote_to(smesh::TET10, mesh);
         } else {
             mesh = smesh::promote_to(smesh::TRI6, mesh);
