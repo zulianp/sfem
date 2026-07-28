@@ -1,122 +1,5 @@
 #include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
 
-extern "C" void neohookean_ogden_proteus_quad4_apply_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_apply_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" double neohookean_ogden_proteus_quad4_apply_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes
-);
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_quad4_apply_soa_diagnostics(
-        void
-);
-extern "C" void neohookean_ogden_proteus_quad4_apply_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_apply_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_gradient_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" double neohookean_ogden_proteus_quad4_gradient_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes
-);
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_quad4_gradient_soa_diagnostics(
-        void
-);
-extern "C" void neohookean_ogden_proteus_quad4_gradient_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_gradient_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_objective_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_objective_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" double neohookean_ogden_proteus_quad4_objective_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes
-);
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_quad4_objective_soa_diagnostics(
-        void
-);
-extern "C" void neohookean_ogden_proteus_quad4_objective_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
-extern "C" void neohookean_ogden_proteus_quad4_objective_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-);
 extern "C" int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -961,195 +844,15 @@ extern "C" int neohookean_ogden_proteus_quad4_objective_steps_packed_affine_mesh
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-
-extern "C" void neohookean_ogden_quad4_apply_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_apply_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_apply_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_apply_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_apply_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_apply_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" double neohookean_ogden_quad4_apply_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes
-) {
-    return neohookean_ogden_proteus_quad4_apply_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_quad4_apply_soa_diagnostics(
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_quad4_apply_soa_diagnostics(
         void
-) {
-    return neohookean_ogden_proteus_quad4_apply_soa_diagnostics();
-}
-
-extern "C" void neohookean_ogden_quad4_apply_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_apply_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_apply_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_apply_soa_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_gradient_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_gradient_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_gradient_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_gradient_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_gradient_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_gradient_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_gradient_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" double neohookean_ogden_quad4_gradient_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes
-) {
-    return neohookean_ogden_proteus_quad4_gradient_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_quad4_gradient_soa_diagnostics(
+);
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_quad4_gradient_soa_diagnostics(
         void
-) {
-    return neohookean_ogden_proteus_quad4_gradient_soa_diagnostics();
-}
-
-extern "C" void neohookean_ogden_quad4_gradient_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_gradient_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_gradient_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_gradient_soa_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_objective_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_objective_affine_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_objective_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_objective_affine_mesh_soa_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_objective_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_objective_isoparametric_mesh_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_objective_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_objective_isoparametric_mesh_soa_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" double neohookean_ogden_quad4_objective_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes
-) {
-    return neohookean_ogden_proteus_quad4_objective_soa_arithmetic_intensity(nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_quad4_objective_soa_diagnostics(
+);
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_proteus_quad4_objective_soa_diagnostics(
         void
-) {
-    return neohookean_ogden_proteus_quad4_objective_soa_diagnostics();
-}
-
-extern "C" void neohookean_ogden_quad4_objective_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_objective_soa_float_print_rate(elapsed, nelements, ndofs);
-}
-
-extern "C" void neohookean_ogden_quad4_objective_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs
-) {
-    neohookean_ogden_proteus_quad4_objective_soa_print_rate(elapsed, nelements, ndofs);
-}
+);
 
 extern "C" int neohookean_ogden_quad4_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
@@ -2335,4 +2038,22 @@ extern "C" int neohookean_ogden_quad4_objective_steps_packed_affine_mesh_soa_flo
         elements[2]
     };
     return neohookean_ogden_proteus_quad4_objective_steps_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+}
+
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_quad4_apply_soa_diagnostics(
+        void
+) {
+    return neohookean_ogden_proteus_quad4_apply_soa_diagnostics();
+}
+
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_quad4_gradient_soa_diagnostics(
+        void
+) {
+    return neohookean_ogden_proteus_quad4_gradient_soa_diagnostics();
+}
+
+extern "C" const sfem::codegen::KernelDiagnostics * neohookean_ogden_quad4_objective_soa_diagnostics(
+        void
+) {
+    return neohookean_ogden_proteus_quad4_objective_soa_diagnostics();
 }

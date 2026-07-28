@@ -15,118 +15,7 @@
 #include <memory>
 #include <vector>
 
-extern "C" {
-int saint_venant_kirchhoff_tri3_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri3_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_tri6_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_quad4_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_quad4_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet4_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_tet10_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex8_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_hex27_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex8_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex27_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_objective_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_gradient_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_apply_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_objective_steps_isoparametric_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *const *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_objective_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_gradient_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_gradient_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_apply_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_apply_affine_mesh_soa_aos_unit(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, real_t *, real_t *, real_t *);
-int saint_venant_kirchhoff_proteus_hex64_objective_steps_affine_mesh_soa(ptrdiff_t, ptrdiff_t, idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const real_t mu, const real_t lmbda, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, const real_t *, const real_t *, ptrdiff_t, const real_t *, real_t *);
-}
+
 
 namespace sfem {
     namespace {
@@ -371,65 +260,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tri3_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tri3_objective_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_objective_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tri6_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tri6_objective_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_objective_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_quad4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_quad4_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_quad4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_quad4_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tet4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tet4_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tet10_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tet10_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_hex8_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_hex8_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_hex27_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_hex27_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex8_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex8_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex27_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex27_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex64_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex64_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -443,65 +291,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tri3_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tri3_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_objective_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tri6_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tri6_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_objective_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tet4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tet4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tet10_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tet10_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex64_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex64_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -515,65 +322,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tri3_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tri3_gradient_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_gradient_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tri6_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tri6_gradient_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_gradient_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_quad4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_quad4_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_quad4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_quad4_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tet4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tet4_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tet10_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tet10_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_hex8_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_hex8_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_hex27_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_hex27_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex8_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex8_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex27_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex27_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex64_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex64_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -587,65 +353,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tri3_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tri3_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_gradient_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tri6_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tri6_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_gradient_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tet4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tet4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tet10_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tet10_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex64_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex64_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -659,65 +384,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tri3_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tri3_apply_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_apply_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tri6_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tri6_apply_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_apply_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_quad4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_quad4_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_quad4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_quad4_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tet4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tet4_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_tet10_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_tet10_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_hex8_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_hex8_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_hex27_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_hex27_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex8_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex8_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex27_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex27_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(saint_venant_kirchhoff_proteus_hex64_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex64_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -731,65 +415,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tri3_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tri3_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_apply_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tri6_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tri6_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = saint_venant_kirchhoff_apply_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tet4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tet4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_tet10_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_tet10_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(saint_venant_kirchhoff_proteus_hex64_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(saint_venant_kirchhoff_proteus_hex64_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -934,34 +577,21 @@ namespace sfem {
                     }
                 }
             }
-            switch (domain.element_type) {
-                case smesh::TRI3:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_tri3_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1) : saint_venant_kirchhoff_tri3_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
-                case smesh::TRI6:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_tri6_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1) : saint_venant_kirchhoff_tri6_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
-                case smesh::QUAD4:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_quad4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1) : saint_venant_kirchhoff_quad4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
-                case smesh::PROTEUS_QUAD4:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_proteus_quad4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1) : saint_venant_kirchhoff_proteus_quad4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
-                case smesh::TET4:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_tet4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : saint_venant_kirchhoff_tet4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::TET10:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_tet10_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : saint_venant_kirchhoff_tet10_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::HEX8:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_hex8_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : saint_venant_kirchhoff_hex8_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::HEX27:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_hex27_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : saint_venant_kirchhoff_hex27_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX8:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_proteus_hex8_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : saint_venant_kirchhoff_proteus_hex8_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX27:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_proteus_hex27_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : saint_venant_kirchhoff_proteus_hex27_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX64:
-                    return impl_->gradient_uses_affine ? saint_venant_kirchhoff_proteus_hex64_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : saint_venant_kirchhoff_proteus_hex64_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                default:
-                    SFEM_ERROR("GeneratedSaintVenantKirchhoff does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                if (impl_->gradient_uses_affine) {
+                    return saint_venant_kirchhoff_gradient_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                }
+                return saint_venant_kirchhoff_gradient_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
             }
+            else if (dim == 3) {
+                if (impl_->gradient_uses_affine) {
+                    return saint_venant_kirchhoff_gradient_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                }
+                return saint_venant_kirchhoff_gradient_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+            }
+            SFEM_ERROR("saint_venant_kirchhoff gradient does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -1112,44 +742,24 @@ namespace sfem {
                       impl_->element_values.get() + nelements,
                       0);
             int status = SFEM_FAILURE;
-            switch (domain.element_type) {
-                case smesh::TRI3:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_tri3_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get()) : saint_venant_kirchhoff_tri3_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
-                    break;
-                case smesh::TRI6:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_tri6_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get()) : saint_venant_kirchhoff_tri6_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
-                    break;
-                case smesh::QUAD4:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_quad4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get()) : saint_venant_kirchhoff_quad4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_QUAD4:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_proteus_quad4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get()) : saint_venant_kirchhoff_proteus_quad4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
-                    break;
-                case smesh::TET4:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_tet4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : saint_venant_kirchhoff_tet4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::TET10:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_tet10_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : saint_venant_kirchhoff_tet10_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::HEX8:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_hex8_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : saint_venant_kirchhoff_hex8_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::HEX27:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_hex27_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : saint_venant_kirchhoff_hex27_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX8:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_proteus_hex8_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : saint_venant_kirchhoff_proteus_hex8_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX27:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_proteus_hex27_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : saint_venant_kirchhoff_proteus_hex27_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX64:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_proteus_hex64_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : saint_venant_kirchhoff_proteus_hex64_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                default:
-                    SFEM_ERROR("GeneratedSaintVenantKirchhoff does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                if (impl_->objective_uses_affine) {
+                    status = saint_venant_kirchhoff_objective_2d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
+                } else {
+                    status = saint_venant_kirchhoff_objective_2d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
+                }
+            }
+            else if (dim == 3) {
+                if (impl_->objective_uses_affine) {
+                    status = saint_venant_kirchhoff_objective_3d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
+                } else {
+                    status = saint_venant_kirchhoff_objective_3d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
+                }
+            }
+            if (dim != 2 && dim != 3) {
+                SFEM_ERROR("saint_venant_kirchhoff objective does not support spatial dimension %d\n", dim);
+                return SFEM_FAILURE;
             }
             if (status != SFEM_SUCCESS) return status;
             real_t sum = 0;
@@ -1235,45 +845,25 @@ namespace sfem {
                 }
             }
             if (status == SFEM_FAILURE) {
-            switch (domain.element_type) {
-                case smesh::TRI3:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_tri3_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_tri3_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::TRI6:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_tri6_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_tri6_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::QUAD4:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_quad4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_quad4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_QUAD4:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_proteus_quad4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::TET4:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_tet4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_tet4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::TET10:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_tet10_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_tet10_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::HEX8:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_hex8_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_hex8_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::HEX27:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_hex27_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_hex27_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX8:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_proteus_hex8_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX27:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_proteus_hex27_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_proteus_hex27_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX64:
-                    status = impl_->objective_uses_affine ? saint_venant_kirchhoff_proteus_hex64_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : saint_venant_kirchhoff_proteus_hex64_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                default:
-                    SFEM_ERROR("GeneratedSaintVenantKirchhoff does not support element type %d\n",
-                               domain.element_type);
+                const int dim = mesh->spatial_dimension();
+                if (dim == 2) {
+                    if (impl_->objective_uses_affine) {
+                        status = saint_venant_kirchhoff_objective_steps_2d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    } else {
+                        status = saint_venant_kirchhoff_objective_steps_2d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    }
+                }
+                else if (dim == 3) {
+                    if (impl_->objective_uses_affine) {
+                        status = saint_venant_kirchhoff_objective_steps_3d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    } else {
+                        status = saint_venant_kirchhoff_objective_steps_3d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    }
+                }
+                if (dim != 2 && dim != 3) {
+                    SFEM_ERROR("saint_venant_kirchhoff objective_steps does not support spatial dimension %d\n", dim);
                     return SFEM_FAILURE;
-            }
+                }
             }
             if (status != SFEM_SUCCESS) return status;
             for (int step = 0; step < nsteps; ++step) {

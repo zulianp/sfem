@@ -170,17 +170,22 @@ def _work_item_loop_lines(source_builder, indent):
     )
 
 
-def _sfem_soa_affine_geometry_stream_lines(source_builder, element_inputs, indent):
+def _sfem_soa_affine_geometry_stream_lines(
+    source_builder,
+    element_inputs,
+    indent,
+    geometry_scalar_type="jacobian_t",
+):
     lines = []
     for array_input in element_inputs:
         for stream in _soa_array_stream_names(array_input):
             lines.extend(
                 [
                     "%sscalar_t block_%s_data[VECTOR_SIZE];" % (indent, stream),
-                    "%sconst scalar_t *const block_%s = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>("
-                    % (indent, stream),
-                    "%s        nelems, g_%s + evbegin, block_%s_data, std::is_same<jacobian_t, scalar_t>());"
-                    % (indent, stream, stream),
+                    "%sconst scalar_t *const block_%s = affine_geometry_stream<scalar_t, %s, VECTOR_SIZE>("
+                    % (indent, stream, geometry_scalar_type),
+                    "%s        nelems, g_%s + evbegin, block_%s_data, std::is_same<%s, scalar_t>());"
+                    % (indent, stream, stream, geometry_scalar_type),
                 ]
             )
     return lines
@@ -2759,6 +2764,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                     source_builder,
                     (_adjugate_input(dim), sfem_soa_reference_input("jacobian_determinant", 1, 1, 1)),
                     "                ",
+                    geometry_scalar_type="geom_t",
                 )
             )
         elif use_tensor_product_geometry:
@@ -3895,6 +3901,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                         source_builder,
                         (_adjugate_input(dim), sfem_soa_reference_input("jacobian_determinant", 1, 1, 1)),
                         "                ",
+                        geometry_scalar_type="geom_t",
                     )
                 )
             elif use_tensor_product_geometry:

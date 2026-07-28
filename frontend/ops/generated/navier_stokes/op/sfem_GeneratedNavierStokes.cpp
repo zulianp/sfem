@@ -324,12 +324,10 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
+            const ptrdiff_t nelements = domain.block->n_elements();
 
-                default:
-                    break;
-            }
             return SFEM_SUCCESS;
         });
 
@@ -342,12 +340,10 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
+            const ptrdiff_t nelements = domain.block->n_elements();
 
-                default:
-                    break;
-            }
             return SFEM_SUCCESS;
         });
 
@@ -360,25 +356,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(navier_stokes_tri6_tri3_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(navier_stokes_tri6_tri3_residual_element_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = navier_stokes_residual_element_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(navier_stokes_tet10_tet4_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(navier_stokes_tet10_tet4_residual_element_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = navier_stokes_residual_element_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(navier_stokes_hex27_hex8_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(navier_stokes_hex27_hex8_residual_element_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -392,25 +387,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(navier_stokes_tri6_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(navier_stokes_tri6_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = navier_stokes_residual_element_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(navier_stokes_tet10_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(navier_stokes_tet10_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = navier_stokes_residual_element_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(navier_stokes_hex27_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(navier_stokes_hex27_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -424,25 +418,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(navier_stokes_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(navier_stokes_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = navier_stokes_jacobian_action_element_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(navier_stokes_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(navier_stokes_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = navier_stokes_jacobian_action_element_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(navier_stokes_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(navier_stokes_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -456,25 +449,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(navier_stokes_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(navier_stokes_tri6_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = navier_stokes_jacobian_action_element_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(navier_stokes_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(navier_stokes_tet10_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = navier_stokes_jacobian_action_element_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(navier_stokes_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(navier_stokes_hex27_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });

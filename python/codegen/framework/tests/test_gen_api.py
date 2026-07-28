@@ -965,6 +965,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_affine_dispatch.cpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_isoparametric_dispatch.cpp", names)
+            self.assertIn("op/sfem_GeneratedNeoHookeanOgden_diagnostics_dispatch.cpp", names)
             self.assertNotIn("op/sfem_GeneratedNeoHookeanOgden_dispatch.cpp", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_manifest.json", names)
             self.assertIn("op/sfem_GeneratedNeoHookeanOgden_registration.cpp", names)
@@ -994,26 +995,41 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("double flops_gradient() const override;", header_source)
             self.assertIn("size_t memory_traffic_bytes_apply() const override;", header_source)
             self.assertIn(
-                "neohookean_ogden_tri3_gradient_isoparametric_mesh_soa",
+                "neohookean_ogden_gradient_2d_isoparametric_mesh_soa",
                 source,
             )
+            self.assertIn(
+                "neohookean_ogden_objective_2d_affine_mesh_soa",
+                source,
+            )
+            for private_function in (
+                "neohookean_ogden_tri3_objective_affine_mesh_soa",
+                "neohookean_ogden_tri3_objective_isoparametric_mesh_soa",
+                "neohookean_ogden_tri3_objective_steps_affine_mesh_soa",
+                "neohookean_ogden_tri3_objective_steps_isoparametric_mesh_soa",
+                "neohookean_ogden_tri3_gradient_affine_mesh_soa",
+                "neohookean_ogden_tri3_gradient_isoparametric_mesh_soa",
+            ):
+                self.assertNotIn(private_function, source)
             self.assertIn("double GeneratedNeoHookeanOgden::flops_gradient() const", source)
             self.assertIn(
-                "KernelDiagnostics_total_flops_affine_mesh(neohookean_ogden_tri3_gradient_soa_diagnostics()",
+                "neohookean_ogden_gradient_2d_soa_diagnostics(domain.element_type)",
                 source,
             )
             self.assertIn(
-                "KernelDiagnostics_total_flops_isoparametric_mesh(neohookean_ogden_tri3_gradient_soa_diagnostics()",
+                "KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements)",
                 source,
             )
             self.assertIn(
-                "KernelDiagnostics_total_bytes_affine_mesh(neohookean_ogden_tri3_apply_soa_diagnostics()",
+                "KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements)",
                 source,
             )
             self.assertIn(
-                "KernelDiagnostics_total_bytes_isoparametric_mesh(neohookean_ogden_tri3_apply_soa_diagnostics()",
+                "KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements",
                 source,
             )
+            self.assertNotIn("neohookean_ogden_tri3_gradient_soa_diagnostics()", source)
+            self.assertNotIn("neohookean_ogden_tri3_apply_soa_diagnostics()", source)
             self.assertIn(
                 "const geom_t *const *adjugate = nullptr;",
                 source,
@@ -1047,6 +1063,14 @@ class GenApiTest(unittest.TestCase):
                 declarations = stream.read()
             self.assertIn(
                 "extern \"C\" int neohookean_ogden_gradient_2d_isoparametric_mesh_soa",
+                declarations,
+            )
+            self.assertIn(
+                "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_2d_soa_diagnostics",
+                declarations,
+            )
+            self.assertNotIn(
+                "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_tri3_gradient_soa_diagnostics",
                 declarations,
             )
             self.assertIn(
@@ -3201,6 +3225,7 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity.cpp", names)
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity.hpp", names)
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity_c_abi.hpp", names)
+            self.assertIn("op/sfem_GeneratedPoroHyperelasticity_diagnostics_dispatch.cpp", names)
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity_manifest.json", names)
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity_registration.cpp", names)
             wrapper = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity.cpp")
@@ -3208,21 +3233,43 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
                 wrapper_contents = input_file.read()
             self.assertIn("class GeneratedPoroHyperelasticity::Impl", wrapper_contents)
             self.assertIn(
+                "poro_hyperelasticity_solid_gradient_2d_isoparametric_mesh_soa",
+                wrapper_contents,
+            )
+            self.assertIn(
+                "poro_hyperelasticity_poro_residual_2d_isoparametric_mesh_soa",
+                wrapper_contents,
+            )
+            self.assertIn(
+                "poro_hyperelasticity_poro_jacobian_action_2d_affine_mesh_soa",
+                wrapper_contents,
+            )
+            for private_function in (
+                "poro_hyperelasticity_solid_tri6_objective_affine_mesh_soa",
                 "poro_hyperelasticity_solid_tri6_gradient_isoparametric_mesh_soa",
-                wrapper_contents,
-            )
-            self.assertIn(
+                "poro_hyperelasticity_solid_tri6_apply_affine_mesh_soa",
                 "poro_hyperelasticity_poro_tri6_tri3_residual_isoparametric_mesh_soa",
+                "poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_soa",
+                "poro_hyperelasticity_solid_tri6_gradient_soa_diagnostics()",
+                "poro_hyperelasticity_poro_tri6_tri3_residual_element_soa_diagnostics()",
+            ):
+                self.assertNotIn(private_function, wrapper_contents)
+            self.assertIn(
+                "poro_hyperelasticity_solid_gradient_2d_soa_diagnostics(domain.element_type)",
                 wrapper_contents,
             )
             self.assertIn(
-                "poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_soa",
+                "poro_hyperelasticity_poro_residual_element_2d_soa_diagnostics(domain.element_type)",
                 wrapper_contents,
             )
             c_abi = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity_c_abi.hpp")
             with open(c_abi, encoding="utf-8") as input_file:
                 declarations = input_file.read()
             self.assertIn(
+                "extern \"C\" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_solid_gradient_2d_soa_diagnostics",
+                declarations,
+            )
+            self.assertNotIn(
                 "extern \"C\" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_solid_tri6_gradient_soa_diagnostics",
                 declarations,
             )
@@ -3243,11 +3290,9 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
                 "poro_hyperelasticity_poro_residual_2d_affine_mesh_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
-            self.assertFalse(
-                any(
-                    operation["name"] == "gradient"
-                    for operation in metadata["runtime_operations"]
-                )
+            self.assertEqual(
+                _manifest_runtime_variants(metadata, "gradient"),
+                {"affine", "isoparametric"},
             )
             self.assertEqual(
                 _manifest_runtime_variants(metadata, "residual"),
@@ -4154,6 +4199,10 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
                 "linear_elasticity_apply_3d_affine_mesh_soa",
                 wrapper_source,
             )
+            self.assertIn(
+                'linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0',
+                wrapper_source,
+            )
             self.assertIn("domain.element_type", wrapper_source)
 
             subprocess.run(
@@ -4525,7 +4574,7 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
                 "material_defaults must be available when SFEM_ENABLE_RYAML is disabled",
             )
             self.assertIn(
-                "neumann_hex8_quadshell4_boundary_residual_sideset_soa",
+                "neumann_quadshell4_boundary_residual_3d_sideset_soa",
                 op_source,
             )
             self.assertIn("sideset_from_yaml", op_source)

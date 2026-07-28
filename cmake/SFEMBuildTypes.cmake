@@ -104,7 +104,14 @@ set(CMAKE_CXX_FLAGS_PROF
 # CUDA architectures are selected through CMake's standard
 # CMAKE_CUDA_ARCHITECTURES variable.
 
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -use_fast_math -Xcompiler=-O3,-march=native,-mtune=native,-fPIC -Xptxas=-O3,-v,-warn-spills  ")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set(CMAKE_CUDA_HOST_COMPILER_FLAGS "-O3,-fPIC")
+else()
+    set(CMAKE_CUDA_HOST_COMPILER_FLAGS "-O3,-march=native,-mtune=native,-fPIC")
+endif()
+
+string(REPLACE "-Xcompiler=-O3,-march=native,-mtune=native,-fPIC" "" CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -use_fast_math -Xcompiler=${CMAKE_CUDA_HOST_COMPILER_FLAGS} -Xptxas=-O3,-v,-warn-spills  ")
 
 if(SFEM_ENABLE_CUDA_LINEINFO)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")
