@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 
@@ -14,7 +15,7 @@ namespace sfem {
 
     class BDF2InertiaPotential::Impl {
     public:
-        std::shared_ptr<FunctionSpace> space;
+        std::shared_ptr<FunctionSpace>  space;
         std::shared_ptr<Buffer<real_t>> mass;
         std::shared_ptr<Buffer<real_t>> u_hat;
         real_t                          alpha{1};
@@ -69,7 +70,7 @@ namespace sfem {
 
             if (impl_->density != real_t(1)) {
                 real_t *const SFEM_RESTRICT mass = impl_->mass->data();
-                const real_t                 rho  = impl_->density;
+                const real_t                rho  = impl_->density;
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < ndofs; ++i) {
                     mass[i] *= rho;
@@ -186,9 +187,7 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int BDF2InertiaPotential::apply(const real_t *const,
-                                    const real_t *const SFEM_RESTRICT h,
-                                    real_t *const SFEM_RESTRICT       out) {
+    int BDF2InertiaPotential::apply(const real_t *const, const real_t *const SFEM_RESTRICT h, real_t *const SFEM_RESTRICT out) {
         SFEM_TRACE_SCOPE("BDF2InertiaPotential::apply");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
@@ -232,7 +231,7 @@ namespace sfem {
 
     int BDF2InertiaPotential::value_steps(const real_t *const SFEM_RESTRICT x,
                                           const real_t *const SFEM_RESTRICT h,
-                                          const int                          nsteps,
+                                          const int                         nsteps,
                                           const real_t *const SFEM_RESTRICT steps,
                                           real_t *const SFEM_RESTRICT       out) {
         SFEM_TRACE_SCOPE("BDF2InertiaPotential::value_steps");
@@ -241,32 +240,51 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        if (nsteps <= 0) {
+            return SFEM_SUCCESS;
+        }
+
         const ptrdiff_t     ndofs = impl_->space->n_dofs();
         const real_t        alpha = impl_->alpha;
         const real_t *const mass  = impl_->mass->data();
         const real_t *const uhat  = impl_->u_hat->data();
 
-        for (int s = 0; s < nsteps; ++s) {
-            const real_t step = steps[s];
-            real_t       acc  = 0;
-#pragma omp parallel for reduction(+ : acc)
+        const real_t half_alpha = real_t(0.5) * alpha;
+
+#pragma omp parallel
+        {
+            real_t *const SFEM_RESTRICT acc = (real_t *)std::calloc(nsteps, sizeof(real_t));
+
+#pragma omp for
             for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                const real_t diff = x[i] + step * h[i] - uhat[i];
-                acc += mass[i] * diff * diff;
+                const real_t x_minus_uhat = x[i] - uhat[i];
+                const real_t hi           = h[i];
+                const real_t scale        = half_alpha * mass[i];
+
+#pragma omp simd
+                for (int s = 0; s < nsteps; ++s) {
+                    const real_t diff = x_minus_uhat + steps[s] * hi;
+                    acc[s] += scale * diff * diff;
+                }
             }
 
-            out[s] += real_t(0.5) * alpha * acc;
+            for (int s = 0; s < nsteps; ++s) {
+#pragma omp atomic update
+                out[s] += acc[s];
+            }
+
+            std::free(acc);
         }
 
         return SFEM_SUCCESS;
     }
 
     std::shared_ptr<Op> BDF2InertiaPotential::clone() const {
-        auto ret              = std::make_shared<BDF2InertiaPotential>(impl_->space);
-        ret->impl_->mass      = impl_->mass;
-        ret->impl_->u_hat     = impl_->u_hat;
-        ret->impl_->alpha     = impl_->alpha;
-        ret->impl_->density   = impl_->density;
+        auto ret            = std::make_shared<BDF2InertiaPotential>(impl_->space);
+        ret->impl_->mass    = impl_->mass;
+        ret->impl_->u_hat   = impl_->u_hat;
+        ret->impl_->alpha   = impl_->alpha;
+        ret->impl_->density = impl_->density;
         return ret;
     }
 
@@ -278,9 +296,7 @@ namespace sfem {
 
     void BDF2InertiaPotential::set_mass(const std::shared_ptr<Buffer<real_t>> &mass) { impl_->mass = mass; }
 
-    void BDF2InertiaPotential::set_field(const char *name,
-                                         const std::shared_ptr<Buffer<real_t>> &values,
-                                         const int) {
+    void BDF2InertiaPotential::set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &values, const int) {
         if (!strcmp(name, "u_hat")) {
             impl_->u_hat = values;
         } else if (!strcmp(name, "mass")) {
@@ -288,9 +304,7 @@ namespace sfem {
         }
     }
 
-    void BDF2InertiaPotential::set_value_in_block(const std::string &,
-                                                  const std::string &var_name,
-                                                  const real_t       value) {
+    void BDF2InertiaPotential::set_value_in_block(const std::string &, const std::string &var_name, const real_t value) {
         if (var_name == "alpha") {
             impl_->alpha = value;
         } else if (var_name == "density") {
