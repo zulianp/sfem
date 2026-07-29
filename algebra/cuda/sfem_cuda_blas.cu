@@ -266,7 +266,8 @@ __global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T 
     __syncthreads();
 
     if (!warp_id) {
-        acc = block_accumulator[lid];
+        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
+        acc                        = (lid < n_warps) ? block_accumulator[lid] : T(0);
         acc = warp_reduce_32(acc);
 
         if (!threadIdx.x) {

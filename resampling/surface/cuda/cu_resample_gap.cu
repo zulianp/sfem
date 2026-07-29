@@ -71,8 +71,34 @@ extern "C" int cu_resample_weight_local(
 
 __global__ void cu_in_place_div(const ptrdiff_t n, real_t* const SFEM_RESTRICT inout, const real_t* const SFEM_RESTRICT w) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-        inout[i] /= w[i];
+        const real_t wi = w[i];
+        inout[i]        = wi > 0 ? inout[i] / wi : 0;
+
+        if (!isfinite(inout[i])) {
+            inout[i] = 0;
+        }
     }
+}
+
+__global__ void cu_zero_normals_kernel(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
+    for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < nnodes; i += blockDim.x * gridDim.x) {
+        normals[0][i] = 0;
+        normals[1][i] = 0;
+        normals[2][i] = 0;
+    }
+}
+
+static int cu_zero_normals(const ptrdiff_t nnodes, real_t** const SFEM_RESTRICT normals) {
+    if (!nnodes) return SFEM_SUCCESS;
+
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    int             block_size = 128;
+    const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nnodes + block_size - 1) / block_size);
+    cu_zero_normals_kernel<<<n_blocks, block_size, 0>>>(nnodes, normals);
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
 }
 
 static int rescale_with_weight(const smesh::ElemType        element_type,
@@ -120,7 +146,8 @@ extern "C" int cu_resample_gap(
     cudaMemset(g, 0, nnodes * sizeof(real_t));
 
     int err = 0;
-    err     = cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals);
+    err     = cu_zero_normals(nnodes, normals);
+    err |= cu_resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, normals);
     err |= rescale_with_weight(element_type, nelements, nnodes, elems, xyz, g);
     err |= cu_normalize(nnodes, normals);
 
@@ -220,10 +247,14 @@ __global__ void cu_normalize_kernel(const ptrdiff_t nnodes, real_t** const SFEM_
 
         const real_t denom = sqrt(nx * nx + ny * ny + nz * nz);
 
-        if (denom > 0) {
+        if (denom > 0 && isfinite(denom)) {
             normals[0][i] = nx / denom;
             normals[1][i] = ny / denom;
             normals[2][i] = nz / denom;
+        } else {
+            normals[0][i] = 0;
+            normals[1][i] = 0;
+            normals[2][i] = 0;
         }
     }
 }
@@ -258,7 +289,8 @@ extern "C" int cu_resample_gap_normals(
         real_t** const SFEM_RESTRICT normals) {
     if (!nelements) return SFEM_SUCCESS;
 
-    int err = cu_resample_gap_normals_local(
+    int err = cu_zero_normals(nnodes, normals);
+    err |= cu_resample_gap_normals_local(
             smesh::shell_type(element_type), nelements, nnodes, elems, xyz, n, stride, origin, delta, data, normals);
     err |= cu_normalize(nnodes, normals);
     return err;

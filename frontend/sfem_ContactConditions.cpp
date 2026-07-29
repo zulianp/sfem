@@ -482,8 +482,6 @@ namespace sfem {
 
     int ContactConditions::distribute_contact_forces(const real_t *const f, real_t *const out) {
         SFEM_TRACE_SCOPE("ContactConditions::distribute_contact_forces");
-        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
 
         const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
         auto      normals = impl_->normals->data();
@@ -492,34 +490,34 @@ namespace sfem {
         int err;
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            err = cu_obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
+            const ptrdiff_t    n   = impl_->contact_surface->node_mapping_device()->size();
+            const idx_t *const idx = impl_->contact_surface->node_mapping_device()->data();
+            err                    = cu_obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
         } else
 #endif
         {
-            err = obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
-        }
-
-        if (impl_->debug) {
-            for (ptrdiff_t i = 0; i < n; ++i) {
-                printf("CC_t: %g = %g  * %g * %g\n", out[(ptrdiff_t)idx[i] * dim + 0], normals[0][i], f[i], m[i]);
-            }
+            const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
+            const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
+            err                    = obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
         }
 
         return err;
     }
 
     int ContactConditions::full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s) {
-        const ptrdiff_t    n       = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx     = impl_->contact_surface->node_mapping()->data();
         auto               m       = impl_->mass_vector->data();
         const int          dim     = impl_->space->mesh_ptr()->spatial_dimension();
         auto               normals = impl_->normals->data();
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            const ptrdiff_t    n   = impl_->contact_surface->node_mapping_device()->size();
+            const idx_t *const idx = impl_->contact_surface->node_mapping_device()->data();
             return cu_obstacle_contact_stress(dim, n, idx, normals, m, r, s);
         }
 #endif
+        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
+        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
         return obstacle_contact_stress(dim, n, idx, normals, m, r, s);
     }
 
@@ -587,23 +585,22 @@ namespace sfem {
         int  err = 0;
 
 #ifdef SFEM_ENABLE_CUDA
-        if (is_ptr_device(g)) {
-            SFEM_ERROR("IMPLEMENT ME!\n");
-        } else
+        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            for (auto &obs : impl_->obstacles) {
+                err += obs->sample_value(cs->element_type(),
+                                         cs->elements_device()->extent(1),
+                                         cs->node_mapping_device()->size(),
+                                         cs->elements_device()->data(),
+                                         cs->points_device()->data(),
+                                         g);
+            }
+
+            return err;
+        }
 #endif
+
         {
             for (auto &obs : impl_->obstacles) {
-#ifdef SFEM_ENABLE_CUDA
-                if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-                    err += obs->sample_value(cs->element_type(),
-                                             cs->elements_device()->extent(1),
-                                             cs->node_mapping_device()->size(),
-                                             cs->elements_device()->data(),
-                                             cs->points_device()->data(),
-                                             g);
-                    continue;
-                }
-#endif
                 // FIXME always sample gap and normals together
                 err += obs->sample_value(cs->element_type(),
                                          cs->elements()->extent(1),
@@ -626,10 +623,6 @@ namespace sfem {
     }
 
     int ContactConditions::signed_distance(const real_t *const disp, real_t *const g) {
-        if (is_ptr_device(disp)) {
-            SFEM_ERROR("IMPLEMENT ME!\n");
-        }
-
         impl_->contact_surface->displace_points(disp);
         return signed_distance(g);
     }
@@ -648,19 +641,23 @@ namespace sfem {
     int ContactConditions::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("ContactConditions::hessian_block_diag_sym");
 
-        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
-
         const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
         auto      normals = impl_->normals->data();
 
-        auto m = impl_->mass_vector->data();
+        auto            m              = impl_->mass_vector->data();
+        const ptrdiff_t n_contact      = impl_->contact_surface->node_mapping()->size();
+        const int       sym_block_size = (dim == 3 ? 6 : 3);
+        impl_->blas_->zeros(n_contact * sym_block_size, values);
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            const ptrdiff_t    n   = impl_->contact_surface->node_mapping_device()->size();
+            const idx_t *const idx = impl_->contact_surface->node_mapping_device()->data();
             return cu_obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);
         }
 #endif
+        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
+        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
         return obstacle_hessian_block_diag_sym(dim, n, idx, normals, m, x, values);
     }
 
