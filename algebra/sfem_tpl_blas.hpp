@@ -18,11 +18,14 @@ namespace sfem {
         std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
 
         std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
+        std::function<void(const ptrdiff_t, const T* const, const T* const, T* const)> dot_into;
         std::function<void(const ptrdiff_t, const T, const T* const, T* const)> axpy;
         std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
         std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
         std::function<void(const std::ptrdiff_t, const T, T* const)> reciprocal;
         std::function<T(const ptrdiff_t, const T* const)> norm2;
+        std::function<void(const ptrdiff_t, const T* const, T* const)> norm2_into;
+        std::function<void(const ptrdiff_t, const T* const, T* const)> copy_scalars_to_host;
         std::function<
                 void(const ptrdiff_t, const T, const T* const, const T, const T* const, T* const)>
                 zaxpby;
@@ -37,12 +40,15 @@ namespace sfem {
             assert(zeros);
             assert(values);
             assert(dot);
+            assert(dot_into);
             assert(norm2);
+            assert(norm2_into);
+            assert(copy_scalars_to_host);
             assert(axpy);
             assert(axpby);
             assert(scal);
 
-            return allocate && destroy && copy && zeros && values && dot && norm2 && axpy &&
+            return allocate && destroy && copy && zeros && values && dot && dot_into && norm2 && norm2_into && copy_scalars_to_host && axpy &&
                    axpby && zaxpby && scal && reciprocal;
         }
     };

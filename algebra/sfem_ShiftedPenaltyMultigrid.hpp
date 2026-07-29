@@ -135,6 +135,7 @@ namespace sfem {
             SharedBuffer<T>  solution;
             SharedBuffer<T>  work;
             SharedBuffer<T>  diag;
+            SharedBuffer<T>  scalars;
             inline ptrdiff_t size() const { return solution->size(); }
             ~Memory() {}
         };
@@ -286,7 +287,10 @@ namespace sfem {
                                          mem->work->data());
                     }
 
-                    const T r_pen_norm = blas_.norm2(n_dofs, mem->work->data());
+                    T scalar_host[SCALAR_WORKSPACE_SIZE];
+                    blas_.norm2_into(n_dofs, mem->work->data(), mem->scalars->data());
+                    blas_.copy_scalars_to_host(1, mem->scalars->data(), scalar_host);
+                    const T r_pen_norm = scalar_host[0];
 
                     if (debug) {
                         printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)r_pen_norm, omega);
@@ -311,11 +315,16 @@ namespace sfem {
                     Tx = correction->data();
                 }
 
-                const T e_pen = ((ub) ? impl_.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
-                                ((lb) ? impl_.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
+                T scalar_host[SCALAR_WORKSPACE_SIZE];
+                blas_.zeros(3, mem->scalars->data());
+                if (ub) impl_.sq_norm_ramp_p_into(n_constrained_dofs, Tx, ub, &mem->scalars->data()[0]);
+                if (lb) impl_.sq_norm_ramp_m_into(n_constrained_dofs, Tx, lb, &mem->scalars->data()[1]);
+                blas_.norm2_into(n_dofs, mem->work->data(), &mem->scalars->data()[2]);
+                blas_.copy_scalars_to_host(3, mem->scalars->data(), scalar_host);
 
+                const T e_pen     = scalar_host[0] + scalar_host[1];
                 const T norm_pen  = std::sqrt(e_pen);
-                const T norm_rpen = blas_.norm2(n_dofs, mem->work->data());
+                const T norm_rpen = scalar_host[2];
 
                 if (enable_shift) {
                     if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
@@ -368,7 +377,9 @@ namespace sfem {
                     blas_.zaxpby(n_dofs, 1, x, -1, x_old->data(), correction->data());
                     blas_.zeros(n_dofs, x_old->data());
                     op->apply(correction->data(), x_old->data());
-                    energy_norm_correction = sqrt(blas_.dot(n_dofs, x_old->data(), correction->data()));
+                    blas_.dot_into(n_dofs, x_old->data(), correction->data(), mem->scalars->data());
+                    blas_.copy_scalars_to_host(1, mem->scalars->data(), scalar_host);
+                    energy_norm_correction = sqrt(scalar_host[0]);
                     blas_.copy(n_dofs, x, x_old->data());
                 }
 
@@ -450,6 +461,8 @@ namespace sfem {
             return Buffer<T>::own(n, blas_.allocate(n), blas_.destroy, (enum MemorySpace)execution_space());
         }
 
+        static constexpr ptrdiff_t SCALAR_WORKSPACE_SIZE = 4;
+
         inline int finest_level() const { return 0; }
         inline int coarsest_level() const { return n_levels() - 1; }
         inline int coarser_level(int level) const { return level + 1; }
@@ -481,6 +494,7 @@ namespace sfem {
                 }
 
                 memory_[l]->work = make_buffer(n);
+                memory_[l]->scalars = make_buffer(SCALAR_WORKSPACE_SIZE);
                 if (constraints_op_) {
                     memory_[l]->diag = make_buffer(constraints_op_x_op_[l]->n_blocks());
                 } else {
@@ -654,12 +668,16 @@ namespace sfem {
                         // ATTENTION to code changes and side-effects
 
                         //  dot(c, (b - A * x))
-                        T numerator = blas_.dot(correction->size(), correction->data(), mem->work->data());
+                        blas_.dot_into(correction->size(), correction->data(), mem->work->data(), &mem->scalars->data()[0]);
                         blas_.zeros(mem->work->size(), mem->work->data());
                         sop->apply(correction->data(), mem->work->data());
 
                         // dot(c, A * c)
-                        T denominator = blas_.dot(correction->size(), correction->data(), mem->work->data());
+                        blas_.dot_into(correction->size(), correction->data(), mem->work->data(), &mem->scalars->data()[1]);
+                        T scalar_host[SCALAR_WORKSPACE_SIZE];
+                        blas_.copy_scalars_to_host(2, mem->scalars->data(), scalar_host);
+                        const T numerator   = scalar_host[0];
+                        const T denominator = scalar_host[1];
                         T alpha       = 1;
 
                         if (std::isfinite(static_cast<double>(numerator)) && std::isfinite(static_cast<double>(denominator)) &&
