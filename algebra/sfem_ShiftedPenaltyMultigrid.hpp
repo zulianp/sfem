@@ -650,6 +650,7 @@ namespace sfem {
                     prolongation->apply(mem_coarse->solution->data(), correction->data());
 
                     if (enable_line_search_) {
+                        SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_cycle::line_search");
                         // ATTENTION to code changes and side-effects
 
                         //  dot(c, (b - A * x))
@@ -661,8 +662,8 @@ namespace sfem {
                         T denominator = blas_.dot(correction->size(), correction->data(), mem->work->data());
                         T alpha       = 1;
 
-                        if (std::isfinite(static_cast<double>(numerator)) &&
-                            std::isfinite(static_cast<double>(denominator)) && denominator != 0) {
+                        if (std::isfinite(static_cast<double>(numerator)) && std::isfinite(static_cast<double>(denominator)) &&
+                            denominator != 0) {
                             alpha = numerator / denominator;
                         }
 
@@ -740,7 +741,7 @@ namespace sfem {
             for (int k = 0; k < this->cycle_type_; k++) {
                 if (constraints_op_) {
                     smoother->set_op_and_diag_shift(sop, constraints_op_x_op_[level], mem->diag);
-                  } else {
+                } else {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
