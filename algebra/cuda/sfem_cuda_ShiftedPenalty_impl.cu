@@ -108,19 +108,23 @@ namespace sfem {
     }
 
     template <typename T>
-    static T sq_norm_ramp_p_tpl(const ptrdiff_t n, const T* const x, T* const ub) {
+    static void sq_norm_ramp_p_into_tpl(const ptrdiff_t n, const T* const x, T* const ub, T* const result) {
         SFEM_DEBUG_SYNCHRONIZE();
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
+        cudaMemset((void*)result, 0, sizeof(T));
+        sq_norm_ramp_p_kernel<<<n_blocks, kernel_block_size>>>(n, x, ub, result);
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
+
+    template <typename T>
+    static T sq_norm_ramp_p_tpl(const ptrdiff_t n, const T* const x, T* const ub) {
         T* device_value = nullptr;
 
         cudaMalloc((void**)&device_value, sizeof(T));
-        cudaMemset((void*)device_value, 0, sizeof(T));
-
-        sq_norm_ramp_p_kernel<<<n_blocks, kernel_block_size>>>(n, x, ub, device_value);
-        SFEM_DEBUG_SYNCHRONIZE();
+        sq_norm_ramp_p_into_tpl(n, x, ub, device_value);
 
         T host_value = -1;
         cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
@@ -147,19 +151,23 @@ namespace sfem {
     }
 
     template <typename T>
-    static T sq_norm_ramp_m_tpl(const ptrdiff_t n, const T* const x, T* const lb) {
+    static void sq_norm_ramp_m_into_tpl(const ptrdiff_t n, const T* const x, T* const lb, T* const result) {
         SFEM_DEBUG_SYNCHRONIZE();
 
         int       kernel_block_size = SFEM_WARP_SIZE * SFEM_N_WARPS_PER_BLOCK;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
+        cudaMemset((void*)result, 0, sizeof(T));
+        sq_norm_ramp_m_kernel<<<n_blocks, kernel_block_size>>>(n, x, lb, result);
+        SFEM_DEBUG_SYNCHRONIZE();
+    }
+
+    template <typename T>
+    static T sq_norm_ramp_m_tpl(const ptrdiff_t n, const T* const x, T* const lb) {
         T* device_value = nullptr;
 
         cudaMalloc((void**)&device_value, sizeof(T));
-        cudaMemset((void*)device_value, 0, sizeof(T));
-
-        sq_norm_ramp_m_kernel<<<n_blocks, kernel_block_size>>>(n, x, lb, device_value);
-        SFEM_DEBUG_SYNCHRONIZE();
+        sq_norm_ramp_m_into_tpl(n, x, lb, device_value);
 
         T host_value = -1;
         cudaMemcpy(&host_value, device_value, sizeof(T), cudaMemcpyDeviceToHost);
@@ -342,6 +350,8 @@ namespace sfem {
     void CUDA_ShiftedPenalty<T>::build(struct ShiftedPenalty_Tpl<T>& tpl) {
         tpl.sq_norm_ramp_p = &sq_norm_ramp_p_tpl<T>;
         tpl.sq_norm_ramp_m = &sq_norm_ramp_m_tpl<T>;
+        tpl.sq_norm_ramp_p_into = &sq_norm_ramp_p_into_tpl<T>;
+        tpl.sq_norm_ramp_m_into = &sq_norm_ramp_m_into_tpl<T>;
         tpl.ramp_p         = &ramp_p_tpl<T>;
         tpl.ramp_m         = &ramp_m_tpl<T>;
         tpl.update_lagr_p  = &update_lagr_p_tpl<T>;
