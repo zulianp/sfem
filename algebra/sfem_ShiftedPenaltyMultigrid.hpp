@@ -659,7 +659,17 @@ namespace sfem {
 
                         // dot(c, A * c)
                         T denominator = blas_.dot(correction->size(), correction->data(), mem->work->data());
-                        T alpha       = numerator / (denominator == 0 ? T(1e-16) : denominator);
+                        T alpha       = 1;
+
+                        if (std::isfinite(static_cast<double>(numerator)) &&
+                            std::isfinite(static_cast<double>(denominator)) && denominator != 0) {
+                            alpha = numerator / denominator;
+                        }
+
+                        if (!std::isfinite(static_cast<double>(alpha))) {
+                            fprintf(stderr, "Non-finite line-search alpha detected!\n");
+                            return CYCLE_FAILURE;
+                        }
 
                         if (debug) printf("alpha = %g\n", alpha);
 
@@ -835,7 +845,7 @@ namespace sfem {
         bool                                 wrap_input_{true};
 
         bool collect_energy_norm_correction_{false};
-        bool enable_line_search_{false};
+        bool enable_line_search_{true};
         bool project_coarse_space_correction_{false};
         bool skip_coarse{false};
         bool verbose{true};

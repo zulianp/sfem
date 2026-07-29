@@ -6,8 +6,13 @@
 
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
+#include "sfem_openmp_blas.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_blas.hpp"
+#endif
 
 #include "boundary_condition.hpp"
 #include "boundary_condition_io.hpp"
