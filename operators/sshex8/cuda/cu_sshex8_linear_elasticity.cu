@@ -595,6 +595,14 @@ static __device__ __forceinline__ int cu_sshex8_hex_vertex_y(const int v) { retu
 
 static __device__ __forceinline__ int cu_sshex8_hex_vertex_z(const int v) { return v >> 2; }
 
+static __device__ __forceinline__ void cu_sshex8_mma_m8n8k4_f64(const double A, const double B, double &C0, double &C1) {
+    asm volatile(
+            "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
+            "{%0,%1},{%2},{%3},{%4,%5};\n"
+            : "=d"(C0), "=d"(C1)
+            : "d"(A), "d"(B), "d"(C0), "d"(C1));
+}
+
 template <typename T>
 static __device__ __forceinline__ void cu_sshex8_tp_ref_grad(const int q, const int node, T *const SFEM_RESTRICT g) {
     const int qx = q & 1;
@@ -682,10 +690,6 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_k
             cu_hex8_sub_adj_0_in_place<T>((T)(1. / LEVEL), shared_adjugate, &shared_determinant);
         }
 
-        for (int i = lidx; i < N_MATRIX; i += nthreads) {
-            emat[i] = 0;
-        }
-
         __syncthreads();
 
         const T determinant = shared_determinant;
@@ -711,50 +715,104 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_k
             T *const row1 = &emat[(row_node * 3 + 1) * N_DOF + col_node * 3];
             T *const row2 = &emat[(row_node * 3 + 2) * N_DOF + col_node * 3];
 
-            atomicAdd(&row0[0], block[0]);
-            atomicAdd(&row0[1], block[1]);
-            atomicAdd(&row0[2], block[2]);
-            atomicAdd(&row1[0], block[3]);
-            atomicAdd(&row1[1], block[4]);
-            atomicAdd(&row1[2], block[5]);
-            atomicAdd(&row2[0], block[6]);
-            atomicAdd(&row2[1], block[7]);
-            atomicAdd(&row2[2], block[8]);
+            row0[0] = block[0];
+            row0[1] = block[1];
+            row0[2] = block[2];
+            row1[0] = block[3];
+            row1[1] = block[4];
+            row1[2] = block[5];
+            row2[0] = block[6];
+            row2[1] = block[7];
+            row2[2] = block[8];
         }
 
         __syncthreads();
 
-        for (int task = lidx; task < N_MICRO * N_DOF; task += nthreads) {
-            const int micro_id = task / N_DOF;
-            const int row      = task - micro_id * N_DOF;
+        assert(blockDim.x == 4);
+        assert(blockDim.y == 8);
 
-            const int xi = micro_id % LEVEL;
-            const int yi = (micro_id / LEVEL) % LEVEL;
-            const int zi = micro_id / (LEVEL * LEVEL);
-            const int base = zi * BLOCK_SIZE_2 + yi * BLOCK_SIZE + xi;
+        const int batch_size  = blockDim.y * blockDim.z;
+        const int batch_start = threadIdx.z * blockDim.y;
+        const int n_rounds    = (N_MICRO + batch_size - 1) / batch_size;
 
-            const int row_vertex = row / 3;
-            const int row_comp   = row - row_vertex * 3;
-            const int row_idx    = base + cu_sshex8_hex_vertex_x(row_vertex) +
-                                cu_sshex8_hex_vertex_y(row_vertex) * BLOCK_SIZE +
-                                cu_sshex8_hex_vertex_z(row_vertex) * BLOCK_SIZE_2;
+        const int in_vertex_0  = threadIdx.x;
+        const int in_vertex_1  = threadIdx.x + 4;
+        const int out_vertex   = threadIdx.y;
+        const int in_x_offset0 = cu_sshex8_hex_vertex_x(in_vertex_0);
+        const int in_y_offset0 = cu_sshex8_hex_vertex_y(in_vertex_0);
+        const int in_z_offset0 = cu_sshex8_hex_vertex_z(in_vertex_0);
+        const int in_x_offset1 = cu_sshex8_hex_vertex_x(in_vertex_1);
+        const int in_y_offset1 = cu_sshex8_hex_vertex_y(in_vertex_1);
+        const int in_z_offset1 = cu_sshex8_hex_vertex_z(in_vertex_1);
+        const int out_x_offset = cu_sshex8_hex_vertex_x(out_vertex);
+        const int out_y_offset = cu_sshex8_hex_vertex_y(out_vertex);
+        const int out_z_offset = cu_sshex8_hex_vertex_z(out_vertex);
 
-            T acc = 0;
+        for (int r = 0; r < n_rounds; r++) {
+            const int in_micro_e  = threadIdx.y + batch_start + r * batch_size;
+            const int out_micro_e = 2 * threadIdx.x + batch_start + r * batch_size;
 
-#pragma unroll
-            for (int col_vertex = 0; col_vertex < 8; col_vertex++) {
-                const int col_idx = base + cu_sshex8_hex_vertex_x(col_vertex) +
-                                    cu_sshex8_hex_vertex_y(col_vertex) * BLOCK_SIZE +
-                                    cu_sshex8_hex_vertex_z(col_vertex) * BLOCK_SIZE_2;
+            double u00 = 0;
+            double u01 = 0;
+            double u02 = 0;
+            double u10 = 0;
+            double u11 = 0;
+            double u12 = 0;
 
-#pragma unroll
-                for (int col_comp = 0; col_comp < 3; col_comp++) {
-                    const int col = col_vertex * 3 + col_comp;
-                    acc += emat[row * N_DOF + col] * u_block[col_comp][col_idx];
-                }
+            if (in_micro_e < N_MICRO) {
+                const int in_xe = in_micro_e % LEVEL;
+                const int in_ye = (in_micro_e / LEVEL) % LEVEL;
+                const int in_ze = in_micro_e / (LEVEL * LEVEL);
+
+                const int idx0 = (in_ze + in_z_offset0) * BLOCK_SIZE_2 + (in_ye + in_y_offset0) * BLOCK_SIZE +
+                                 (in_xe + in_x_offset0);
+                const int idx1 = (in_ze + in_z_offset1) * BLOCK_SIZE_2 + (in_ye + in_y_offset1) * BLOCK_SIZE +
+                                 (in_xe + in_x_offset1);
+
+                u00 = (double)u_block[0][idx0];
+                u01 = (double)u_block[1][idx0];
+                u02 = (double)u_block[2][idx0];
+                u10 = (double)u_block[0][idx1];
+                u11 = (double)u_block[1][idx1];
+                u12 = (double)u_block[2][idx1];
             }
 
-            atomicAdd(&out_block[row_comp][row_idx], acc);
+#pragma unroll
+            for (int out_comp = 0; out_comp < 3; out_comp++) {
+                double C0 = 0;
+                double C1 = 0;
+
+                const int row  = out_vertex * 3 + out_comp;
+                const int col0 = in_vertex_0 * 3;
+                const int col1 = in_vertex_1 * 3;
+
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col0 + 0], u00, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col1 + 0], u10, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col0 + 1], u01, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col1 + 1], u11, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col0 + 2], u02, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col1 + 2], u12, C0, C1);
+
+                if (out_micro_e < N_MICRO) {
+                    const int out_xe = out_micro_e % LEVEL;
+                    const int out_ye = (out_micro_e / LEVEL) % LEVEL;
+                    const int out_ze = out_micro_e / (LEVEL * LEVEL);
+                    const int idx    = (out_ze + out_z_offset) * BLOCK_SIZE_2 + (out_ye + out_y_offset) * BLOCK_SIZE +
+                                    (out_xe + out_x_offset);
+
+                    atomicAdd(&out_block[out_comp][idx], (T)C0);
+                }
+
+                if (out_micro_e + 1 < N_MICRO) {
+                    const int out_xe = (out_micro_e + 1) % LEVEL;
+                    const int out_ye = ((out_micro_e + 1) / LEVEL) % LEVEL;
+                    const int out_ze = (out_micro_e + 1) / (LEVEL * LEVEL);
+                    const int idx    = (out_ze + out_z_offset) * BLOCK_SIZE_2 + (out_ye + out_y_offset) * BLOCK_SIZE +
+                                    (out_xe + out_x_offset);
+
+                    atomicAdd(&out_block[out_comp][idx], (T)C1);
+                }
+            }
         }
 
         __syncthreads();
@@ -1009,7 +1067,7 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, device_id);
 
-    dim3 block_size(128, 1, 1);
+    dim3 block_size(4, 8, 4);
     dim3 n_blocks(MIN(nelements, prop.maxGridSize[0]), 1, 1);
 
     if (stream) {
