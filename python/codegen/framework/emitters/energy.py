@@ -174,11 +174,12 @@ class OpenMPEnergySoASourceBuilder:
             "#endif",
         )
 
-    def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name):
+    def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name, extra_headers=()):
         return (
             "#include <cstdio>",
             "#include <type_traits>",
             '#include "%s"' % local_name,
+            *('#include "%s"' % header for header in extra_headers),
             '#include "%s"' % geometry_name,
             '#include "%s"' % diagnostics_name,
             *self.target.includes(),
@@ -302,11 +303,12 @@ class CUDAEnergySoASourceBuilder:
             "#endif",
         )
 
-    def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name):
+    def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name, extra_headers=()):
         return (
             "#include <type_traits>",
             *self.target.includes(),
             '#include "%s"' % local_name,
+            *('#include "%s"' % header for header in extra_headers),
             '#include "%s"' % geometry_name,
             '#include "%s"' % diagnostics_name,
         )
