@@ -138,7 +138,7 @@ int cu_affine_hex8_elemental_matrix_apply_tpl(const ptrdiff_t              nelem
 
 extern int cu_affine_hex8_elemental_matrix_apply(const ptrdiff_t                 nelements,
                                                  idx_t **const SFEM_RESTRICT     elements,
-                                                 const enum smesh::PrimitiveType             real_type,
+                                                 const enum smesh::PrimitiveType real_type,
                                                  void **const SFEM_RESTRICT      elemental_matrix,
                                                  const void *const SFEM_RESTRICT x,
                                                  void *const SFEM_RESTRICT       y,
@@ -314,7 +314,7 @@ int cu_affine_sshex8_elemental_matrix_apply_warp_tpl(const ptrdiff_t            
     static const int BLOCK_SIZE = LEVEL + 1;
 
     dim3 block_size(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-    dim3 n_blocks(MIN(nelements, 65535), 1, 1);
+    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
@@ -381,7 +381,7 @@ int cu_affine_sshex8_elemental_matrix_apply_tpl(const int                    lev
 extern int cu_affine_sshex8_elemental_matrix_apply(const int                       level,
                                                    const ptrdiff_t                 nelements,
                                                    idx_t **const SFEM_RESTRICT     elements,
-                                                   const enum smesh::PrimitiveType             real_type,
+                                                   const enum smesh::PrimitiveType real_type,
                                                    void **const SFEM_RESTRICT      elemental_matrix,
                                                    const void *const SFEM_RESTRICT x,
                                                    void *const SFEM_RESTRICT       y,
@@ -523,7 +523,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t        
     static const int BLOCK_SIZE = LEVEL + 1;
 
     dim3 block_size(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-    dim3 n_blocks(MIN(nelements, 65535), 1, 1);
+    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
@@ -560,7 +560,7 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC(const ptrd
     __shared__ T emat[64];
 
     const int lane_id = threadIdx.x + blockDim.x * threadIdx.y;
-    const int lidx = lane_id + (blockDim.x * blockDim.y) * threadIdx.z;
+    const int lidx    = lane_id + (blockDim.x * blockDim.y) * threadIdx.z;
 
     // Elemental matrix entries for this thread
     const int offset_0 = threadIdx.y * 8 + threadIdx.x;
@@ -722,13 +722,13 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl(const ptrdiff_t          
     static const int Z_SIZE = (LEVEL * LEVEL * LEVEL + 8 - 1) / 8;
 
     int z_block_size = MIN(max_z_size, Z_SIZE);
-    
-    if(z_block_size * 4 * 8 < POW3(LEVEL + 1)) {
+
+    if (z_block_size * 4 * 8 < POW3(LEVEL + 1)) {
         SFEM_ERROR("Too large block size!\n");
     }
 
     dim3 block_size(4, 8, z_block_size);
-    dim3 n_blocks(MIN(nelements, 65535), 1, 1);
+    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);
@@ -798,7 +798,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                   
 int cu_affine_sshex8_elemental_matrix_apply_AoS(const int                        level,
                                                 const ptrdiff_t                  nelements,
                                                 const idx_t *const SFEM_RESTRICT elements,
-                                                const enum smesh::PrimitiveType              real_type,
+                                                const enum smesh::PrimitiveType  real_type,
                                                 const void *const SFEM_RESTRICT  elemental_matrix,
                                                 const void *const SFEM_RESTRICT  x,
                                                 void *const SFEM_RESTRICT        y,
