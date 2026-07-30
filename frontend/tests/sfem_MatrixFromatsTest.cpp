@@ -648,6 +648,8 @@ int test_generated_laplace_crs_bsr_matches_existing_laplacian() {
     std::vector<real_t> generated_gradient(ndofs, 0);
     std::vector<real_t> expected_action(ndofs, 0);
     std::vector<real_t> generated_action(ndofs, 0);
+    std::vector<real_t> generated_crs_action(ndofs, 0);
+    std::vector<real_t> generated_bsr_action(ndofs, 0);
     std::vector<real_t> packed_action(ndofs, 0);
     geom_t **const mesh_points = mesh->points()->data();
     for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
@@ -668,6 +670,28 @@ int test_generated_laplace_crs_bsr_matches_existing_laplacian() {
     SFEM_TEST_ASSERT(assert_close_action("generated Laplace apply",
                                          expected_action,
                                          generated_action,
+                                         1e-14,
+                                         1e-12) == SFEM_SUCCESS);
+
+    auto generated_crs = sfem::hessian_crs(generated_function, nullptr, sfem::EXECUTION_SPACE_HOST);
+    auto generated_bsr = sfem::hessian_bsr(generated_function, nullptr, sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(generated_crs != nullptr);
+    SFEM_TEST_ASSERT(generated_bsr != nullptr);
+    SFEM_TEST_ASSERT(generated_crs->apply(direction.data(), generated_crs_action.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(generated_bsr->apply(direction.data(), generated_bsr_action.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(assert_close_action("generated Laplace CRS hessian",
+                                         expected_action,
+                                         generated_crs_action,
+                                         1e-8,
+                                         1e-10) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(assert_close_action("generated Laplace BSR hessian",
+                                         expected_action,
+                                         generated_bsr_action,
+                                         1e-8,
+                                         1e-10) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(assert_close_action("generated Laplace CRS/BSR hessian",
+                                         generated_crs_action,
+                                         generated_bsr_action,
                                          1e-14,
                                          1e-12) == SFEM_SUCCESS);
 
@@ -705,6 +729,7 @@ int test_generated_laplace_hex8_dia_matches_apply() {
     const ptrdiff_t ndofs = space->n_dofs();
     std::vector<real_t> direction(ndofs, 0);
     std::vector<real_t> expected_action(ndofs, 0);
+    std::vector<real_t> dia_action(ndofs, 0);
     std::vector<real_t> packed_action(ndofs, 0);
 
     geom_t **const points = mesh->points()->data();
@@ -713,6 +738,15 @@ int test_generated_laplace_hex8_dia_matches_apply() {
     }
 
     SFEM_TEST_ASSERT(function->apply(nullptr, direction.data(), expected_action.data()) == SFEM_SUCCESS);
+
+    auto generated_dia = sfem::hessian_dia(function, nullptr, sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(generated_dia != nullptr);
+    SFEM_TEST_ASSERT(generated_dia->apply(direction.data(), dia_action.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(assert_close_action("generated HEX8 DIA Laplace hessian",
+                                         expected_action,
+                                         dia_action,
+                                         1e-8,
+                                         1e-10) == SFEM_SUCCESS);
 
     auto packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true);
     auto packed_space = sfem::FunctionSpace::create(packed_mesh, 1);
@@ -849,4 +883,3 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
-

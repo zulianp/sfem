@@ -2462,3 +2462,361 @@ extern "C" int laplace_tet4_jacobian_action_isoparametric_mesh_aos_float(
 ) {
     return laplace_tet4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, parameters[0], 1, direction + 0, 1, output + 0);
 }
+
+namespace sfem {
+namespace codegen {
+
+static SFEM_INLINE void laplace_tet4_hessian_crs_isoparametric_mesh_soa_find_cols(
+        const idx_t *const SFEM_RESTRICT targets,
+        const idx_t *const SFEM_RESTRICT row,
+        const int lenrow,
+        idx_t *const SFEM_RESTRICT ks) {
+#pragma unroll(4)
+    for (int d = 0; d < 4; ++d) {
+        ks[d] = 0;
+    }
+    for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(4)
+        for (int d = 0; d < 4; ++d) {
+            ks[d] += row[k] < targets[d];
+        }
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE int laplace_tet4_hessian_crs_isoparametric_mesh_soa_scatter_crs(
+        const idx_t *const SFEM_RESTRICT ev,
+        const scalar_t *const SFEM_RESTRICT element_matrix,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        scalar_t *const SFEM_RESTRICT values) {
+    static constexpr int N_SHAPE = 4;
+    count_t entries[N_SHAPE * N_SHAPE];
+    idx_t ks[N_SHAPE];
+    bool valid_graph = true;
+    for (int i = 0; i < N_SHAPE; ++i) {
+        const count_t row_begin = rowptr[ev[i]];
+        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);
+        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
+        laplace_tet4_hessian_crs_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
+        for (int j = 0; j < N_SHAPE; ++j) {
+            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {
+                if (valid_graph) {
+                    std::fprintf(stderr, "laplace_tet4_hessian_crs_isoparametric_mesh_soa_scatter_crs missing graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
+                }
+                entries[i * N_SHAPE + j] = row_begin;
+                valid_graph = false;
+            } else {
+                entries[i * N_SHAPE + j] = row_begin + ks[j];
+            }
+        }
+    }
+    if (!valid_graph) return SFEM_FAILURE;
+    for (int i = 0; i < N_SHAPE; ++i) {
+        for (int j = 0; j < N_SHAPE; ++j) {
+#pragma omp atomic update
+            values[entries[i * N_SHAPE + j]] += element_matrix[i * N_SHAPE + j];
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE int laplace_tet4_hessian_crs_isoparametric_mesh_soa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const scalar_t kappa,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        scalar_t *const SFEM_RESTRICT values
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int N_FIELDS = 1;
+    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
+    static constexpr int VECTOR_SIZE = 1;
+    (void)nnodes;
+    const scalar_t *const isoparametric_shape = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::shape();
+    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::grad_ref_z();
+    const scalar_t *const isoparametric_q_weight = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::q_weight();
+
+    int invalid_matrix_graph = 0;
+#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)
+    for (ptrdiff_t element = 0; element < nelements; ++element) {
+        const ptrdiff_t evbegin = element;
+        const int nelems = 1;
+        idx_t ev[N_SHAPE];
+        scalar_t element_matrix[16];
+        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
+        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
+        scalar_t block_determinant[N_QP * VECTOR_SIZE];
+        scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
+        scalar_t block_output[N_STREAMS][VECTOR_SIZE];
+        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t node = elements[shape][element];
+            const idx_t coordinate_node = elements[shape][element];
+            ev[shape] = node;
+            for (int d = 0; d < DIM; ++d) {
+                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
+            }
+        }
+
+        scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        for (int q = 0; q < N_QP; ++q) {
+            const int lane = 0;
+            const scalar_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3];
+            const scalar_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3];
+            const scalar_t J02 = block_coordinates[0][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3];
+            const scalar_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3];
+            const scalar_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3];
+            const scalar_t J12 = block_coordinates[1][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3];
+            const scalar_t J20 = block_coordinates[2][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3];
+            const scalar_t J21 = block_coordinates[2][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3];
+            const scalar_t J22 = block_coordinates[2][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3];
+            geometry_jacobian_adjugate_and_determinant_3<scalar_t>(
+                    J00, J01, J02, J10, J11, J12, J20, J21, J22,
+                    block_adjugate_streams, block_determinant, q * VECTOR_SIZE + lane);
+        }
+        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+
+        for (int entry = 0; entry < 16; ++entry) {
+            element_matrix[entry] = scalar_t(0);
+        }
+        for (int trial_local = 0; trial_local < 4; ++trial_local) {
+            const int trial = trial_local;
+            for (int stream = 0; stream < N_STREAMS; ++stream) {
+                block_direction[stream][0] = scalar_t(0);
+                block_output[stream][0] = scalar_t(0);
+            }
+            block_direction[trial][0] = scalar_t(1);
+            laplace_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_direction, kappa, block_output);
+            for (int test_local = 0; test_local < 4; ++test_local) {
+                const int test = test_local;
+                element_matrix[test_local * 4 + trial_local] = block_output[test][0];
+            }
+        }
+
+        invalid_matrix_graph |= (laplace_tet4_hessian_crs_isoparametric_mesh_soa_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
+    }
+
+    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::laplace_tet4_hessian_crs_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
+}
+
+extern "C" int laplace_tet4_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::laplace_tet4_hessian_crs_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
+}
+
+extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::laplace_tet4_hessian_crs_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
+}
+
+extern "C" int laplace_tet4_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::laplace_tet4_hessian_crs_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
+}
+
+namespace sfem {
+namespace codegen {
+
+template <typename scalar_t>
+static SFEM_INLINE int laplace_tet4_hessian_dia_isoparametric_mesh_soa_scatter_dia(
+        const idx_t *const SFEM_RESTRICT ev,
+        const scalar_t *const SFEM_RESTRICT element_matrix,
+        const ptrdiff_t nnodes,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        scalar_t *const SFEM_RESTRICT values) {
+    static constexpr int N_SHAPE = 4;
+    ptrdiff_t diagonals[N_SHAPE * N_SHAPE];
+    bool valid_diagonal_offsets = true;
+    for (int i = 0; i < N_SHAPE; ++i) {
+        for (int j = 0; j < N_SHAPE; ++j) {
+            const int offset = (int)(ev[j] - ev[i]);
+            ptrdiff_t diagonal = 0;
+            while (diagonal < ndiag && diag_offsets[diagonal] != offset) ++diagonal;
+            if (diagonal == ndiag) {
+                if (valid_diagonal_offsets) {
+                    std::fprintf(stderr, "laplace_tet4_hessian_dia_isoparametric_mesh_soa_scatter_dia missing diagonal offset %d\n", offset);
+                }
+                diagonals[i * N_SHAPE + j] = 0;
+                valid_diagonal_offsets = false;
+            } else {
+                diagonals[i * N_SHAPE + j] = diagonal;
+            }
+        }
+    }
+    if (!valid_diagonal_offsets) return SFEM_FAILURE;
+    for (int i = 0; i < N_SHAPE; ++i) {
+        for (int j = 0; j < N_SHAPE; ++j) {
+            const ptrdiff_t diagonal = diagonals[i * N_SHAPE + j];
+#pragma omp atomic update
+            values[diagonal * nnodes + ev[i]] += element_matrix[i * N_SHAPE + j];
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE int laplace_tet4_hessian_dia_isoparametric_mesh_soa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const scalar_t kappa,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        scalar_t *const SFEM_RESTRICT values
+) {
+    static constexpr int DIM = 3;
+    static constexpr int N_QP = 1;
+    static constexpr int N_SHAPE = 4;
+    static constexpr int VECTOR_SIZE = 1;
+    (void)nnodes;
+    const scalar_t *const isoparametric_shape = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::shape();
+    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const isoparametric_grad_ref_z = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::grad_ref_z();
+    const scalar_t *const isoparametric_q_weight = sfem::codegen::laplace_tet4_isoparametric_reference_data<scalar_t>::q_weight();
+
+    int invalid_matrix_graph = 0;
+#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)
+    for (ptrdiff_t element = 0; element < nelements; ++element) {
+        const ptrdiff_t evbegin = element;
+        const int nelems = 1;
+        idx_t ev[N_SHAPE];
+        scalar_t element_matrix[N_SHAPE * N_SHAPE];
+        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
+        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
+        scalar_t block_determinant[N_QP * VECTOR_SIZE];
+        scalar_t block_direction[N_SHAPE][VECTOR_SIZE];
+        scalar_t block_output[N_SHAPE][VECTOR_SIZE];
+        const geom_t *const coordinate_components[DIM] = {points[0], points[1], points[2]};
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t node = elements[shape][element];
+            const idx_t coordinate_node = elements[shape][element];
+            ev[shape] = node;
+            for (int d = 0; d < DIM; ++d) {
+                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
+            }
+        }
+
+        scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+        for (int q = 0; q < N_QP; ++q) {
+            const int lane = 0;
+            const scalar_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3];
+            const scalar_t J01 = block_coordinates[0][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3];
+            const scalar_t J02 = block_coordinates[0][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[3][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[6][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[9][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3];
+            const scalar_t J10 = block_coordinates[1][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3];
+            const scalar_t J11 = block_coordinates[1][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3];
+            const scalar_t J12 = block_coordinates[1][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[4][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[7][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[10][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3];
+            const scalar_t J20 = block_coordinates[2][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 3];
+            const scalar_t J21 = block_coordinates[2][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_y[q * N_SHAPE + 3];
+            const scalar_t J22 = block_coordinates[2][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 0] + block_coordinates[5][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 1] + block_coordinates[8][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 2] + block_coordinates[11][lane] * isoparametric_grad_ref_z[q * N_SHAPE + 3];
+            geometry_jacobian_adjugate_and_determinant_3<scalar_t>(
+                    J00, J01, J02, J10, J11, J12, J20, J21, J22,
+                    block_adjugate_streams, block_determinant, q * VECTOR_SIZE + lane);
+        }
+        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
+
+        for (int entry = 0; entry < N_SHAPE * N_SHAPE; ++entry) {
+            element_matrix[entry] = scalar_t(0);
+        }
+        static constexpr int TENSOR_STREAMS[N_SHAPE] = {0, 1, 2, 3};
+        for (int trial = 0; trial < N_SHAPE; ++trial) {
+            const int tensor_trial = TENSOR_STREAMS[trial];
+            for (int stream = 0; stream < N_SHAPE; ++stream) {
+                block_direction[stream][0] = scalar_t(0);
+                block_output[stream][0] = scalar_t(0);
+            }
+            block_direction[tensor_trial][0] = scalar_t(1);
+            laplace_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_direction, kappa, block_output);
+            for (int test = 0; test < N_SHAPE; ++test) {
+                const int tensor_test = TENSOR_STREAMS[test];
+                element_matrix[test * N_SHAPE + trial] = block_output[tensor_test][0];
+            }
+        }
+
+        invalid_matrix_graph |= (laplace_tet4_hessian_dia_isoparametric_mesh_soa_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values) != SFEM_SUCCESS);
+    }
+
+    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_tet4_hessian_dia_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        double *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::laplace_tet4_hessian_dia_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, values);
+}
+
+extern "C" int laplace_tet4_hessian_dia_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        float *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::laplace_tet4_hessian_dia_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, values);
+}

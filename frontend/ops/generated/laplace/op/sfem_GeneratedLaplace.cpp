@@ -922,7 +922,28 @@ namespace sfem {
                             const idx_t *const colidx,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_crs");
-        return SFEM_FAILURE;
+
+
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters,
+                            mesh->spatial_dimension(),
+                            storage);
+
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_crs_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+            }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_crs_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+            }
+            SFEM_ERROR("laplace hessian_crs does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
     }
 
     int GeneratedLaplace::hessian_bsr(const real_t *const state,
@@ -930,7 +951,28 @@ namespace sfem {
                             const idx_t *const colidx,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_bsr");
-        return SFEM_FAILURE;
+
+
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters,
+                            mesh->spatial_dimension(),
+                            storage);
+
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_bsr_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+            }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_bsr_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], rowptr, colidx, values);
+            }
+            SFEM_ERROR("laplace hessian_bsr does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
     }
 
     int GeneratedLaplace::hessian_dia(const real_t *const state,
@@ -938,7 +980,28 @@ namespace sfem {
                             const ptrdiff_t ndiag,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_dia");
-        return SFEM_FAILURE;
+
+
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters,
+                            mesh->spatial_dimension(),
+                            storage);
+
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_dia_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+            }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 1;
+                return laplace_hessian_dia_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], diag_offsets, ndiag, values);
+            }
+            SFEM_ERROR("laplace hessian_dia does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
     }
 
     int GeneratedLaplace::value(const real_t *, real_t *const) {
