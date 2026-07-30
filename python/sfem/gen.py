@@ -1614,7 +1614,12 @@ def _codegen_file_directory(unit, context, filename):
 
 
 def _is_codegen_local_header(filename):
-    return filename.endswith("_local.hpp") or filename.endswith("_local.cuh")
+    return (
+        filename.endswith("_local.hpp")
+        or filename.endswith("_local.cuh")
+        or filename.endswith("_hessian.hpp")
+        or filename.endswith("_hessian.cuh")
+    )
 
 
 def _codegen_dimension_directory(context):

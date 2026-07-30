@@ -656,6 +656,76 @@ int cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl(const ptrdiff_t      
 }
 
 template <typename T, int LEVEL>
+int cu_affine_sshex8_linear_elasticity_apply_local_mem_original_tpl(
+        const ptrdiff_t                          nelements,
+        idx_t **const SFEM_RESTRICT              elements,
+        const ptrdiff_t                          jacobian_stride,
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+        const T                                  mu,
+        const T                                  lambda,
+        const ptrdiff_t                          u_stride,
+        const T *const SFEM_RESTRICT             ux,
+        const T *const SFEM_RESTRICT             uy,
+        const T *const SFEM_RESTRICT             uz,
+        const ptrdiff_t                          out_stride,
+        T *const SFEM_RESTRICT                   outx,
+        T *const SFEM_RESTRICT                   outy,
+        T *const SFEM_RESTRICT                   outz,
+        void                                    *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    int block_size = 128;
+#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    {
+        int min_grid_size;
+        cudaOccupancyMaxPotentialBlockSize(
+                &min_grid_size, &block_size, cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL>, 0, 0);
+    }
+#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+
+    const ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0, s>>>(nelements,
+                                                                                                            elements,
+                                                                                                            jacobian_stride,
+                                                                                                            jacobian_adjugate,
+                                                                                                            jacobian_determinant,
+                                                                                                            mu,
+                                                                                                            lambda,
+                                                                                                            u_stride,
+                                                                                                            ux,
+                                                                                                            uy,
+                                                                                                            uz,
+                                                                                                            out_stride,
+                                                                                                            outx,
+                                                                                                            outy,
+                                                                                                            outz);
+    } else {
+        cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel<T, LEVEL><<<n_blocks, block_size, 0>>>(nelements,
+                                                                                                         elements,
+                                                                                                         jacobian_stride,
+                                                                                                         jacobian_adjugate,
+                                                                                                         jacobian_determinant,
+                                                                                                         mu,
+                                                                                                         lambda,
+                                                                                                         u_stride,
+                                                                                                         ux,
+                                                                                                         uy,
+                                                                                                         uz,
+                                                                                                         out_stride,
+                                                                                                         outx,
+                                                                                                         outy,
+                                                                                                         outz);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+template <typename T, int LEVEL>
 int cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
@@ -907,6 +977,7 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
 // #define my_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_large cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_segmented cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl
+#define my_kernel_local_mem_original cu_affine_sshex8_linear_elasticity_apply_local_mem_original_tpl
 
 static int cu_sshex8_linear_elasticity_level8_kernel() {
     static int kernel = -1;
@@ -1013,6 +1084,24 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                 (real_t *)outy,
                                                 (real_t *)outz,
                                                 stream);
+                }
+                case 3: {
+                    return my_kernel_local_mem_original<real_t, 8>(nelements,
+                                                                   elements,
+                                                                   jacobian_stride,
+                                                                   (cu_jacobian_t *)jacobian_adjugate,
+                                                                   (cu_jacobian_t *)jacobian_determinant,
+                                                                   mu,
+                                                                   lambda,
+                                                                   u_stride,
+                                                                   (real_t *)ux,
+                                                                   (real_t *)uy,
+                                                                   (real_t *)uz,
+                                                                   out_stride,
+                                                                   (real_t *)outx,
+                                                                   (real_t *)outy,
+                                                                   (real_t *)outz,
+                                                                   stream);
                 }
                 default: {
                     return my_kernel_segmented<real_t, 8>(nelements,

@@ -4802,6 +4802,37 @@ def _c_abi_function_exists(kernel_sources, function_name, public_only=False):
     return False
 
 
+def _c_abi_public_dispatch_case_elements(kernel_sources, function_name):
+    if not kernel_sources:
+        return ()
+    for source in kernel_sources.values():
+        marker = "%s(" % function_name
+        start = source.find(marker)
+        while start >= 0:
+            declaration_prefix = source[max(0, start - 64) : start]
+            if "SFEM_CODEGEN_PUBLIC_C_ABI" not in declaration_prefix:
+                start = source.find(marker, start + len(marker))
+                continue
+            body_start = source.find("{", start)
+            if body_start < 0:
+                return ()
+            depth = 0
+            for idx in range(body_start, len(source)):
+                char = source[idx]
+                if char == "{":
+                    depth += 1
+                elif char == "}":
+                    depth -= 1
+                    if depth == 0:
+                        body = source[body_start : idx + 1]
+                        return tuple(
+                            sorted(set(re.findall(r"\bcase\s+smesh::([A-Z0-9_]+)\s*:", body)))
+                        )
+            return ()
+        return ()
+    return ()
+
+
 def _c_abi_function_declaration(kernel_sources, function_name, public_only=False):
     if not kernel_sources:
         return None
@@ -6012,8 +6043,18 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
         isop = "%s_gradient_%dd_isoparametric_mesh_soa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append("%s    if (impl_->gradient_uses_affine) {" % indent)
-        if _c_abi_function_exists(kernel_sources, affine_aos_unit, public_only=True):
-            lines.append("%s        if (adjugate_aos) {" % indent)
+        affine_aos_unit_elements = _c_abi_public_dispatch_case_elements(
+            kernel_sources,
+            affine_aos_unit,
+        )
+        if affine_aos_unit_elements:
+            lines.append(
+                "%s        if (adjugate_aos && (%s)) {"
+                % (
+                    indent,
+                    _element_condition("domain.element_type", affine_aos_unit_elements),
+                )
+            )
             lines.append(
                 "%s            return %s(%s);"
                 % (

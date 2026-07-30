@@ -425,8 +425,15 @@ def generate_sfem_soa_cpp_files(
     tensor_product_name = source_builder.header_name("tensor_product_kernels")
     geometry_name = source_builder.header_name("geometry_kernels")
     diagnostics_name = source_builder.header_name("kernel_diagnostics")
+    hessian_name = source_builder.header_name("%s_hessian" % local_prefix)
     header_guard_suffix = source_builder.header_guard_suffix()
     operator_name = "%s_operator.%s" % (prefix, source_builder.operator_extension)
+    emits_hessian_header = _sfem_soa_emits_hessian_header(
+        forms,
+        quadrature_rule,
+        array_inputs,
+        basis_family,
+    )
     files = [
         GeneratedKernelFile(
             math_name,
@@ -466,6 +473,24 @@ def generate_sfem_soa_cpp_files(
                 source_builder.tensor_product_header_source(),
             )
         )
+    if emits_hessian_header:
+        files.append(
+            GeneratedKernelFile(
+                hessian_name,
+                _sfem_soa_hessian_header(
+                    forms,
+                    local_prefix,
+                    dim,
+                    n_nodes,
+                    array_inputs,
+                    quadrature_rule,
+                    basis_family,
+                    math_name,
+                    tensor_product_name,
+                    source_builder,
+                ),
+            )
+        )
     files.extend(
         [
         GeneratedKernelFile(
@@ -495,6 +520,7 @@ def generate_sfem_soa_cpp_files(
                 vector_size,
                 local_prefix,
                 local_name,
+                hessian_name if emits_hessian_header else None,
                 geometry_name,
                 diagnostics_name,
                 array_inputs,
@@ -652,6 +678,212 @@ def _sfem_soa_local_header(
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
     return "\n".join(lines)
+
+
+def _sfem_soa_emits_hessian_header(
+    forms,
+    quadrature_rule,
+    array_inputs,
+    basis_family,
+):
+    if quadrature_rule is None:
+        return False
+    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
+    return any(
+        _sfem_soa_direct_hessian_matrix_assembly_available(
+            form,
+            quadrature_rule,
+            reference_inputs,
+            basis_family,
+        )
+        for form in forms
+    )
+
+
+def _sfem_soa_direct_hessian_function_name(
+    local_prefix,
+    use_tensor_product_reference,
+):
+    family = "tensor_product" if use_tensor_product_reference else "reference"
+    return "%s_direct_hessian_%s_element_matrix" % (local_prefix, family)
+
+
+def _sfem_soa_hessian_header(
+    forms,
+    prefix,
+    dim,
+    n_nodes,
+    array_inputs,
+    quadrature_rule,
+    basis_family=None,
+    math_name="kernel_math.hpp",
+    tensor_product_name="tensor_product_kernels.hpp",
+    source_builder=None,
+):
+    if source_builder is None:
+        source_builder = _default_openmp_energy_source_builder()
+    guard = "%s_HESSIAN_%s" % (
+        _cpp_macro_name(prefix),
+        source_builder.header_guard_suffix(),
+    )
+    reference_inputs = _sfem_soa_reference_inputs(array_inputs)
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        reference_inputs,
+        basis_family,
+    )
+    use_reference_gradient_vectors = (
+        not use_tensor_product_reference
+        and len(reference_inputs) == 1
+        and reference_inputs[0].name == "grad_ref"
+    )
+    lines = [
+        "#ifndef %s" % guard,
+        "#define %s" % guard,
+        "",
+        "#include <math.h>",
+        "#include <stddef.h>",
+        "#if defined(__has_include)",
+        '#if __has_include("sfem_base.hpp")',
+        '#include "sfem_base.hpp"',
+        "#define SFEM_GENERATED_SCALAR_T",
+        "#endif",
+        "#endif",
+        "",
+        *source_builder.local_header_preamble_lines(
+            math_name,
+            tensor_product_name,
+            basis_family,
+        ),
+        "",
+        "#ifndef SFEM_GENERATED_SCALAR_T",
+        "#define SFEM_GENERATED_SCALAR_T",
+        "typedef double real_t;",
+        "typedef ptrdiff_t idx_t;",
+        "typedef double geom_t;",
+        "#endif",
+        "",
+    ]
+    lines = [line for line in lines if line != ""]
+    lines.extend(["namespace sfem {", "namespace codegen {", ""])
+
+    emitted = set()
+    for form in forms:
+        if not _sfem_soa_direct_hessian_matrix_assembly_available(
+            form,
+            quadrature_rule,
+            reference_inputs,
+            basis_family,
+        ):
+            continue
+        name = _sfem_soa_direct_hessian_function_name(
+            prefix,
+            use_tensor_product_reference,
+        )
+        if name in emitted:
+            continue
+        emitted.add(name)
+        lines.extend(
+            _sfem_soa_direct_hessian_element_matrix_function(
+                form,
+                name,
+                dim,
+                quadrature_rule,
+                reference_inputs,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                source_builder,
+            )
+        )
+        lines.append("")
+
+    lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
+    return "\n".join(lines)
+
+
+def _sfem_soa_direct_hessian_element_matrix_function(
+    form,
+    name,
+    dim,
+    quadrature_rule,
+    reference_inputs,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+    source_builder,
+):
+    params = [
+        *(
+            "const scalar_t *const SFEM_RESTRICT block_jacobian_adjugate%d" % component
+            for component in range(dim * dim)
+        ),
+        "const scalar_t *const SFEM_RESTRICT block_jacobian_determinant0",
+    ]
+    if use_tensor_product_reference:
+        params.extend(
+            (
+                "const scalar_t *const SFEM_RESTRICT shape_1d",
+                "const scalar_t *const SFEM_RESTRICT grad_1d",
+                "const scalar_t *const SFEM_RESTRICT q_weight_1d",
+            )
+        )
+    elif use_reference_gradient_vectors:
+        params.extend(_sfem_reference_gradient_vector_params(dim))
+        params.append("const scalar_t *const SFEM_RESTRICT q_weight")
+    else:
+        params.extend(
+            "const %s *const SFEM_RESTRICT %s"
+            % (array_input.scalar_type, _sfem_soa_reference_param_name(array_input))
+            for array_input in reference_inputs
+        )
+        params.append("const scalar_t *const SFEM_RESTRICT q_weight")
+    params.extend(_form_material_parameter_declarations(form))
+    params.append("scalar_t *const SFEM_RESTRICT element_matrix")
+
+    lines = [
+        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+        "static %s void %s(" % (_inline_qualifier(source_builder), name),
+    ]
+    for idx, param in enumerate(params):
+        comma = "," if idx + 1 < len(params) else ""
+        lines.append("        %s%s" % (param, comma))
+    lines.extend(
+        [
+            ") {",
+            "    static_assert(N_QP > 0, \"N_QP must be positive\");",
+            "    static_assert(N_SHAPE > 0, \"N_SHAPE must be positive\");",
+            "    static_assert(VECTOR_SIZE > 0, \"VECTOR_SIZE must be positive\");",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int NDOFS = DIM * N_SHAPE;",
+        ]
+    )
+    if use_tensor_product_reference:
+        lines.extend(
+            [
+                "    static constexpr int N_QP_1D = integer_root(N_QP, %d);"
+                % quadrature_rule.dim,
+                "    static constexpr int N_SHAPE_1D = integer_root(N_SHAPE, %d);"
+                % quadrature_rule.dim,
+                "    static_assert(ipow(N_QP_1D, %d) == N_QP, \"N_QP must be tensor-product compatible\");"
+                % quadrature_rule.dim,
+                "    static_assert(ipow(N_SHAPE_1D, %d) == N_SHAPE, \"N_SHAPE must be tensor-product compatible\");"
+                % quadrature_rule.dim,
+            ]
+        )
+    lines.extend(
+        _sfem_soa_direct_hessian_matrix_assembly_lines(
+            form,
+            dim,
+            quadrature_rule,
+            reference_inputs,
+            use_tensor_product_reference,
+            use_reference_gradient_vectors,
+            "",
+            "    ",
+            emit_tensor_product_static_constants=False,
+        )
+    )
+    lines.append("}")
+    return lines
 
 
 def _sfem_soa_block_function(
@@ -982,6 +1214,24 @@ def _sfem_soa_block_function(
     _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item)
     lines.extend(["    }", "}"])
     return lines
+
+
+def _sfem_soa_direct_hessian_matrix_assembly_available(
+    form,
+    quadrature_rule,
+    reference_inputs,
+    basis_family,
+):
+    if form.name != "apply" or form.weak_form is None:
+        return False
+    if len(reference_inputs) != 1 or reference_inputs[0].name != "grad_ref":
+        return False
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        reference_inputs,
+        basis_family,
+    )
+    return not _form_uses_current(form, default=True)
 
 
 def _constant_p1_specialized_local(local_prefix, quadrature_rule):
@@ -1922,6 +2172,92 @@ def _tensor_product_quadrature_weight_expr(dim, weight_name="q_weight_1d"):
     return " * ".join(factors)
 
 
+def _tensor_product_shape_coordinate_arrays(quadrature_rule, indent):
+    coords = _tensor_product_node_coords(quadrature_rule)
+    axis_names = ("x", "y", "z")[: quadrature_rule.dim]
+    lines = []
+    for axis, name in enumerate(axis_names):
+        lines.append(
+            "%sstatic constexpr int SHAPE_%s[N_SHAPE] = {%s};"
+            % (
+                indent,
+                name.upper(),
+                ", ".join(str(coord[axis]) for coord in coords),
+            )
+        )
+    return lines
+
+
+def _tensor_product_shape_coordinate_lines(dim, shape_expr, prefix, indent):
+    if dim == 2:
+        return (
+            "%sconst int %s_sx = %s %% N_SHAPE_1D;" % (indent, prefix, shape_expr),
+            "%sconst int %s_sy = %s / N_SHAPE_1D;" % (indent, prefix, shape_expr),
+        )
+    if dim == 3:
+        return (
+            "%sconst int %s_sx = %s %% N_SHAPE_1D;" % (indent, prefix, shape_expr),
+            "%sconst int %s_sy = (%s / N_SHAPE_1D) %% N_SHAPE_1D;"
+            % (indent, prefix, shape_expr),
+            "%sconst int %s_sz = %s / (N_SHAPE_1D * N_SHAPE_1D);"
+            % (indent, prefix, shape_expr),
+        )
+    raise ValueError("tensor-product shape coordinates require dim 2 or 3")
+
+
+def _tensor_product_reference_gradient_expr_from_coords(
+    dim,
+    derivative_axis,
+    coord_prefix,
+    shape_name="shape_1d",
+    grad_name="grad_1d",
+):
+    factors = []
+    for axis in range(dim):
+        qp_name = ("qx", "qy", "qz")[axis]
+        node_axis_name = "%s_%s" % (coord_prefix, ("sx", "sy", "sz")[axis])
+        table_name = grad_name if axis == derivative_axis else shape_name
+        factors.append("%s[%s * N_SHAPE_1D + %s]" % (table_name, qp_name, node_axis_name))
+    return " * ".join(factors)
+
+
+def _sfem_soa_reference_gradient_expr_for_shape(
+    dim,
+    component,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+    reference_inputs,
+    shape_expr,
+    coord_prefix=None,
+    reference_prefix="",
+):
+    if use_tensor_product_reference:
+        if coord_prefix is None:
+            raise ValueError("tensor-product reference gradients require coordinate variables")
+        return _tensor_product_reference_gradient_expr_from_coords(
+            dim,
+            component,
+            coord_prefix,
+            "%sshape_1d" % reference_prefix,
+            "%sgrad_1d" % reference_prefix,
+        )
+    if use_reference_gradient_vectors:
+        return "%s%s[q * N_SHAPE + %s]" % (
+            reference_prefix,
+            _sfem_reference_gradient_vector_name(component),
+            shape_expr,
+        )
+    if len(reference_inputs) == 1 and reference_inputs[0].name == "grad_ref":
+        return "%s%s[(q * N_SHAPE + %s) * %d + %d]" % (
+            reference_prefix,
+            reference_inputs[0].name,
+            shape_expr,
+            dim,
+            component,
+        )
+    raise ValueError("hessian matrix generation requires reference gradients")
+
+
 def _append_tensor_product_reference_gradient_lines(lines, name, quadrature_rule):
     for shape, coords in enumerate(_tensor_product_node_coords(quadrature_rule)):
         for component in range(quadrature_rule.dim):
@@ -2082,6 +2418,7 @@ def _sfem_soa_operator_source(
     vector_size,
     local_prefix,
     local_name,
+    hessian_name,
     geometry_name,
     diagnostics_name,
     array_inputs,
@@ -2096,7 +2433,12 @@ def _sfem_soa_operator_source(
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     lines = [
-        *source_builder.operator_preamble_lines(local_name, geometry_name, diagnostics_name),
+        *source_builder.operator_preamble_lines(
+            local_name,
+            geometry_name,
+            diagnostics_name,
+            extra_headers=(() if hessian_name is None else (hessian_name,)),
+        ),
         "",
         "#include <cstdint>",
         "#include <cstdlib>",
@@ -4592,6 +4934,229 @@ def _sfem_soa_mesh_objective_steps_function(
     return lines
 
 
+def _sfem_soa_direct_hessian_matrix_assembly_lines(
+    form,
+    dim,
+    quadrature_rule,
+    reference_inputs,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+    reference_prefix,
+    indent,
+    emit_tensor_product_static_constants=True,
+):
+    if _form_uses_current(form, default=True):
+        raise ValueError("direct hessian matrix assembly currently requires no current field")
+    weak_form = form.weak_form
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        _weak_form_deformation_gradient_substitutions(weak_form, "grad_u"),
+        tuple(sp.symbols("trial_grad[%d]" % i) for i in range(dim * dim)),
+    )
+    lines = [
+        "%sfor (int entry = 0; entry < NDOFS * NDOFS; ++entry) {" % indent,
+        "%s    element_matrix[entry] = scalar_t(0);" % indent,
+        "%s}" % indent,
+    ]
+    if use_tensor_product_reference and emit_tensor_product_static_constants:
+        lines.extend(
+            [
+                "%sstatic constexpr int N_QP_1D = %d;"
+                % (indent, quadrature_rule.tensor_product_n_qp_1d),
+                "%sstatic constexpr int N_SHAPE_1D = %d;"
+                % (indent, quadrature_rule.tensor_product_n_shape_1d),
+            ]
+        )
+    lines.append("%sfor (int q = 0; q < N_QP; ++q) {" % indent)
+    if use_tensor_product_reference:
+        lines.extend(_tensor_product_q_index_lines(dim, indent + "    "))
+        lines.append(
+            "%s    const scalar_t qw = %s;"
+            % (indent, _tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+        )
+    else:
+        lines.append("%s    const scalar_t qw = %sq_weight[q];" % (indent, reference_prefix))
+    lines.extend(
+        [
+            "%s    const int lane = 0;" % indent,
+            "%s    const ptrdiff_t geometry_offset = q * VECTOR_SIZE + lane;" % indent,
+        ]
+    )
+    for component in range(dim * dim):
+        lines.append(
+            "%s    const scalar_t jacobian_adjugate_lane%d = block_jacobian_adjugate%d[geometry_offset];"
+            % (indent, component, component)
+        )
+    lines.extend(
+        [
+            "%s    const scalar_t jacobian_determinant_lane0 = block_jacobian_determinant0[geometry_offset];"
+            % indent,
+            "%s    const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;"
+            % indent,
+            "%s    for (int trial_component = 0; trial_component < DIM; ++trial_component) {"
+            % indent,
+            "%s        for (int trial_shape = 0; trial_shape < N_SHAPE; ++trial_shape) {"
+            % indent,
+        ]
+    )
+    if use_tensor_product_reference:
+        lines.extend(
+            _tensor_product_shape_coordinate_lines(
+                dim,
+                "trial_shape",
+                "trial",
+                "%s            " % indent,
+            )
+        )
+    for ref_component in range(dim):
+        lines.append(
+            "%s            const scalar_t trial_grad_ref%d = %s;"
+            % (
+                indent,
+                ref_component,
+                _sfem_soa_reference_gradient_expr_for_shape(
+                    dim,
+                    ref_component,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    reference_inputs,
+                    "trial_shape",
+                    coord_prefix="trial",
+                    reference_prefix=reference_prefix,
+                ),
+            )
+        )
+    lines.extend(
+        [
+            "%s            scalar_t trial_grad[DIM * DIM];" % indent,
+            "%s            for (int i = 0; i < DIM * DIM; ++i) {" % indent,
+            "%s                trial_grad[i] = scalar_t(0);" % indent,
+            "%s            }" % indent,
+        ]
+    )
+    for phys_component in range(dim):
+        terms = [
+            "trial_grad_ref%d * jacobian_adjugate_lane%d"
+            % (ref_component, ref_component * dim + phys_component)
+            for ref_component in range(dim)
+        ]
+        lines.append(
+            "%s            trial_grad[trial_component * DIM + %d] = (%s) * inv_jacobian_determinant;"
+            % (indent, phys_component, " + ".join(terms))
+        )
+    lines.append("%s            scalar_t material[DIM * DIM];" % indent)
+    local_material_lines = []
+    _append_cse_array_assignments(
+        local_material_lines,
+        tuple(material),
+        ["material[%d] =" % i for i in range(dim * dim)],
+        "weak_hess_tmp",
+    )
+    lines.extend("%s            %s" % (indent, line.strip()) for line in local_material_lines)
+    lines.extend(
+        [
+            "%s            for (int test_component = 0; test_component < DIM; ++test_component) {"
+            % indent,
+            "%s                for (int test_shape = 0; test_shape < N_SHAPE; ++test_shape) {"
+            % indent,
+        ]
+    )
+    if use_tensor_product_reference:
+        lines.extend(
+            _tensor_product_shape_coordinate_lines(
+                dim,
+                "test_shape",
+                "test",
+                "%s                    " % indent,
+            )
+        )
+    for ref_component in range(dim):
+        lines.append(
+            "%s                    const scalar_t test_grad_ref%d = %s;"
+            % (
+                indent,
+                ref_component,
+                _sfem_soa_reference_gradient_expr_for_shape(
+                    dim,
+                    ref_component,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    reference_inputs,
+                    "test_shape",
+                    coord_prefix="test",
+                    reference_prefix=reference_prefix,
+                ),
+            )
+        )
+    lines.append("%s                    scalar_t entry = scalar_t(0);" % indent)
+    for ref_component in range(dim):
+        terms = [
+            "material[test_component * DIM + %d] * jacobian_adjugate_lane%d"
+            % (k, ref_component * dim + k)
+            for k in range(dim)
+        ]
+        lines.append(
+            "%s                    entry += test_grad_ref%d * qw * (%s);"
+            % (indent, ref_component, " + ".join(terms))
+        )
+    lines.extend(
+        [
+            "%s                    const int row = test_component * N_SHAPE + test_shape;"
+            % indent,
+            "%s                    const int col = trial_component * N_SHAPE + trial_shape;"
+            % indent,
+            "%s                    element_matrix[row * NDOFS + col] += entry;" % indent,
+            "%s                }" % indent,
+            "%s            }" % indent,
+            "%s        }" % indent,
+            "%s    }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    return lines
+
+
+def _sfem_soa_direct_hessian_element_matrix_call_lines(
+    function_name,
+    dim,
+    material_parameter_names,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+    reference_inputs,
+    tensor_shape_name,
+    tensor_grad_name,
+    tensor_weight_name,
+    scalar_weight_name,
+    reference_prefix,
+    indent,
+):
+    args = [
+        *("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
+        "block_jacobian_determinant0",
+    ]
+    if use_tensor_product_reference:
+        args.extend((tensor_shape_name, tensor_grad_name, tensor_weight_name))
+    elif use_reference_gradient_vectors:
+        args.extend(
+            "%s%s" % (reference_prefix, _sfem_reference_gradient_vector_name(component))
+            for component in range(dim)
+        )
+        args.append(scalar_weight_name)
+    else:
+        args.extend(
+            "%s%s" % (reference_prefix, array_input.name)
+            for array_input in reference_inputs
+        )
+        args.append(scalar_weight_name)
+    args.extend(material_parameter_names)
+    args.append("element_matrix")
+    return (
+        "%s%s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+        % (indent, function_name, ", ".join(args)),
+    )
+
+
 def _sfem_soa_hessian_matrix_assembly_function(
     form,
     prefix,
@@ -4651,6 +5216,16 @@ def _sfem_soa_hessian_matrix_assembly_function(
     )
     if specialized_prefix is not None and not use_tensor_product_reference:
         block_name = "%s_apply_block" % specialized_prefix
+    direct_hessian_assembly = _sfem_soa_direct_hessian_matrix_assembly_available(
+        form,
+        quadrature_rule,
+        reference_inputs,
+        basis_family,
+    )
+    direct_hessian_function_name = _sfem_soa_direct_hessian_function_name(
+        local_prefix,
+        use_tensor_product_reference,
+    )
 
     function_base = _sfem_soa_hessian_matrix_public_function_base(
         prefix,
@@ -4884,34 +5459,52 @@ def _sfem_soa_hessian_matrix_assembly_function(
         call_args.append("block_u_streams")
     call_args.extend(("block_h_streams", "block_out_streams"))
 
-    lines.extend(
-        [
-            "",
-            "        for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
-            "            element_matrix[entry] = scalar_t(0);",
-            "        }",
-            "",
-            "        for (int trial_component = 0; trial_component < DIM; ++trial_component) {",
-            "            for (int trial_shape = 0; trial_shape < N_SHAPE; ++trial_shape) {",
-            "                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
-            "                    block_h_data[stream][0] = scalar_t(0);",
-            "                    block_out_data[stream][0] = scalar_t(0);",
-            "                }",
-            "                block_h_data[trial_shape * DIM + trial_component][0] = scalar_t(1);",
-            "                %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
-            % (block_name, ", ".join(call_args)),
-            "                const int col = trial_component * N_SHAPE + trial_shape;",
-            "                for (int test_component = 0; test_component < DIM; ++test_component) {",
-            "                    for (int test_shape = 0; test_shape < N_SHAPE; ++test_shape) {",
-            "                        const int row = test_component * N_SHAPE + test_shape;",
-            "                        element_matrix[row * NDOFS + col] = block_out_data[test_shape * DIM + test_component][0];",
-            "                    }",
-            "                }",
-            "            }",
-            "        }",
-            "",
-        ]
-    )
+    lines.append("")
+    if direct_hessian_assembly:
+        lines.extend(
+            _sfem_soa_direct_hessian_element_matrix_call_lines(
+                direct_hessian_function_name,
+                dim,
+                material_parameter_names,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                reference_inputs,
+                tensor_shape_name,
+                tensor_grad_name,
+                tensor_weight_name,
+                scalar_weight_name,
+                reference_prefix,
+                "        ",
+            )
+        )
+    else:
+        lines.extend(
+            [
+                "        for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
+                "            element_matrix[entry] = scalar_t(0);",
+                "        }",
+                "",
+                "        for (int trial_component = 0; trial_component < DIM; ++trial_component) {",
+                "            for (int trial_shape = 0; trial_shape < N_SHAPE; ++trial_shape) {",
+                "                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                "                    block_h_data[stream][0] = scalar_t(0);",
+                "                    block_out_data[stream][0] = scalar_t(0);",
+                "                }",
+                "                block_h_data[trial_shape * DIM + trial_component][0] = scalar_t(1);",
+                "                %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+                % (block_name, ", ".join(call_args)),
+                "                const int col = trial_component * N_SHAPE + trial_shape;",
+                "                for (int test_component = 0; test_component < DIM; ++test_component) {",
+                "                    for (int test_shape = 0; test_shape < N_SHAPE; ++test_shape) {",
+                "                        const int row = test_component * N_SHAPE + test_shape;",
+                "                        element_matrix[row * NDOFS + col] = block_out_data[test_shape * DIM + test_component][0];",
+                "                    }",
+                "                }",
+                "            }",
+                "        }",
+            ]
+        )
+    lines.append("")
     lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "        "))
     lines.extend(
         [
@@ -5241,31 +5834,53 @@ def _sfem_soa_hessian_matrix_assembly_function(
         if uses_current:
             packed_call_args.append("block_u_streams")
         packed_call_args.extend(("block_h_streams", "block_out_streams"))
+        lines.append("")
+        if direct_hessian_assembly:
+            lines.extend(
+                _sfem_soa_direct_hessian_element_matrix_call_lines(
+                    direct_hessian_function_name,
+                    dim,
+                    material_parameter_names,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    reference_inputs,
+                    tensor_shape_name,
+                    tensor_grad_name,
+                    tensor_weight_name,
+                    scalar_weight_name,
+                    reference_prefix,
+                    "            ",
+                )
+            )
+        else:
+            lines.extend(
+                [
+                    "            for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
+                    "                element_matrix[entry] = scalar_t(0);",
+                    "            }",
+                    "",
+                    "            for (int trial_component = 0; trial_component < DIM; ++trial_component) {",
+                    "                for (int trial_shape = 0; trial_shape < N_SHAPE; ++trial_shape) {",
+                    "                    for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    "                        block_h_data[stream][0] = scalar_t(0);",
+                    "                        block_out_data[stream][0] = scalar_t(0);",
+                    "                    }",
+                    "                    block_h_data[trial_shape * DIM + trial_component][0] = scalar_t(1);",
+                    "                    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+                    % (block_name, ", ".join(packed_call_args)),
+                    "                    const int col = trial_component * N_SHAPE + trial_shape;",
+                    "                    for (int test_component = 0; test_component < DIM; ++test_component) {",
+                    "                        for (int test_shape = 0; test_shape < N_SHAPE; ++test_shape) {",
+                    "                            const int row = test_component * N_SHAPE + test_shape;",
+                    "                            element_matrix[row * NDOFS + col] = block_out_data[test_shape * DIM + test_component][0];",
+                    "                        }",
+                    "                    }",
+                    "                }",
+                    "            }",
+                ]
+            )
         lines.extend(
             [
-                "",
-                "            for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {",
-                "                element_matrix[entry] = scalar_t(0);",
-                "            }",
-                "",
-                "            for (int trial_component = 0; trial_component < DIM; ++trial_component) {",
-                "                for (int trial_shape = 0; trial_shape < N_SHAPE; ++trial_shape) {",
-                "                    for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
-                "                        block_h_data[stream][0] = scalar_t(0);",
-                "                        block_out_data[stream][0] = scalar_t(0);",
-                "                    }",
-                "                    block_h_data[trial_shape * DIM + trial_component][0] = scalar_t(1);",
-                "                    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
-                % (block_name, ", ".join(packed_call_args)),
-                "                    const int col = trial_component * N_SHAPE + trial_shape;",
-                "                    for (int test_component = 0; test_component < DIM; ++test_component) {",
-                "                        for (int test_shape = 0; test_shape < N_SHAPE; ++test_shape) {",
-                "                            const int row = test_component * N_SHAPE + test_shape;",
-                "                            element_matrix[row * NDOFS + col] = block_out_data[test_shape * DIM + test_component][0];",
-                "                        }",
-                "                    }",
-                "                }",
-                "            }",
                 "",
                 "            const count_t *const entries = &packed_element_entries[element * NDOFS * NDOFS];",
                 "            %s_scatter_packed_crs_entries(element_matrix, entries, values);" % function_base,

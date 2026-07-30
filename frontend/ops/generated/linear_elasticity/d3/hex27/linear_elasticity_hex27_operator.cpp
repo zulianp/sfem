@@ -64,6 +64,28 @@ extern "C" int linear_elasticity_proteus_hex27_gradient_isoparametric_mesh_soa_f
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
 extern "C" int linear_elasticity_proteus_hex27_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1138,6 +1160,92 @@ extern "C" int linear_elasticity_hex27_gradient_isoparametric_mesh_soa_float(
         elements[6]
     };
     return linear_elasticity_proteus_hex27_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+}
+
+extern "C" int linear_elasticity_hex27_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+) {
+    idx_t *proteus_elements[27] = {
+        elements[0],
+        elements[8],
+        elements[1],
+        elements[11],
+        elements[24],
+        elements[9],
+        elements[3],
+        elements[10],
+        elements[2],
+        elements[16],
+        elements[20],
+        elements[17],
+        elements[23],
+        elements[26],
+        elements[21],
+        elements[19],
+        elements[22],
+        elements[18],
+        elements[4],
+        elements[12],
+        elements[5],
+        elements[15],
+        elements[25],
+        elements[13],
+        elements[7],
+        elements[14],
+        elements[6]
+    };
+    return linear_elasticity_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, rowptr, colidx, values);
+}
+
+extern "C" int linear_elasticity_hex27_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+) {
+    idx_t *proteus_elements[27] = {
+        elements[0],
+        elements[8],
+        elements[1],
+        elements[11],
+        elements[24],
+        elements[9],
+        elements[3],
+        elements[10],
+        elements[2],
+        elements[16],
+        elements[20],
+        elements[17],
+        elements[23],
+        elements[26],
+        elements[21],
+        elements[19],
+        elements[22],
+        elements[18],
+        elements[4],
+        elements[12],
+        elements[5],
+        elements[15],
+        elements[25],
+        elements[13],
+        elements[7],
+        elements[14],
+        elements[6]
+    };
+    return linear_elasticity_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, rowptr, colidx, values);
 }
 
 extern "C" int linear_elasticity_hex27_objective_isoparametric_mesh_soa(

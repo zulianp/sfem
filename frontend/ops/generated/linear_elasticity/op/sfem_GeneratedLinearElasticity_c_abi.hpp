@@ -23,6 +23,7 @@ typedef double geom_t;
 #endif
 
 #include "../../kernel_diagnostics.hpp"
+#include "../matrix_formats.hpp"
 
 #include "smesh_mesh.hpp"
 
@@ -1410,6 +1411,70 @@ extern "C" int linear_elasticity_gradient_packed_two_pass_3d_isoparametric_mesh_
         float *const SFEM_RESTRICT outz
 );
 
+extern "C" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa_float(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa_float(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" void linear_elasticity_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_hex27_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_hex27_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_hex8_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_hex8_matrix_assembly_variant_count();
+
 extern "C" int linear_elasticity_objective_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
         const ptrdiff_t nelements,
@@ -1985,3 +2050,69 @@ extern "C" int linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_so
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+
+extern "C" void linear_elasticity_proteus_hex125_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex125_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_proteus_hex125_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_proteus_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex27_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_proteus_hex27_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_proteus_hex64_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex64_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_proteus_hex64_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_proteus_hex729_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex729_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_proteus_hex729_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex8_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_proteus_hex8_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_quad4_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_proteus_quad4_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_quad4_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_quad4_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_tet10_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_tet10_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_tet4_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_tet4_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_tri3_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_tri3_matrix_assembly_variant_count();
+
+extern "C" void linear_elasticity_tri6_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_tri6_matrix_assembly_variant(const int variant);
+
+extern "C" int linear_elasticity_tri6_matrix_assembly_variant_count();

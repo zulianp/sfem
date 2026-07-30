@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <type_traits>
 #include "../linear_elasticity_d2_simplex_local.hpp"
+#include "../linear_elasticity_d2_simplex_hessian.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
@@ -5421,3 +5422,230 @@ extern "C" int linear_elasticity_tri6_apply_packed_two_pass_isoparametric_mesh_s
 
 } // namespace codegen
 } // namespace sfem
+
+
+namespace sfem {
+namespace codegen {
+
+static SFEM_INLINE void linear_elasticity_tri6_hessian_isoparametric_mesh_soa_find_cols(
+        const idx_t *const SFEM_RESTRICT targets,
+        const idx_t *const SFEM_RESTRICT row,
+        const int lenrow,
+        idx_t *const SFEM_RESTRICT ks) {
+#pragma unroll(6)
+    for (int d = 0; d < 6; ++d) {
+        ks[d] = 0;
+    }
+    for (int k = 0; k < lenrow; ++k) {
+#pragma unroll(6)
+        for (int d = 0; d < 6; ++d) {
+            ks[d] += row[k] < targets[d];
+        }
+    }
+}
+
+template <typename scalar_t>
+static SFEM_INLINE int linear_elasticity_tri6_hessian_isoparametric_mesh_soa_scatter_bsr(
+        const idx_t *const SFEM_RESTRICT ev,
+        const scalar_t *const SFEM_RESTRICT element_matrix,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        scalar_t *const SFEM_RESTRICT values) {
+    static constexpr int DIM = 2;
+    static constexpr int N_SHAPE = 6;
+    count_t entries[N_SHAPE * N_SHAPE];
+    idx_t ks[N_SHAPE];
+    bool valid_block_graph = true;
+    for (int i = 0; i < N_SHAPE; ++i) {
+        const idx_t dof_i = ev[i];
+        const count_t row_begin = rowptr[dof_i];
+        const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
+        linear_elasticity_tri6_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
+        for (int j = 0; j < N_SHAPE; ++j) {
+            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {
+                if (valid_block_graph) {
+                    std::fprintf(stderr, "linear_elasticity_tri6_hessian_isoparametric_mesh_soa_scatter_bsr missing block graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
+                }
+                entries[i * N_SHAPE + j] = row_begin;
+                valid_block_graph = false;
+            } else {
+                entries[i * N_SHAPE + j] = row_begin + ks[j];
+            }
+        }
+    }
+    if (!valid_block_graph) return SFEM_FAILURE;
+    for (int i = 0; i < N_SHAPE; ++i) {
+        for (int j = 0; j < N_SHAPE; ++j) {
+            scalar_t *const block = &values[entries[i * N_SHAPE + j] * DIM * DIM];
+            for (int bi = 0; bi < DIM; ++bi) {
+                const int row = bi * N_SHAPE + i;
+                for (int bj = 0; bj < DIM; ++bj) {
+                    const int col = bj * N_SHAPE + j;
+#pragma omp atomic update
+                    block[bi * DIM + bj] += element_matrix[row * (DIM * N_SHAPE) + col];
+                }
+            }
+        }
+    }
+    return SFEM_SUCCESS;
+}
+
+template <typename scalar_t, typename geometry_t, int FORMAT>
+static int linear_elasticity_tri6_hessian_isoparametric_mesh_soa_assemble_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geometry_t *const *const SFEM_RESTRICT points,
+        const scalar_t lmbda,
+        const scalar_t mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        scalar_t *const SFEM_RESTRICT values,
+        const int *const SFEM_RESTRICT diag_offsets,
+        const ptrdiff_t ndiag,
+        const ptrdiff_t coo_nnz,
+        const idx_t *const SFEM_RESTRICT coo_rows,
+        const idx_t *const SFEM_RESTRICT coo_cols,
+        idx_t *const SFEM_RESTRICT coo_triplet_rows,
+        idx_t *const SFEM_RESTRICT coo_triplet_cols) {
+    static constexpr int DIM = 2;
+    static constexpr int N_QP = 6;
+    static constexpr int N_SHAPE = 6;
+    static constexpr int VECTOR_SIZE = 1;
+    static constexpr int NDOFS = DIM * N_SHAPE;
+    (void)nnodes;
+    const geometry_t *const SFEM_RESTRICT x = points[0];
+    const geometry_t *const SFEM_RESTRICT y = points[1];
+    const scalar_t *const isoparametric_grad_ref_x = sfem::codegen::linear_elasticity_tri6_isoparametric_reference_data<scalar_t>::grad_ref_x();
+    const scalar_t *const isoparametric_grad_ref_y = sfem::codegen::linear_elasticity_tri6_isoparametric_reference_data<scalar_t>::grad_ref_y();
+    const scalar_t *const isoparametric_q_weight = sfem::codegen::linear_elasticity_tri6_isoparametric_reference_data<scalar_t>::q_weight();
+
+    int invalid_matrix_graph = 0;
+#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)
+    for (ptrdiff_t element = 0; element < nelements; ++element) {
+        idx_t ev[N_SHAPE];
+        scalar_t element_matrix[NDOFS * NDOFS];
+        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
+        static constexpr int nelems = VECTOR_SIZE;
+        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
+        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+        scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+        const scalar_t *block_h_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_h_streams[stream] = block_h_data[stream];
+        }
+        scalar_t *block_out_streams[N_SHAPE * DIM];
+        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
+            block_out_streams[stream] = block_out_data[stream];
+        }
+
+        for (int shape = 0; shape < N_SHAPE; ++shape) {
+            const idx_t node = elements[shape][element];
+            ev[shape] = node;
+            for (int d = 0; d < DIM; ++d) {
+                block_coordinate_data[shape * DIM + d][0] = scalar_t(points[d][node]);
+            }
+        }
+
+
+        for (int q = 0; q < N_QP; ++q) {
+            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3};
+            scalar_t J00_values[VECTOR_SIZE];
+            scalar_t J01_values[VECTOR_SIZE];
+            scalar_t J10_values[VECTOR_SIZE];
+            scalar_t J11_values[VECTOR_SIZE];
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                J00_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                J01_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                J10_values[lane] = scalar_t(0);
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                J11_values[lane] = scalar_t(0);
+            }
+            for (int shape = 0; shape < N_SHAPE; ++shape) {
+                const scalar_t g0 = isoparametric_grad_ref_x[q * N_SHAPE + shape];
+                const scalar_t g1 = isoparametric_grad_ref_y[q * N_SHAPE + shape];
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    J00_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g0;
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    J01_values[lane] += block_coordinate_data[shape * 2 + 0][lane] * g1;
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    J10_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g0;
+                }
+                #pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    J11_values[lane] += block_coordinate_data[shape * 2 + 1][lane] * g1;
+                }
+            }
+            #pragma omp simd
+            for (int lane = 0; lane < nelems; ++lane) {
+                const scalar_t J00 = J00_values[lane];
+                const scalar_t J01 = J01_values[lane];
+                const scalar_t J10 = J10_values[lane];
+                const scalar_t J11 = J11_values[lane];
+                geometry_jacobian_adjugate_and_determinant_2<scalar_t>(
+                        J00, J01, J10, J11, block_jacobian_adjugate_streams, block_jacobian_determinant0, q * VECTOR_SIZE + lane);
+            }
+        }
+
+        linear_elasticity_d2_simplex_direct_hessian_reference_element_matrix<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, lmbda, mu, element_matrix);
+
+        if constexpr (FORMAT == 1) {
+            invalid_matrix_graph |= (linear_elasticity_tri6_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
+        } else {
+            invalid_matrix_graph |= 1;
+        }
+    }
+
+    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int linear_elasticity_tri6_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::linear_elasticity_tri6_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+}
+
+extern "C" int linear_elasticity_tri6_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::linear_elasticity_tri6_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+}

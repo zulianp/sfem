@@ -811,6 +811,292 @@ extern "C" int linear_elasticity_tet4_gradient_isoparametric_mesh_soa_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_tri3_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_tri6_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_tri3_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_tri6_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_hex27_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_hex8_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex125_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex64_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex729_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_tet10_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_hex27_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_hex8_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex125_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex64_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex729_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_tet10_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+);
 extern "C" int linear_elasticity_proteus_quad4_objective_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1904,6 +2190,134 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_isoparame
             return linear_elasticity_tet4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
         default:
             std::fprintf(stderr, "linear_elasticity_gradient_3d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
+            return SFEM_FAILURE;
+    }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+) {
+    switch (element_type) {
+        case smesh::PROTEUS_QUAD4:
+            return linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::QUAD4:
+            return linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::TRI3:
+            return linear_elasticity_tri3_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::TRI6:
+            return linear_elasticity_tri6_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        default:
+            std::fprintf(stderr, "linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
+            return SFEM_FAILURE;
+    }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa_float(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+) {
+    switch (element_type) {
+        case smesh::PROTEUS_QUAD4:
+            return linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::QUAD4:
+            return linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::TRI3:
+            return linear_elasticity_tri3_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::TRI6:
+            return linear_elasticity_tri6_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        default:
+            std::fprintf(stderr, "linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
+            return SFEM_FAILURE;
+    }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        double *const SFEM_RESTRICT values
+) {
+    switch (element_type) {
+        case smesh::HEX27:
+            return linear_elasticity_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::HEX8:
+            return linear_elasticity_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX125:
+            return linear_elasticity_proteus_hex125_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX27:
+            return linear_elasticity_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX64:
+            return linear_elasticity_proteus_hex64_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX729:
+            return linear_elasticity_proteus_hex729_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX8:
+            return linear_elasticity_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::TET10:
+            return linear_elasticity_tet10_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::TET4:
+            return linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        default:
+            std::fprintf(stderr, "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
+            return SFEM_FAILURE;
+    }
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa_float(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        const count_t *const SFEM_RESTRICT rowptr,
+        const idx_t *const SFEM_RESTRICT colidx,
+        float *const SFEM_RESTRICT values
+) {
+    switch (element_type) {
+        case smesh::HEX27:
+            return linear_elasticity_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::HEX8:
+            return linear_elasticity_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX125:
+            return linear_elasticity_proteus_hex125_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX27:
+            return linear_elasticity_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX64:
+            return linear_elasticity_proteus_hex64_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX729:
+            return linear_elasticity_proteus_hex729_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::PROTEUS_HEX8:
+            return linear_elasticity_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::TET10:
+            return linear_elasticity_tet10_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        case smesh::TET4:
+            return linear_elasticity_tet4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
+        default:
+            std::fprintf(stderr, "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
             return SFEM_FAILURE;
     }
 }
