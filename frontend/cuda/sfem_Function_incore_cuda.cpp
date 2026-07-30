@@ -57,12 +57,11 @@ namespace sfem {
 
     std::shared_ptr<Buffer<idx_t *>> create_device_elements(const std::shared_ptr<FunctionSpace> &space,
                                                             const smesh::ElemType                 element_type) {
-        if (space->has_semi_structured_mesh()) {
-            return smesh::to_device(space->mesh().elements(0));
-
-        } else {
-            return smesh::to_device(space->mesh().elements(0));
-        }
+        (void)element_type;
+        assert(space);
+        assert(space->mesh_ptr());
+        assert(space->mesh_ptr()->n_blocks() >= 1);
+        return space->mesh_ptr()->block(0)->device_elements_SoA();
     }
 
     std::shared_ptr<Buffer<idx_t>> create_device_elements_AoS(const std::shared_ptr<FunctionSpace> &space,
