@@ -877,8 +877,9 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out) override {
-            SFEM_TRACE_SCOPE("cu_linear_elasticity_apply");
             return iterate([&](const OpDomain &domain) {
+                SFEM_TRACE_SCOPE_VARIANT("cu_linear_elasticity_gradient_%d", smesh::elem_num_nodes(domain.element_type));
+
                 auto domain_op = std::static_pointer_cast<GPULinearElasticityOpData>(domain.user_data);
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
@@ -899,8 +900,9 @@ namespace sfem {
         }
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
-            SFEM_TRACE_SCOPE("cu_linear_elasticity_apply");
             return iterate([&](const OpDomain &domain) {
+                SFEM_TRACE_SCOPE_VARIANT("cu_linear_elasticity_apply_%d", smesh::elem_num_nodes(domain.element_type));
+
                 auto domain_op = std::static_pointer_cast<GPULinearElasticityOpData>(domain.user_data);
                 auto mu        = domain.parameters->require_real_value("mu");
                 auto lambda    = domain.parameters->require_real_value("lambda");
