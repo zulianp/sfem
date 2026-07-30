@@ -366,7 +366,7 @@ namespace sfem {
                                                                                 const OpDomain                       &domain) {
             auto ret          = std::make_shared<GPULaplacianOpData>();
             ret->element_type = domain.element_type;
-            ret->elements     = smesh::to_device(domain.block->elements());
+            ret->elements     = domain.block->device_elements_SoA();
 
             const auto block_id = block_id_for_domain(*space->mesh_ptr(), *domain.block);
             ret->fff            = create_gpu_laplacian_fff(space, block_id);
@@ -441,12 +441,45 @@ namespace sfem {
                 const std::shared_ptr<FunctionSpace> &space,
                 const OpDomain                       &domain) {
             auto ret      = std::make_shared<GPULinearElasticityOpData>();
-            ret->elements = smesh::to_device(domain.block->elements());
+            ret->elements = domain.block->device_elements_SoA();
 
             const auto block_id       = block_id_for_domain(*space->mesh_ptr(), *domain.block);
             ret->jacobian_adjugate    = create_gpu_jacobian_adjugate(space, block_id);
             ret->jacobian_determinant = create_gpu_jacobian_determinant(space, block_id);
             return ret;
+        }
+
+        static std::shared_ptr<GPULinearElasticityOpData> share_gpu_le_op_data(const OpDomain &fine_domain,
+                                                                               const OpDomain &coarse_domain) {
+            auto fine = std::static_pointer_cast<GPULinearElasticityOpData>(fine_domain.user_data);
+            assert(fine);
+            assert(fine->jacobian_adjugate);
+            assert(fine->jacobian_determinant);
+
+            auto ret                  = std::make_shared<GPULinearElasticityOpData>();
+            ret->elements             = coarse_domain.block->device_elements_SoA();
+            ret->jacobian_adjugate    = fine->jacobian_adjugate;
+            ret->jacobian_determinant = fine->jacobian_determinant;
+            return ret;
+        }
+
+        static int populate_gpu_le_domains_sharing_jacobians(const MultiDomainOp                 &fine_domains,
+                                                             const std::shared_ptr<MultiDomainOp> &coarse_domains) {
+            for (auto &n2d : coarse_domains->domains()) {
+                auto fine_it = fine_domains.domains().find(n2d.first);
+                if (fine_it == fine_domains.domains().end() || !fine_it->second.user_data) {
+                    return SFEM_FAILURE;
+                }
+
+                auto domain_op = share_gpu_le_op_data(fine_it->second, n2d.second);
+                if (!domain_op || !domain_op->elements || !domain_op->jacobian_adjugate ||
+                    !domain_op->jacobian_determinant) {
+                    return SFEM_FAILURE;
+                }
+
+                n2d.second.user_data = std::static_pointer_cast<void>(domain_op);
+            }
+            return SFEM_SUCCESS;
         }
 
         class GPUKelvinVoigtNewmarkOpData {
@@ -500,7 +533,7 @@ namespace sfem {
         static std::shared_ptr<GPUKelvinVoigtNewmarkOpData> create_gpu_kv_op_data(const std::shared_ptr<FunctionSpace> &space,
                                                                                   const OpDomain                       &domain) {
             auto ret      = std::make_shared<GPUKelvinVoigtNewmarkOpData>();
-            ret->elements = smesh::to_device(domain.block->elements());
+            ret->elements = domain.block->device_elements_SoA();
 
             const auto block_id       = block_id_for_domain(*space->mesh_ptr(), *domain.block);
             ret->jacobian_adjugate    = create_gpu_jacobian_adjugate(space, block_id);
@@ -734,18 +767,24 @@ namespace sfem {
             const auto block_names = selected_block_names();
 
             if (derefined_space->has_semi_structured_mesh() && is_semistructured_type(derefined_space->element_type())) {
-                auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
-                ret->initialize(block_names);
+                auto ret     = std::make_shared<GPULinearElasticity>(derefined_space);
+                ret->domains = std::make_shared<MultiDomainOp>(derefined_space, block_names);
                 gpu_linear_elasticity_copy_material(*domains, *ret->domains);
+                if (populate_gpu_le_domains_sharing_jacobians(*domains, ret->domains) != SFEM_SUCCESS) {
+                    return nullptr;
+                }
                 return ret;
             }
 
             if (space->has_semi_structured_mesh() && is_semistructured_type(element_type)) {
-                auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
-                ret->initialize(block_names);
+                auto ret     = std::make_shared<GPULinearElasticity>(derefined_space);
+                ret->domains = std::make_shared<MultiDomainOp>(derefined_space, block_names);
                 gpu_linear_elasticity_copy_material(*domains, *ret->domains);
                 assert(derefined_space->n_blocks() == 1);
                 ret->override_element_types({derefined_space->element_type()});
+                if (populate_gpu_le_domains_sharing_jacobians(*domains, ret->domains) != SFEM_SUCCESS) {
+                    return nullptr;
+                }
                 return ret;
             }
 
