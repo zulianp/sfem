@@ -169,6 +169,7 @@ namespace sfem {
             assert(rtr0 == rtr0);
 
             if (rtr0 == 0) {
+                blas.destroy(r);
                 return SFEM_SUCCESS;
             }
 
@@ -235,11 +236,11 @@ namespace sfem {
             monitor(0, r_norm0, 1, 0);
 
             if (rtr0 == 0) {
+                blas.destroy(r);
                 return SFEM_SUCCESS;
             }
 
             T* z  = blas.allocate(n);
-            T* Mz = blas.allocate(n);
             T* p  = blas.allocate(n);
             T* Ap = blas.allocate(n);
 
@@ -253,6 +254,10 @@ namespace sfem {
             T       rtz  = rtz0;
 
             if (rtz == 0) {
+                blas.destroy(r);
+                blas.destroy(z);
+                blas.destroy(p);
+                blas.destroy(Ap);
                 return SFEM_SUCCESS;
             }
 
@@ -306,9 +311,7 @@ namespace sfem {
             blas.destroy(r);
             blas.destroy(p);
             blas.destroy(Ap);
-
             blas.destroy(z);
-            blas.destroy(Mz);
             return info;
         }
     };
