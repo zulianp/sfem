@@ -110,6 +110,15 @@ int affine_sshex8_linear_elasticity_block_diag_sym(const int                    
                                                    real_t *const                out4,
                                                    real_t *const                out5);
 
+int sshex8_linear_elasticity_element_matrix(int                           level,
+                                            const ptrdiff_t               nelements,
+                                            const ptrdiff_t               nnodes,
+                                            idx_t **const SFEM_RESTRICT   elements,
+                                            geom_t **const SFEM_RESTRICT  points,
+                                            const real_t                  mu,
+                                            const real_t                  lambda,
+                                            scalar_t *const SFEM_RESTRICT values);
+
 int sshex8_linear_elasticity_objective_steps(int                               level,
                                              const ptrdiff_t                   nelements,
                                              const ptrdiff_t                   stride,

@@ -1255,6 +1255,51 @@ int affine_sshex8_linear_elasticity_block_diag_sym(const int                    
     return SFEM_SUCCESS;
 }
 
+int sshex8_linear_elasticity_element_matrix(int                           level,
+                                            const ptrdiff_t               nelements,
+                                            const ptrdiff_t               nnodes,
+                                            idx_t **const SFEM_RESTRICT   elements,
+                                            geom_t **const SFEM_RESTRICT  points,
+                                            const real_t                  mu,
+                                            const real_t                  lambda,
+                                            scalar_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+    const scalar_t      h = 1. / level;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+        scalar_t adjugate[9];
+        scalar_t determinant;
+        scalar_t sub_adjugate[9];
+        scalar_t sub_determinant;
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, adjugate, &determinant);
+        hex8_sub_adj_0(adjugate, determinant, h, sub_adjugate, &sub_determinant);
+        hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, &values[i * 24 * 24]);
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int sshex8_linear_elasticity_objective_steps(int                               level,
                                              const ptrdiff_t                   nelements,
                                              const ptrdiff_t                   stride,
