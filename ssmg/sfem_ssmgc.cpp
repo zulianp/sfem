@@ -37,17 +37,7 @@ namespace sfem {
 
         auto linear_op = sfem::create_linear_operator(op_type::MATRIX_FREE, f, nullptr, es);
         sp->set_op(linear_op);
-
-#ifdef SFEM_ENABLE_CUDA
-        if (es == EXECUTION_SPACE_DEVICE) {
-            CUDA_BLAS<real_t>::build_blas(sp->blas);
-            CUDA_ShiftedPenalty<real_t>::build(sp->impl);
-            sp->execution_space_ = EXECUTION_SPACE_DEVICE;
-        } else
-#endif
-        {
-            sp->default_init();
-        }
+        sp->default_init();
 
         sp->set_atol(1e-12);
         sp->set_max_it(20);
@@ -141,11 +131,9 @@ namespace sfem {
         void restrict_contact_constraints() {
             SFEM_TRACE_SCOPE("SPMG::restrict_contact_constraints");
             const int nlevels = levels.size();
-            auto      blas    = sfem::blas<T>(levels[0]->function->execution_space());
             for (int i = 1; i < nlevels; i++) {
                 auto fine   = levels[i - 1];
                 auto coarse = levels[i];
-                blas->zeros(coarse->sbv->data()->size(), coarse->sbv->data()->data());
                 restrict_sbv[i - 1]->apply(fine->sbv->data()->data(), coarse->sbv->data()->data());
             }
         }
@@ -182,8 +170,27 @@ namespace sfem {
 
         int update_contact(const T *const disp) {
             SFEM_TRACE_SCOPE("SPMG::update_contact");
-            contact_conds->update(disp);
-            contact_conds->update_signed_distance(disp, upper_bound->data());
+            auto                      f  = levels[0]->function;
+            const enum ExecutionSpace es = f->execution_space();
+
+#ifdef SFEM_ENABLE_CUDA
+            if (EXECUTION_SPACE_DEVICE == es) {
+                // FIXME avoid copies from/to device
+
+                auto wdisp = Buffer<const T>::wrap(f->space()->n_dofs(), disp, MEMORY_SPACE_DEVICE);
+                auto hdisp = smesh::to_host(wdisp);
+
+                contact_conds->update(hdisp->data());
+
+                auto hg = sfem::create_host_buffer<T>(upper_bound->size());
+                contact_conds->update_signed_distance(hdisp->data(), hg->data());
+                buffer_host_to_device(hg->size() * sizeof(T), (void *)hg->data(), (void *)upper_bound->data());
+            } else
+#endif
+            {
+                contact_conds->update(disp);
+                contact_conds->update_signed_distance(disp, upper_bound->data());
+            }
 
             return SFEM_SUCCESS;
         }
@@ -193,13 +200,19 @@ namespace sfem {
             contact_conds->init();
             linear_constraints_op           = contact_conds->linear_constraints_op();
             linear_constraints_op_transpose = contact_conds->linear_constraints_op_transpose();
+            upper_bound = sfem::create_buffer<T>(contact_conds->n_constrained_dofs(), sfem::MEMORY_SPACE_HOST);
+
+            contact_conds->signed_distance(upper_bound->data());
             const ExecutionSpace es             = levels[0]->function->execution_space();
             const int            block_size     = levels[0]->function->space()->block_size();
             const int            sym_block_size = (block_size == 3 ? 6 : 3);
             const int            nlevels        = levels.size();
 
-            upper_bound = sfem::create_buffer<T>(contact_conds->n_constrained_dofs(), es);
-            contact_conds->signed_distance(upper_bound->data());
+#ifdef SFEM_ENABLE_CUDA
+            if (EXECUTION_SPACE_DEVICE == es) {
+                upper_bound = smesh::to_device(upper_bound);
+            }
+#endif
 
             std::vector<std::shared_ptr<Buffer<idx_t *>>> host_sides;
             {
@@ -298,7 +311,7 @@ namespace sfem {
             bool coarse_solver_verbose          = false;
             bool debug                          = false;
             bool enable_shift                   = true;
-            bool enable_line_search             = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
+            bool enable_line_search             = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", false);
             bool project_coarse_correction      = false;
 
             int SFEM_ENABLE_NL_OBSTACLE       = smesh::Env::read("SFEM_ENABLE_NL_OBSTACLE", 1);

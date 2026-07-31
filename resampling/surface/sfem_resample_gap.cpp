@@ -107,9 +107,6 @@ int resample_gap(
 
     smesh::ElemType st = shell_type(element_type);
     memset(g, 0, nnodes * sizeof(real_t));
-    memset(xnormal, 0, nnodes * sizeof(real_t));
-    memset(ynormal, 0, nnodes * sizeof(real_t));
-    memset(znormal, 0, nnodes * sizeof(real_t));
 
     if (resample_gap_local(st, nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, xnormal, ynormal, znormal) !=
         SFEM_SUCCESS) {
@@ -123,25 +120,15 @@ int resample_gap(
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        g[i] = w[i] > 0 ? g[i] / w[i] : 0;
-
-        if (!isfinite(g[i])) {
-            g[i] = 0;
-        }
+        g[i] /= w[i];
     }
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         real_t denom = sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
-        if (denom > 0 && isfinite(denom)) {
-            xnormal[i] /= denom;
-            ynormal[i] /= denom;
-            znormal[i] /= denom;
-        } else {
-            xnormal[i] = 0;
-            ynormal[i] = 0;
-            znormal[i] = 0;
-        }
+        xnormal[i] /= denom;
+        ynormal[i] /= denom;
+        znormal[i] /= denom;
     }
 
     free(w);
@@ -209,11 +196,7 @@ int resample_gap_value(
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        g[i] = w[i] > 0 ? g[i] / w[i] : 0;
-
-        if (!isfinite(g[i])) {
-            g[i] = 0;
-        }
+        g[i] /= w[i];
     }
 
     free(w);
@@ -272,10 +255,6 @@ int resample_gap_normals(
         real_t* const SFEM_RESTRICT znormal) {
     if (!nelements) return SFEM_SUCCESS;
 
-    memset(xnormal, 0, nnodes * sizeof(real_t));
-    memset(ynormal, 0, nnodes * sizeof(real_t));
-    memset(znormal, 0, nnodes * sizeof(real_t));
-
     if (resample_gap_normals_local(shell_type(element_type),
                                    nelements,
                                    nnodes,
@@ -296,14 +275,10 @@ int resample_gap_normals(
     for (ptrdiff_t i = 0; i < nnodes; i++) {
         const real_t denom = sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
 
-        if (denom > 0 && isfinite(denom)) {
+        if (denom > 0) {
             xnormal[i] /= denom;
             ynormal[i] /= denom;
             znormal[i] /= denom;
-        } else {
-            xnormal[i] = 0;
-            ynormal[i] = 0;
-            znormal[i] = 0;
         }
     }
 

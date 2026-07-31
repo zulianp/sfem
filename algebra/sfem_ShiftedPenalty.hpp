@@ -131,8 +131,6 @@ namespace sfem {
             if (lb && !lagr_lb) lagr_lb = make_buffer(n_constrained_dofs);
             if (ub && !lagr_ub) lagr_ub = make_buffer(n_constrained_dofs);
 
-            auto scalars = make_buffer(2);
-
             T penetration_norm = 0;
             T penetration_tol  = 1 / (penalty_param_ * 0.1);
 
@@ -281,12 +279,8 @@ namespace sfem {
                     Tx = c->data();
                 }
 
-                blas.zeros(2, scalars->data());
-                if (ub) impl.sq_norm_ramp_p_into(n_constrained_dofs, Tx, ub, &scalars->data()[0]);
-                if (lb) impl.sq_norm_ramp_m_into(n_constrained_dofs, Tx, lb, &scalars->data()[1]);
-                T scalar_host[2] = {0, 0};
-                blas.copy_scalars_to_host(2, scalars->data(), scalar_host);
-                const T e_pen = scalar_host[0] + scalar_host[1];
+                const T e_pen = ((ub) ? impl.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
+                                ((lb) ? impl.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
 
                 const T norm_pen  = std::sqrt(e_pen);
                 const T norm_rpen = blas.norm2(n_dofs, r_pen->data());

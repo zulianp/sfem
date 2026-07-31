@@ -15,8 +15,6 @@ namespace sfem {
     struct ShiftedPenalty_Tpl {
         std::function<T(const ptrdiff_t, const T* const, T* const)>                                               sq_norm_ramp_p;
         std::function<T(const ptrdiff_t, const T* const, T* const)>                                               sq_norm_ramp_m;
-        std::function<void(const ptrdiff_t, const T* const, T* const, T* const)>                                  sq_norm_ramp_p_into;
-        std::function<void(const ptrdiff_t, const T* const, T* const, T* const)>                                  sq_norm_ramp_m_into;
         std::function<void(const ptrdiff_t n, const T, const T* const, const T* const, const T* const, T* const)> ramp_p;
 
         std::function<void(const ptrdiff_t n, const T, const T* const, const T* const, const T* const, T* const)> ramp_m;
@@ -46,8 +44,8 @@ namespace sfem {
                 calc_J_pen;
 
         bool good() const {
-            return sq_norm_ramp_p && sq_norm_ramp_m && sq_norm_ramp_p_into && sq_norm_ramp_m_into && ramp_p && ramp_m &&
-                   update_lagr_p && update_lagr_m && calc_r_pen && calc_J_pen;
+            return sq_norm_ramp_p && sq_norm_ramp_m && ramp_p && ramp_m && update_lagr_p && update_lagr_m && calc_r_pen &&
+                   calc_J_pen;
         }
     };
 
@@ -64,11 +62,6 @@ namespace sfem {
                 return ret;
             };
 
-            tpl.sq_norm_ramp_p_into = [sq_norm_ramp_p = tpl.sq_norm_ramp_p](
-                                              const ptrdiff_t n, const T* const x, T* const ub, T* const out) {
-                *out = sq_norm_ramp_p(n, x, ub);
-            };
-
             tpl.sq_norm_ramp_m = [](const ptrdiff_t n, const T* const x, T* const lb) -> T {
                 T ret = 0;
 #pragma omp parallel for reduction(+ : ret)
@@ -77,11 +70,6 @@ namespace sfem {
                     ret += diff * diff;
                 }
                 return ret;
-            };
-
-            tpl.sq_norm_ramp_m_into = [sq_norm_ramp_m = tpl.sq_norm_ramp_m](
-                                              const ptrdiff_t n, const T* const x, T* const lb, T* const out) {
-                *out = sq_norm_ramp_m(n, x, lb);
             };
 
             // Adds to negative gradient (i.e., residual)
