@@ -1654,8 +1654,8 @@ namespace sfem {
             if (err != SFEM_SUCCESS) {
                 return err;
             }
-            linear_elasticity->set_value_in_block("", "mu", mu);
-            linear_elasticity->set_value_in_block("", "lambda", lambda);
+            // Seed all domains (empty block_name is not a valid MultiDomainOp key)
+            gpu_linear_elasticity_seed_material(*linear_elasticity->domains, mu, lambda);
             return SFEM_SUCCESS;
         }
 
@@ -1763,8 +1763,14 @@ namespace sfem {
                 element_matrix = smesh::to_device(h_element_matrix);
             }
 
-            if (linear_elasticity) {
-                linear_elasticity->set_value_in_block(block_name, var_name, value);
+            if (linear_elasticity && linear_elasticity->domains) {
+                if (block_name.empty()) {
+                    for (auto &kv : linear_elasticity->domains->domains()) {
+                        kv.second.parameters->set_value(var_name, value);
+                    }
+                } else {
+                    linear_elasticity->set_value_in_block(block_name, var_name, value);
+                }
             }
         }
     };
