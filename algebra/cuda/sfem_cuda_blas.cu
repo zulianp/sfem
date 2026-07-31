@@ -88,11 +88,6 @@ static void sfem_blas_init() {
     }
 }
 
-static void sfem_blas_set_pointer_mode(cublasPointerMode_t mode) {
-    sfem_blas_init();
-    CHECK_CUBLAS(cublasSetPointerMode(cublas_handle, mode));
-}
-
 template <typename T>
 class BLASImpl {};
 
@@ -102,15 +97,8 @@ public:
     static double dot(const ptrdiff_t n, const double *const l, const double *const r) {
         sfem_blas_init();
         double ret = 0;
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_HOST);
         CHECK_CUBLAS(cublasDdot(cublas_handle, n, l, 1, r, 1, &ret));
         return ret;
-    }
-
-    static void dot_into(const ptrdiff_t n, const double *const l, const double *const r, double *const result) {
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_DEVICE);
-        CHECK_CUBLAS(cublasDdot(cublas_handle, n, l, 1, r, 1, result));
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_HOST);
     }
 
     static void axpy(const ptrdiff_t n, const double alpha, const double *const x, double *const y) {
@@ -156,14 +144,7 @@ public:
 
     static void nrm2(const ptrdiff_t n, const double *const x, double *const result) {
         sfem_blas_init();
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_HOST);
         CHECK_CUBLAS(cublasDnrm2(cublas_handle, n, x, 1, result));
-    }
-
-    static void nrm2_into(const ptrdiff_t n, const double *const x, double *const result) {
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_DEVICE);
-        CHECK_CUBLAS(cublasDnrm2(cublas_handle, n, x, 1, result));
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_HOST);
     }
 };
 
@@ -173,15 +154,8 @@ public:
     static float dot(const ptrdiff_t n, const float *const l, const float *const r) {
         sfem_blas_init();
         float ret = 0;
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_HOST);
         CHECK_CUBLAS(cublasSdot(cublas_handle, n, l, 1, r, 1, &ret));
         return ret;
-    }
-
-    static void dot_into(const ptrdiff_t n, const float *const l, const float *const r, float *const result) {
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_DEVICE);
-        CHECK_CUBLAS(cublasSdot(cublas_handle, n, l, 1, r, 1, result));
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_HOST);
     }
 
     static void axpy(const ptrdiff_t n, const float alpha, const float *const x, float *const y) {
@@ -227,14 +201,7 @@ public:
 
     static void nrm2(const ptrdiff_t n, const float *const x, float *const result) {
         sfem_blas_init();
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_HOST);
         CHECK_CUBLAS(cublasSnrm2(cublas_handle, n, x, 1, result));
-    }
-
-    static void nrm2_into(const ptrdiff_t n, const float *const x, float *const result) {
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_DEVICE);
-        CHECK_CUBLAS(cublasSnrm2(cublas_handle, n, x, 1, result));
-        sfem_blas_set_pointer_mode(CUBLAS_POINTER_MODE_HOST);
     }
 };
 
@@ -299,8 +266,7 @@ __global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T 
     __syncthreads();
 
     if (!warp_id) {
-        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
-        acc                        = (lid < n_warps) ? block_accumulator[lid] : T(0);
+        acc = block_accumulator[lid];
         acc = warp_reduce_32(acc);
 
         if (!threadIdx.x) {
@@ -310,32 +276,23 @@ __global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T 
 }
 
 template <typename T>
-__global__ void tsqrt_in_place(T *const SFEM_RESTRICT value) {
-    *value = sqrt(*value);
-}
-
-template <typename T>
 class BLAS {
 public:
     static T dot(const ptrdiff_t n, const T *const l, const T *const r) {
+        int       kernel_block_size = 128;
+        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+
         T *d_result = 0;
         cudaMalloc((void **)&d_result, sizeof(T));
+        cudaMemset((void *)d_result, 0, sizeof(T));
 
-        dot_into(n, l, r, d_result);
+        tdot<<<n_blocks, kernel_block_size>>>(n, l, r, d_result);
+        SFEM_DEBUG_SYNCHRONIZE();
 
         T ret = 0;
         cudaMemcpy(&ret, d_result, sizeof(T), cudaMemcpyDeviceToHost);
         cudaFree(d_result);
         return ret;
-    }
-
-    static void dot_into(const ptrdiff_t n, const T *const l, const T *const r, T *const result) {
-        int       kernel_block_size = 128;
-        ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
-
-        cudaMemset((void *)result, 0, sizeof(T));
-        tdot<<<n_blocks, kernel_block_size>>>(n, l, r, result);
-        SFEM_DEBUG_SYNCHRONIZE();
     }
 
     static void axpy(const ptrdiff_t n, const T alpha, const T *const x, T *const y) {
@@ -379,17 +336,8 @@ public:
     }
 
     static void nrm2(const ptrdiff_t n, const T *const x, T *const result) {
-        T *d_result = 0;
-        cudaMalloc((void **)&d_result, sizeof(T));
-        nrm2_into(n, x, d_result);
-        cudaMemcpy(result, d_result, sizeof(T), cudaMemcpyDeviceToHost);
-        cudaFree(d_result);
-    }
-
-    static void nrm2_into(const ptrdiff_t n, const T *const x, T *const result) {
-        dot_into(n, x, x, result);
-        tsqrt_in_place<<<1, 1>>>(result);
-        SFEM_DEBUG_SYNCHRONIZE();
+        T sq_nrm = dot(n, x, x);
+        *result  = sqrt(sq_nrm);
     }
 };
 
@@ -578,21 +526,12 @@ namespace sfem {
             return ret;
         };
 
-        tpl.norm2_into = [](const ptrdiff_t n, const T *const x, T *const out) {
-            BLAS<T>::nrm2_into(n, x, out);
-        };
-
-        tpl.copy_scalars_to_host = [](const ptrdiff_t n, const T *const src, T *const dest) {
-            CHECK_CUDA(cudaMemcpy(dest, src, n * sizeof(T), cudaMemcpyDeviceToHost));
-        };
-
         tpl.xypaz      = txypaz<T>;
         tpl.reciprocal = reciprocal<T>;
 
         tpl.destroy = &d_destroy;
         tpl.values  = &tvalues<T>;
         tpl.dot     = &BLAS<T>::dot;
-        tpl.dot_into = &BLAS<T>::dot_into;
         tpl.axpby   = &BLAS<T>::axpby;
         tpl.axpy    = &BLAS<T>::axpy;
         tpl.scal    = &BLAS<T>::scal;
