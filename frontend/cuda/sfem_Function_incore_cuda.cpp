@@ -1557,12 +1557,13 @@ namespace sfem {
 
     class GPUEMVectorWarpOp : public Op {
     public:
-        std::shared_ptr<FunctionSpace>  space;
-        enum smesh::PrimitiveType       real_type{smesh::SMESH_DEFAULT};
-        std::shared_ptr<Buffer<idx_t>>  elements;
-        std::shared_ptr<Buffer<real_t>> element_matrix;
-        real_t                          mu{1};
-        real_t                          lambda{1};
+        std::shared_ptr<FunctionSpace>       space;
+        enum smesh::PrimitiveType            real_type{smesh::SMESH_DEFAULT};
+        std::shared_ptr<Buffer<idx_t>>       elements;
+        std::shared_ptr<Buffer<real_t>>      element_matrix;
+        std::shared_ptr<GPULinearElasticity> linear_elasticity;
+        real_t                               mu{1};
+        real_t                               lambda{1};
 
         GPUEMVectorWarpOp(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -1577,17 +1578,19 @@ namespace sfem {
             return ret;
         }
 
-        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
-            SFEM_ERROR("IMPLEMENT ME!\n");
-            return nullptr;
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &lor_space) override {
+            SFEM_TRACE_SCOPE("GPUEMVectorWarpOp::lor_op");
+            assert(linear_elasticity);
+            return linear_elasticity->lor_op(lor_space);
         }
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
             SFEM_TRACE_SCOPE("GPUEMVectorWarpOp::derefine_op");
 
             assert(element_matrix);
-            if (!element_matrix) {
-                SFEM_ERROR("GPUEMVectorWarpOp::derefine_op requires initialized elemental matrices\n");
+            assert(linear_elasticity);
+            if (!element_matrix || !linear_elasticity) {
+                SFEM_ERROR("GPUEMVectorWarpOp::derefine_op requires initialized operator\n");
                 return nullptr;
             }
 
@@ -1599,17 +1602,16 @@ namespace sfem {
                 ret->lambda         = lambda;
                 ret->element_matrix = element_matrix;  // share as-is
                 ret->elements       = create_device_elements_AoS(derefined_space, derefined_space->element_type());
+                ret->linear_elasticity =
+                        std::static_pointer_cast<GPULinearElasticity>(linear_elasticity->derefine_op(derefined_space));
+                if (!ret->linear_elasticity) {
+                    return nullptr;
+                }
                 return ret;
             }
 
             // Coarsest level: fall back to matrix-free GPU LinearElasticity
-            auto ret = std::make_shared<GPULinearElasticity>(derefined_space);
-            ret->initialize();
-            ret->set_value_in_block("", "mu", mu);
-            ret->set_value_in_block("", "lambda", lambda);
-            assert(derefined_space->n_blocks() == 1);
-            ret->override_element_types({derefined_space->element_type()});
-            return ret;
+            return linear_elasticity->derefine_op(derefined_space);
         }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
@@ -1627,8 +1629,8 @@ namespace sfem {
             mu     = SFEM_SHEAR_MODULUS;
             lambda = SFEM_FIRST_LAME_PARAMETER;
 
-            auto &ssm             = space->mesh();
-            auto  mesh            = smesh::derefine(space->mesh_ptr(), 1);
+            auto &ssm              = space->mesh();
+            auto  mesh             = smesh::derefine(space->mesh_ptr(), 1);
             auto  h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 24 * 24);
 
             int err = sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
@@ -1639,10 +1641,22 @@ namespace sfem {
                                                                         mu,
                                                                         lambda,
                                                                         h_element_matrix->data());
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
 
             elements       = create_device_elements_AoS(space, space->element_type());
             element_matrix = smesh::to_device(h_element_matrix);
-            return err;
+
+            // Companion matrix-free LE for hessian_diag / block_diag / BSR / etc.
+            linear_elasticity = std::make_shared<GPULinearElasticity>(space);
+            err               = linear_elasticity->initialize(block_names);
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
+            linear_elasticity->set_value_in_block("", "mu", mu);
+            linear_elasticity->set_value_in_block("", "lambda", lambda);
+            return SFEM_SUCCESS;
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
@@ -1669,20 +1683,33 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const   colidx,
                         real_t *const        values) override {
-            SFEM_ERROR("[Error] GPUEMVectorWarpOp::hessian_crs NOT IMPLEMENTED!\n");
-            return SFEM_FAILURE;
+            assert(linear_elasticity);
+            return linear_elasticity->hessian_crs(x, rowptr, colidx, values);
         }
 
-        int hessian_diag(const real_t *const, real_t *const out) override {
-            SFEM_ERROR("[Error] GPUEMVectorWarpOp::hessian_diag NOT IMPLEMENTED!\n");
-            return SFEM_FAILURE;
+        int hessian_bsr(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            assert(linear_elasticity);
+            return linear_elasticity->hessian_bsr(x, rowptr, colidx, values);
+        }
+
+        int hessian_diag(const real_t *const x, real_t *const out) override {
+            assert(linear_elasticity);
+            return linear_elasticity->hessian_diag(x, out);
+        }
+
+        int hessian_block_diag_sym(const real_t *const x, real_t *const values) override {
+            assert(linear_elasticity);
+            return linear_elasticity->hessian_block_diag_sym(x, values);
         }
 
         int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
 
         int value(const real_t *x, real_t *const out) override {
-            SFEM_ERROR("[Error] GPUEMVectorWarpOp::value NOT IMPLEMENTED!\n");
-            return SFEM_FAILURE;
+            assert(linear_elasticity);
+            return linear_elasticity->value(x, out);
         }
 
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
@@ -1692,6 +1719,17 @@ namespace sfem {
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
+
+        std::shared_ptr<Op> clone() const override {
+            auto ret               = std::make_shared<GPUEMVectorWarpOp>(space);
+            ret->real_type         = real_type;
+            ret->elements          = elements;
+            ret->element_matrix    = element_matrix;
+            ret->linear_elasticity = linear_elasticity;
+            ret->mu                = mu;
+            ret->lambda            = lambda;
+            return ret;
+        }
 
         void set_value_in_block(const std::string &block_name,
                                 const std::string &var_name,
@@ -1710,8 +1748,8 @@ namespace sfem {
             }
 
             if (changed && element_matrix) {
-                auto &ssm  = space->mesh();
-                auto  mesh = smesh::derefine(space->mesh_ptr(), 1);
+                auto &ssm              = space->mesh();
+                auto  mesh             = smesh::derefine(space->mesh_ptr(), 1);
                 auto  h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 24 * 24);
 
                 sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
@@ -1723,6 +1761,10 @@ namespace sfem {
                                                                   lambda,
                                                                   h_element_matrix->data());
                 element_matrix = smesh::to_device(h_element_matrix);
+            }
+
+            if (linear_elasticity) {
+                linear_elasticity->set_value_in_block(block_name, var_name, value);
             }
         }
     };
