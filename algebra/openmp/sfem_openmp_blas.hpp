@@ -38,10 +38,6 @@ namespace sfem {
             return ret;
         }
 
-        static void dot_into(const ptrdiff_t n, const T* const l, const T* const r, T* const out) {
-            *out = dot(n, l, r);
-        }
-
         static void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
                           T* const y) {
 #pragma omp parallel for
@@ -87,10 +83,6 @@ namespace sfem {
             return sqrt(ret);
         }
 
-        static void norm2_into(const ptrdiff_t n, const T* const x, T* const out) {
-            *out = norm2(n, x);
-        }
-
         static void values(const std::ptrdiff_t n, const T v, T* const x) {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
@@ -125,10 +117,7 @@ namespace sfem {
             tpl.destroy = destroy;
             tpl.copy = copy;
             tpl.dot = dot;
-            tpl.dot_into = dot_into;
             tpl.norm2 = norm2;
-            tpl.norm2_into = norm2_into;
-            tpl.copy_scalars_to_host = copy;
             tpl.axpy = [](const ptrdiff_t n, const T alpha, const T* const x, T* const y) {
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n; i++) {

@@ -45,11 +45,9 @@ int         obstacle_hessian_block_diag_sym(const int                         di
                                             const real_t *const SFEM_RESTRICT m,
                                             const real_t *const               x,
                                             real_t *const                     values) {
-    const int sym_block_size = (dim == 3 ? 6 : 3);
-
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < n; ++i) {
-        real_t *const v = &values[i * sym_block_size];
+        real_t *const v = &values[i * 6];
 
         int d_idx = 0;
         for (int d1 = 0; d1 < dim; d1++) {

@@ -138,30 +138,11 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
         SMESH_ERROR("Cannot derfine mesh!\n");
     }
 
-    const int from_level     = smesh::semistructured_level(*impl_->mesh);
-    auto      derefined_mesh = smesh::derefine(impl_->mesh, to_level);
+    auto derefined_mesh = smesh::derefine(impl_->mesh, to_level);
 
     // FIXME remove me once PROTEUS_HEX8 assemblies are supported
     if (derefined_mesh && derefined_mesh->element_type(0) == smesh::PROTEUS_HEX8) {
         derefined_mesh = smesh::sshex_to_hex8(derefined_mesh);
-
-        auto fine_soa  = impl_->mesh->block(0)->device_elements_SoA();
-        auto hex8_soa  = smesh::sshex8_to_hex8_device_elements_view(fine_soa, from_level);
-        derefined_mesh->block(0)->set_device_elements_SoA(hex8_soa);
-
-        auto ret = std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size, derefined_mesh->element_type(0));
-        ret->set_device_elements(hex8_soa);
-        return ret;
-    }
-
-    if (derefined_mesh && smesh::is_semistructured_type(derefined_mesh->element_type(0))) {
-        auto fine_soa   = impl_->mesh->block(0)->device_elements_SoA();
-        auto coarse_soa = smesh::sshex8_device_elements_view(fine_soa, from_level, to_level);
-        derefined_mesh->block(0)->set_device_elements_SoA(coarse_soa);
-
-        auto ret = std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size, derefined_mesh->element_type(0));
-        ret->set_device_elements(coarse_soa);
-        return ret;
     }
 
     return std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size, derefined_mesh->element_type(0));
