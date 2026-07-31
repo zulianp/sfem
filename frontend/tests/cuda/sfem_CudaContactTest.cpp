@@ -250,17 +250,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                     lagrange_ub->data(),
                     Jpen->data());
 
-    auto e_pen_buf = sfem::create_buffer<real_t>(1, es);
-    impl.sq_norm_ramp_p_into(contact_conds->n_constrained_dofs(), x->data(), upper_bound->data(), e_pen_buf->data());
-    real_t e_pen = 0;
-#ifdef SFEM_ENABLE_CUDA
-    if (EXECUTION_SPACE_DEVICE == es) {
-        buffer_device_to_host(sizeof(real_t), e_pen_buf->data(), &e_pen);
-    } else
-#endif
-    {
-        e_pen = e_pen_buf->data()[0];
-    }
+    auto e_pen = impl.sq_norm_ramp_p(contact_conds->n_constrained_dofs(), x->data(), upper_bound->data());
 
     auto lagr_ub = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
     impl.update_lagr_p(contact_conds->n_constrained_dofs(), 10, x->data(), upper_bound->data(), lagr_ub->data());
