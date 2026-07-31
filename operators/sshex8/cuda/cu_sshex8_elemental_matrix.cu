@@ -824,3 +824,390 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS(const int                       
         }
     }
 }
+
+//////////////////////// Vector (block_size = 3) ////////////////////////
+
+template <typename T, int LEVEL>
+__global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_warp(
+        const ptrdiff_t                  nelements,
+        const idx_t *const SFEM_RESTRICT elements,
+        const T *const SFEM_RESTRICT     elemental_matrix,
+        const T *const SFEM_RESTRICT     x,
+        T *const SFEM_RESTRICT           y) {
+    static const int BLOCK_SIZE   = LEVEL + 1;
+    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;
+    static const int EMAT_SIZE    = 24 * 24;
+
+    assert(blockDim.x == BLOCK_SIZE);
+    assert(blockDim.y == BLOCK_SIZE);
+    assert(blockDim.z == BLOCK_SIZE);
+
+    __shared__ T x_block[3][BLOCK_SIZE_3];
+    __shared__ T y_block[3][BLOCK_SIZE_3];
+    __shared__ T emat[EMAT_SIZE];
+
+    for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        const int lidx = threadIdx.z * BLOCK_SIZE_2 + threadIdx.y * BLOCK_SIZE + threadIdx.x;
+
+        {
+            const T *const SFEM_RESTRICT emat_e = &elemental_matrix[e * EMAT_SIZE];
+            for (int i = lidx; i < EMAT_SIZE; i += BLOCK_SIZE_3) {
+                emat[i] = emat_e[i];
+            }
+        }
+
+        const ptrdiff_t gidx = elements[e * BLOCK_SIZE_3 + lidx];
+#pragma unroll
+        for (int d = 0; d < 3; d++) {
+            x_block[d][lidx] = x[gidx * 3 + d];
+            y_block[d][lidx] = 0;
+        }
+
+        const bool is_element = threadIdx.x < LEVEL && threadIdx.y < LEVEL && threadIdx.z < LEVEL;
+
+        __syncthreads();
+
+        if (is_element) {
+            T element_u[24];
+            T element_v[24];
+
+#pragma unroll
+            for (int i = 0; i < 8; i++) {
+                const int x_idx = (i & 1) ? threadIdx.x + 1 : threadIdx.x;
+                const int y_idx = (i & 2) ? threadIdx.y + 1 : threadIdx.y;
+                const int z_idx = (i & 4) ? threadIdx.z + 1 : threadIdx.z;
+                const int nidx  = cu_sshex8_lidx(LEVEL, x_idx, y_idx, z_idx);
+#pragma unroll
+                for (int d = 0; d < 3; d++) {
+                    element_u[d * 8 + i] = x_block[d][nidx];
+                    element_v[d * 8 + i] = 0;
+                }
+            }
+
+            for (int i = 0; i < 24; i++) {
+                const T *const row = &emat[i * 24];
+                const T        ui  = element_u[i];
+                for (int j = 0; j < 24; j++) {
+                    element_v[j] += ui * row[j];
+                }
+            }
+
+#pragma unroll
+            for (int i = 0; i < 8; i++) {
+                const int x_idx = (i & 1) ? threadIdx.x + 1 : threadIdx.x;
+                const int y_idx = (i & 2) ? threadIdx.y + 1 : threadIdx.y;
+                const int z_idx = (i & 4) ? threadIdx.z + 1 : threadIdx.z;
+                const int nidx  = cu_sshex8_lidx(LEVEL, x_idx, y_idx, z_idx);
+#pragma unroll
+                for (int d = 0; d < 3; d++) {
+                    atomicAdd(&y_block[d][nidx], element_v[d * 8 + i]);
+                }
+            }
+        }
+
+        const int interior = threadIdx.x > 0 && threadIdx.y > 0 && threadIdx.z > 0 && threadIdx.x < LEVEL &&
+                             threadIdx.y < LEVEL && threadIdx.z < LEVEL;
+
+        __syncthreads();
+
+#pragma unroll
+        for (int d = 0; d < 3; d++) {
+            if (interior)
+                y[gidx * 3 + d] += y_block[d][lidx];
+            else
+                atomicAdd(&y[gidx * 3 + d], y_block[d][lidx]);
+        }
+    }
+}
+
+template <typename T, int LEVEL>
+int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl(const ptrdiff_t                  nelements,
+                                                                const idx_t *const SFEM_RESTRICT elements,
+                                                                const T *const SFEM_RESTRICT     elemental_matrix,
+                                                                const T *const SFEM_RESTRICT     x,
+                                                                T *const SFEM_RESTRICT           y,
+                                                                void                            *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    static const int BLOCK_SIZE = LEVEL + 1;
+
+    dim3 block_size(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_warp<T, LEVEL>
+                <<<n_blocks, block_size, 0, s>>>(nelements, elements, elemental_matrix, x, y);
+    } else {
+        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_warp<T, LEVEL>
+                <<<n_blocks, block_size, 0>>>(nelements, elements, elemental_matrix, x, y);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+template <typename T, int LEVEL>
+__global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC(
+        const ptrdiff_t                  nelements,
+        const idx_t *const SFEM_RESTRICT elements,
+        const T *const SFEM_RESTRICT     elemental_matrix,
+        const T *const SFEM_RESTRICT     x,
+        T *const SFEM_RESTRICT           y) {
+    assert(blockDim.x == 4);
+    assert(blockDim.y == 8);
+    assert(blockDim.x * blockDim.y * blockDim.z >= 64);
+
+    static const int BLOCK_SIZE       = LEVEL + 1;
+    static const int BLOCK_SIZE_2     = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3     = BLOCK_SIZE_2 * BLOCK_SIZE;
+    static const int N_MICRO_ELEMENTS = LEVEL * LEVEL * LEVEL;
+    static const int EMAT_SIZE        = 24 * 24;
+
+    assert(blockDim.x * blockDim.y * blockDim.z >= BLOCK_SIZE_3);
+
+    __shared__ T x_block[3][BLOCK_SIZE_3];
+    __shared__ T y_block[3][BLOCK_SIZE_3];
+    __shared__ T emat[EMAT_SIZE];
+
+    const int lane_id  = threadIdx.x + blockDim.x * threadIdx.y;
+    const int lidx     = lane_id + (blockDim.x * blockDim.y) * threadIdx.z;
+    const int nthreads = blockDim.x * blockDim.y * blockDim.z;
+
+    const int in_x_offset = !!(threadIdx.x & 1);
+    const int in_y_offset = !!(threadIdx.x & 2);
+
+    const int out_x_offset = !!(threadIdx.y & 1);
+    const int out_y_offset = !!(threadIdx.y & 2);
+    const int out_z_offset = !!(threadIdx.y & 4);
+
+    const int batch_size   = blockDim.y * blockDim.z;
+    const int n_rounds     = (N_MICRO_ELEMENTS + batch_size - 1) / batch_size;
+    const int batch_offset = threadIdx.z * 8;
+
+    for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        {
+            const T *const SFEM_RESTRICT emat_e = &elemental_matrix[e * EMAT_SIZE];
+            for (int i = lidx; i < EMAT_SIZE; i += nthreads) {
+                emat[i] = emat_e[i];
+            }
+        }
+
+        if (lidx < BLOCK_SIZE_3) {
+            const ptrdiff_t gidx = elements[e * BLOCK_SIZE_3 + lidx];
+#pragma unroll
+            for (int d = 0; d < 3; d++) {
+                x_block[d][lidx] = x[gidx * 3 + d];
+                y_block[d][lidx] = 0;
+            }
+        }
+
+        __syncthreads();
+
+        // Apply each 8x8 component-pair block with the scalar Tensor-Core pattern
+        for (int out_c = 0; out_c < 3; out_c++) {
+            for (int in_c = 0; in_c < 3; in_c++) {
+                const int row0 = out_c * 8 + threadIdx.y;
+                const int col0 = in_c * 8 + threadIdx.x;
+                const int col1 = in_c * 8 + 4 + threadIdx.x;
+
+                const double A0 = emat[row0 * 24 + col0];
+                const double A1 = emat[row0 * 24 + col1];
+
+                for (int r = 0; r < n_rounds; r++) {
+                    const int in_micro_e  = threadIdx.y + batch_offset + r * batch_size;
+                    const int out_micro_e = 2 * threadIdx.x + batch_offset + r * batch_size;
+
+                    double u0 = 0;
+                    double u1 = 0;
+
+                    if (in_micro_e < N_MICRO_ELEMENTS) {
+                        const int in_xe = in_micro_e % LEVEL;
+                        const int in_ye = (in_micro_e / LEVEL) % LEVEL;
+                        const int in_ze = in_micro_e / (LEVEL * LEVEL);
+                        const int x0    = in_xe + in_x_offset;
+                        const int y0    = in_ye + in_y_offset;
+
+                        const int idx0 = cu_sshex8_lidx(LEVEL, x0, y0, in_ze);
+                        const int idx1 = cu_sshex8_lidx(LEVEL, x0, y0, in_ze + 1);
+
+                        u0 = x_block[in_c][idx0];
+                        u1 = x_block[in_c][idx1];
+                    }
+
+                    double C[2] = {0, 0};
+
+                    asm volatile(
+                            "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
+                            "{%0,%1},{%2},{%3},{%4,%5};\n"
+                            : "=d"(C[0]), "=d"(C[1])
+                            : "d"(A0), "d"(u0), "d"(C[0]), "d"(C[1]));
+
+                    asm volatile(
+                            "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
+                            "{%0,%1},{%2},{%3},{%4,%5};\n"
+                            : "=d"(C[0]), "=d"(C[1])
+                            : "d"(A1), "d"(u1), "d"(C[0]), "d"(C[1]));
+
+                    if (out_micro_e < N_MICRO_ELEMENTS) {
+                        const int out_xe = out_micro_e % LEVEL;
+                        const int out_ye = (out_micro_e / LEVEL) % LEVEL;
+                        const int out_ze = out_micro_e / (LEVEL * LEVEL);
+
+                        const int x0 = out_xe + out_x_offset;
+                        const int y0 = out_ye + out_y_offset;
+                        const int z0 = out_ze + out_z_offset;
+
+                        const int idx0 = cu_sshex8_lidx(LEVEL, x0, y0, z0);
+                        atomicAdd(&y_block[out_c][idx0], (T)C[0]);
+                    }
+
+                    if (out_micro_e + 1 < N_MICRO_ELEMENTS) {
+                        const int out_xe = (out_micro_e + 1) % LEVEL;
+                        const int out_ye = ((out_micro_e + 1) / LEVEL) % LEVEL;
+                        const int out_ze = (out_micro_e + 1) / (LEVEL * LEVEL);
+
+                        const int x1 = out_xe + out_x_offset;
+                        const int y1 = out_ye + out_y_offset;
+                        const int z1 = out_ze + out_z_offset;
+
+                        const int idx1 = cu_sshex8_lidx(LEVEL, x1, y1, z1);
+                        atomicAdd(&y_block[out_c][idx1], (T)C[1]);
+                    }
+                }
+            }
+        }
+
+        __syncthreads();
+
+        if (lidx < BLOCK_SIZE_3) {
+            const ptrdiff_t gidx = elements[e * BLOCK_SIZE_3 + lidx];
+#pragma unroll
+            for (int d = 0; d < 3; d++) {
+                atomicAdd(&y[gidx * 3 + d], y_block[d][lidx]);
+            }
+        }
+    }
+}
+
+template <typename T, int LEVEL>
+int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl(const ptrdiff_t                  nelements,
+                                                              const idx_t *const SFEM_RESTRICT elements,
+                                                              const T *const SFEM_RESTRICT     elemental_matrix,
+                                                              const T *const SFEM_RESTRICT     x,
+                                                              T *const SFEM_RESTRICT           y,
+                                                              void                            *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    int min_grid_size;
+    int max_z_size;
+    cudaOccupancyMaxPotentialBlockSize(
+            &min_grid_size, &max_z_size, cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC<T, LEVEL>, 0, 0);
+
+    max_z_size /= 32;
+    static const int Z_SIZE = (LEVEL * LEVEL * LEVEL + 8 - 1) / 8;
+
+    int z_block_size = MIN(max_z_size, Z_SIZE);
+
+    if (z_block_size * 4 * 8 < POW3(LEVEL + 1)) {
+        SFEM_ERROR("Too large block size for vector TC kernel!\n");
+    }
+
+    dim3 block_size(4, 8, z_block_size);
+    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC<T, LEVEL>
+                <<<n_blocks, block_size, 0, s>>>(nelements, elements, elemental_matrix, x, y);
+    } else {
+        cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC<T, LEVEL>
+                <<<n_blocks, block_size, 0>>>(nelements, elements, elemental_matrix, x, y);
+    }
+
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+template <typename T>
+int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl(const int                        level,
+                                                           const ptrdiff_t                  nelements,
+                                                           const idx_t *const SFEM_RESTRICT elements,
+                                                           const T *const SFEM_RESTRICT     elemental_matrix,
+                                                           const T *const SFEM_RESTRICT     x,
+                                                           T *const SFEM_RESTRICT           y,
+                                                           void                            *stream) {
+    int SFEM_ENABLE_TC = 1;
+    SFEM_READ_ENV(SFEM_ENABLE_TC, atoi);
+
+    if (SFEM_ENABLE_TC) {
+        switch (level) {
+            case 4: {
+                return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl<T, 4>(
+                        nelements, elements, elemental_matrix, x, y, stream);
+            }
+            case 6: {
+                return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl<T, 6>(
+                        nelements, elements, elemental_matrix, x, y, stream);
+            }
+            case 8: {
+                return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl<T, 8>(
+                        nelements, elements, elemental_matrix, x, y, stream);
+            }
+            default:
+                break;
+        }
+    }
+
+    switch (level) {
+        case 4: {
+            return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl<T, 4>(
+                    nelements, elements, elemental_matrix, x, y, stream);
+        }
+        case 6: {
+            return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl<T, 6>(
+                    nelements, elements, elemental_matrix, x, y, stream);
+        }
+        case 8: {
+            return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl<T, 8>(
+                    nelements, elements, elemental_matrix, x, y, stream);
+        }
+        default:
+            break;
+    }
+
+    SFEM_ERROR("cu_affine_sshex8_elemental_matrix_apply_AoS_vector: level %d NOT implemented!\n", level);
+    return SFEM_FAILURE;
+}
+
+int cu_affine_sshex8_elemental_matrix_apply_AoS_vector(const int                        level,
+                                                       const ptrdiff_t                  nelements,
+                                                       const idx_t *const SFEM_RESTRICT elements,
+                                                       const enum smesh::PrimitiveType  real_type,
+                                                       const void *const SFEM_RESTRICT  elemental_matrix,
+                                                       const void *const SFEM_RESTRICT  x,
+                                                       void *const SFEM_RESTRICT        y,
+                                                       void                            *stream) {
+    switch (real_type) {
+        case smesh::SMESH_DEFAULT: {
+            return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl<real_t>(
+                    level, nelements, elements, (const real_t *)elemental_matrix, (const real_t *)x, (real_t *)y, stream);
+        }
+        case smesh::SMESH_FLOAT32: {
+            return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl<float>(
+                    level, nelements, elements, (const float *)elemental_matrix, (const float *)x, (float *)y, stream);
+        }
+        case smesh::SMESH_FLOAT64: {
+            return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl<double>(
+                    level, nelements, elements, (const double *)elemental_matrix, (const double *)x, (double *)y, stream);
+        }
+        default: {
+            SFEM_ERROR(
+                    "[Error] cu_affine_sshex8_elemental_matrix_apply_AoS_vector: not implemented for type %s (code %d)\n",
+                    smesh::to_string(real_type),
+                    real_type);
+            return SFEM_FAILURE;
+        }
+    }
+}
