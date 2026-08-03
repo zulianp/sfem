@@ -235,6 +235,33 @@ namespace sfem {
                 blas_.copy(n_dofs, x, x_old->data());
             }
 
+            if (debug && constraints_op_) {
+                blas_.zeros(n_dofs, mem->work->data());
+
+                // Solution space to constraints space
+                constraints_op_->apply(mem->solution->data(), correction->data());
+
+                // Constraints space to solution space
+                blas_.zeros(n_constrained_dofs, mem->work->data());
+                impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
+
+                blas_.zeros(n_dofs, correction->data());
+
+                // Constraints space to solution space
+                constraints_op_transpose_->apply(mem->work->data(), correction->data());
+
+                blas_.zeros(n_dofs, mem->work->data());
+                op->apply(mem->solution->data(), mem->work->data());
+                blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                blas_.axpy(n_dofs, 1, correction->data(), mem->work->data());
+
+                const T r_pen_norm = blas_.norm2(n_dofs, mem->work->data());
+
+                if (debug) {
+                    printf("||g|| start: %e\n", (double)r_pen_norm);
+                }
+            }
+
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
                 T rnorm_previous = 10000000000;
@@ -730,7 +757,7 @@ namespace sfem {
             for (int k = 0; k < this->cycle_type_; k++) {
                 if (constraints_op_) {
                     smoother->set_op_and_diag_shift(sop, constraints_op_x_op_[level], mem->diag);
-                  } else {
+                } else {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
