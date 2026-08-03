@@ -16,6 +16,7 @@
 
 #include <sys/stat.h>
 #include <cstddef>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -353,6 +354,13 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int NeumannConditions::hessian_bsr(const real_t *const /*x*/,
+                                       const count_t *const /*rowptr*/,
+                                       const idx_t *const /*colidx*/,
+                                       real_t *const /*values*/) {
+        return SFEM_SUCCESS;
+    }
+
     int NeumannConditions::gradient(const real_t *const /*x*/, real_t *const out) {
         SFEM_TRACE_SCOPE("NeumannConditions::gradient");
 
@@ -401,7 +409,63 @@ namespace sfem {
     }
 
     int NeumannConditions::value(const real_t *x, real_t *const out) {
-        // TODO
+        SFEM_TRACE_SCOPE("NeumannConditions::value");
+
+        auto space = impl_->space;
+        auto temp  = create_host_buffer<real_t>(space->n_dofs());
+        if (!temp) {
+            return SFEM_FAILURE;
+        }
+
+        int err = gradient(x, temp->data());
+        if (err != SFEM_SUCCESS) {
+            return err;
+        }
+
+        const ptrdiff_t     ndofs = space->n_dofs();
+        const real_t *const g     = temp->data();
+        real_t              acc   = 0;
+
+#pragma omp parallel for reduction(+ : acc)
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            acc += g[i] * x[i];
+        }
+
+        *out += acc;
+        return SFEM_SUCCESS;
+    }
+
+    int NeumannConditions::value_steps(const real_t *const       x,
+                                       const real_t *const       h,
+                                       const int                 nsteps,
+                                       const real_t *const       steps,
+                                       real_t *const             out) {
+        SFEM_TRACE_SCOPE("NeumannConditions::value_steps");
+
+        auto space = impl_->space;
+        auto temp  = create_host_buffer<real_t>(space->n_dofs());
+        if (!temp) {
+            return SFEM_FAILURE;
+        }
+
+        int err = gradient(x, temp->data());
+        if (err != SFEM_SUCCESS) {
+            return err;
+        }
+
+        const ptrdiff_t     ndofs = space->n_dofs();
+        const real_t *const g     = temp->data();
+
+        for (int s = 0; s < nsteps; ++s) {
+            const real_t step = steps[s];
+            real_t       acc  = 0;
+#pragma omp parallel for reduction(+ : acc)
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                acc += g[i] * (x[i] + step * h[i]);
+            }
+            out[s] += acc;
+        }
+
         return SFEM_SUCCESS;
     }
 

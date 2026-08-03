@@ -118,17 +118,20 @@ int resample_gap(
         return SFEM_FAILURE;
     }
 
+    // Lumped-mass pseudo-inverse (same pattern as blas.reciprocal): skip w_i == 0.
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        g[i] /= w[i];
+        if (w[i]) g[i] /= w[i];
     }
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        real_t denom = sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
-        xnormal[i] /= denom;
-        ynormal[i] /= denom;
-        znormal[i] /= denom;
+        const real_t denom = sqrt(xnormal[i] * xnormal[i] + ynormal[i] * ynormal[i] + znormal[i] * znormal[i]);
+        if (denom > 0) {
+            xnormal[i] /= denom;
+            ynormal[i] /= denom;
+            znormal[i] /= denom;
+        }
     }
 
     free(w);
@@ -194,9 +197,10 @@ int resample_gap_value(
         return SFEM_FAILURE;
     }
 
+    // Lumped-mass pseudo-inverse (same pattern as blas.reciprocal): skip w_i == 0.
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nnodes; i++) {
-        g[i] /= w[i];
+        if (w[i]) g[i] /= w[i];
     }
 
     free(w);

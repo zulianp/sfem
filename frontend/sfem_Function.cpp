@@ -6,8 +6,13 @@
 
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
+#include "sfem_openmp_blas.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_blas.hpp"
+#endif
 
 #include "boundary_condition.hpp"
 #include "boundary_condition_io.hpp"
@@ -372,6 +377,22 @@ namespace sfem {
         if (impl_->handle_constraints) {
             for (auto &c : impl_->constraints) {
                 c->hessian_bsr(x, rowptr, colidx, values);
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int Function::hessian_dia(const real_t *const x,
+                              const int *const    diag_offsets,
+                              const ptrdiff_t     ndiag,
+                              real_t *const       values) {
+        SFEM_TRACE_SCOPE("Function::hessian_dia");
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_dia(x, diag_offsets, ndiag, values) != SFEM_SUCCESS) {
+                std::cerr << "Failed hessian_dia in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
             }
         }
 

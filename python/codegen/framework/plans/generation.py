@@ -7,6 +7,10 @@ from codegen.framework.plans.expression import KernelExpressionPlan
 from codegen.framework.plans.form_transformations import (
     simplex_gradient_metric_transformation,
 )
+from codegen.framework.plans.matrix_formats import (
+    MatrixFormatPlan,
+    specialize_matrix_format_plan,
+)
 from codegen.framework.symbolic.forms import FormCollection, FormOrder, PipelineStage
 from codegen.framework.fem.geometry import GeometryPlanNode
 
@@ -46,7 +50,11 @@ class LocalPhase(Enum):
 
 class KernelTarget(Enum):
     OPENMP = "openmp"
+    AVX512 = "avx512"
+    ARM_SVE = "arm_sve"
+    ARM_SME = "arm_sme"
     CUDA = "cuda"
+    HIP = "hip"
 
 
 class KernelScope(Enum):
@@ -479,6 +487,7 @@ class KernelPlan:
     block_kernels: tuple = ()
     emission: KernelEmission = KernelEmission.FILES
     expression_plans: tuple = ()
+    matrix_format_plan: object = None
 
     def __post_init__(self):
         name = str(self.name)
@@ -492,6 +501,7 @@ class KernelPlan:
         block_kernels = tuple(self.block_kernels)
         expression_plans = tuple(self.expression_plans)
         mesh_phase_plans = tuple(self.mesh_phase_plans)
+        matrix_format_plan = self.matrix_format_plan
         if mesh_phase_plans:
             for plan in mesh_phase_plans:
                 if not isinstance(plan, MeshPhasePlan):
@@ -542,6 +552,8 @@ class KernelPlan:
         for expression_plan in expression_plans:
             if not isinstance(expression_plan, KernelExpressionPlan):
                 raise TypeError("kernel plan expression_plans must be KernelExpressionPlan objects")
+        if matrix_format_plan is not None and not isinstance(matrix_format_plan, MatrixFormatPlan):
+            raise TypeError("kernel plan matrix_format_plan must be a MatrixFormatPlan")
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "dim", dim)
         object.__setattr__(self, "mesh_phases", mesh_phases)
@@ -554,6 +566,7 @@ class KernelPlan:
         object.__setattr__(self, "emission", emission)
         object.__setattr__(self, "block_kernels", block_kernels)
         object.__setattr__(self, "expression_plans", expression_plans)
+        object.__setattr__(self, "matrix_format_plan", matrix_format_plan)
 
     @staticmethod
     def _mesh_phase_plans_from_phases(mesh_phases, geometry, blocks, streams):
@@ -602,8 +615,6 @@ class KernelPlan:
                 "kernel '%s' dimension %d does not match context dimension %d"
                 % (self.name, self.dim, context.specialization.dim)
             )
-        if self.target is not KernelTarget.OPENMP:
-            raise ValueError("kernel '%s' target '%s' is not supported" % (self.name, self.target.value))
         _validate_phase_sequence(
             "mesh",
             tuple(phase.phase for phase in self.mesh_phase_plans),
@@ -640,6 +651,11 @@ class KernelPlan:
             kernel.specialize_for_context(context)
             for kernel in self.block_kernels
         )
+        matrix_format_plan = specialize_matrix_format_plan(
+            self.matrix_format_plan,
+            self,
+            context,
+        )
         return replace(
             self,
             mesh_phases=(),
@@ -647,6 +663,7 @@ class KernelPlan:
             blocks=blocks,
             block=selected_block,
             block_kernels=block_kernels,
+            matrix_format_plan=matrix_format_plan,
         )
 
     def local_kernel_plan(self, context, prefix, suffix=""):
@@ -680,6 +697,9 @@ class KernelPlan:
                 expression_plan.to_dict()
                 for expression_plan in self.expression_plans
             ],
+            "matrix_format_plan": None
+            if self.matrix_format_plan is None
+            else self.matrix_format_plan.to_dict(),
             "block_kernels": [
                 kernel.to_dict(include_block_kernels=False)
                 for kernel in self.block_kernels

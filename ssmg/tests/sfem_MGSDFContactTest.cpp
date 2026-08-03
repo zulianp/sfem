@@ -4,10 +4,9 @@
 
 #include "sfem_Function.hpp"
 
+#include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_CRS.hpp"
-
 
 #include "matrixio_array.h"
 
@@ -312,8 +311,9 @@ int test_contact() {
     }
 #endif
 
-    auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, "LinearElasticity", es);
+    auto op_name = smesh::Env::read_string("SFEM_OPERATOR", "LinearElasticity");
+    auto f       = sfem::Function::create(fs);
+    auto op      = sfem::create_op(fs, op_name, es);
     op->initialize();
 
     f->add_operator(op);

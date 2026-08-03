@@ -1,5 +1,6 @@
 #include "sshex8_stencil_element_matrix_apply.hpp"
 
+#include "packed_elements.hpp"
 #include "sshex8.hpp"
 #include "sshex8_skeleton_stencil.hpp"
 #include "stencil3.hpp"
@@ -72,6 +73,87 @@ int sshex8_stencil_element_matrix_apply(const int                           leve
         free(ev);
         free(eu);
         free(v);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int sshex8_stencil_element_matrix_apply3(const int                           level,
+                                         const ptrdiff_t                     nelements,
+                                         idx_t **const SFEM_RESTRICT         elements,
+                                         const scalar_t *const SFEM_RESTRICT g_element_matrix,
+                                         const ptrdiff_t                     u_stride,
+                                         const real_t *const SFEM_RESTRICT   ux,
+                                         const real_t *const SFEM_RESTRICT   uy,
+                                         const real_t *const SFEM_RESTRICT   uz,
+                                         const ptrdiff_t                     out_stride,
+                                         real_t *const SFEM_RESTRICT         outx,
+                                         real_t *const SFEM_RESTRICT         outy,
+                                         real_t *const SFEM_RESTRICT         outz) {
+    const int nxe = sshex8_nxe(level);
+    const int txe = sshex8_txe(level);
+
+#pragma omp parallel
+    {
+        scalar_t *eu[3];
+        scalar_t *v[3];
+
+        for (int d = 0; d < 3; d++) {
+            eu[d] = (scalar_t *)malloc(nxe * sizeof(scalar_t));
+            v[d]  = (scalar_t *)malloc(nxe * sizeof(scalar_t));
+        }
+
+        idx_t    *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
+        scalar_t *X  = (scalar_t *)malloc(txe * 24 * sizeof(scalar_t));
+        scalar_t *Y  = (scalar_t *)malloc(txe * 24 * sizeof(scalar_t));
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            for (int d = 0; d < nxe; d++) {
+                ev[d] = elements[d][e];
+            }
+
+            for (int d = 0; d < nxe; d++) {
+                const ptrdiff_t idx = ev[d] * u_stride;
+                eu[0][d]           = ux[idx];
+                eu[1][d]           = uy[idx];
+                eu[2][d]           = uz[idx];
+                assert(eu[0][d] == eu[0][d]);
+                assert(eu[1][d] == eu[1][d]);
+                assert(eu[2][d] == eu[2][d]);
+            }
+
+            sshex8_SoA_pack_elements(level, eu, X);
+            packed_elements_matmul(24, txe, 24, &g_element_matrix[e * 24 * 24], X, Y);
+
+            for (int d = 0; d < 3; d++) {
+                memset(v[d], 0, nxe * sizeof(scalar_t));
+            }
+
+            sshex8_SoA_unpack_add_elements(level, Y, v);
+
+            for (int d = 0; d < nxe; d++) {
+                const ptrdiff_t idx = ev[d] * out_stride;
+
+#pragma omp atomic update
+                outx[idx] += v[0][d];
+
+#pragma omp atomic update
+                outy[idx] += v[1][d];
+
+#pragma omp atomic update
+                outz[idx] += v[2][d];
+            }
+        }
+
+        free(ev);
+        free(X);
+        free(Y);
+
+        for (int d = 0; d < 3; d++) {
+            free(eu[d]);
+            free(v[d]);
+        }
     }
 
     return SFEM_SUCCESS;

@@ -271,7 +271,10 @@ def main():
         ]
 
     if args.probe_metal_toolchain:
-        manifest["metal_toolchain"] = _probe_metal_toolchain(output_dir)
+        manifest["metal_toolchain"] = _probe_metal_toolchain(
+            output_dir,
+            manifest["iree_metal_executable_files"],
+        )
 
     if args.run_metal_smoke:
         local_metal = TensorProductLaplaceFormMetalLowering(form_ir)
@@ -2234,10 +2237,10 @@ def _run_iree_metal_runtime_smoke(output_dir, form_ir, form_linalg_lowering):
     }
 
 
-def _probe_metal_toolchain(output_dir):
+def _probe_metal_toolchain(output_dir, iree_metal_executable_files=()):
     xcrun = shutil.which("xcrun")
     output_dir = Path(output_dir)
-    metal_files = sorted(output_dir.rglob("*.metal"))
+    metal_files = _metal_toolchain_source_paths(output_dir, iree_metal_executable_files)
     if xcrun is None:
         return [
             {
@@ -2276,6 +2279,17 @@ def _probe_metal_toolchain(output_dir):
             }
         )
     return results
+
+
+def _metal_toolchain_source_paths(output_dir, iree_metal_executable_files=()):
+    output_dir = Path(output_dir)
+    paths = {Path(path) for path in output_dir.rglob("*.metal")}
+    for item in iree_metal_executable_files or ():
+        for path in item.get("metal_source_paths", ()):
+            path = Path(path)
+            if path.suffix == ".metal":
+                paths.add(path)
+    return sorted(paths, key=lambda path: str(path))
 
 
 def _metal_toolchain_air_path(output_dir, air_dir, path):

@@ -108,7 +108,8 @@ static SFEM_INLINE void tet10_laplacian_apply_add_fff(const scalar_t *const SFEM
 }
 
 // SoA-style quadrature point kernel (useful for vectorization over element index)
-static SFEM_INLINE void tet10_laplacian_apply_qp_fff_soa(const scalar_t                     qx,
+template <typename scalar_t, typename accumulator_t>
+static SFEM_INLINE void tet10_laplacian_apply_qp_fff_soa_tpl(const scalar_t                     qx,
                                                          const scalar_t                     qy,
                                                          const scalar_t                     qz,
                                                          const scalar_t                     qw,
@@ -184,7 +185,8 @@ static SFEM_INLINE void tet10_laplacian_apply_qp_fff_soa(const scalar_t         
 }
 
 // SoA-style wrapper (useful for vectorization over element index)
-static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t                     fff0,
+template <typename scalar_t, typename accumulator_t>
+static SFEM_INLINE void tet10_laplacian_apply_fff_soa_tpl(const scalar_t                     fff0,
                                                       const scalar_t                     fff1,
                                                       const scalar_t                     fff2,
                                                       const scalar_t                     fff3,
@@ -222,7 +224,7 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
     *e9 = 0;
 
     // Numerical quadrature (same points/weights as tet10_laplacian_apply_add_fff)
-    tet10_laplacian_apply_qp_fff_soa(0,
+    tet10_laplacian_apply_qp_fff_soa_tpl<scalar_t, accumulator_t>(0,
                                      0,
                                      0,
                                      0.025,
@@ -253,7 +255,7 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
                                      e8,
                                      e9);
 
-    tet10_laplacian_apply_qp_fff_soa(1,
+    tet10_laplacian_apply_qp_fff_soa_tpl<scalar_t, accumulator_t>(1,
                                      0,
                                      0,
                                      0.025,
@@ -284,7 +286,7 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
                                      e8,
                                      e9);
 
-    tet10_laplacian_apply_qp_fff_soa(0,
+    tet10_laplacian_apply_qp_fff_soa_tpl<scalar_t, accumulator_t>(0,
                                      1,
                                      0,
                                      0.025,
@@ -315,7 +317,7 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
                                      e8,
                                      e9);
 
-    tet10_laplacian_apply_qp_fff_soa(0,
+    tet10_laplacian_apply_qp_fff_soa_tpl<scalar_t, accumulator_t>(0,
                                      0,
                                      1,
                                      0.025,
@@ -347,7 +349,7 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
                                      e9);
 
     static const scalar_t athird = 1. / 3;
-    tet10_laplacian_apply_qp_fff_soa(athird,
+    tet10_laplacian_apply_qp_fff_soa_tpl<scalar_t, accumulator_t>(athird,
                                      athird,
                                      0.,
                                      0.225,
@@ -378,7 +380,7 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
                                      e8,
                                      e9);
 
-    tet10_laplacian_apply_qp_fff_soa(athird,
+    tet10_laplacian_apply_qp_fff_soa_tpl<scalar_t, accumulator_t>(athird,
                                      0.,
                                      athird,
                                      0.225,
@@ -409,7 +411,7 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
                                      e8,
                                      e9);
 
-    tet10_laplacian_apply_qp_fff_soa(0.,
+    tet10_laplacian_apply_qp_fff_soa_tpl<scalar_t, accumulator_t>(0.,
                                      athird,
                                      athird,
                                      0.225,
@@ -440,7 +442,7 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
                                      e8,
                                      e9);
 
-    tet10_laplacian_apply_qp_fff_soa(athird,
+    tet10_laplacian_apply_qp_fff_soa_tpl<scalar_t, accumulator_t>(athird,
                                      athird,
                                      athird,
                                      0.225,
@@ -470,6 +472,36 @@ static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t            
                                      e7,
                                      e8,
                                      e9);
+}
+
+static SFEM_INLINE void tet10_laplacian_apply_fff_soa(const scalar_t                     fff0,
+                                                      const scalar_t                     fff1,
+                                                      const scalar_t                     fff2,
+                                                      const scalar_t                     fff3,
+                                                      const scalar_t                     fff4,
+                                                      const scalar_t                     fff5,
+                                                      const scalar_t                     u0,
+                                                      const scalar_t                     u1,
+                                                      const scalar_t                     u2,
+                                                      const scalar_t                     u3,
+                                                      const scalar_t                     u4,
+                                                      const scalar_t                     u5,
+                                                      const scalar_t                     u6,
+                                                      const scalar_t                     u7,
+                                                      const scalar_t                     u8,
+                                                      const scalar_t                     u9,
+                                                      accumulator_t *const SFEM_RESTRICT e0,
+                                                      accumulator_t *const SFEM_RESTRICT e1,
+                                                      accumulator_t *const SFEM_RESTRICT e2,
+                                                      accumulator_t *const SFEM_RESTRICT e3,
+                                                      accumulator_t *const SFEM_RESTRICT e4,
+                                                      accumulator_t *const SFEM_RESTRICT e5,
+                                                      accumulator_t *const SFEM_RESTRICT e6,
+                                                      accumulator_t *const SFEM_RESTRICT e7,
+                                                      accumulator_t *const SFEM_RESTRICT e8,
+                                                      accumulator_t *const SFEM_RESTRICT e9) {
+    tet10_laplacian_apply_fff_soa_tpl<scalar_t, accumulator_t>(
+            fff0, fff1, fff2, fff3, fff4, fff5, u0, u1, u2, u3, u4, u5, u6, u7, u8, u9, e0, e1, e2, e3, e4, e5, e6, e7, e8, e9);
 }
 
 static SFEM_INLINE void tet10_laplacian_hessian_fff(const scalar_t *fff, accumulator_t *element_matrix) {

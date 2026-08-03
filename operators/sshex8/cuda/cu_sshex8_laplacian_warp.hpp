@@ -111,7 +111,7 @@ static int cu_affine_sshex8_laplacian_apply_warp_tpl(const ptrdiff_t            
     static const int BLOCK_SIZE = LEVEL + 1;
 
     dim3 block_size(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-    dim3 n_blocks(MIN(nelements, 65535), 1, 1);
+    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);

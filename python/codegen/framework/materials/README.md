@@ -39,9 +39,15 @@ PYTHONPATH=python python -m codegen.framework.materials.two_phase_flow \
 
 PYTHONPATH=python python -m codegen.framework.generators.stokes \
     --out-dir /tmp/stokes --element TRI6_TRI3 --compile
+
+PYTHONPATH=python python -m codegen.framework.materials.navier_stokes \
+    --out-dir /tmp/navier_stokes --element TRI6_TRI3 --compile
 ```
 
 `poro_hyperelasticity` is a mixed formulation and defaults to Taylor-Hood
 compatible element pairs: `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`.
 `stokes` is a minimal residual-only Taylor-Hood example that uses the same
 compatible element pairs to exercise mixed velocity-pressure kernel generation.
+`navier_stokes` extends the Taylor-Hood mixed path with transient mass,
+explicit previous-velocity convection, viscosity, pressure coupling, and
+incompressibility terms for the wall-mounted-hump workflow.

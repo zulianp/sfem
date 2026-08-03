@@ -52,11 +52,21 @@ namespace sfem {
                         const idx_t *const   colidx,
                         real_t *const        values) override;
 
+        int hessian_bsr(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override;
+
         int gradient(const real_t *const x, real_t *const out) override;
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
 
         int value(const real_t *x, real_t *const out) override;
+        int value_steps(const real_t       *x,
+                        const real_t       *h,
+                        const int           nsteps,
+                        const real_t *const steps,
+                        real_t *const       out) override;
 
         int hessian_diag(const real_t *const x, real_t *const values) override;
         int hessian_block_diag_sym(const real_t *const, real_t *const) override { return SFEM_SUCCESS; }

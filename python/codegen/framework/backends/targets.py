@@ -5,11 +5,32 @@ from enum import Enum
 class TargetLanguage(Enum):
     CPP = "c++"
     CUDA = "cuda"
+    HIP = "hip"
 
 
 class ExecutionModel(Enum):
     VECTOR_LANES = "vector_lanes"
+    VECTOR_LENGTH_AGNOSTIC = "vector_length_agnostic"
     SIMT_THREADS = "simt_threads"
+
+
+class MatrixUnitKind(Enum):
+    NONE = "none"
+    ARM_SME = "arm_sme"
+    CUDA_TENSOR_CORES = "cuda_tensor_cores"
+    HIP_MATRIX_CORES = "hip_matrix_cores"
+
+
+@dataclass(frozen=True)
+class KernelVariantPolicy:
+    mesh_layouts: tuple = ("standard",)
+    thread_variants: tuple = ()
+    warp_variants: tuple = ()
+    packed_mesh_passes: tuple = ()
+
+    @property
+    def supports_packed_mesh(self):
+        return "packed" in self.mesh_layouts
 
 
 @dataclass(frozen=True)
@@ -27,6 +48,10 @@ class LoopLoweringPolicy:
     block_index: str = "blockIdx.x"
     block_dim: str = "blockDim.x"
     grid_dim: str = "gridDim.x"
+    vector_isa: str = ""
+    vector_length_aware: bool = False
+    preferred_vector_bits: int = 0
+    matrix_unit: MatrixUnitKind = MatrixUnitKind.NONE
 
 
 @dataclass(frozen=True)
@@ -131,6 +156,24 @@ class TargetPlatform:
     def supports_device_kernels(self):
         return False
 
+    def vectorization_diagnostic_flags(self, compiler="c++"):
+        compiler = str(compiler)
+        if "clang" in compiler or compiler in ("c++", "cc"):
+            return ("-Rpass=loop-vectorize", "-Werror=pass-failed")
+        if "gcc" in compiler or "g++" in compiler:
+            return ("-fopt-info-vec-optimized",)
+        return ()
+
+    def target_compile_flags(self):
+        return ()
+
+    def variant_policy(self):
+        return KernelVariantPolicy()
+
+    @property
+    def supports_matrix_units(self):
+        return self.loop_lowering_policy().matrix_unit is not MatrixUnitKind.NONE
+
 
 @dataclass(frozen=True)
 class OpenMPTarget(TargetPlatform):
@@ -191,6 +234,83 @@ class OpenMPTarget(TargetPlatform):
 
 
 @dataclass(frozen=True)
+class AVX512Target(OpenMPTarget):
+    name: str = "avx512"
+    default_alignment: int = 64
+
+    def loop_lowering_policy(self):
+        return LoopLoweringPolicy(
+            execution_model=ExecutionModel.VECTOR_LANES,
+            emits_lane_loop=True,
+            maps_lane_to_thread=False,
+            vectorize_lane_loop=True,
+            parallel_element_loop=True,
+            supports_shared_memory=False,
+            vector_isa="avx512",
+            preferred_vector_bits=512,
+        )
+
+    def target_compile_flags(self):
+        return ("-mavx512f",)
+
+    def variant_policy(self):
+        return KernelVariantPolicy(
+            mesh_layouts=("standard", "packed"),
+            packed_mesh_passes=("one_pass", "two_pass"),
+        )
+
+
+@dataclass(frozen=True)
+class ARMSVETarget(OpenMPTarget):
+    name: str = "arm_sve"
+    default_alignment: int = 64
+
+    def loop_lowering_policy(self):
+        return LoopLoweringPolicy(
+            execution_model=ExecutionModel.VECTOR_LENGTH_AGNOSTIC,
+            emits_lane_loop=True,
+            maps_lane_to_thread=False,
+            vectorize_lane_loop=True,
+            parallel_element_loop=True,
+            supports_shared_memory=False,
+            lane_index_type="ptrdiff_t",
+            vector_isa="arm_sve",
+            vector_length_aware=True,
+        )
+
+    def target_compile_flags(self):
+        return ("-march=armv8-a+sve",)
+
+    def variant_policy(self):
+        return KernelVariantPolicy(
+            mesh_layouts=("standard", "packed"),
+            packed_mesh_passes=("one_pass", "two_pass"),
+        )
+
+
+@dataclass(frozen=True)
+class ARMSMETarget(ARMSVETarget):
+    name: str = "arm_sme"
+
+    def loop_lowering_policy(self):
+        return LoopLoweringPolicy(
+            execution_model=ExecutionModel.VECTOR_LENGTH_AGNOSTIC,
+            emits_lane_loop=True,
+            maps_lane_to_thread=False,
+            vectorize_lane_loop=True,
+            parallel_element_loop=True,
+            supports_shared_memory=False,
+            lane_index_type="ptrdiff_t",
+            vector_isa="arm_sme",
+            vector_length_aware=True,
+            matrix_unit=MatrixUnitKind.ARM_SME,
+        )
+
+    def target_compile_flags(self):
+        return ("-march=armv9-a+sme",)
+
+
+@dataclass(frozen=True)
 class CUDATarget(TargetPlatform):
     name: str = "cuda"
     language: TargetLanguage = TargetLanguage.CUDA
@@ -232,6 +352,8 @@ class CUDATarget(TargetPlatform):
             vectorize_lane_loop=False,
             parallel_element_loop=False,
             supports_shared_memory=True,
+            vector_isa="cuda",
+            matrix_unit=MatrixUnitKind.CUDA_TENSOR_CORES,
         )
 
     def work_item_name(self, name, component):
@@ -246,6 +368,44 @@ class CUDATarget(TargetPlatform):
     @property
     def supports_device_kernels(self):
         return True
+
+    def vectorization_diagnostic_flags(self, compiler="nvcc"):
+        return ()
+
+    def variant_policy(self):
+        return KernelVariantPolicy(
+            mesh_layouts=("standard", "packed"),
+            thread_variants=("per_thread",),
+            warp_variants=("per_warp",),
+            packed_mesh_passes=("one_pass", "two_pass"),
+        )
+
+
+@dataclass(frozen=True)
+class HIPTarget(CUDATarget):
+    name: str = "hip"
+    language: TargetLanguage = TargetLanguage.HIP
+
+    def includes(self):
+        return ("#include <hip/hip_runtime.h>",)
+
+    def kernel_launch_style(self):
+        return "hip_grid_stride"
+
+    def wrapper_style(self):
+        return "hip_launcher"
+
+    def loop_lowering_policy(self):
+        return LoopLoweringPolicy(
+            execution_model=ExecutionModel.SIMT_THREADS,
+            emits_lane_loop=False,
+            maps_lane_to_thread=True,
+            vectorize_lane_loop=False,
+            parallel_element_loop=False,
+            supports_shared_memory=True,
+            vector_isa="hip",
+            matrix_unit=MatrixUnitKind.HIP_MATRIX_CORES,
+        )
 
 
 def _pow_helper_name(exponent):

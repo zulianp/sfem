@@ -2,12 +2,12 @@
 #define SFEM_CUDA_BASE_H
 
 #include <cuda.h>
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
-#include <cuda_fp16.h>
 
-#include <stdio.h>
 #include <assert.h>
+#include <stdio.h>
 
 inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool abort = true) {
     if (code != cudaSuccess) {
@@ -17,8 +17,21 @@ inline void sfem_cuda_check(cudaError_t code, const char* file, int line, bool a
     }
 }
 
-#define SFEM_CUDA_CHECK(ans) \
-    { sfem_cuda_check((ans), __FILE__, __LINE__); }
+#define SFEM_CUDA_CHECK(ans)                        \
+    {                                               \
+        sfem_cuda_check((ans), __FILE__, __LINE__); \
+    }
+
+/** Lazily caches cudaDevAttrMaxGridDimX for the current device (one query per process). */
+inline int sfem_cuda_max_grid_dim_x() {
+    static int max_grid_x = -1;
+    if (max_grid_x < 0) {
+        int device_id = 0;
+        cudaGetDevice(&device_id);
+        cudaDeviceGetAttribute(&max_grid_x, cudaDevAttrMaxGridDimX, device_id);
+    }
+    return max_grid_x;
+}
 
 #ifndef NDEBUG
 #define SFEM_DEBUG_SYNCHRONIZE()                \
@@ -55,15 +68,14 @@ namespace sfem {
     } while (0)
 
 // Launch bounds configuration for CUDA kernels
-#define SFEM_LAUNCH_BOUNDS(threads_per_block, min_blocks_per_sm) \
-    __launch_bounds__(threads_per_block, min_blocks_per_sm)
+#define SFEM_LAUNCH_BOUNDS(threads_per_block, min_blocks_per_sm) __launch_bounds__(threads_per_block, min_blocks_per_sm)
 
-#else //SFEM_ENABLE_NVTX
+#else  // SFEM_ENABLE_NVTX
 
 #define SFEM_NVTX_SCOPE(name)
 #define SFEM_RANGE_PUSH(name_)
 #define SFEM_RANGE_POP()
- 
-#endif //SFEM_ENABLE_NVTX
+
+#endif  // SFEM_ENABLE_NVTX
 
 #endif  // SFEM_CUDA_BASE_H

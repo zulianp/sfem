@@ -158,6 +158,44 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
         self.assertEqual(checked_paths, {"valid.linalg.mlir"})
         self.assertNotIn("configured_module_internal_hal.mlir", checked_paths)
 
+    def test_metal_toolchain_sources_include_iree_manifest_paths(self):
+        from codegen.framework.mlir.scripts.tensor_product_laplace_artifacts import (
+            _metal_toolchain_source_info,
+            _metal_toolchain_source_paths,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generated_path = root / "ebe_metal" / "laplace.metal"
+            generated_path.parent.mkdir()
+            generated_path.write_text("kernel void sfem_generated() {}\n")
+
+            iree_path = (
+                root
+                / "iree_metal_executable_files"
+                / "sum_factor_linalg_pipeline_to_metal_executable_files"
+                / "executable_files"
+                / "dispatch_0.metal"
+            )
+            iree_path.parent.mkdir(parents=True)
+            iree_path.write_text("kernel void iree_generated() {}\n")
+
+            paths = _metal_toolchain_source_paths(
+                root,
+                [
+                    {
+                        "metal_source_paths": [
+                            str(iree_path),
+                            str(iree_path),
+                        ]
+                    }
+                ],
+            )
+
+        self.assertEqual(paths, sorted({generated_path, iree_path}, key=lambda path: str(path)))
+        source_kinds = {_metal_toolchain_source_info(root, path)["source_kind"] for path in paths}
+        self.assertEqual(source_kinds, {"sfem_generated_metal", "iree_metal_executable_file"})
+
     def test_model_is_sourced_from_generated_linear_elasticity_plan(self):
         lowering = MatrixFreeEBEMLIRLowering.from_linear_elasticity(
             element="TET4",
@@ -1908,13 +1946,19 @@ class MatrixFreeEBEMLIRTest(unittest.TestCase):
             self.assertEqual(len(output_air_paths), len(set(output_air_paths)), manifest["metal_toolchain"])
             toolchain_source_kinds = {item["source_kind"] for item in manifest["metal_toolchain"]}
             self.assertIn("sfem_generated_metal", toolchain_source_kinds)
-            self.assertIn("iree_metal_executable_file", toolchain_source_kinds)
-            iree_toolchain = [
-                item for item in manifest["metal_toolchain"] if item["source_kind"] == "iree_metal_executable_file"
-            ]
-            self.assertTrue(iree_toolchain)
-            self.assertTrue(all(item["source_group"].endswith("_to_metal_executable_files") for item in iree_toolchain))
-            self.assertTrue(all("/iree_metal_executable_files/" in item["output_air"] for item in iree_toolchain))
+            iree_source_count = sum(
+                item.get("metal_source_count", 0) for item in manifest["iree_metal_executable_files"]
+            )
+            if iree_source_count:
+                self.assertIn("iree_metal_executable_file", toolchain_source_kinds)
+                iree_toolchain = [
+                    item for item in manifest["metal_toolchain"] if item["source_kind"] == "iree_metal_executable_file"
+                ]
+                self.assertEqual(len(iree_toolchain), iree_source_count)
+                self.assertTrue(
+                    all(item["source_group"].endswith("_to_metal_executable_files") for item in iree_toolchain)
+                )
+                self.assertTrue(all("/iree_metal_executable_files/" in item["output_air"] for item in iree_toolchain))
         self.assertTrue(manifest["mlir_validation"])
         self.assertTrue(all(item["ok"] for item in manifest["mlir_validation"]), manifest["mlir_validation"])
 

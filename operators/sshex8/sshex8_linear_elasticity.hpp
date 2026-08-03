@@ -110,6 +110,27 @@ int affine_sshex8_linear_elasticity_block_diag_sym(const int                    
                                                    real_t *const                out4,
                                                    real_t *const                out5);
 
+int sshex8_linear_elasticity_element_matrix(int                           level,
+                                            const ptrdiff_t               nelements,
+                                            const ptrdiff_t               nnodes,
+                                            idx_t **const SFEM_RESTRICT   elements,
+                                            geom_t **const SFEM_RESTRICT  points,
+                                            const real_t                  mu,
+                                            const real_t                  lambda,
+                                            scalar_t *const SFEM_RESTRICT values);
+
+/** Same as sshex8_linear_elasticity_element_matrix, but with HEX8 node indices
+ *  remapped to cartesian bit-ordering (x + 2*y + 4*z) within each 8x8 component block.
+ *  Required by the AoS/Tensor-Core elemental-matrix apply kernels. */
+int sshex8_linear_elasticity_element_matrix_cartesian(int                           level,
+                                                      const ptrdiff_t               nelements,
+                                                      const ptrdiff_t               nnodes,
+                                                      idx_t **const SFEM_RESTRICT   elements,
+                                                      geom_t **const SFEM_RESTRICT  points,
+                                                      const real_t                  mu,
+                                                      const real_t                  lambda,
+                                                      scalar_t *const SFEM_RESTRICT values);
+
 int sshex8_linear_elasticity_objective_steps(int                               level,
                                              const ptrdiff_t                   nelements,
                                              const ptrdiff_t                   stride,

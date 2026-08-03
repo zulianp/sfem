@@ -2,6 +2,7 @@
 #define TET4_LAPLACIAN_INLINE_CPU_H
 
 #include "operator_inline_cpu.hpp"
+#include "tet4_inline_cpu.hpp"
 
 // FFF
 static SFEM_INLINE void tet4_laplacian_hessian_fff(const scalar_t *const SFEM_RESTRICT fff,
@@ -72,6 +73,33 @@ static SFEM_INLINE void tet4_laplacian_apply_fff(const scalar_t *const SFEM_REST
 }
 
 // SoA-style wrapper (useful for vectorization over element index)
+template <typename scalar_tpl_t, typename accumulator_tpl_t>
+static SFEM_INLINE void tet4_laplacian_apply_fff_soa_tpl(const scalar_tpl_t fff0,
+                                                         const scalar_tpl_t fff1,
+                                                         const scalar_tpl_t fff2,
+                                                         const scalar_tpl_t fff3,
+                                                         const scalar_tpl_t fff4,
+                                                         const scalar_tpl_t fff5,
+                                                         const scalar_tpl_t u0,
+                                                         const scalar_tpl_t u1,
+                                                         const scalar_tpl_t u2,
+                                                         const scalar_tpl_t u3,
+                                                         accumulator_tpl_t *const SFEM_RESTRICT e0,
+                                                         accumulator_tpl_t *const SFEM_RESTRICT e1,
+                                                         accumulator_tpl_t *const SFEM_RESTRICT e2,
+                                                         accumulator_tpl_t *const SFEM_RESTRICT e3) {
+    const scalar_tpl_t x0 = fff0 + fff1 + fff2;
+    const scalar_tpl_t x1 = fff1 + fff3 + fff4;
+    const scalar_tpl_t x2 = fff2 + fff4 + fff5;
+    const scalar_tpl_t x3 = fff1 * u0;
+    const scalar_tpl_t x4 = fff2 * u0;
+    const scalar_tpl_t x5 = fff4 * u0;
+    *e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+    *e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
+    *e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
+    *e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+}
+
 static SFEM_INLINE void tet4_laplacian_apply_fff_soa(const scalar_t                fff0,
                                                      const scalar_t                fff1,
                                                      const scalar_t                fff2,
@@ -86,16 +114,8 @@ static SFEM_INLINE void tet4_laplacian_apply_fff_soa(const scalar_t             
                                                      accumulator_t *const SFEM_RESTRICT e1,
                                                      accumulator_t *const SFEM_RESTRICT e2,
                                                      accumulator_t *const SFEM_RESTRICT e3) {
-    const scalar_t x0 = fff0 + fff1 + fff2;
-    const scalar_t x1 = fff1 + fff3 + fff4;
-    const scalar_t x2 = fff2 + fff4 + fff5;
-    const scalar_t x3 = fff1 * u0;
-    const scalar_t x4 = fff2 * u0;
-    const scalar_t x5 = fff4 * u0;
-    *e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
-    *e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;
-    *e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;
-    *e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;
+    tet4_laplacian_apply_fff_soa_tpl<scalar_t, accumulator_t>(
+            fff0, fff1, fff2, fff3, fff4, fff5, u0, u1, u2, u3, e0, e1, e2, e3);
 }
 
 static SFEM_INLINE void tet4_laplacian_apply_add_fff(const scalar_t *const SFEM_RESTRICT fff,

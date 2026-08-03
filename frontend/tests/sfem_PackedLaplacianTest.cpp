@@ -64,3 +64,4 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

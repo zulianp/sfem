@@ -32,6 +32,10 @@ def sfem_is_proteus_hex_element(element_type):
     return str(element_type).upper() in _PROTEUS_HEX_ORDER_BY_TYPE
 
 
+def sfem_is_proteus_quad_element(element_type):
+    return str(element_type).upper() == "PROTEUS_QUAD4"
+
+
 def sfem_is_tensor_product_hex_element(element_type):
     element_type = str(element_type).upper()
     return element_type in ("HEX8", "HEX27") or element_type in _PROTEUS_HEX_ORDER_BY_TYPE
@@ -51,6 +55,10 @@ def sfem_tensor_product_hex_order(element_type):
 
 def sfem_tensor_product_hex_uses_cartesian_ordering(element_type):
     return sfem_is_proteus_hex_element(element_type)
+
+
+def sfem_tensor_product_quad_uses_cartesian_ordering(element_type):
+    return sfem_is_proteus_quad_element(element_type)
 
 
 @dataclass(frozen=True)
@@ -474,7 +482,7 @@ def _sfem_cell_name(element_type):
         return "triangle"
     if element_type in ("TET4", "TET10"):
         return "tetrahedron"
-    if element_type == "QUAD4":
+    if element_type in ("QUAD4", "PROTEUS_QUAD4"):
         return "quadrilateral"
     if sfem_is_tensor_product_hex_element(element_type):
         return "hexahedron"
@@ -519,14 +527,14 @@ def sfem_default_quadrature_order(element_type, integration_case="standard"):
         if hex_order > 1:
             return hex_order + 2
     if integration_case == "value_linear_residual":
-        if element_type in ("TRI3", "TET4", "QUAD4", "HEX8"):
+        if element_type in ("TRI3", "TET4", "QUAD4", "PROTEUS_QUAD4", "HEX8"):
             return 2
         if element_type in ("TRI6", "TET10"):
             return 4
         if hex_order > 1:
             return hex_order + 1
     if integration_case == "value_residual":
-        if element_type in ("TRI3", "TET4", "TRI6", "TET10", "QUAD4", "HEX8", "HEX27"):
+        if element_type in ("TRI3", "TET4", "TRI6", "TET10", "QUAD4", "PROTEUS_QUAD4", "HEX8", "HEX27"):
             return 4
         if sfem_is_proteus_hex_element(element_type):
             return hex_order + 2
@@ -537,7 +545,7 @@ def sfem_default_quadrature_order(element_type, integration_case="standard"):
             return hex_order + 2
     if hex_order > 0:
         return hex_order + 1
-    if element_type in ("QUAD4", "HEX8", "TRI6", "TET10"):
+    if element_type in ("QUAD4", "PROTEUS_QUAD4", "HEX8", "TRI6", "TET10"):
         return 2
     return 1
 
@@ -594,7 +602,7 @@ def sfem_element_quadrature_rule(element_type, order=None):
             gradients.extend(_tet10_reference_gradients(x, y, z))
         return SfemElementQuadratureRule(element_type, 3, 10, weights, gradients, order)
 
-    if element_type == "QUAD4":
+    if element_type in ("QUAD4", "PROTEUS_QUAD4"):
         points, weights_1d = _sfem_unit_interval_gauss_rule(order)
         shape_values_1d, shape_gradients_1d = _sfem_lagrange_q1_1d_shapes(points)
         gradients = []
@@ -659,6 +667,7 @@ def sfem_supported_element_types():
         "TRI3",
         "TRI6",
         "QUAD4",
+        "PROTEUS_QUAD4",
         "TET4",
         "TET10",
         "HEX8",
@@ -844,7 +853,7 @@ def sfem_tensor_product_field_reference_data(element_type, cell_rule, prefix):
     if not cell_rule.is_tensor_product:
         raise ValueError("cell rule must be tensor-product")
     points, _ = _sfem_unit_interval_gauss_rule(cell_rule.order)
-    if element_type == "QUAD4":
+    if element_type in ("QUAD4", "PROTEUS_QUAD4"):
         shape_values_1d, shape_gradients_1d = _sfem_lagrange_q1_1d_shapes(points)
     elif sfem_is_tensor_product_hex_element(element_type):
         shape_values_1d, shape_gradients_1d = _sfem_lagrange_1d_shapes(
