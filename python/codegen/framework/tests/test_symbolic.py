@@ -54,7 +54,17 @@ from codegen.framework.symbolic.forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
-from codegen.framework.backends.targets import CUDATarget, ExecutionModel, OpenMPTarget, TargetLanguage
+from codegen.framework.backends.targets import (
+    AVX512Target,
+    ARMSMETarget,
+    ARMSVETarget,
+    CUDATarget,
+    ExecutionModel,
+    HIPTarget,
+    MatrixUnitKind,
+    OpenMPTarget,
+    TargetLanguage,
+)
 
 
 class SymbolicFrameworkTest(unittest.TestCase):
@@ -130,7 +140,11 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_target_platform_classes(self):
         openmp = OpenMPTarget()
+        avx512 = AVX512Target()
+        arm_sve = ARMSVETarget()
+        arm_sme = ARMSMETarget()
         cuda = CUDATarget()
+        hip = HIPTarget()
 
         self.assertEqual(openmp.generated_language, "c++")
         self.assertEqual(openmp.parallel_for_pragma(), "#pragma omp parallel for")
@@ -156,6 +170,16 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertTrue(openmp_loop.parallel_element_loop)
         self.assertEqual(openmp_loop.lane_index, "lane")
         self.assertEqual(openmp_loop.vector_size_symbol, "VECTOR_SIZE")
+        self.assertEqual(avx512.loop_lowering_policy().vector_isa, "avx512")
+        self.assertEqual(avx512.loop_lowering_policy().preferred_vector_bits, 512)
+        self.assertIn("-mavx512f", avx512.target_compile_flags())
+        self.assertTrue(avx512.variant_policy().supports_packed_mesh)
+        self.assertEqual(arm_sve.loop_lowering_policy().execution_model, ExecutionModel.VECTOR_LENGTH_AGNOSTIC)
+        self.assertTrue(arm_sve.loop_lowering_policy().vector_length_aware)
+        self.assertIn("-march=armv8-a+sve", arm_sve.target_compile_flags())
+        self.assertTrue(arm_sme.loop_lowering_policy().vector_length_aware)
+        self.assertTrue(arm_sme.supports_matrix_units)
+        self.assertEqual(arm_sme.loop_lowering_policy().matrix_unit, MatrixUnitKind.ARM_SME)
         self.assertEqual(cuda.language, TargetLanguage.CUDA)
         self.assertEqual(cuda.function_qualifier(), "__host__ __device__ __forceinline__")
         self.assertEqual(cuda.restrict_qualifier(), "__restrict__")
@@ -173,6 +197,13 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertFalse(cuda_loop.vectorize_lane_loop)
         self.assertFalse(cuda_loop.parallel_element_loop)
         self.assertTrue(cuda_loop.supports_shared_memory)
+        self.assertTrue(cuda.variant_policy().supports_packed_mesh)
+        self.assertIn("per_warp", cuda.variant_policy().warp_variants)
+        self.assertEqual(hip.language, TargetLanguage.HIP)
+        self.assertEqual(hip.includes(), ("#include <hip/hip_runtime.h>",))
+        self.assertEqual(hip.kernel_launch_style(), "hip_grid_stride")
+        self.assertEqual(hip.wrapper_style(), "hip_launcher")
+        self.assertEqual(hip.loop_lowering_policy().matrix_unit, MatrixUnitKind.HIP_MATRIX_CORES)
 
     def test_accepts_all_m1_expression_roles(self):
         x, y, z = sp.symbols("x y z")

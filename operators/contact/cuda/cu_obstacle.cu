@@ -75,8 +75,10 @@ __global__ void obstacle_hessian_block_diag_sym_kernel(const int                
                                                        const real_t *const SFEM_RESTRICT m,
                                                        const real_t *const               x,
                                                        real_t *const                     values) {
+    const int sym_block_size = (dim == 3 ? 6 : 3);
+
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-        real_t *const v = &values[i * 6];
+        real_t *const v = &values[i * sym_block_size];
 
         int d_idx = 0;
         for (int d1 = 0; d1 < dim; d1++) {

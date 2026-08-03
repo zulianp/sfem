@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from codegen.framework.fem.reference import sfem_element_quadrature_rule
+from codegen.framework.fem.reference import (
+    sfem_element_quadrature_rule,
+    sfem_is_proteus_quad_element,
+    sfem_is_tensor_product_hex_element,
+)
 from codegen.framework.fem.tensor_product import (
     TensorProductOperation,
     TensorProductSumFactorizationPlan,
@@ -215,6 +219,6 @@ def field_basis_plans_for_fem_policy(fem_policy, fields):
 
 
 def _field_rule_for_cell_rule(element_type, cell_rule):
-    if element_type in ("QUAD4", "HEX8", "HEX27"):
+    if element_type == "QUAD4" or sfem_is_proteus_quad_element(element_type) or sfem_is_tensor_product_hex_element(element_type):
         return sfem_element_quadrature_rule(element_type, cell_rule.order)
     return sfem_element_quadrature_rule(element_type)

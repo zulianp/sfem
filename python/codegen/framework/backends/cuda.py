@@ -4,7 +4,8 @@ import re
 from codegen.framework.symbolic.forms import FormOrder
 from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 from codegen.framework.emitters.energy import CUDAEnergySoAEmitter
-from codegen.framework.plans.generation import MeshPhase
+from codegen.framework.plans.generation import KernelTarget, MeshPhase
+from codegen.framework.backends.targets import CUDATarget, HIPTarget
 
 
 @dataclass(frozen=True)
@@ -20,9 +21,11 @@ class CUDASoABackend:
     """CUDA/SoA backend boundary for planned material code-generation units."""
 
     supports_op_wrapper: bool = False
-    emitter: object = CUDAEnergySoAEmitter()
+    target: object = CUDATarget()
+    emitter: object = None
 
     def emit(self, unit, context):
+        _require_gpu_target(unit)
         unit.validate_for_context(context)
         kind = _kind_value(unit.kind)
         if kind != "energy_soa":
@@ -36,7 +39,14 @@ class CUDASoABackend:
 
     def _emit_energy(self, unit, context):
         _validate_energy_plan(unit)
-        return self.emitter.emit_plan(energy_soa_kernel_emission_plan(unit, context))
+        emitter = self.emitter
+        if emitter is None:
+            operator_extension = "hip" if isinstance(self.target, HIPTarget) else "cu"
+            emitter = CUDAEnergySoAEmitter(
+                target=self.target,
+                operator_extension=operator_extension,
+            )
+        return emitter.emit_plan(energy_soa_kernel_emission_plan(unit, context))
 
 
 def _kind_value(kind):
@@ -54,6 +64,14 @@ def _validate_energy_plan(unit):
             MeshPhase.SCATTER,
         ),
     )
+
+
+def _require_gpu_target(unit):
+    if unit.target not in (KernelTarget.OPENMP, KernelTarget.CUDA, KernelTarget.HIP):
+        raise ValueError(
+            "CUDA/HIP SoA backend cannot emit target '%s'"
+            % getattr(unit.target, "value", unit.target)
+        )
 
 
 def _require_form_metadata(unit, orders):
@@ -97,7 +115,11 @@ def _require_mesh_phases(unit, phases):
 
 
 def _validate_cuda_source_contract(files):
-    operator_sources = tuple(file for file in files if file.path.endswith("_operator.cu"))
+    operator_sources = tuple(
+        file
+        for file in files
+        if file.path.endswith("_operator.cu") or file.path.endswith("_operator.hip")
+    )
     if not operator_sources:
         raise RuntimeError("CUDA SoA backend did not emit a CUDA mesh operator")
     for operator in operator_sources:
