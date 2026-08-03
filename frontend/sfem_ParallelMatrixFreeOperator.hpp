@@ -16,6 +16,7 @@ namespace sfem {
                                    ExecutionSpace                         execution_space);
         ~ParallelMatrixFreeOperator() override;
 
+        int update_state();
         int apply(const real_t *const x, real_t *const y) override;
         std::ptrdiff_t rows() const override;
         std::ptrdiff_t cols() const override;

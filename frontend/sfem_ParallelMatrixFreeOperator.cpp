@@ -45,10 +45,35 @@ namespace sfem {
         impl_->output_scratch = create_host_buffer<real_t>(impl_->local_dofs);
         if (state) {
             impl_->state_scratch = create_host_buffer<real_t>(impl_->local_dofs);
+            update_state();
         }
     }
 
     ParallelMatrixFreeOperator::~ParallelMatrixFreeOperator() = default;
+
+    int ParallelMatrixFreeOperator::update_state() {
+        SFEM_TRACE_SCOPE("ParallelMatrixFreeOperator::update_state");
+
+        if (!impl_->state) {
+            return SFEM_SUCCESS;
+        }
+
+        real_t *const state_scratch = impl_->state_scratch->data();
+        if (impl_->state->size() == static_cast<size_t>(impl_->local_dofs)) {
+            std::memcpy(state_scratch, impl_->state->data(), sizeof(real_t) * impl_->local_dofs);
+        } else if (impl_->state->size() == static_cast<size_t>(impl_->owned_dofs)) {
+            std::memcpy(state_scratch, impl_->state->data(), sizeof(real_t) * impl_->owned_dofs);
+            std::fill(state_scratch + impl_->owned_dofs, state_scratch + impl_->local_dofs, real_t(0));
+        } else {
+            SFEM_ERROR("ParallelMatrixFreeOperator state has invalid size %ld, expected %ld or %ld\n",
+                       (long)impl_->state->size(),
+                       (long)impl_->owned_dofs,
+                       (long)impl_->local_dofs);
+            return SFEM_FAILURE;
+        }
+
+        return impl_->exchange->gather(state_scratch, impl_->block_size);
+    }
 
     int ParallelMatrixFreeOperator::apply(const real_t *const x, real_t *const y) {
         SFEM_TRACE_SCOPE("ParallelMatrixFreeOperator::apply");
@@ -68,28 +93,7 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        const real_t *state_local = nullptr;
-        if (impl_->state) {
-            real_t *const state_scratch = impl_->state_scratch->data();
-            if (impl_->state->size() == static_cast<size_t>(impl_->local_dofs)) {
-                std::memcpy(state_scratch, impl_->state->data(), sizeof(real_t) * impl_->local_dofs);
-            } else if (impl_->state->size() == static_cast<size_t>(impl_->owned_dofs)) {
-                std::memcpy(state_scratch, impl_->state->data(), sizeof(real_t) * impl_->owned_dofs);
-                std::fill(state_scratch + impl_->owned_dofs, state_scratch + impl_->local_dofs, real_t(0));
-            } else {
-                SFEM_ERROR("ParallelMatrixFreeOperator state has invalid size %ld, expected %ld or %ld\n",
-                           (long)impl_->state->size(),
-                           (long)impl_->owned_dofs,
-                           (long)impl_->local_dofs);
-                return SFEM_FAILURE;
-            }
-
-            if (impl_->exchange->gather(state_scratch, impl_->block_size) != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
-
-            state_local = state_scratch;
-        }
+        const real_t *const state_local = impl_->state_scratch ? impl_->state_scratch->data() : nullptr;
 
         std::fill(y_local, y_local + impl_->local_dofs, real_t(0));
         if (impl_->function->apply(state_local, h_local, y_local) != SFEM_SUCCESS) {
