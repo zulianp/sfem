@@ -1143,6 +1143,10 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl(const int            
 
     if (SFEM_ENABLE_TC) {
         switch (level) {
+            case 2: {
+                return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl<T, 2>(
+                        nelements, elements, elemental_matrix, x, y, stream);
+            }
             case 4: {
                 return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl<T, 4>(
                         nelements, elements, elemental_matrix, x, y, stream);
@@ -1161,6 +1165,10 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl(const int            
     }
 
     switch (level) {
+        case 2: {
+            return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl<T, 2>(
+                    nelements, elements, elemental_matrix, x, y, stream);
+        }
         case 4: {
             return cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl<T, 4>(
                     nelements, elements, elemental_matrix, x, y, stream);
