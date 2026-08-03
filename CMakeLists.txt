@@ -12,6 +12,7 @@ project(
 
 # Std CMake imports
 include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
 # Our CMake imports
 include(cmake/SFEMCompilerFeatures.cmake)
@@ -465,6 +466,16 @@ if(SFEM_ENABLE_TESTING)
         if(TARGET ssdf)
             target_link_libraries(sfem_MaMALTest PRIVATE ssdf)
         endif()
+    endif()
+
+    if(SFEM_ENABLE_MPI)
+        add_executable(sfem_ParallelLaplacianApplyTest frontend/tests/mpi/sfem_ParallelLaplacianApplyTest.cpp)
+        target_link_libraries(sfem_ParallelLaplacianApplyTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelLaplacianApplyTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelLaplacianApplyTest>)
+        set_tests_properties(sfem_ParallelLaplacianApplyTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelLaplacianApplyTest)
     endif()
 endif()
 

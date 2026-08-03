@@ -27,6 +27,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_Multigrid.hpp"
+#include "sfem_ParallelMatrixFreeOperator.hpp"
 #include "smesh_env.hpp"
 
 #include "sell.hpp"
@@ -1336,11 +1337,7 @@ namespace sfem {
                                                                           const std::shared_ptr<sfem::Buffer<real_t>> &u,
                                                                           enum sfem::ExecutionSpace                    es) {
         if (format == op_type::MATRIX_FREE) {
-            return sfem::make_op<real_t>(
-                    f->space()->n_dofs(),
-                    f->space()->n_dofs(),
-                    [=](const real_t *const x, real_t *const y) { f->apply((u ? u->data() : nullptr), x, y); },
-                    f->execution_space());
+            return sfem::create_parallel_matrix_free_operator(f, u, es);
         }
 
         if (f->space()->block_size() == 1) {
