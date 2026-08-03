@@ -8,8 +8,8 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-#include "../kernel_math.hpp"
-#include "../tensor_product_kernels.hpp"
+#include "../../kernel_math.hpp"
+#include "../../tensor_product_kernels.hpp"
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
@@ -42,8 +42,8 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_objective_block(
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 3],
         scalar_t *const SFEM_RESTRICT value
 ) {
@@ -118,8 +118,8 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_gradient_block(
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 3],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 3]
 ) {
@@ -233,8 +233,8 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_apply_block(
         const scalar_t *const SFEM_RESTRICT shape_1d,
         const scalar_t *const SFEM_RESTRICT grad_1d,
         const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * 3],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 3]
 ) {

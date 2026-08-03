@@ -170,6 +170,22 @@ namespace sfem {
         }
 
         /**
+         * @brief Assemble the Hessian matrix in DIA format
+         * @param x Current solution vector
+         * @param diag_offsets Diagonal offsets in node-block rows
+         * @param ndiag Number of diagonal offsets
+         * @param values Matrix values array (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int hessian_dia(const real_t *const /*x*/,
+                                const int *const /*diag_offsets*/,
+                                const ptrdiff_t /*ndiag*/,
+                                real_t *const /*values*/) {
+            SFEM_ERROR("DIA assembly not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /**
          * @brief Assemble the diagonal of the Hessian matrix
          * @param x Current solution vector
          * @param values Diagonal values (output)

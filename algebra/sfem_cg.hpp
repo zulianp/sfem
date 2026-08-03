@@ -148,14 +148,65 @@ namespace sfem {
 
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
+        ~ConjugateGradient() { destroy_workspace(); }
+
     private:
+        T*        work_r_{nullptr};
+        T*        work_z_{nullptr};
+        T*        work_p_{nullptr};
+        T*        work_Ap_{nullptr};
+        ptrdiff_t work_n_{-1};
+
+        void destroy_workspace() {
+            if (!blas.destroy) {
+                work_r_ = work_z_ = work_p_ = work_Ap_ = nullptr;
+                work_n_                                = -1;
+                return;
+            }
+            if (work_r_) {
+                blas.destroy(work_r_);
+                work_r_ = nullptr;
+            }
+            if (work_z_) {
+                blas.destroy(work_z_);
+                work_z_ = nullptr;
+            }
+            if (work_p_) {
+                blas.destroy(work_p_);
+                work_p_ = nullptr;
+            }
+            if (work_Ap_) {
+                blas.destroy(work_Ap_);
+                work_Ap_ = nullptr;
+            }
+            work_n_ = -1;
+        }
+
+        void ensure_workspace(const ptrdiff_t n, const bool need_z) {
+            if (work_n_ == n && work_r_ && work_p_ && work_Ap_ && (!need_z || work_z_)) {
+                return;
+            }
+
+            destroy_workspace();
+            work_r_  = blas.allocate(n);
+            work_p_  = blas.allocate(n);
+            work_Ap_ = blas.allocate(n);
+            if (need_z) {
+                work_z_ = blas.allocate(n);
+            }
+            work_n_ = n;
+        }
+
         int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
                 assert(0);
                 return SFEM_FAILURE;
             }
 
-            T* r = blas.allocate(n);
+            ensure_workspace(n, false);
+            T* r  = work_r_;
+            T* p  = work_p_;
+            T* Ap = work_Ap_;
 
             apply_op->apply(x, r);
 
@@ -171,9 +222,6 @@ namespace sfem {
             if (rtr0 == 0) {
                 return SFEM_SUCCESS;
             }
-
-            T* p  = blas.allocate(n);
-            T* Ap = blas.allocate(n);
 
             blas.copy(n, r, p);
 
@@ -213,10 +261,6 @@ namespace sfem {
                 }
             }
 
-            // clean-up
-            blas.destroy(r);
-            blas.destroy(p);
-            blas.destroy(Ap);
             return info;
         }
 
@@ -225,8 +269,13 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            T* r = blas.allocate(n);
+            ensure_workspace(n, true);
+            T* r  = work_r_;
+            T* z  = work_z_;
+            T* p  = work_p_;
+            T* Ap = work_Ap_;
 
+            blas.zeros(n, r);
             apply_op->apply(x, r);
             blas.axpby(n, 1, b, -1, r);
 
@@ -237,11 +286,6 @@ namespace sfem {
             if (rtr0 == 0) {
                 return SFEM_SUCCESS;
             }
-
-            T* z  = blas.allocate(n);
-            T* Mz = blas.allocate(n);
-            T* p  = blas.allocate(n);
-            T* Ap = blas.allocate(n);
 
             preconditioner_op->apply(r, z);
             blas.copy(n, z, p);
@@ -302,13 +346,6 @@ namespace sfem {
                 }
             }
 
-            // clean-up
-            blas.destroy(r);
-            blas.destroy(p);
-            blas.destroy(Ap);
-
-            blas.destroy(z);
-            blas.destroy(Mz);
             return info;
         }
     };

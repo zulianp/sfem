@@ -10,13 +10,19 @@
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_GeneratedNeoHookeanOgden.hpp"
+#include "sfem_NeoHookeanOgdenPacked.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "smesh_env.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_mesh_reorder.hpp"
 #include "smesh_semistructured.hpp"
 
 namespace {
+
+    double mdofs_per_second(const double elapsed, const ptrdiff_t ndofs, const int repeat) {
+        return 1e-6 * static_cast<double>(ndofs) / (elapsed / repeat);
+    }
 
     struct BoundaryNodes {
         sfem::SharedBuffer<idx_t> left;
@@ -123,6 +129,20 @@ namespace {
         }
     }
 
+    bool packed_neohookean_supported(const smesh::ElemType element_type, const std::string &operator_name) {
+        if (operator_name == "GeneratedNeoHookeanOgden") {
+            return generated_neohookean_supported(element_type);
+        }
+
+        switch (element_type) {
+            case smesh::HEX8:
+            case smesh::TET10:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     void set_neohookean_geometry_options(const std::shared_ptr<sfem::Op> &op, const bool assume_affine) {
         op->set_option("assume_affine", assume_affine);
         op->set_option("ASSUME_AFFINE", assume_affine);
@@ -174,6 +194,15 @@ namespace {
         return MPI_Wtime() - t0;
     }
 
+    real_t max_abs_diff(const real_t *const left, const real_t *const right, const ptrdiff_t n) {
+        real_t max_diff = 0;
+#pragma omp parallel for reduction(max : max_diff)
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            max_diff = std::max(max_diff, static_cast<real_t>(std::abs(left[i] - right[i])));
+        }
+        return max_diff;
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -194,17 +223,22 @@ int main(int argc, char *argv[]) {
     const real_t      displacement_value      = smesh::Env::read("SFEM_DISPLACEMENT", 0.05);
     const real_t      damping                 = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
     const int         line_search_steps       = smesh::Env::read("SFEM_NL_LINE_SEARCH_STEPS", 20);
-    const real_t      mu                      = smesh::Env::read("SFEM_SHEAR_MODULUS", 1.0);
-    const real_t      lambda                  = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", 1.0);
-    const std::string generated_operator_name = smesh::Env::read_string("SFEM_GENERATED_OPERATOR", "GeneratedNeoHookeanOgden");
-    const std::string baseline_operator_name  = smesh::Env::read_string("SFEM_BASELINE_OPERATOR", "NeoHookeanOgden");
-    const std::string codegen_geometry        = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "isoparametric");
-    const std::string output_path             = smesh::Env::read_string("SFEM_OUTPUT_PATH", "");
-    const bool        run_baseline_requested  = smesh::Env::read("SFEM_RUN_BASELINE", true);
+    const real_t      mu                       = smesh::Env::read("SFEM_SHEAR_MODULUS", 1.0);
+    const real_t      lambda                   = smesh::Env::read("SFEM_FIRST_LAME_PARAMETER", 1.0);
+    const int         packed_elements_per_pack = smesh::Env::read("SFEM_ELEMENTS_PER_PACK", 0);
+    const std::string generated_operator_name  = smesh::Env::read_string("SFEM_GENERATED_OPERATOR", "GeneratedNeoHookeanOgden");
+    const std::string baseline_operator_name   = smesh::Env::read_string("SFEM_BASELINE_OPERATOR", "NeoHookeanOgden");
+    const std::string packed_operator_name     = smesh::Env::read_string("SFEM_PACKED_OPERATOR", "GeneratedNeoHookeanOgden");
+    const std::string codegen_geometry         = smesh::Env::read_string("SFEM_CODEGEN_GEOMETRY", "isoparametric");
+    const std::string output_path              = smesh::Env::read_string("SFEM_OUTPUT_PATH", "");
+    const bool        run_baseline_requested   = smesh::Env::read("SFEM_RUN_BASELINE", true);
+    const bool        run_packed_requested     = smesh::Env::read("SFEM_RUN_PACKED", true);
 
     const auto element_type = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
     auto       mesh         = sfem::Mesh::create_cube(
             comm, static_cast<smesh::ElemType>(element_type), resolution, resolution, resolution, 0, 0, 0, 1, 1, 1);
+    auto sfc = smesh::SFC::create_from_env();
+    sfc->reorder(*mesh);
 
     const int block_size = mesh->spatial_dimension();
     if (block_size != 3) {
@@ -249,6 +283,30 @@ int main(int argc, char *argv[]) {
         baseline_f->add_operator(baseline_op);
     }
 
+    const bool                      run_packed = run_packed_requested && packed_neohookean_supported(mesh->element_type(0), packed_operator_name);
+    std::shared_ptr<sfem::Function> packed_f;
+    std::shared_ptr<sfem::Op>       packed_op;
+    std::shared_ptr<sfem::FunctionSpace> packed_fs;
+    if (run_packed) {
+        auto packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true, packed_elements_per_pack);
+        packed_fs        = sfem::FunctionSpace::create(packed_mesh, block_size);
+        packed_f         = sfem::Function::create(packed_fs);
+        if (packed_operator_name == "NeoHookeanOgdenPacked") {
+            packed_op = std::make_shared<sfem::NeoHookeanOgdenPacked>(packed_fs);
+        } else {
+            packed_op = sfem::create_op(packed_fs, packed_operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
+        }
+        if (!packed_op) {
+            SFEM_ERROR("Unable to create packed operator %s\n", packed_operator_name.c_str());
+        }
+        set_neohookean_geometry_options(packed_op, assume_affine);
+        if (packed_op->initialize() != SFEM_SUCCESS) {
+            SFEM_ERROR("Unable to initialize packed operator %s\n", packed_operator_name.c_str());
+        }
+        set_neohookean_material(packed_op, mu, lambda);
+        packed_f->add_operator(packed_op);
+    }
+
     const BoundaryNodes                               boundary = create_x_boundary_nodes(mesh);
     std::vector<sfem::DirichletConditions::Condition> conditions;
     conditions.reserve(4);
@@ -261,6 +319,10 @@ int main(int argc, char *argv[]) {
     if (baseline_f) {
         baseline_f->add_constraint(dirichlet);
     }
+    if (packed_f) {
+        auto packed_dirichlet = sfem::DirichletConditions::create(packed_fs, conditions);
+        packed_f->add_constraint(packed_dirichlet);
+    }
 
     const ptrdiff_t     nelements = mesh->n_elements();
     const ptrdiff_t     ndofs     = fs->n_dofs();
@@ -269,6 +331,7 @@ int main(int argc, char *argv[]) {
     auto                increment = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto                trial     = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto                output    = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    auto                packed    = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
     auto                blas      = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
     std::vector<real_t> line_search_alphas(std::max(line_search_steps, 1));
     std::vector<real_t> line_search_values(std::max(line_search_steps, 1));
@@ -297,6 +360,11 @@ int main(int argc, char *argv[]) {
         baseline_f->update(x->data());
         baseline_linear_op = sfem::create_linear_operator("MF", baseline_f, x, sfem::EXECUTION_SPACE_HOST);
     }
+    std::shared_ptr<sfem::Operator<real_t>> packed_linear_op;
+    if (packed_f) {
+        packed_f->update(x->data());
+        packed_linear_op = sfem::create_linear_operator("MF", packed_f, x, sfem::EXECUTION_SPACE_HOST);
+    }
 
     for (int i = 0; i < warmup; ++i) {
         blas->zeros(ndofs, rhs->data());
@@ -309,6 +377,50 @@ int main(int argc, char *argv[]) {
             blas->zeros(ndofs, output->data());
             baseline_linear_op->apply(trial->data(), output->data());
         }
+        if (packed_f) {
+            blas->zeros(ndofs, rhs->data());
+            packed_f->gradient(x->data(), rhs->data());
+            blas->zeros(ndofs, output->data());
+            packed_linear_op->apply(trial->data(), output->data());
+        }
+    }
+
+    blas->zeros(ndofs, rhs->data());
+    generated_f->gradient(x->data(), rhs->data());
+    real_t baseline_gradient_max_abs_diff_vs_generated = 0;
+    real_t packed_gradient_max_abs_diff_vs_generated   = 0;
+    real_t packed_gradient_max_abs_diff_vs_standard    = 0;
+    if (baseline_f) {
+        blas->zeros(ndofs, increment->data());
+        baseline_f->gradient(x->data(), increment->data());
+        baseline_gradient_max_abs_diff_vs_generated = max_abs_diff(increment->data(), rhs->data(), ndofs);
+    }
+    if (packed_f) {
+        blas->zeros(ndofs, packed->data());
+        packed_f->gradient(x->data(), packed->data());
+        packed_gradient_max_abs_diff_vs_generated = max_abs_diff(packed->data(), rhs->data(), ndofs);
+        if (baseline_f) {
+            packed_gradient_max_abs_diff_vs_standard = max_abs_diff(packed->data(), increment->data(), ndofs);
+        }
+    }
+
+    blas->zeros(ndofs, output->data());
+    generated_linear_op->apply(trial->data(), output->data());
+    real_t baseline_apply_max_abs_diff_vs_generated = 0;
+    real_t packed_apply_max_abs_diff_vs_generated   = 0;
+    real_t packed_apply_max_abs_diff_vs_standard    = 0;
+    if (baseline_linear_op) {
+        blas->zeros(ndofs, increment->data());
+        baseline_linear_op->apply(trial->data(), increment->data());
+        baseline_apply_max_abs_diff_vs_generated = max_abs_diff(increment->data(), output->data(), ndofs);
+    }
+    if (packed_linear_op) {
+        blas->zeros(ndofs, packed->data());
+        packed_linear_op->apply(trial->data(), packed->data());
+        packed_apply_max_abs_diff_vs_generated = max_abs_diff(packed->data(), output->data(), ndofs);
+        if (baseline_linear_op) {
+            packed_apply_max_abs_diff_vs_standard = max_abs_diff(packed->data(), increment->data(), ndofs);
+        }
     }
 
     const double generated_gradient_elapsed = time_gradient(generated_f, x->data(), rhs->data(), ndofs, repeat, blas);
@@ -316,13 +428,20 @@ int main(int argc, char *argv[]) {
 
     double baseline_gradient_elapsed = 0;
     double baseline_apply_elapsed    = 0;
+    double packed_gradient_elapsed   = 0;
+    double packed_apply_elapsed      = 0;
     if (baseline_f) {
         baseline_gradient_elapsed = time_gradient(baseline_f, x->data(), rhs->data(), ndofs, repeat, blas);
         baseline_apply_elapsed    = time_apply(baseline_linear_op, trial->data(), output->data(), ndofs, repeat, blas);
     }
+    if (packed_f) {
+        packed_gradient_elapsed = time_gradient(packed_f, x->data(), packed->data(), ndofs, repeat, blas);
+        packed_apply_elapsed    = time_apply(packed_linear_op, trial->data(), packed->data(), ndofs, repeat, blas);
+    }
 
     printf("generated_operator %s\n", generated_operator_name.c_str());
     printf("baseline_operator %s\n", baseline_f ? baseline_operator_name.c_str() : "disabled");
+    printf("packed_operator %s\n", packed_f ? packed_operator_name.c_str() : "disabled");
     printf("geometry %s\n", codegen_geometry.c_str());
     printf("element_type %s\n", type_to_string(mesh->element_type(0)));
     printf("#elements %ld\n", static_cast<long>(nelements));
@@ -330,6 +449,24 @@ int main(int argc, char *argv[]) {
     printf("#dofs %ld\n", static_cast<long>(ndofs));
     printf("#left_nodes %ld\n", static_cast<long>(boundary.left->size()));
     printf("#right_nodes %ld\n", static_cast<long>(boundary.right->size()));
+    if (baseline_f) {
+        printf("baseline_gradient_max_abs_diff_vs_generated %g\n",
+               static_cast<double>(baseline_gradient_max_abs_diff_vs_generated));
+        printf("baseline_apply_max_abs_diff_vs_generated %g\n",
+               static_cast<double>(baseline_apply_max_abs_diff_vs_generated));
+    }
+    if (packed_f) {
+        printf("packed_gradient_max_abs_diff_vs_generated %g\n",
+               static_cast<double>(packed_gradient_max_abs_diff_vs_generated));
+        printf("packed_apply_max_abs_diff_vs_generated %g\n",
+               static_cast<double>(packed_apply_max_abs_diff_vs_generated));
+        if (baseline_f) {
+            printf("packed_gradient_max_abs_diff_vs_standard %g\n",
+                   static_cast<double>(packed_gradient_max_abs_diff_vs_standard));
+            printf("packed_apply_max_abs_diff_vs_standard %g\n",
+                   static_cast<double>(packed_apply_max_abs_diff_vs_standard));
+        }
+    }
     printf("\n%-72s %12s %16s %13s %12s %12s %10s %13s %12s\n",
            "Operation",
            "Time [s]",
@@ -373,6 +510,48 @@ int main(int argc, char *argv[]) {
                    baseline_f->memory_traffic_bytes_apply());
     } else if (run_baseline_requested) {
         printf("baseline_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
+    }
+    if (packed_f) {
+        print_rate("packed_gradient",
+                   packed_gradient_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   packed_f->flops_gradient(),
+                   packed_f->memory_traffic_bytes_gradient());
+        print_rate("packed_hessian_apply",
+                   packed_apply_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   packed_f->flops_apply(),
+                   packed_f->memory_traffic_bytes_apply());
+    } else if (run_packed_requested) {
+        printf("packed_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
+    }
+
+    if (baseline_f) {
+        printf("baseline_gradient_speedup_vs_generated %g\n", generated_gradient_elapsed / baseline_gradient_elapsed);
+        printf("baseline_apply_speedup_vs_generated %g\n", generated_apply_elapsed / baseline_apply_elapsed);
+    }
+    if (packed_f) {
+        printf("packed_gradient_speedup_vs_generated %g\n", generated_gradient_elapsed / packed_gradient_elapsed);
+        printf("packed_apply_speedup_vs_generated %g\n", generated_apply_elapsed / packed_apply_elapsed);
+        if (baseline_f) {
+            printf("packed_gradient_speedup_vs_standard %g\n", baseline_gradient_elapsed / packed_gradient_elapsed);
+            printf("packed_apply_speedup_vs_standard %g\n", baseline_apply_elapsed / packed_apply_elapsed);
+        }
+    }
+
+    printf("generated_gradient_mdofs_per_s %g\n", mdofs_per_second(generated_gradient_elapsed, ndofs, repeat));
+    printf("generated_apply_mdofs_per_s %g\n", mdofs_per_second(generated_apply_elapsed, ndofs, repeat));
+    if (baseline_f) {
+        printf("baseline_gradient_mdofs_per_s %g\n", mdofs_per_second(baseline_gradient_elapsed, ndofs, repeat));
+        printf("baseline_apply_mdofs_per_s %g\n", mdofs_per_second(baseline_apply_elapsed, ndofs, repeat));
+    }
+    if (packed_f) {
+        printf("packed_gradient_mdofs_per_s %g\n", mdofs_per_second(packed_gradient_elapsed, ndofs, repeat));
+        printf("packed_apply_mdofs_per_s %g\n", mdofs_per_second(packed_apply_elapsed, ndofs, repeat));
     }
 
     const auto generated_gradient = [&](const real_t *const state, real_t *const out) {

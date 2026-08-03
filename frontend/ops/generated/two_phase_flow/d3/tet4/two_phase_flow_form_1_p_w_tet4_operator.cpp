@@ -1,10 +1,17 @@
 #include <type_traits>
+#include <cstdint>
+#include <cstdlib>
+#include <string.h>
 #include "../two_phase_flow_form_1_p_w_d3_simplex_local.hpp"
-#include "../../geometry_kernels.hpp"
-#include "../../kernel_diagnostics.hpp"
+#include "../../../geometry_kernels.hpp"
+#include "../../../kernel_diagnostics.hpp"
+#include "../../../packed_thread_scratch.hpp"
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
+#endif
+#ifndef SFEM_FAILURE
+#define SFEM_FAILURE 1
 #endif
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -12,6 +19,7 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include <cstdio>
 
 namespace sfem {
 namespace codegen {
@@ -163,72 +171,66 @@ extern "C" double two_phase_flow_form_1_p_w_tet4_residual_element_soa_arithmetic
 extern "C" void two_phase_flow_form_1_p_w_tet4_residual_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_residual_element_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_residual_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_residual_element_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_residual_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_w_tet4_residual_affine_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_residual_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_w_tet4_residual_affine_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_residual_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_w_tet4_residual_isoparametric_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_residual_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_w_tet4_residual_isoparametric_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -299,24 +301,22 @@ extern "C" double two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_w_arithmetic_int
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_w_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_w",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_w_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_w_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -387,24 +387,22 @@ extern "C" double two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_c_arithmetic_int
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_c_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_c",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_c_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_c_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_p_w_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -475,24 +473,22 @@ extern "C" double two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_w_arithmetic_int
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_w_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_w",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_w_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_w_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_w_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -563,24 +559,22 @@ extern "C" double two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_c_arithmetic_int
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_c_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_c",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_c_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_c_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_p_c_p_c_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -651,72 +645,66 @@ extern "C" double two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_ari
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate(
             "two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_action_affine_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_w_tet4_jacobian_action_affine_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_action_affine_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
             "two_phase_flow_form_1_p_w_tet4_jacobian_action_affine_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_action_isoparametric_mesh_soa_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_w_tet4_jacobian_action_isoparametric_mesh_soa",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(double), sizeof(double), sizeof(double));
 }
 
 extern "C" void two_phase_flow_form_1_p_w_tet4_jacobian_action_isoparametric_mesh_soa_float_print_rate(
         const double elapsed,
         const ptrdiff_t nelements,
-        const ptrdiff_t ndofs,
-        const int repeat) {
+        const ptrdiff_t ndofs) {
     sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
             "two_phase_flow_form_1_p_w_tet4_jacobian_action_isoparametric_mesh_soa_float",
             &sfem::codegen::two_phase_flow_form_1_p_w_tet4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs, repeat,
+            elapsed, nelements, ndofs,
             sizeof(float), sizeof(float), sizeof(float));
 }
 
@@ -872,51 +860,19 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_tet4_residual_affine_mesh_soa_i
             }
         }
 
-        const scalar_t * block_current_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_current_streams[stream] = block_current[stream];
+        const jacobian_t *const affine_geometry_sources[10] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_adjugate4 + evbegin, g_jacobian_adjugate5 + evbegin, g_jacobian_adjugate6 + evbegin, g_jacobian_adjugate7 + evbegin, g_jacobian_adjugate8 + evbegin, g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[10][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[10];
+        for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
         }
-        const scalar_t * block_previous_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_previous_streams[stream] = block_previous[stream];
+        const scalar_t *block_adjugate[9];
+        for (int component = 0; component < 9; ++component) {
+            block_adjugate[component] = block_affine_geometry_streams[component];
         }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-        const scalar_t *const block_adjugate[9] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
 
-        two_phase_flow_form_1_p_w_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current_streams, block_previous_streams, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, block_output_streams);
+        two_phase_flow_form_1_p_w_d3_simplex_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[9], block_adjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, block_current, block_previous, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1143,21 +1099,9 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_tet4_residual_isoparametric_mes
             }
         }
 
-        const scalar_t * block_current_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_current_streams[stream] = block_current[stream];
-        }
-        const scalar_t * block_previous_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_previous_streams[stream] = block_previous[stream];
-        }
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
         const scalar_t *const block_adjugate[9] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3], block_adjugate_data[4], block_adjugate_data[5], block_adjugate_data[6], block_adjugate_data[7], block_adjugate_data[8]};
 
-        two_phase_flow_form_1_p_w_d3_simplex_residual_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current_streams, block_previous_streams, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, block_output_streams);
+        two_phase_flow_form_1_p_w_d3_simplex_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, block_current, block_previous, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1336,15 +1280,15 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_tet4_jacobian_action_affine_mes
             }
         }
 
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
+        const jacobian_t *const affine_geometry_sources[1] = {g_jacobian_determinant0 + evbegin};
+        scalar_t block_affine_geometry_data[1][VECTOR_SIZE];
+        const scalar_t *block_affine_geometry_streams[1];
+        for (int geometry_stream = 0; geometry_stream < 1; ++geometry_stream) {
+            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
+                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
         }
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
 
-        two_phase_flow_form_1_p_w_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_determinant0, affine_shape, affine_q_weight, block_output_streams);
+        two_phase_flow_form_1_p_w_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[0], affine_shape, affine_q_weight, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
@@ -1461,12 +1405,8 @@ static SFEM_INLINE int two_phase_flow_form_1_p_w_tet4_jacobian_action_isoparamet
             }
         }
 
-        scalar_t * block_output_streams[N_FIELDS * N_SHAPE];
-        for (int stream = 0; stream < N_FIELDS * N_SHAPE; ++stream) {
-            block_output_streams[stream] = block_output[stream];
-        }
 
-        two_phase_flow_form_1_p_w_d3_simplex_jacobian_action_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, isoparametric_shape, isoparametric_q_weight, block_output_streams);
+        two_phase_flow_form_1_p_w_d3_simplex_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, isoparametric_shape, isoparametric_q_weight, block_output);
 
         scalar_t *const output_components[N_FIELDS] = {p_w_out, p_c_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {

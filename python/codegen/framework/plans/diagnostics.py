@@ -191,7 +191,7 @@ def _energy_diagnostics_entries(
     rule = emission_plan.isoparametric_specialization.quadrature_rule
     entries = []
     for expression_plan in unit.expression_plans:
-        public_name = "%s_%s_%s_soa" % (
+        public_name = _energy_public_name(
             operator_prefix,
             rule.element_type.lower(),
             expression_plan.name,
@@ -206,6 +206,14 @@ def _energy_diagnostics_entries(
             )
         )
     return tuple(entries)
+
+
+def _energy_public_name(operator_prefix, element, form_name):
+    operator_prefix = str(operator_prefix)
+    element = str(element).lower()
+    if operator_prefix.lower().endswith("_%s" % element):
+        return "%s_%s_soa" % (operator_prefix, form_name)
+    return "%s_%s_%s_soa" % (operator_prefix, element, form_name)
 
 
 def _residual_diagnostics_entries(

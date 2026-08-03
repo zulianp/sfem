@@ -9,8 +9,7 @@ from codegen.framework.fem.tensor_product_geometry import (
     sfem_geometry_kernels_header_source,
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
-    tensor_product_evaluated_isoparametric_geometry_lines,
-    tensor_product_ordered_coordinate_streams,
+    tensor_product_gradient_isoparametric_geometry_lines,
 )
 from codegen.framework.fem.tensor_product_kernels import sfem_tensor_product_kernels_header_source
 from codegen.framework.backends.targets import OpenMPTarget
@@ -25,6 +24,7 @@ from codegen.framework.fem.reference import (
     sfem_soa_element_specialization,
     sfem_tensor_product_field_reference_data,
     sfem_tensor_product_hex_uses_cartesian_ordering,
+    sfem_tensor_product_quad_uses_cartesian_ordering,
     SfemReferenceData,
 )
 from codegen.framework.emitters.quadrature_codegen import (
@@ -50,6 +50,7 @@ from codegen.framework.symbolic.core import (
 from codegen.framework.emitters.energy_codegen import (
     _sfem_soa_diagnostic_print_wrapper_lines,
     _sfem_soa_diagnostics_header,
+    _sfem_packed_thread_scratch_header_source,
 )
 
 
@@ -57,21 +58,90 @@ def _target():
     return OpenMPTarget()
 
 
-def _tensor_product_coordinate_stream_layout(dim, n_shape, element_type, storage_name):
-    shape_order = (
-        tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
-        else None
+def _tensor_product_coordinate_shape_order(dim, n_shape, element_type):
+    if sfem_tensor_product_hex_uses_cartesian_ordering(element_type) or sfem_tensor_product_quad_uses_cartesian_ordering(element_type):
+        return tuple(range(n_shape))
+    return tensor_product_cartesian_shape_order(dim, n_shape)
+
+
+def _identity_order(order):
+    return tuple(order) == tuple(range(len(order)))
+
+
+def _single_field_shape_order(n_shape, n_fields, field_stream_order):
+    return tuple(field_stream_order[shape * n_fields] // n_fields for shape in range(n_shape))
+
+
+def _stream_to_tensor_order(field_stream_order):
+    ordered = [0] * len(field_stream_order)
+    for tensor_stream, mesh_stream in enumerate(field_stream_order):
+        ordered[mesh_stream] = tensor_stream
+    return tuple(ordered)
+
+
+def _linear_index_offset(values):
+    values = tuple(values)
+    if not values:
+        return 0
+    offset = values[0]
+    if values == tuple(offset + i for i in range(len(values))):
+        return offset
+    return None
+
+
+def _local_index_mapping_expr(name, values, index_expr):
+    offset = _linear_index_offset(values)
+    if offset is None:
+        return "%s(%s)" % (name, index_expr)
+    if offset == 0:
+        return index_expr
+    return "(%s + %d)" % (index_expr, offset)
+
+
+def _local_index_mapping_lambda_lines(name, values, indent):
+    if _linear_index_offset(values) is not None:
+        return []
+    lines = [
+        "%sconst auto %s = [](const int local) -> int {" % (indent, name),
+        "%s    switch (local) {" % indent,
+    ]
+    lines.extend(
+        "%s        case %d: return %d;" % (indent, local, value)
+        for local, value in enumerate(values)
     )
-    ordered_streams = tensor_product_ordered_coordinate_streams(
-        dim,
+    lines.extend(
+        [
+            "%s        default: return 0;" % indent,
+            "%s    }" % indent,
+            "%s};" % indent,
+        ]
+    )
+    return lines
+
+
+def _single_field_element_alias_lines(n_shape, shape_order, indent, array_name="field_elements", pointer_type="idx_t"):
+    if _identity_order(shape_order):
+        return [], "elements"
+    return [
+        "%sconst %s *const SFEM_RESTRICT %s[%d] = {%s};"
+        % (
+            indent,
+            pointer_type,
+            array_name,
+            n_shape,
+            ", ".join("elements[%d]" % shape for shape in shape_order),
+        )
+    ], array_name
+
+
+def _coordinate_element_alias_lines(dim, n_shape, element_type, indent, pointer_type="idx_t"):
+    return _single_field_element_alias_lines(
         n_shape,
-        tuple(range(dim * n_shape)),
-        shape_order=shape_order,
+        _tensor_product_coordinate_shape_order(dim, n_shape, element_type),
+        indent,
+        array_name="coordinate_elements",
+        pointer_type=pointer_type,
     )
-    if ordered_streams == tuple(range(dim * n_shape)):
-        return storage_name, True
-    return tuple("%s[%d]" % (storage_name, stream) for stream in ordered_streams), False
 
 
 def _inline_qualifier():
@@ -742,6 +812,8 @@ class MeshBlockGatherLoop:
     setup_lines: tuple = ()
     close_lines: tuple = ()
     element_index: str = None
+    element_array: str = "elements"
+    element_pointer_type: str = "idx_t"
 
 
 @dataclass(frozen=True)
@@ -752,6 +824,8 @@ class MeshBlockScatterLoop:
     setup_lines: tuple = ()
     close_lines: tuple = ()
     element_index: str = None
+    element_array: str = "elements"
+    element_pointer_type: str = "idx_t"
 
 
 def _mesh_block_gather_loop_lines(indent, loop, assignment_lines):
@@ -759,8 +833,8 @@ def _mesh_block_gather_loop_lines(indent, loop, assignment_lines):
     lines = [
         "%sfor (int %s = 0; %s < %s; ++%s) {"
         % (indent, loop.shape_var, loop.shape_var, loop.shape_count, loop.shape_var),
-        "%s    const idx_t *const SFEM_RESTRICT element_shape = elements[%s];"
-        % (indent, element_index),
+        "%s    const %s *const SFEM_RESTRICT element_shape = %s[%s];"
+        % (indent, loop.element_pointer_type, loop.element_array, element_index),
     ]
     lines.extend(loop.setup_lines)
     lines.extend(_work_item_loop_lines(loop.lane_indent))
@@ -780,8 +854,8 @@ def _mesh_block_scatter_loop_lines(indent, loop, accumulation_line):
     lines = [
         "%sfor (int %s = 0; %s < %s; ++%s) {"
         % (indent, loop.shape_var, loop.shape_var, loop.shape_count, loop.shape_var),
-        "%s    const idx_t *const SFEM_RESTRICT element_shape = elements[%s];"
-        % (indent, element_index),
+        "%s    const %s *const SFEM_RESTRICT element_shape = %s[%s];"
+        % (indent, loop.element_pointer_type, loop.element_array, element_index),
     ]
     lines.extend(loop.setup_lines)
     lines.extend(
@@ -798,7 +872,7 @@ def _mesh_block_scatter_loop_lines(indent, loop, accumulation_line):
     return lines
 
 
-def _field_gather_lines(system, dependencies, indent):
+def _field_gather_lines(system, dependencies, indent, element_array="elements"):
     lines = []
     if dependencies.current:
         lines.append(
@@ -843,6 +917,7 @@ def _field_gather_lines(system, dependencies, indent):
                 MeshBlockGatherLoop(
                     shape_var="shape",
                     shape_count="N_SHAPE",
+                    element_array=element_array,
                     setup_lines=(
                         "%s    for (int field = 0; field < N_FIELDS; ++field)" % indent
                         + " {",
@@ -858,7 +933,7 @@ def _field_gather_lines(system, dependencies, indent):
     return lines
 
 
-def _coordinate_gather_lines(dim, indent):
+def _coordinate_gather_lines(dim, indent, element_array="elements", pointer_type="idx_t"):
     return [
         "%sconst geom_t *const coordinate_components[DIM] = {%s};"
         % (indent, ", ".join("points[%d]" % d for d in range(dim))),
@@ -867,6 +942,8 @@ def _coordinate_gather_lines(dim, indent):
             MeshBlockGatherLoop(
                 shape_var="shape",
                 shape_count="N_SHAPE",
+                element_array=element_array,
+                element_pointer_type=pointer_type,
                 setup_lines=("%s    for (int d = 0; d < DIM; ++d) {" % indent,),
                 close_lines=("%s    }" % indent,),
                 lane_indent="%s        " % indent,
@@ -879,17 +956,18 @@ def _coordinate_gather_lines(dim, indent):
     ]
 
 
-def _field_atomic_scatter_lines(system, indent):
+def _field_atomic_scatter_lines(system, indent, element_array="elements"):
     return [
         "%sscalar_t *const output_components[N_FIELDS] = {%s};"
         % (indent, ", ".join("%s_out" % field.name for field in system.fields)),
         *_mesh_block_scatter_loop_lines(
             indent,
-            MeshBlockScatterLoop(
-                shape_var="shape",
-                shape_count="N_SHAPE",
-                setup_lines=(
-                    "%s    for (int field = 0; field < N_FIELDS; ++field) {" % indent,
+                MeshBlockScatterLoop(
+                    shape_var="shape",
+                    shape_count="N_SHAPE",
+                    element_array=element_array,
+                    setup_lines=(
+                        "%s    for (int field = 0; field < N_FIELDS; ++field) {" % indent,
                     "%s        const int stream = shape * N_FIELDS + field;" % indent,
                     "%s        scalar_t *const SFEM_RESTRICT out = output_components[field];" % indent,
                 ),
@@ -1323,6 +1401,65 @@ def _mixed_tensor_product_field_stream_order(
     return tuple(order)
 
 
+def _mixed_field_shape_orders(
+    layout,
+    cell_rule,
+    field_element_types,
+    basis_family,
+):
+    if not _is_tensor_product_family(cell_rule, basis_family):
+        return tuple(tuple(range(layout.n_shape(field_index))) for field_index in range(len(layout.fields)))
+
+    field_element_types = {} if field_element_types is None else field_element_types
+    orders = []
+    for field_index, field in enumerate(layout.fields):
+        n_shape = layout.n_shape(field_index)
+        element_type = _field_element_type(
+            _residual_parent_field_name(field),
+            cell_rule,
+            field_element_types,
+        )
+        orders.append(
+            tuple(range(n_shape))
+            if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+            else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
+        )
+    return tuple(orders)
+
+
+def _mixed_field_element_alias_lines(
+    layout,
+    cell_rule,
+    field_element_types,
+    basis_family,
+    indent,
+):
+    shape_orders = _mixed_field_shape_orders(
+        layout,
+        cell_rule,
+        field_element_types,
+        basis_family,
+    )
+    lines = []
+    arrays = []
+    for field_index, shape_order in enumerate(shape_orders):
+        if _identity_order(shape_order):
+            arrays.append("elements")
+            continue
+        array_name = "field_%d_elements" % field_index
+        lines.append(
+            "%sconst idx_t *const SFEM_RESTRICT %s[%d] = {%s};"
+            % (
+                indent,
+                array_name,
+                layout.n_shape(field_index),
+                ", ".join("elements[%d]" % shape for shape in shape_order),
+            )
+        )
+        arrays.append(array_name)
+    return lines, tuple(arrays)
+
+
 def _mixed_block_stream_pointer_lines(
     layout,
     dependencies,
@@ -1330,7 +1467,16 @@ def _mixed_block_stream_pointer_lines(
     cell_rule,
     field_element_types,
     basis_family,
+    force_contiguous=False,
 ):
+    if force_contiguous:
+        args = {
+            group.name: "block_%s" % group.name
+            for group in _dependency_stream_groups(dependencies)
+        }
+        args["output"] = "block_output"
+        return [], args
+
     field_stream_order = _mixed_tensor_product_field_stream_order(
         layout,
         cell_rule,
@@ -1370,7 +1516,16 @@ def _single_field_block_stream_arguments(
     n_streams,
     field_stream_order,
     indent,
+    force_contiguous=False,
 ):
+    if force_contiguous:
+        args = {
+            group.name: "block_%s" % group.name
+            for group in _dependency_stream_groups(dependencies)
+        }
+        args["output"] = "block_output"
+        return [], args
+
     lines = []
     args = {}
     for group in _dependency_stream_groups(dependencies):
@@ -1399,9 +1554,11 @@ def _single_field_block_stream_arguments(
     return lines, args
 
 
-def _mixed_field_gather_lines(system, layout, dependencies, indent):
+def _mixed_field_gather_lines(system, layout, dependencies, indent, field_element_arrays=None):
     lines = []
     dependency_groups = tuple(_dependency_stream_groups(dependencies, mesh=True))
+    if field_element_arrays is None:
+        field_element_arrays = tuple("elements" for _ in system.fields)
     for field_index, field in enumerate(system.fields):
         n_shape = layout.n_shape(field_index)
         offset = layout.offset(field_index)
@@ -1424,6 +1581,7 @@ def _mixed_field_gather_lines(system, layout, dependencies, indent):
                 MeshBlockGatherLoop(
                     shape_var="local_shape",
                     shape_count=str(n_shape),
+                    element_array=field_element_arrays[field_index],
                     setup_lines=(
                         "%s    const int stream = %d + local_shape;" % (indent, offset),
                     ),
@@ -1435,8 +1593,10 @@ def _mixed_field_gather_lines(system, layout, dependencies, indent):
     return lines
 
 
-def _mixed_field_atomic_scatter_lines(system, layout, indent):
+def _mixed_field_atomic_scatter_lines(system, layout, indent, field_element_arrays=None):
     lines = []
+    if field_element_arrays is None:
+        field_element_arrays = tuple("elements" for _ in system.fields)
     for field_index, field in enumerate(system.fields):
         n_shape = layout.n_shape(field_index)
         offset = layout.offset(field_index)
@@ -1450,6 +1610,7 @@ def _mixed_field_atomic_scatter_lines(system, layout, indent):
                     MeshBlockScatterLoop(
                         shape_var="local_shape",
                         shape_count=str(n_shape),
+                        element_array=field_element_arrays[field_index],
                         setup_lines=(
                             "%s        const int stream = %d + local_shape;"
                             % (indent, offset),
@@ -1588,6 +1749,7 @@ def generate_coupled_residual_sfem_files(
     operator_name=None,
     reference_data_plan=None,
     diagnostics_plan=None,
+    matrix_format_plan=None,
 ):
     if not isinstance(system, CoupledResidualSystem):
         raise TypeError("system must be CoupledResidualSystem")
@@ -1609,7 +1771,11 @@ def generate_coupled_residual_sfem_files(
     family = emission_plan.basis_family
     geometry_family = emission_plan.geometry_family
     local_prefix = "%s_d%d_%s" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
-    element_prefix = "%s_%s" % (prefix, element_type.lower()) if operator_prefix is None else str(operator_prefix)
+    element_prefix = (
+        _single_element_operator_prefix(prefix, element_type)
+        if operator_prefix is None
+        else str(operator_prefix)
+    )
     if reference_data_plan is not None:
         validate_reference_data_plan(
             reference_data_plan,
@@ -1649,6 +1815,7 @@ def generate_coupled_residual_sfem_files(
         action_coeffs,
         basis_family=family,
         geometry_family=geometry_family,
+        matrix_format_plan=matrix_format_plan,
     )
     diagnostics_name = "kernel_diagnostics.hpp"
     return (
@@ -1665,9 +1832,21 @@ def generate_coupled_residual_sfem_files(
             diagnostics_name,
             "\n".join(_sfem_soa_diagnostics_header()),
         ),
+        GeneratedKernelFile(
+            "packed_thread_scratch.hpp",
+            _sfem_packed_thread_scratch_header_source(),
+        ),
         GeneratedKernelFile(local_name, local_source),
         GeneratedKernelFile(operator_name, operator_source),
     )
+
+
+def _single_element_operator_prefix(prefix, element_type):
+    element = str(element_type).lower()
+    prefix = str(prefix)
+    if prefix.lower().endswith("_%s" % element):
+        return prefix
+    return "%s_%s" % (prefix, element)
 
 
 def generate_mixed_residual_sfem_files(
@@ -1768,6 +1947,10 @@ def generate_mixed_residual_sfem_files(
         GeneratedKernelFile(
             "kernel_diagnostics.hpp",
             "\n".join(_sfem_soa_diagnostics_header()),
+        ),
+        GeneratedKernelFile(
+            "packed_thread_scratch.hpp",
+            _sfem_packed_thread_scratch_header_source(),
         ),
         GeneratedKernelFile(local_name, local_source),
         GeneratedKernelFile(operator_name, operator_source),
@@ -2321,26 +2504,28 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                     "    scalar_t %s_%s_grad_ref[N_QP * DIM * VECTOR_SIZE];"
                     % (group.name, field.name)
                 )
-            lines.append(
-                "    const scalar_t *const %s_%s_streams[%s] = {%s};"
-                % (
-                    group.name,
-                    field.name,
-                    shape_name,
-                    _field_stream_initializer(layout, field_index, group.name),
+            if stream_layout == "contiguous":
+                stream_arg = "%s + %d" % (group.name, layout.offset(field_index))
+            else:
+                stream_arg = "%s_%s_streams" % (group.name, field.name)
+                lines.append(
+                    "    const scalar_t *const %s[%s] = {%s};"
+                    % (
+                        stream_arg,
+                        shape_name,
+                        _field_stream_initializer(layout, field_index, group.name),
+                    )
                 )
-            )
             if group.uses_gradient:
                 lines.extend(
                     [
                         "    %s<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
                         % (tensor_evaluate_name, shape_name),
-                        "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s_%s_streams, %s_%s_value, %s_%s_grad_ref);"
+                        "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s, %s_%s_value, %s_%s_grad_ref);"
                         % (
                             reference_index,
                             reference_index,
-                            group.name,
-                            field.name,
+                            stream_arg,
                             group.name,
                             field.name,
                             group.name,
@@ -2353,8 +2538,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                     [
                         "    %s<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
                         % (tensor_evaluate_value_name, shape_name),
-                        "            nelems, field_shape_1d[%d], %s_%s_streams, %s_%s_value);"
-                        % (reference_index, group.name, field.name, group.name, field.name),
+                        "            nelems, field_shape_1d[%d], %s, %s_%s_value);"
+                        % (reference_index, stream_arg, group.name, field.name),
                     ]
                 )
 
@@ -2452,23 +2637,27 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         shape_name = layout.n_shape_constant(field)
         offset = layout.offset(row)
         reference_index = layout.reference_index(row)
-        lines.append(
-            "    scalar_t *const %s_output_streams[%s] = {%s};"
-            % (
-                field.name,
-                shape_name,
-                _indexed_stream_range_initializer(
-                    "output", offset, layout.n_shape(row)
-                ),
+        if stream_layout == "contiguous":
+            output_arg = "output + %d" % offset
+        else:
+            output_arg = "%s_output_streams" % field.name
+            lines.append(
+                "    scalar_t *const %s[%s] = {%s};"
+                % (
+                    output_arg,
+                    shape_name,
+                    _indexed_stream_range_initializer(
+                        "output", offset, layout.n_shape(row)
+                    ),
+                )
             )
-        )
         if dependencies.uses_test_gradients:
             lines.extend(
                 [
                     "    %s<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
                     % (tensor_integrate_name, shape_name),
-                    "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s_value_coeff, %s_grad_coeff_ref, %s_output_streams);"
-                    % (reference_index, reference_index, field.name, field.name, field.name),
+                    "            nelems, field_shape_1d[%d], field_grad_1d[%d], %s_value_coeff, %s_grad_coeff_ref, %s);"
+                    % (reference_index, reference_index, field.name, field.name, output_arg),
                 ]
             )
         else:
@@ -2476,8 +2665,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 [
                     "    %s<scalar_t, N_QP, %s, VECTOR_SIZE, DIM, 1>("
                     % (tensor_integrate_value_name, shape_name),
-                    "            nelems, field_shape_1d[%d], %s_value_coeff, %s_output_streams);"
-                    % (reference_index, field.name, field.name),
+                    "            nelems, field_shape_1d[%d], %s_value_coeff, %s);"
+                    % (reference_index, field.name, output_arg),
                 ]
             )
     return lines
@@ -3493,6 +3682,7 @@ def _operator_source(
     action_coeffs,
     basis_family=None,
     geometry_family=None,
+    matrix_format_plan=None,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -3504,12 +3694,19 @@ def _operator_source(
     tensor_product = _is_tensor_product_family(rule, basis_family)
     lines = [
         "#include <type_traits>",
+        "#include <cstdint>",
+        "#include <cstdlib>",
+        "#include <string.h>",
         '#include "%s"' % local_name,
         '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
+        '#include "packed_thread_scratch.hpp"',
         "",
         "#ifndef SFEM_SUCCESS",
         "#define SFEM_SUCCESS 0",
+        "#endif",
+        "#ifndef SFEM_FAILURE",
+        "#define SFEM_FAILURE 1",
         "#endif",
         "#ifndef MIN",
         "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
@@ -3517,8 +3714,18 @@ def _operator_source(
         "#ifdef _OPENMP",
         "#include <omp.h>",
         "#endif",
+        "#include <cstdio>",
         "",
     ]
+    if prefix == "laplace_tet4":
+        lines.append('#include "tet4_laplacian_inline_cpu.hpp"')
+        lines.append("")
+    elif prefix == "laplace_tet10":
+        lines.append('#include "tet10_laplacian_inline_cpu.hpp"')
+        lines.append("")
+    elif prefix == "laplace_proteus_hex8":
+        lines.append('#include "hex8_laplacian_inline_cpu.hpp"')
+        lines.append("")
     lines.extend(_affine_geometry_stream_helper_lines())
     lines.extend(
         [
@@ -3726,6 +3933,42 @@ def _operator_source(
                 dependencies,
             )
         )
+    lines.extend(
+        _scalar_crs_matrix_assembly_source(
+            system,
+            prefix,
+            local_prefix,
+            specialization,
+            form_dependencies["jacobian_action"],
+            basis_family,
+            geometry_family,
+            matrix_format_plan,
+        )
+    )
+    lines.extend(
+        _scalar_coo_triplet_matrix_assembly_source(
+            system,
+            prefix,
+            local_prefix,
+            specialization,
+            form_dependencies["jacobian_action"],
+            basis_family,
+            geometry_family,
+            matrix_format_plan,
+        )
+    )
+    lines.extend(
+        _scalar_dia_matrix_assembly_source(
+            system,
+            prefix,
+            local_prefix,
+            specialization,
+            form_dependencies["jacobian_action"],
+            basis_family,
+            geometry_family,
+            matrix_format_plan,
+        )
+    )
     return "\n".join(lines)
 
 
@@ -3850,6 +4093,23 @@ def _mixed_operator_source(
                 geometry_family,
             )
         )
+    lines.extend(
+        _mixed_coo_triplet_matrix_assembly_source(
+            system,
+            prefix,
+            local_prefix,
+            element,
+            rule,
+            field_element_types,
+            _codegen_dependencies(
+                system,
+                action_coeffs,
+                system.jacobian_action_dependencies(),
+            ),
+            basis_family,
+            geometry_family,
+        )
+    )
     return "\n".join(lines)
 
 
@@ -4041,6 +4301,14 @@ def _mixed_affine_function(
             basis_family,
         )
     )
+    field_element_lines, field_element_arrays = _mixed_field_element_alias_lines(
+        layout,
+        cell_rule,
+        field_element_types,
+        basis_family,
+        "    ",
+    )
+    lines.extend(field_element_lines)
     lines.extend(
         [
             "",
@@ -4060,7 +4328,7 @@ def _mixed_affine_function(
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
         ]
     )
-    field_gather = _mixed_field_gather_lines(system, layout, dependencies, "        ")
+    field_gather = _mixed_field_gather_lines(system, layout, dependencies, "        ", field_element_arrays)
     if field_gather:
         lines.extend(["", *field_gather])
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
@@ -4092,6 +4360,7 @@ def _mixed_affine_function(
         cell_rule,
         field_element_types,
         basis_family,
+        force_contiguous=True,
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
@@ -4118,7 +4387,7 @@ def _mixed_affine_function(
             "",
         ]
     )
-    lines.extend(_mixed_field_atomic_scatter_lines(system, layout, "        "))
+    lines.extend(_mixed_field_atomic_scatter_lines(system, layout, "        ", field_element_arrays))
     lines.extend(
         [
             "    }",
@@ -4237,6 +4506,25 @@ def _mixed_isoparametric_function(
         lines.extend(_mixed_tensor_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
     else:
         lines.extend(_mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
+    field_element_lines, field_element_arrays = _mixed_field_element_alias_lines(
+        layout,
+        cell_rule,
+        field_element_types,
+        basis_family,
+        "    ",
+    )
+    lines.extend(field_element_lines)
+    coordinate_element_lines, coordinate_element_array = (
+        _coordinate_element_alias_lines(
+            dim,
+            cell_rule.n_shape,
+            cell_rule.element_type,
+            "    ",
+        )
+        if tensor_product_geometry
+        else ([], "elements")
+    )
+    lines.extend(coordinate_element_lines)
     lines.extend(
         [
             _parallel_for_pragma("static"),
@@ -4258,29 +4546,21 @@ def _mixed_isoparametric_function(
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
         ]
     )
-    lines.extend(["", *_coordinate_gather_lines(dim, "        ")])
-    field_gather = _mixed_field_gather_lines(system, layout, dependencies, "        ")
+    lines.extend(["", *_coordinate_gather_lines(dim, "        ", coordinate_element_array)])
+    field_gather = _mixed_field_gather_lines(system, layout, dependencies, "        ", field_element_arrays)
     if field_gather:
         lines.extend(["", *field_gather])
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
     if tensor_product_geometry:
-        coordinate_streams, contiguous_coordinate_streams = (
-            _tensor_product_coordinate_stream_layout(
-                dim,
-                cell_rule.n_shape,
-                cell_rule.element_type,
-                "block_coordinates",
-            )
-        )
         lines.append("")
         lines.extend(
-            tensor_product_evaluated_isoparametric_geometry_lines(
+            tensor_product_gradient_isoparametric_geometry_lines(
                 dim=dim,
                 n_shape=cell_rule.n_shape,
                 n_qp=cell_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams=coordinate_streams,
-                contiguous_coordinate_streams=contiguous_coordinate_streams,
+                coordinate_streams="block_coordinates",
+                contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
                     "block_adjugate_data[%d][%s]" % (component, index)
                 ),
@@ -4350,6 +4630,7 @@ def _mixed_isoparametric_function(
         cell_rule,
         field_element_types,
         basis_family,
+        force_contiguous=True,
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
@@ -4375,7 +4656,7 @@ def _mixed_isoparametric_function(
             "",
         ]
     )
-    lines.extend(_mixed_field_atomic_scatter_lines(system, layout, "        "))
+    lines.extend(_mixed_field_atomic_scatter_lines(system, layout, "        ", field_element_arrays))
     lines.extend(
         [
             "    }",
@@ -4410,6 +4691,413 @@ def _mixed_isoparametric_function(
     return lines
 
 
+def _mixed_stream_component_offsets(layout):
+    group_component_begin = {}
+    component_begin = 0
+    for group in layout.groups:
+        group_component_begin[group.name] = component_begin
+        component_begin += group.components
+
+    offsets = []
+    for field_index, field in enumerate(layout.fields):
+        group = layout.group_for_field(field_index)
+        component = int(getattr(field, "component", 0))
+        component_offset = group_component_begin[group.name] + component
+        offsets.extend(component_offset for _ in range(layout.n_shape(field_index)))
+    return tuple(offsets)
+
+
+def _mixed_stream_shape_offsets(layout):
+    offsets = []
+    for field_index, _ in enumerate(layout.fields):
+        offsets.extend(range(layout.n_shape(field_index)))
+    return tuple(offsets)
+
+
+def _mixed_triplet_stream_indices(layout, group_names):
+    selected = set(group_names)
+    indices = []
+    for field_index, field in enumerate(layout.fields):
+        if _residual_parent_field_name(field) not in selected:
+            continue
+        indices.extend(
+            layout.stream_index(field_index, local_shape)
+            for local_shape in range(layout.n_shape(field_index))
+        )
+    return tuple(indices)
+
+
+def _mixed_triplet_group_names_from_prefix(prefix, layout):
+    marker = "_form_2_"
+    groups = tuple(group.name for group in layout.groups)
+    if marker not in prefix:
+        return groups, groups
+
+    suffix = prefix.split(marker, 1)[1]
+    for row in groups:
+        row_prefix = "%s_" % row
+        if not suffix.startswith(row_prefix):
+            continue
+        column = suffix[len(row_prefix) :]
+        if column in groups:
+            return (row,), (column,)
+    return (), ()
+
+
+def _mixed_coo_triplet_scatter_lines(function_base, layout, row_streams, column_streams):
+    component_offsets = _mixed_stream_component_offsets(layout)
+    shape_offsets = _mixed_stream_shape_offsets(layout)
+    return [
+        "template <typename scalar_t>",
+        "static SFEM_INLINE void %s_scatter_coo_triplets(" % function_base,
+        "        idx_t **const SFEM_RESTRICT elements,",
+        "        const ptrdiff_t element,",
+        "        const ptrdiff_t out_stride,",
+        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+        "        idx_t *const SFEM_RESTRICT rows,",
+        "        idx_t *const SFEM_RESTRICT cols,",
+        "        scalar_t *const SFEM_RESTRICT values) {",
+        "    static constexpr int N_ROW_STREAMS = %d;" % len(row_streams),
+        "    static constexpr int N_COL_STREAMS = %d;" % len(column_streams),
+        "    static constexpr int ROW_COMPONENT[N_ROW_STREAMS] = {%s};"
+        % ", ".join(str(component_offsets[stream]) for stream in row_streams),
+        "    static constexpr int ROW_SHAPE[N_ROW_STREAMS] = {%s};"
+        % ", ".join(str(shape_offsets[stream]) for stream in row_streams),
+        "    static constexpr int COL_COMPONENT[N_COL_STREAMS] = {%s};"
+        % ", ".join(str(component_offsets[stream]) for stream in column_streams),
+        "    static constexpr int COL_SHAPE[N_COL_STREAMS] = {%s};"
+        % ", ".join(str(shape_offsets[stream]) for stream in column_streams),
+        "    const ptrdiff_t element_offset = element * N_ROW_STREAMS * N_COL_STREAMS;",
+        "    for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {",
+        "        const idx_t row_node = elements[ROW_SHAPE[row_stream]][element];",
+        "        const idx_t global_row = row_node * out_stride + ROW_COMPONENT[row_stream];",
+        "        for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {",
+        "            const idx_t col_node = elements[COL_SHAPE[col_stream]][element];",
+        "            const ptrdiff_t entry = element_offset + row_stream * N_COL_STREAMS + col_stream;",
+        "            rows[entry] = global_row;",
+        "            cols[entry] = col_node * out_stride + COL_COMPONENT[col_stream];",
+        "            values[entry] = element_matrix[row_stream * N_COL_STREAMS + col_stream];",
+        "        }",
+        "    }",
+        "}",
+        "",
+    ]
+
+
+def _mixed_coo_triplet_matrix_assembly_source(
+    system,
+    prefix,
+    local_prefix,
+    element,
+    cell_rule,
+    field_element_types,
+    dependencies,
+    basis_family=None,
+    geometry_family=None,
+):
+    if not dependencies.direction:
+        return []
+
+    dim = system.dim
+    layout = MixedFieldLayout.create(system, cell_rule, field_element_types)
+    row_groups, column_groups = _mixed_triplet_group_names_from_prefix(prefix, layout)
+    row_streams = _mixed_triplet_stream_indices(
+        layout,
+        row_groups,
+    )
+    column_streams = _mixed_triplet_stream_indices(
+        layout,
+        column_groups,
+    )
+    if not row_streams or not column_streams:
+        return []
+
+    function_base = "%s_%s_hessian_coo_triplet_isoparametric_mesh_soa" % (
+        prefix,
+        str(element).lower(),
+    )
+    impl = "%s_impl" % function_base
+    block = "%s_jacobian_action_block" % local_prefix
+    tensor_product = _is_tensor_product_family(cell_rule, basis_family)
+    tensor_product_geometry = _is_tensor_product_family(cell_rule, geometry_family)
+    field_stream_order = _mixed_tensor_product_field_stream_order(
+        layout,
+        cell_rule,
+        field_element_types,
+        basis_family,
+    )
+    stream_to_tensor_order = _stream_to_tensor_order(field_stream_order)
+    row_tensor_streams = tuple(stream_to_tensor_order[stream] for stream in row_streams)
+    column_tensor_streams = tuple(stream_to_tensor_order[stream] for stream in column_streams)
+    reference_stage = "isoparametric"
+    reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
+    params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+        "const geom_t *const *const SFEM_RESTRICT points",
+    ]
+    params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
+    state_dependencies = ResidualCodegenDependencies(
+        current=dependencies.current,
+        previous=dependencies.previous,
+        direction=False,
+        parameters=dependencies.parameters,
+        current_value=dependencies.current_value,
+        current_gradient=dependencies.current_gradient,
+        previous_value=dependencies.previous_value,
+        previous_gradient=dependencies.previous_gradient,
+        direction_value=False,
+        direction_gradient=False,
+        value_coefficients=dependencies.value_coefficients,
+        gradient_coefficients=dependencies.gradient_coefficients,
+    )
+    params.extend(_mixed_mesh_dependency_params(layout, state_dependencies))
+    params.extend(
+        [
+            "const ptrdiff_t out_stride",
+            "idx_t *const SFEM_RESTRICT rows",
+            "idx_t *const SFEM_RESTRICT cols",
+            "scalar_t *const SFEM_RESTRICT values",
+        ]
+    )
+
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+    ]
+    lines.extend(_mixed_coo_triplet_scatter_lines(function_base, layout, row_streams, column_streams))
+    lines.extend(
+        [
+            "template <typename scalar_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_QP = %d;" % cell_rule.n_qp,
+            "    static constexpr int CELL_N_SHAPE = %d;" % cell_rule.n_shape,
+            "    static constexpr int N_SHAPE = CELL_N_SHAPE;",
+            "    static constexpr int N_FIELDS = %d;" % layout.n_reference_fields,
+            "    static constexpr int N_FIELD_STREAMS = %d;" % layout.total_streams,
+            "    static constexpr int VECTOR_SIZE = 1;",
+            "    (void)nnodes;",
+        ]
+    )
+    if tensor_product:
+        lines.extend(_mixed_tensor_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
+    else:
+        lines.extend(_mixed_simplex_cell_reference_alias_lines(prefix, reference_stage, cell_rule))
+    field_element_lines, field_element_arrays = _mixed_field_element_alias_lines(
+        layout,
+        cell_rule,
+        field_element_types,
+        basis_family,
+        "    ",
+    )
+    lines.extend(field_element_lines)
+    coordinate_element_lines, coordinate_element_array = (
+        _coordinate_element_alias_lines(
+            dim,
+            cell_rule.n_shape,
+            cell_rule.element_type,
+            "    ",
+        )
+        if tensor_product_geometry
+        else ([], "elements")
+    )
+    lines.extend(coordinate_element_lines)
+    lines.extend(
+        [
+            _parallel_for_pragma("static"),
+            "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            "        const ptrdiff_t evbegin = element;",
+            "        const int nelems = 1;",
+            "        scalar_t block_coordinates[DIM * CELL_N_SHAPE][VECTOR_SIZE];",
+            "        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];",
+            "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
+        ]
+    )
+    if dependencies.current:
+        lines.append("        scalar_t block_current[N_FIELD_STREAMS][VECTOR_SIZE];")
+    if dependencies.previous:
+        lines.append("        scalar_t block_previous[N_FIELD_STREAMS][VECTOR_SIZE];")
+    lines.extend(
+        [
+            "        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];",
+            "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
+            "        scalar_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
+            "",
+        ]
+    )
+    lines.extend(_coordinate_gather_lines(dim, "        ", coordinate_element_array))
+    field_gather = _mixed_field_gather_lines(system, layout, state_dependencies, "        ", field_element_arrays)
+    if field_gather:
+        lines.extend(["", *field_gather])
+    if tensor_product_geometry:
+        lines.append("")
+        lines.extend(
+            tensor_product_gradient_isoparametric_geometry_lines(
+                dim=dim,
+                n_shape=cell_rule.n_shape,
+                n_qp=cell_rule.n_qp,
+                local_prefix=local_prefix,
+                coordinate_streams="block_coordinates",
+                contiguous_coordinate_streams=True,
+                adjugate_target=lambda component, index: (
+                    "block_adjugate_data[%d][%s]" % (component, index)
+                ),
+                determinant_target=lambda index: (
+                    "block_determinant[%s]" % index
+                ),
+                adjugate_streams=tuple(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_determinant",
+                shape_name="%s_shape_1d" % reference_stage,
+                grad_name="%s_grad_1d" % reference_stage,
+            )
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "        scalar_t *block_adjugate_streams[DIM * DIM] = {%s};"
+                % ", ".join(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                "        for (int q = 0; q < N_QP; ++q) {",
+                "            const int lane = 0;",
+            ]
+        )
+        for i in range(dim):
+            for j in range(dim):
+                terms = [
+                    "block_coordinates[%d][lane] * %s_cell_grad_ref_%d[q * CELL_N_SHAPE + %d]"
+                    % (
+                        shape * dim + i,
+                        reference_stage,
+                        j,
+                        shape,
+                    )
+                    for shape in range(cell_rule.n_shape)
+                ]
+                lines.append(
+                    "            const scalar_t J%d%d = %s;"
+                    % (i, j, " + ".join(terms))
+                )
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
+        lines.extend(["        }"])
+    lines.extend([""])
+    lines.extend(
+        _mixed_reference_pointer_lines(
+            reference_data,
+            system,
+            cell_rule,
+            dependencies,
+            "        ",
+            field_element_types,
+            basis_family,
+        )
+    )
+    lines.append(
+        "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
+        % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
+    )
+    block_stream_lines, block_stream_args = _mixed_block_stream_pointer_lines(
+        layout,
+        dependencies,
+        "        ",
+        cell_rule,
+        field_element_types,
+        basis_family,
+        force_contiguous=True,
+    )
+    lines.extend(block_stream_lines)
+    block_function = "%s_contiguous" % block if not block_stream_lines else block
+    call_args = [
+        "nelems",
+        "0",
+        "block_determinant",
+    ]
+    if dependencies.uses_adjugate:
+        call_args.append("block_adjugate")
+    call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
+    call_args.extend(
+        block_stream_args[group.name]
+        for group in _dependency_stream_groups(dependencies)
+    )
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.append(block_stream_args["output"])
+    lines.extend([""])
+    lines.extend(_local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, "        "))
+    lines.extend(_local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, "        "))
+    lines.extend(
+        [
+            "        for (int entry = 0; entry < %d; ++entry) {"
+            % (len(row_streams) * len(column_streams)),
+            "            element_matrix[entry] = scalar_t(0);",
+            "        }",
+            "        for (int trial_local = 0; trial_local < %d; ++trial_local) {"
+            % len(column_streams),
+            "            const int trial = %s;"
+            % _local_index_mapping_expr("col_tensor_stream", column_tensor_streams, "trial_local"),
+            "            for (int stream = 0; stream < N_FIELD_STREAMS; ++stream) {",
+            "                block_direction[stream][0] = scalar_t(0);",
+            "                block_output[stream][0] = scalar_t(0);",
+            "            }",
+            "            block_direction[trial][0] = scalar_t(1);",
+            "            %s<scalar_t, N_QP, CELL_N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block_function, ", ".join(call_args)),
+            "            for (int test_local = 0; test_local < %d; ++test_local) {"
+            % len(row_streams),
+            "                const int test = %s;"
+            % _local_index_mapping_expr("row_tensor_stream", row_tensor_streams, "test_local"),
+            "                element_matrix[test_local * %d + trial_local] = block_output[test][0];"
+            % len(column_streams),
+            "            }",
+            "        }",
+            "",
+            "        %s_scatter_coo_triplets(elements, element, out_stride, element_matrix, rows, cols, values);"
+            % function_base,
+            "    }",
+            "",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [param.replace("scalar_t", scalar_type) for param in params]
+        lines.append('extern "C" int %s%s(' % (function_base, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        call_args = ["nelements", "nnodes", "elements", "points"]
+        call_args.extend(map(str, dependencies.parameters))
+        call_args.extend(_mixed_mesh_dependency_call_args(layout, state_dependencies))
+        call_args.extend(("out_stride", "rows", "cols", "values"))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
 def _field_n_shape(field, cell_rule, field_element_types):
     return _field_n_shape_by_name(
         _residual_parent_field_name(field),
@@ -4423,7 +5111,7 @@ def _field_n_shape_by_name(field_name, cell_rule, field_element_types):
     return sfem_field_n_shape(
         element_type,
         cell_rule.order
-        if element_type == "QUAD4" or sfem_is_tensor_product_hex_element(element_type)
+        if element_type in ("QUAD4", "PROTEUS_QUAD4") or sfem_is_tensor_product_hex_element(element_type)
         else None,
     )
 
@@ -4851,6 +5539,30 @@ def _mesh_operator_source(
                 gradient_metric,
             )
         )
+        if form == "jacobian_action":
+            lines.extend(
+                _scalar_packed_affine_jacobian_action_source(
+                    system,
+                    prefix,
+                    local_prefix,
+                    affine_specialization,
+                    dependencies,
+                    coefficients,
+                    basis_family,
+                )
+            )
+            lines.extend(
+                _scalar_packed_affine_jacobian_action_source(
+                    system,
+                    prefix,
+                    local_prefix,
+                    affine_specialization,
+                    dependencies,
+                    coefficients,
+                    basis_family,
+                    two_pass=True,
+                )
+            )
         lines.extend(
             _isoparametric_mesh_operator_source(
                 system,
@@ -4873,6 +5585,13 @@ def _mesh_operator_source(
             emit_reference_basis=not omit_simplex_reference_basis_inputs,
         )
     )
+    field_shape_order = _single_field_shape_order(n_shape, n_fields, field_stream_order)
+    field_element_lines, field_element_array = _single_field_element_alias_lines(
+        n_shape,
+        field_shape_order,
+        "    ",
+    )
+    lines.extend(field_element_lines)
     lines.extend(
         [
             "",
@@ -4903,13 +5622,14 @@ def _mesh_operator_source(
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
         ]
     )
-    lines.extend(_field_gather_lines(system, dependencies, "        "))
+    lines.extend(_field_gather_lines(system, dependencies, "        ", field_element_array))
     lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        "), ""])
     block_stream_lines, block_stream_args = _single_field_block_stream_arguments(
         dependencies,
         n_fields * n_shape,
         field_stream_order,
         "        ",
+        force_contiguous=bool(field_element_lines),
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
@@ -5034,7 +5754,7 @@ def _mesh_operator_source(
             "",
         ]
     )
-    lines.extend(_field_atomic_scatter_lines(system, "        "))
+    lines.extend(_field_atomic_scatter_lines(system, "        ", field_element_array))
     lines.extend(
         [
             "    }",
@@ -5094,6 +5814,30 @@ def _mesh_operator_source(
                 "",
             ]
         )
+    if form == "jacobian_action":
+        lines.extend(
+            _scalar_packed_affine_jacobian_action_source(
+                system,
+                prefix,
+                local_prefix,
+                affine_specialization,
+                dependencies,
+                coefficients,
+                basis_family,
+            )
+        )
+        lines.extend(
+            _scalar_packed_affine_jacobian_action_source(
+                system,
+                prefix,
+                local_prefix,
+                affine_specialization,
+                dependencies,
+                coefficients,
+                basis_family,
+                two_pass=True,
+            )
+        )
     lines.extend(
         _isoparametric_mesh_operator_source(
             system,
@@ -5107,6 +5851,32 @@ def _mesh_operator_source(
             geometry_family,
         )
     )
+    if form == "jacobian_action":
+        lines.extend(
+            _scalar_packed_jacobian_action_source(
+                system,
+                prefix,
+                local_prefix,
+                isoparametric_specialization,
+                dependencies,
+                coefficients,
+                basis_family,
+                geometry_family,
+            )
+        )
+        lines.extend(
+            _scalar_packed_jacobian_action_source(
+                system,
+                prefix,
+                local_prefix,
+                isoparametric_specialization,
+                dependencies,
+                coefficients,
+                basis_family,
+                geometry_family,
+                two_pass=True,
+            )
+        )
     return lines
 
 
@@ -5171,6 +5941,2175 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
                 ") {",
                 "    return %s%s(%s);"
                 % (target, suffix, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _matrix_format_values(matrix_format_plan):
+    if matrix_format_plan is None or getattr(matrix_format_plan, "is_empty", True):
+        return ()
+    values = []
+    for matrix_format in matrix_format_plan.formats:
+        value = getattr(matrix_format, "value", str(matrix_format)).lower()
+        if value not in values:
+            values.append(value)
+    return tuple(values)
+
+
+def _packed_crs_passes(matrix_format_plan):
+    if matrix_format_plan is None or getattr(matrix_format_plan, "is_empty", True):
+        return ()
+    passes = []
+    for variant in matrix_format_plan.variants:
+        matrix_format = getattr(variant.matrix_format, "value", str(variant.matrix_format)).lower()
+        mesh_layout = getattr(variant.mesh_layout, "value", str(variant.mesh_layout)).lower()
+        if matrix_format != "crs" or mesh_layout != "packed":
+            continue
+        packed_pass = getattr(variant.packed_pass, "value", str(variant.packed_pass)).lower()
+        if packed_pass and packed_pass != "none" and packed_pass not in passes:
+            passes.append(packed_pass)
+    return tuple(passes)
+
+
+def _compatible_matrix_field_indices_from_prefix(prefix, system, element_type):
+    fields = tuple(system.fields)
+    names = tuple(field.name for field in fields)
+    marker = "_form_2_"
+    if marker not in prefix:
+        all_indices = tuple(range(len(fields)))
+        return all_indices, all_indices
+
+    suffix = prefix.split(marker, 1)[1]
+    element_suffix = "_%s" % str(element_type).lower()
+    if suffix.endswith(element_suffix):
+        suffix = suffix[: -len(element_suffix)]
+
+    for row_index, row_name in sorted(
+        enumerate(names),
+        key=lambda item: len(item[1]),
+        reverse=True,
+    ):
+        row_prefix = "%s_" % row_name
+        if not suffix.startswith(row_prefix):
+            continue
+        column_name = suffix[len(row_prefix) :]
+        if column_name in names:
+            return (row_index,), (names.index(column_name),)
+
+    all_indices = tuple(range(len(fields)))
+    return all_indices, all_indices
+
+
+def _compatible_matrix_stream_indices(field_indices, n_shape):
+    streams = []
+    for field_index in field_indices:
+        streams.extend(field_index * n_shape + shape for shape in range(n_shape))
+    return tuple(streams)
+
+
+def _compatible_stream_component_offsets(n_fields, n_shape):
+    offsets = []
+    for field_index in range(n_fields):
+        offsets.extend(field_index for _ in range(n_shape))
+    return tuple(offsets)
+
+
+def _compatible_stream_shape_offsets(n_fields, n_shape):
+    offsets = []
+    for _ in range(n_fields):
+        offsets.extend(range(n_shape))
+    return tuple(offsets)
+
+
+def _crs_find_cols_lines(function_base, n_shape):
+    lines = [
+        "static SFEM_INLINE void %s_find_cols(" % function_base,
+        "        const idx_t *const SFEM_RESTRICT targets,",
+        "        const idx_t *const SFEM_RESTRICT row,",
+        "        const int lenrow,",
+        "        idx_t *const SFEM_RESTRICT ks) {",
+    ]
+    if n_shape <= 10:
+        lines.append("#pragma unroll(%d)" % n_shape)
+    lines.extend(
+        [
+            "    for (int d = 0; d < %d; ++d) {" % n_shape,
+            "        ks[d] = 0;",
+            "    }",
+            "    for (int k = 0; k < lenrow; ++k) {",
+        ]
+    )
+    if n_shape <= 10:
+        lines.append("#pragma unroll(%d)" % n_shape)
+    lines.extend(
+        [
+            "        for (int d = 0; d < %d; ++d) {" % n_shape,
+            "            ks[d] += row[k] < targets[d];",
+            "        }",
+            "    }",
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
+def _scalar_crs_matrix_scatter_lines(function_base, n_shape):
+    return _crs_find_cols_lines(function_base, n_shape) + [
+        "template <typename scalar_t>",
+        "static SFEM_INLINE int %s_scatter_crs(" % function_base,
+        "        const idx_t *const SFEM_RESTRICT ev,",
+        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+        "        const count_t *const SFEM_RESTRICT rowptr,",
+        "        const idx_t *const SFEM_RESTRICT colidx,",
+        "        scalar_t *const SFEM_RESTRICT values) {",
+        "    static constexpr int N_SHAPE = %d;" % n_shape,
+        "    count_t entries[N_SHAPE * N_SHAPE];",
+        "    idx_t ks[N_SHAPE];",
+        "    bool valid_graph = true;",
+        "    for (int i = 0; i < N_SHAPE; ++i) {",
+        "        const count_t row_begin = rowptr[ev[i]];",
+        "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
+        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
+        "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
+        "        for (int j = 0; j < N_SHAPE; ++j) {",
+        "            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {",
+        "                if (valid_graph) {",
+        "                    std::fprintf(stderr, \"%s_scatter_crs missing graph entry (%%ld, %%ld)\\n\", (long)ev[i], (long)ev[j]);"
+        % function_base,
+        "                }",
+        "                entries[i * N_SHAPE + j] = row_begin;",
+        "                valid_graph = false;",
+        "            } else {",
+        "                entries[i * N_SHAPE + j] = row_begin + ks[j];",
+        "            }",
+        "        }",
+        "    }",
+        "    if (!valid_graph) return SFEM_FAILURE;",
+        "    for (int i = 0; i < N_SHAPE; ++i) {",
+        "        for (int j = 0; j < N_SHAPE; ++j) {",
+        "#pragma omp atomic update",
+        "            values[entries[i * N_SHAPE + j]] += element_matrix[i * N_SHAPE + j];",
+        "        }",
+        "    }",
+        "    return SFEM_SUCCESS;",
+        "}",
+        "",
+    ]
+
+
+def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_streams, column_streams):
+    component_offsets = _compatible_stream_component_offsets(n_fields, n_shape)
+    shape_offsets = _compatible_stream_shape_offsets(n_fields, n_shape)
+    return _crs_find_cols_lines(function_base, n_shape) + [
+        "template <typename scalar_t>",
+        "static SFEM_INLINE int %s_scatter_crs(" % function_base,
+        "        const idx_t *const SFEM_RESTRICT ev,",
+        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+        "        const count_t *const SFEM_RESTRICT rowptr,",
+        "        const idx_t *const SFEM_RESTRICT colidx,",
+        "        scalar_t *const SFEM_RESTRICT values) {",
+        "    static constexpr int N_SHAPE = %d;" % n_shape,
+        "    static constexpr int N_FIELDS = %d;" % n_fields,
+        "    static constexpr int N_ROW_STREAMS = %d;" % len(row_streams),
+        "    static constexpr int N_COL_STREAMS = %d;" % len(column_streams),
+        "    static constexpr int ROW_COMPONENT[%d] = {%s};"
+        % (
+            len(row_streams),
+            ", ".join(str(component_offsets[stream]) for stream in row_streams),
+        ),
+        "    static constexpr int ROW_SHAPE[%d] = {%s};"
+        % (
+            len(row_streams),
+            ", ".join(str(shape_offsets[stream]) for stream in row_streams),
+        ),
+        "    static constexpr int COL_COMPONENT[%d] = {%s};"
+        % (
+            len(column_streams),
+            ", ".join(str(component_offsets[stream]) for stream in column_streams),
+        ),
+        "    static constexpr int COL_SHAPE[%d] = {%s};"
+        % (
+            len(column_streams),
+            ", ".join(str(shape_offsets[stream]) for stream in column_streams),
+        ),
+        "    count_t entries[N_SHAPE * N_SHAPE];",
+        "    idx_t ks[N_SHAPE];",
+        "    bool valid_graph = true;",
+        "    for (int i = 0; i < N_SHAPE; ++i) {",
+        "        const count_t row_begin = rowptr[ev[i]];",
+        "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
+        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
+        "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
+        "        for (int j = 0; j < N_SHAPE; ++j) {",
+        "            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {",
+        "                if (valid_graph) {",
+        "                    std::fprintf(stderr, \"%s_scatter_crs missing graph entry (%%ld, %%ld)\\n\", (long)ev[i], (long)ev[j]);"
+        % function_base,
+        "                }",
+        "                entries[i * N_SHAPE + j] = row_begin;",
+        "                valid_graph = false;",
+        "            } else {",
+        "                entries[i * N_SHAPE + j] = row_begin + ks[j];",
+        "            }",
+        "        }",
+        "    }",
+        "    if (!valid_graph) return SFEM_FAILURE;",
+        "    for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {",
+        "        const int row_shape = ROW_SHAPE[row_stream];",
+        "        const int bi = ROW_COMPONENT[row_stream];",
+        "        for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {",
+        "            const int col_shape = COL_SHAPE[col_stream];",
+        "            const int bj = COL_COMPONENT[col_stream];",
+        "            scalar_t *const block = &values[entries[row_shape * N_SHAPE + col_shape] * N_FIELDS * N_FIELDS];",
+        "#pragma omp atomic update",
+        "            block[bi * N_FIELDS + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];",
+        "        }",
+        "    }",
+        "    return SFEM_SUCCESS;",
+        "}",
+        "",
+    ]
+
+
+def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_streams, column_streams):
+    lines = [
+        "static SFEM_INLINE idx_t %s_packed_global_node(" % function_base,
+        "        const uint16_t packed_node,",
+        "        const ptrdiff_t pack,",
+        "        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,",
+        "        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,",
+        "        const idx_t *const SFEM_RESTRICT ghost_idx) {",
+        "    const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+        "    return packed_node < n_contiguous ? idx_t(owned_nodes_ptr[pack] + packed_node) : ghost_idx[ghost_ptr[pack] + packed_node - n_contiguous];",
+        "}",
+        "",
+        "template <typename scalar_t>",
+        "static SFEM_INLINE int %s_discover_packed_crs_entries(" % function_base,
+        "        const idx_t *const SFEM_RESTRICT ev,",
+        "        const count_t *const SFEM_RESTRICT rowptr,",
+        "        const idx_t *const SFEM_RESTRICT colidx,",
+        "        count_t *const SFEM_RESTRICT entries) {",
+        "    static constexpr int N_SHAPE = %d;" % n_shape,
+        "    idx_t ks[N_SHAPE];",
+        "    bool valid_graph = true;",
+        "    for (int i = 0; i < N_SHAPE; ++i) {",
+        "        const count_t row_begin = rowptr[ev[i]];",
+        "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
+        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
+        "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
+        "        for (int j = 0; j < N_SHAPE; ++j) {",
+        "            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {",
+        "                if (valid_graph) {",
+        "                    std::fprintf(stderr, \"%s_discover_packed_crs_entries missing graph entry (%%ld, %%ld)\\n\", (long)ev[i], (long)ev[j]);"
+        % function_base,
+        "                }",
+        "                entries[i * N_SHAPE + j] = row_begin;",
+        "                valid_graph = false;",
+        "            } else {",
+        "                entries[i * N_SHAPE + j] = row_begin + ks[j];",
+        "            }",
+        "        }",
+        "    }",
+        "    return valid_graph ? SFEM_SUCCESS : SFEM_FAILURE;",
+        "}",
+        "",
+    ]
+    if n_fields == 1:
+        lines.extend(
+            [
+                "template <typename scalar_t>",
+                "static SFEM_INLINE void %s_scatter_packed_crs_entries(" % function_base,
+                "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+                "        const count_t *const SFEM_RESTRICT entries,",
+                "        scalar_t *const SFEM_RESTRICT values) {",
+                "    static constexpr int N_SHAPE = %d;" % n_shape,
+                "    for (int i = 0; i < N_SHAPE; ++i) {",
+                "        for (int j = 0; j < N_SHAPE; ++j) {",
+                "#pragma omp atomic update",
+                "            values[entries[i * N_SHAPE + j]] += element_matrix[i * N_SHAPE + j];",
+                "        }",
+                "    }",
+                "}",
+                "",
+            ]
+        )
+        return lines
+
+    component_offsets = _compatible_stream_component_offsets(n_fields, n_shape)
+    shape_offsets = _compatible_stream_shape_offsets(n_fields, n_shape)
+    lines.extend(
+        [
+            "template <typename scalar_t>",
+            "static SFEM_INLINE void %s_scatter_packed_crs_entries(" % function_base,
+            "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+            "        const count_t *const SFEM_RESTRICT entries,",
+            "        scalar_t *const SFEM_RESTRICT values) {",
+            "    static constexpr int N_SHAPE = %d;" % n_shape,
+            "    static constexpr int N_FIELDS = %d;" % n_fields,
+            "    static constexpr int N_ROW_STREAMS = %d;" % len(row_streams),
+            "    static constexpr int N_COL_STREAMS = %d;" % len(column_streams),
+            "    static constexpr int ROW_COMPONENT[%d] = {%s};"
+            % (
+                len(row_streams),
+                ", ".join(str(component_offsets[stream]) for stream in row_streams),
+            ),
+            "    static constexpr int ROW_SHAPE[%d] = {%s};"
+            % (
+                len(row_streams),
+                ", ".join(str(shape_offsets[stream]) for stream in row_streams),
+            ),
+            "    static constexpr int COL_COMPONENT[%d] = {%s};"
+            % (
+                len(column_streams),
+                ", ".join(str(component_offsets[stream]) for stream in column_streams),
+            ),
+            "    static constexpr int COL_SHAPE[%d] = {%s};"
+            % (
+                len(column_streams),
+                ", ".join(str(shape_offsets[stream]) for stream in column_streams),
+            ),
+            "    for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {",
+            "        const int row_shape = ROW_SHAPE[row_stream];",
+            "        const int bi = ROW_COMPONENT[row_stream];",
+            "        for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {",
+            "            const int col_shape = COL_SHAPE[col_stream];",
+            "            const int bj = COL_COMPONENT[col_stream];",
+            "            scalar_t *const block = &values[entries[row_shape * N_SHAPE + col_shape] * N_FIELDS * N_FIELDS];",
+            "#pragma omp atomic update",
+            "            block[bi * N_FIELDS + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];",
+            "        }",
+            "    }",
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
+def _scalar_crs_matrix_assembly_source(
+    system,
+    prefix,
+    local_prefix,
+    specialization,
+    dependencies,
+    basis_family,
+    geometry_family,
+    matrix_format_plan,
+):
+    matrix_formats = _matrix_format_values(matrix_format_plan)
+    if not {"crs", "bsr"}.intersection(matrix_formats):
+        return []
+    if not dependencies.direction:
+        return []
+    packed_crs_passes = _packed_crs_passes(matrix_format_plan)
+
+    rule = specialization.quadrature_rule
+    dim = system.dim
+    n_fields = len(system.fields)
+    n_shape = rule.n_shape
+    n_streams = n_fields * n_shape
+    n_qp = rule.n_qp
+    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
+    row_fields, column_fields = _compatible_matrix_field_indices_from_prefix(
+        prefix,
+        system,
+        rule.element_type,
+    )
+    row_streams = _compatible_matrix_stream_indices(row_fields, n_shape)
+    column_streams = _compatible_matrix_stream_indices(column_fields, n_shape)
+    shape_order = (
+        tuple(range(n_shape))
+        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        else tensor_product_cartesian_shape_order(dim, n_shape)
+        if tensor_product
+        else tuple(range(n_shape))
+    )
+    field_stream_order = streams_in_shape_order(tuple(range(n_shape)), 1, shape_order)
+    if n_fields != 1:
+        field_stream_order = streams_in_shape_order(
+            tuple(range(n_streams)),
+            n_fields,
+            shape_order,
+        )
+    field_shape_order = _single_field_shape_order(n_shape, n_fields, field_stream_order)
+    field_streams_in_tensor_order = _stream_to_tensor_order(field_stream_order)
+    row_tensor_streams = tuple(field_streams_in_tensor_order[stream] for stream in row_streams)
+    column_tensor_streams = tuple(field_streams_in_tensor_order[stream] for stream in column_streams)
+    field_element_lines, field_element_array = _single_field_element_alias_lines(
+        n_shape,
+        field_shape_order,
+        "    ",
+    )
+    coordinate_element_lines, coordinate_element_array = (
+        _coordinate_element_alias_lines(
+            dim,
+            n_shape,
+            rule.element_type,
+            "    ",
+        )
+        if tensor_product_geometry
+        else ([], "elements")
+    )
+    function_base = "%s_hessian_crs_isoparametric_mesh_soa" % prefix
+    impl = "%s_impl" % function_base
+    block = "%s_jacobian_action_block" % local_prefix
+    params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+        "const geom_t *const *const SFEM_RESTRICT points",
+    ]
+    params.extend(
+        "const scalar_t %s" % parameter for parameter in dependencies.parameters
+    )
+    state_dependencies = ResidualCodegenDependencies(
+        current=dependencies.current,
+        previous=dependencies.previous,
+        direction=False,
+        parameters=dependencies.parameters,
+        current_value=dependencies.current_value,
+        current_gradient=dependencies.current_gradient,
+        previous_value=dependencies.previous_value,
+        previous_gradient=dependencies.previous_gradient,
+        direction_value=False,
+        direction_gradient=False,
+        value_coefficients=dependencies.value_coefficients,
+        gradient_coefficients=dependencies.gradient_coefficients,
+    )
+    if state_dependencies.current:
+        params.append("const ptrdiff_t current_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % field.name
+            for field in system.fields
+        )
+    if state_dependencies.previous:
+        params.append("const ptrdiff_t previous_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
+            for field in system.fields
+        )
+    params.extend(
+        [
+            "const count_t *const SFEM_RESTRICT rowptr",
+            "const idx_t *const SFEM_RESTRICT colidx",
+            "scalar_t *const SFEM_RESTRICT values",
+        ]
+    )
+
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+    ]
+    if n_fields == 1:
+        lines.extend(_scalar_crs_matrix_scatter_lines(function_base, n_shape))
+    else:
+        lines.extend(
+            _compatible_crs_matrix_scatter_lines(
+                function_base,
+                n_shape,
+                n_fields,
+                row_streams,
+                column_streams,
+            )
+        )
+    if packed_crs_passes:
+        lines.extend(
+            _scalar_crs_packed_matrix_helpers(
+                function_base,
+                n_shape,
+                n_fields,
+                row_streams,
+                column_streams,
+            )
+        )
+    lines.extend(
+        [
+            "template <typename scalar_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for index, param in enumerate(params):
+        lines.append(
+            "        %s%s" % (param, "," if index + 1 < len(params) else "")
+        )
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_QP = %d;" % n_qp,
+            "    static constexpr int N_SHAPE = %d;" % n_shape,
+            "    static constexpr int N_FIELDS = %d;" % n_fields,
+            "    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;",
+            "    static constexpr int VECTOR_SIZE = 1;",
+            "    (void)nnodes;",
+        ]
+    )
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    lines.extend(field_element_lines)
+    lines.extend(coordinate_element_lines)
+    lines.extend(
+        [
+            "",
+            "    int invalid_matrix_graph = 0;",
+            "#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)",
+            "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            "        const ptrdiff_t evbegin = element;",
+            "        const int nelems = 1;",
+            "        idx_t ev[N_SHAPE];",
+            "        scalar_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
+            "        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];",
+            "        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];",
+            "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
+        ]
+    )
+    if state_dependencies.current:
+        lines.append("        scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
+    if state_dependencies.previous:
+        lines.append("        scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+    lines.extend(
+        [
+            "        scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
+            "        scalar_t block_output[N_STREAMS][VECTOR_SIZE];",
+            "        const geom_t *const coordinate_components[DIM] = {%s};"
+            % ", ".join("points[%d]" % d for d in range(dim)),
+            "",
+            "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+            "            const idx_t node = elements[shape][element];",
+            "            const idx_t coordinate_node = %s[shape][element];" % coordinate_element_array,
+            "            ev[shape] = node;",
+            "            for (int d = 0; d < DIM; ++d) {",
+            "                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);",
+            "            }",
+        ]
+    )
+    if state_dependencies.current:
+        if field_element_lines:
+            lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
+            for field_index, field in enumerate(system.fields):
+                lines.append(
+                    "            block_current[shape * N_FIELDS + %d][0] = %s[field_node * current_stride];"
+                    % (field_index, field.name)
+                )
+        else:
+            for field_index, field in enumerate(system.fields):
+                lines.append(
+                    "            block_current[%d * N_SHAPE + shape][0] = %s[node * current_stride];"
+                    % (field_index, field.name)
+                )
+    if state_dependencies.previous:
+        if field_element_lines and not state_dependencies.current:
+            lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
+        if field_element_lines:
+            for field_index, field in enumerate(system.fields):
+                lines.append(
+                    "            block_previous[shape * N_FIELDS + %d][0] = %s_old[field_node * previous_stride];"
+                    % (field_index, field.name)
+                )
+        else:
+            for field_index, field in enumerate(system.fields):
+                lines.append(
+                    "            block_previous[%d * N_SHAPE + shape][0] = %s_old[node * previous_stride];"
+                    % (field_index, field.name)
+                )
+    lines.extend(
+        [
+            "        }",
+            "",
+        ]
+    )
+    if tensor_product_geometry:
+        lines.extend(
+            tensor_product_gradient_isoparametric_geometry_lines(
+                dim=dim,
+                n_shape=n_shape,
+                n_qp=rule.n_qp,
+                local_prefix=local_prefix,
+                coordinate_streams="block_coordinates",
+                contiguous_coordinate_streams=True,
+                adjugate_target=lambda component, index: (
+                    "block_adjugate_data[%d][%s]" % (component, index)
+                ),
+                determinant_target=lambda index: (
+                    "block_determinant[%s]" % index
+                ),
+                adjugate_streams=tuple(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_determinant",
+                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
+                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+            )
+        )
+    else:
+        lines.extend(
+            [
+                "        scalar_t *block_adjugate_streams[DIM * DIM] = {%s};"
+                % ", ".join(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                "        for (int q = 0; q < N_QP; ++q) {",
+                "            const int lane = 0;",
+            ]
+        )
+        for i in range(dim):
+            for j in range(dim):
+                terms = [
+                    "block_coordinates[%d][lane] * %s[q * N_SHAPE + %d]"
+                    % (
+                        shape * dim + i,
+                        _mesh_reference_name(
+                            "isoparametric",
+                            sfem_simplex_grad_ref_name("grad_ref", j),
+                        ),
+                        shape,
+                    )
+                    for shape in range(n_shape)
+                ]
+                lines.append(
+                    "            const scalar_t J%d%d = %s;"
+                    % (i, j, " + ".join(terms))
+                )
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
+        lines.extend(["        }"])
+    if field_element_lines:
+        state_stream_args = {}
+        if state_dependencies.current:
+            state_stream_args["current"] = "block_current"
+        if state_dependencies.previous:
+            state_stream_args["previous"] = "block_previous"
+        direction_arg = "block_direction"
+        output_arg = "block_output"
+        block_function = "%s_contiguous" % block
+    else:
+        state_stream_args = {}
+        if state_dependencies.current:
+            current_lines, current_arg = _block_stream_argument(
+                "const scalar_t *",
+                "block_current_streams",
+                "block_current",
+                n_streams,
+                field_stream_order,
+                "        ",
+                mutable=False,
+            )
+            lines.extend(current_lines)
+            state_stream_args["current"] = current_arg
+        if state_dependencies.previous:
+            previous_lines, previous_arg = _block_stream_argument(
+                "const scalar_t *",
+                "block_previous_streams",
+                "block_previous",
+                n_streams,
+                field_stream_order,
+                "        ",
+                mutable=False,
+            )
+            lines.extend(previous_lines)
+            state_stream_args["previous"] = previous_arg
+        direction_lines, direction_arg = _block_stream_argument(
+            "const scalar_t *",
+            "block_direction_streams",
+            "block_direction",
+            n_streams,
+            field_stream_order,
+            "        ",
+            mutable=False,
+        )
+        output_lines, output_arg = _block_stream_argument(
+            "scalar_t *",
+            "block_output_streams",
+            "block_output",
+            n_streams,
+            field_stream_order,
+            "        ",
+            mutable=True,
+        )
+        lines.extend(direction_lines)
+        lines.extend(output_lines)
+        block_function = (
+            block
+            if direction_lines or output_lines
+            else "%s_contiguous" % block
+        )
+    lines.append(
+        "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
+        % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
+    )
+    call_args = [
+        "1",
+        "1",
+        "block_determinant",
+    ]
+    if dependencies.uses_adjugate:
+        call_args.append("block_adjugate")
+    if tensor_product:
+        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        if dependencies.uses_reference_gradients:
+            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+    else:
+        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        if dependencies.uses_reference_gradients:
+            call_args.extend(
+                _mesh_reference_name(
+                    "isoparametric",
+                    sfem_simplex_grad_ref_name("grad_ref", d),
+                )
+                for d in range(dim)
+            )
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+    if state_dependencies.current:
+        call_args.append(state_stream_args["current"])
+    if state_dependencies.previous:
+        call_args.append(state_stream_args["previous"])
+    call_args.append(direction_arg)
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.append(output_arg)
+    lines.extend([""])
+    lines.extend(_local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, "        "))
+    lines.extend(_local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, "        "))
+    lines.extend(
+        [
+            "        for (int entry = 0; entry < %d; ++entry) {"
+            % (len(row_streams) * len(column_streams)),
+            "            element_matrix[entry] = scalar_t(0);",
+            "        }",
+            "        for (int trial_local = 0; trial_local < %d; ++trial_local) {"
+            % len(column_streams),
+            "            const int trial = %s;"
+            % _local_index_mapping_expr("col_tensor_stream", column_tensor_streams, "trial_local"),
+            "            for (int stream = 0; stream < N_STREAMS; ++stream) {",
+            "                block_direction[stream][0] = scalar_t(0);",
+            "                block_output[stream][0] = scalar_t(0);",
+            "            }",
+            "            block_direction[trial][0] = scalar_t(1);",
+            "            %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block_function, ", ".join(call_args)),
+            "            for (int test_local = 0; test_local < %d; ++test_local) {"
+            % len(row_streams),
+            "                const int test = %s;"
+            % _local_index_mapping_expr("row_tensor_stream", row_tensor_streams, "test_local"),
+            "                element_matrix[test_local * %d + trial_local] = block_output[test][0];"
+            % len(column_streams),
+            "            }",
+            "        }",
+            "",
+            "        invalid_matrix_graph |= (%s_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);"
+            % function_base,
+            "    }",
+            "",
+            "    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;",
+            "}",
+            "",
+        ]
+    )
+    if packed_crs_passes:
+        packed_fill_impl = "%s_packed_fill_impl" % function_base
+        packed_discover_impl = "%s_packed_discover_impl" % function_base
+        packed_params = [
+            "const ptrdiff_t n_packs",
+            "const ptrdiff_t n_elements_per_pack",
+            "const ptrdiff_t nelements",
+            "const ptrdiff_t nnodes",
+            "const ptrdiff_t max_nodes_per_pack",
+            "uint16_t **const SFEM_RESTRICT elements",
+            "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
+            "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
+            "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
+            "const idx_t *const SFEM_RESTRICT ghost_idx",
+            "const geom_t *const *const SFEM_RESTRICT points",
+        ]
+        packed_params.extend(
+            "const scalar_t %s" % parameter for parameter in dependencies.parameters
+        )
+        if state_dependencies.current:
+            packed_params.append("const ptrdiff_t current_stride")
+            packed_params.extend(
+                "const scalar_t *const SFEM_RESTRICT %s" % field.name
+                for field in system.fields
+            )
+        if state_dependencies.previous:
+            packed_params.append("const ptrdiff_t previous_stride")
+            packed_params.extend(
+                "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
+                for field in system.fields
+            )
+        packed_fill_params = tuple(
+            packed_params
+            + [
+                "const count_t *const SFEM_RESTRICT packed_element_entries",
+                "scalar_t *const SFEM_RESTRICT values",
+            ]
+        )
+        packed_discover_params = tuple(
+            [
+                "const ptrdiff_t n_packs",
+                "const ptrdiff_t n_elements_per_pack",
+                "const ptrdiff_t nelements",
+                "const ptrdiff_t nnodes",
+                "const ptrdiff_t max_nodes_per_pack",
+                "uint16_t **const SFEM_RESTRICT elements",
+                "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
+                "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
+                "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
+                "const idx_t *const SFEM_RESTRICT ghost_idx",
+                "const count_t *const SFEM_RESTRICT rowptr",
+                "const idx_t *const SFEM_RESTRICT colidx",
+                "count_t *const SFEM_RESTRICT packed_element_entries",
+            ]
+        )
+        lines.extend(
+            [
+                "template <typename scalar_t>",
+                "%s int %s(" % (_function_qualifier(), packed_discover_impl),
+            ]
+        )
+        for index, param in enumerate(packed_discover_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(packed_discover_params) else ""))
+        lines.extend(
+            [
+                ") {",
+                "    static constexpr int N_SHAPE = %d;" % n_shape,
+                "    (void)nnodes;",
+                "    (void)max_nodes_per_pack;",
+                "    (void)n_shared_nodes;",
+                "    int invalid_matrix_graph = 0;",
+                "#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)",
+                "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+                "        const ptrdiff_t e_start = pack * n_elements_per_pack;",
+                "        const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+                "        for (ptrdiff_t element = e_start; element < e_end; ++element) {",
+                "            idx_t ev[N_SHAPE];",
+                "            for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                "                ev[shape] = %s_packed_global_node(elements[shape][element], pack, owned_nodes_ptr, ghost_ptr, ghost_idx);" % function_base,
+                "            }",
+                "            count_t *const entries = &packed_element_entries[element * N_SHAPE * N_SHAPE];",
+                "            invalid_matrix_graph |= (%s_discover_packed_crs_entries<scalar_t>(ev, rowptr, colidx, entries) != SFEM_SUCCESS);" % function_base,
+                "        }",
+                "    }",
+                "    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;",
+                "}",
+                "",
+                "template <typename scalar_t>",
+                "%s int %s(" % (_function_qualifier(), packed_fill_impl),
+            ]
+        )
+        for index, param in enumerate(packed_fill_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(packed_fill_params) else ""))
+        lines.extend(
+            [
+                ") {",
+                "    static constexpr int DIM = %d;" % dim,
+                "    static constexpr int N_QP = %d;" % n_qp,
+                "    static constexpr int N_SHAPE = %d;" % n_shape,
+                "    static constexpr int N_FIELDS = %d;" % n_fields,
+                "    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;",
+                "    static constexpr int VECTOR_SIZE = 1;",
+                "    (void)nnodes;",
+                "    (void)n_shared_nodes;",
+            ]
+        )
+        lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+        packed_coordinate_element_lines, packed_coordinate_element_array = (
+            _coordinate_element_alias_lines(
+                dim,
+                n_shape,
+                rule.element_type,
+                "    ",
+                pointer_type="uint16_t",
+            )
+            if tensor_product_geometry
+            else ([], "elements")
+        )
+        lines.extend(packed_coordinate_element_lines)
+        packed_field_element_lines, packed_field_element_array = _single_field_element_alias_lines(
+            n_shape,
+            field_shape_order,
+            "    ",
+            pointer_type="uint16_t",
+        )
+        lines.extend(packed_field_element_lines)
+        lines.extend(
+            [
+                "",
+                "#pragma omp parallel",
+                "    {",
+                "        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);",
+            ]
+        )
+        if state_dependencies.current:
+            lines.append(
+                "        scalar_t *const SFEM_RESTRICT pack_current = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)N_FIELDS * (size_t)max_nodes_per_pack);"
+            )
+        if state_dependencies.previous:
+            lines.append(
+                "        scalar_t *const SFEM_RESTRICT pack_previous = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)N_FIELDS * (size_t)max_nodes_per_pack);"
+            )
+        lines.extend(
+            [
+                "",
+                "#pragma omp for schedule(static)",
+                "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+                "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+                "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+                "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+                "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+                "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+                "            const geom_t *const coordinate_components[DIM] = {%s};"
+                % ", ".join("points[%d]" % d for d in range(dim)),
+                "            for (int d = 0; d < DIM; ++d) {",
+                "                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;",
+                "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
+                "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "                    pack_coordinate[k] = scalar_t(coordinate_component[owned_nodes_ptr[pack] + k]);",
+                "                }",
+                "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[ghosts[k]]);",
+                "                }",
+                "            }",
+            ]
+        )
+        if state_dependencies.current:
+            for field_index, field in enumerate(system.fields):
+                lines.extend(
+                    [
+                        "            {",
+                        "                scalar_t *const SFEM_RESTRICT pack_field = pack_current + %d * max_nodes_per_pack;" % field_index,
+                        "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                        "                    pack_field[k] = %s[(owned_nodes_ptr[pack] + k) * current_stride];" % field.name,
+                        "                }",
+                        "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                        "                    pack_field[n_contiguous + k] = %s[ghosts[k] * current_stride];" % field.name,
+                        "                }",
+                        "            }",
+                    ]
+                )
+        if state_dependencies.previous:
+            for field_index, field in enumerate(system.fields):
+                lines.extend(
+                    [
+                        "            {",
+                        "                scalar_t *const SFEM_RESTRICT pack_field = pack_previous + %d * max_nodes_per_pack;" % field_index,
+                        "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                        "                    pack_field[k] = %s_old[(owned_nodes_ptr[pack] + k) * previous_stride];" % field.name,
+                        "                }",
+                        "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                        "                    pack_field[n_contiguous + k] = %s_old[ghosts[k] * previous_stride];" % field.name,
+                        "                }",
+                        "            }",
+                    ]
+                )
+        lines.extend(
+            [
+                "",
+                "            for (ptrdiff_t element = e_start; element < e_end; ++element) {",
+                "                const int nelems = 1;",
+                "                scalar_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
+                "                scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];",
+                "                scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];",
+                "                scalar_t block_determinant[N_QP * VECTOR_SIZE];",
+            ]
+        )
+        if state_dependencies.current:
+            lines.append("                scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
+        if state_dependencies.previous:
+            lines.append("                scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+        lines.extend(
+            [
+                "                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
+                "                scalar_t block_output[N_STREAMS][VECTOR_SIZE];",
+                "",
+                "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                "                    const uint16_t packed_node = elements[shape][element];",
+                "                    const uint16_t coordinate_packed_node = %s[shape][element];" % packed_coordinate_element_array,
+                "                    for (int d = 0; d < DIM; ++d) {",
+                "                        block_coordinates[shape * DIM + d][0] = pack_coordinates[d * max_nodes_per_pack + coordinate_packed_node];",
+                "                }",
+            ]
+        )
+        if state_dependencies.current:
+            if packed_field_element_lines:
+                lines.append("                    const uint16_t field_packed_node = %s[shape][element];" % packed_field_element_array)
+                for field_index, field in enumerate(system.fields):
+                    lines.append(
+                        "                    block_current[shape * N_FIELDS + %d][0] = pack_current[%d * max_nodes_per_pack + field_packed_node];"
+                        % (field_index, field_index)
+                    )
+            else:
+                for field_index, field in enumerate(system.fields):
+                    lines.append(
+                        "                    block_current[%d * N_SHAPE + shape][0] = pack_current[%d * max_nodes_per_pack + packed_node];"
+                        % (field_index, field_index)
+                    )
+        if state_dependencies.previous:
+            if packed_field_element_lines and not state_dependencies.current:
+                lines.append("                    const uint16_t field_packed_node = %s[shape][element];" % packed_field_element_array)
+            if packed_field_element_lines:
+                for field_index, field in enumerate(system.fields):
+                    lines.append(
+                        "                    block_previous[shape * N_FIELDS + %d][0] = pack_previous[%d * max_nodes_per_pack + field_packed_node];"
+                        % (field_index, field_index)
+                    )
+            else:
+                for field_index, field in enumerate(system.fields):
+                    lines.append(
+                        "                    block_previous[%d * N_SHAPE + shape][0] = pack_previous[%d * max_nodes_per_pack + packed_node];"
+                        % (field_index, field_index)
+                    )
+        lines.extend(["                }", ""])
+        if tensor_product_geometry:
+            lines.extend(
+                tensor_product_gradient_isoparametric_geometry_lines(
+                    dim=dim,
+                    n_shape=n_shape,
+                    n_qp=rule.n_qp,
+                    local_prefix=local_prefix,
+                    coordinate_streams="block_coordinates",
+                    contiguous_coordinate_streams=True,
+                    adjugate_target=lambda component, index: (
+                        "block_adjugate_data[%d][%s]" % (component, index)
+                    ),
+                    determinant_target=lambda index: (
+                        "block_determinant[%s]" % index
+                    ),
+                    adjugate_streams=tuple(
+                        "block_adjugate_data[%d]" % component
+                        for component in range(dim * dim)
+                    ),
+                    determinant_stream="block_determinant",
+                    shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
+                    grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+                )
+            )
+        else:
+            lines.extend(
+                [
+                    "            scalar_t *block_adjugate_streams[DIM * DIM] = {%s};"
+                    % ", ".join(
+                        "block_adjugate_data[%d]" % component
+                        for component in range(dim * dim)
+                    ),
+                    "            for (int q = 0; q < N_QP; ++q) {",
+                    "                const int lane = 0;",
+                ]
+            )
+            for i in range(dim):
+                for j in range(dim):
+                    terms = [
+                        "block_coordinates[%d][lane] * %s[q * N_SHAPE + %d]"
+                        % (
+                            shape * dim + i,
+                            _mesh_reference_name(
+                                "isoparametric",
+                                sfem_simplex_grad_ref_name("grad_ref", j),
+                            ),
+                            shape,
+                        )
+                        for shape in range(n_shape)
+                    ]
+                    lines.append(
+                        "                const scalar_t J%d%d = %s;"
+                        % (i, j, " + ".join(terms))
+                    )
+            lines.extend(_isoparametric_geometry_assignment_lines(dim, "                "))
+            lines.extend(["            }"])
+        if packed_field_element_lines:
+            if state_dependencies.current:
+                state_stream_args["current"] = "block_current"
+            if state_dependencies.previous:
+                state_stream_args["previous"] = "block_previous"
+            direction_arg = "block_direction"
+            output_arg = "block_output"
+        else:
+            if state_dependencies.current:
+                current_lines, current_arg = _block_stream_argument(
+                    "const scalar_t *",
+                    "block_current_streams",
+                    "block_current",
+                    n_streams,
+                    field_stream_order,
+                    "            ",
+                    mutable=False,
+                )
+                lines.extend(current_lines)
+                state_stream_args["current"] = current_arg
+            if state_dependencies.previous:
+                previous_lines, previous_arg = _block_stream_argument(
+                    "const scalar_t *",
+                    "block_previous_streams",
+                    "block_previous",
+                    n_streams,
+                    field_stream_order,
+                    "            ",
+                    mutable=False,
+                )
+                lines.extend(previous_lines)
+                state_stream_args["previous"] = previous_arg
+            direction_lines, direction_arg = _block_stream_argument(
+                "const scalar_t *",
+                "block_direction_streams",
+                "block_direction",
+                n_streams,
+                field_stream_order,
+                "            ",
+                mutable=False,
+            )
+            output_lines, output_arg = _block_stream_argument(
+                "scalar_t *",
+                "block_output_streams",
+                "block_output",
+                n_streams,
+                field_stream_order,
+                "            ",
+                mutable=True,
+            )
+            lines.extend(direction_lines)
+            lines.extend(output_lines)
+        lines.append(
+            "            const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
+            % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
+        )
+        packed_call_args = list(call_args)
+        if state_dependencies.current:
+            current_index = packed_call_args.index(state_stream_args["current"])
+            packed_call_args[current_index] = state_stream_args["current"]
+        if state_dependencies.previous:
+            previous_index = packed_call_args.index(state_stream_args["previous"])
+            packed_call_args[previous_index] = state_stream_args["previous"]
+        packed_call_args[packed_call_args.index(direction_arg)] = direction_arg
+        packed_call_args[-1] = output_arg
+        lines.extend([""])
+        lines.extend(_local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, "            "))
+        lines.extend(_local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, "            "))
+        lines.extend(
+            [
+                "            for (int entry = 0; entry < %d; ++entry) {"
+                % (len(row_streams) * len(column_streams)),
+                "                element_matrix[entry] = scalar_t(0);",
+                "            }",
+                "            for (int trial_local = 0; trial_local < %d; ++trial_local) {"
+                % len(column_streams),
+                "                const int trial = %s;"
+                % _local_index_mapping_expr("col_tensor_stream", column_tensor_streams, "trial_local"),
+                "                for (int stream = 0; stream < N_STREAMS; ++stream) {",
+                "                    block_direction[stream][0] = scalar_t(0);",
+                "                    block_output[stream][0] = scalar_t(0);",
+                "                }",
+                "                block_direction[trial][0] = scalar_t(1);",
+                "                %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+                % (block_function, ", ".join(packed_call_args)),
+                "                for (int test_local = 0; test_local < %d; ++test_local) {"
+                % len(row_streams),
+                "                    const int test = %s;"
+                % _local_index_mapping_expr("row_tensor_stream", row_tensor_streams, "test_local"),
+                "                    element_matrix[test_local * %d + trial_local] = block_output[test][0];"
+                % len(column_streams),
+                "                }",
+                "            }",
+                "",
+                "            const count_t *const entries = &packed_element_entries[element * N_SHAPE * N_SHAPE];",
+                "            %s_scatter_packed_crs_entries(element_matrix, entries, values);" % function_base,
+                "            }",
+                "        }",
+            ]
+        )
+        lines.extend(
+            [
+                "    }",
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("scalar_t", scalar_type) for param in params
+        ]
+        if "crs" in matrix_formats:
+            lines.append('extern "C" int %s%s(' % (function_base, suffix))
+            for index, param in enumerate(typed_params):
+                lines.append(
+                    "        %s%s" % (param, "," if index + 1 < len(typed_params) else "")
+                )
+            call_args = ["nelements", "nnodes", "elements", "points"]
+            call_args.extend(map(str, dependencies.parameters))
+            if state_dependencies.current:
+                call_args.append("current_stride")
+                call_args.extend(field.name for field in system.fields)
+            if state_dependencies.previous:
+                call_args.append("previous_stride")
+                call_args.extend("%s_old" % field.name for field in system.fields)
+            call_args.extend(("rowptr", "colidx", "values"))
+            lines.extend(
+                [
+                    ") {",
+                    "    return sfem::codegen::%s<%s>(%s);"
+                    % (impl, scalar_type, ", ".join(call_args)),
+                    "}",
+                    "",
+                ]
+            )
+        if "bsr" in matrix_formats:
+            bsr_name = function_base.replace("_hessian_crs_", "_hessian_bsr_")
+            lines.append('extern "C" int %s%s(' % (bsr_name, suffix))
+            for index, param in enumerate(typed_params):
+                lines.append(
+                    "        %s%s" % (param, "," if index + 1 < len(typed_params) else "")
+                )
+            call_args = ["nelements", "nnodes", "elements", "points"]
+            call_args.extend(map(str, dependencies.parameters))
+            if state_dependencies.current:
+                call_args.append("current_stride")
+                call_args.extend(field.name for field in system.fields)
+            if state_dependencies.previous:
+                call_args.append("previous_stride")
+                call_args.extend("%s_old" % field.name for field in system.fields)
+            call_args.extend(("rowptr", "colidx", "values"))
+            lines.extend(
+                [
+                    ") {",
+                    "    return sfem::codegen::%s<%s>(%s);"
+                    % (impl, scalar_type, ", ".join(call_args)),
+                    "}",
+                    "",
+                ]
+            )
+        if "crs" in matrix_formats and "one_pass" in packed_crs_passes:
+            one_pass_name = function_base.replace(
+                "_hessian_crs_",
+                "_hessian_crs_packed_one_pass_",
+            )
+            typed_packed_fill_params = [
+                param.replace("scalar_t", scalar_type) for param in packed_fill_params
+            ]
+            lines.append('extern "C" int %s%s(' % (one_pass_name, suffix))
+            for index, param in enumerate(typed_packed_fill_params):
+                lines.append(
+                    "        %s%s" % (param, "," if index + 1 < len(typed_packed_fill_params) else "")
+                )
+            call_args = [
+                "n_packs",
+                "n_elements_per_pack",
+                "nelements",
+                "nnodes",
+                "max_nodes_per_pack",
+                "elements",
+                "owned_nodes_ptr",
+                "n_shared_nodes",
+                "ghost_ptr",
+                "ghost_idx",
+                "points",
+            ]
+            call_args.extend(map(str, dependencies.parameters))
+            if state_dependencies.current:
+                call_args.append("current_stride")
+                call_args.extend(field.name for field in system.fields)
+            if state_dependencies.previous:
+                call_args.append("previous_stride")
+                call_args.extend("%s_old" % field.name for field in system.fields)
+            call_args.extend(("packed_element_entries", "values"))
+            lines.extend(
+                [
+                    ") {",
+                    "    return sfem::codegen::%s<%s>(%s);"
+                    % (packed_fill_impl, scalar_type, ", ".join(call_args)),
+                    "}",
+                    "",
+                ]
+            )
+        if "crs" in matrix_formats and "two_pass" in packed_crs_passes:
+            two_pass_name = function_base.replace(
+                "_hessian_crs_",
+                "_hessian_crs_packed_two_pass_",
+            )
+            typed_two_pass_params = [
+                param.replace("scalar_t", scalar_type)
+                for param in (
+                    packed_params
+                    + [
+                        "const count_t *const SFEM_RESTRICT rowptr",
+                        "const idx_t *const SFEM_RESTRICT colidx",
+                        "count_t *const SFEM_RESTRICT packed_element_entries",
+                        "scalar_t *const SFEM_RESTRICT values",
+                    ]
+                )
+            ]
+            lines.append('extern "C" int %s%s(' % (two_pass_name, suffix))
+            for index, param in enumerate(typed_two_pass_params):
+                lines.append(
+                    "        %s%s" % (param, "," if index + 1 < len(typed_two_pass_params) else "")
+                )
+            common_args = [
+                "n_packs",
+                "n_elements_per_pack",
+                "nelements",
+                "nnodes",
+                "max_nodes_per_pack",
+                "elements",
+                "owned_nodes_ptr",
+                "n_shared_nodes",
+                "ghost_ptr",
+                "ghost_idx",
+            ]
+            fill_args = common_args + ["points"]
+            fill_args.extend(map(str, dependencies.parameters))
+            if state_dependencies.current:
+                fill_args.append("current_stride")
+                fill_args.extend(field.name for field in system.fields)
+            if state_dependencies.previous:
+                fill_args.append("previous_stride")
+                fill_args.extend("%s_old" % field.name for field in system.fields)
+            fill_args.extend(("packed_element_entries", "values"))
+            lines.extend(
+                [
+                    ") {",
+                    "    const int graph_status = sfem::codegen::%s<%s>(%s);"
+                    % (
+                        packed_discover_impl,
+                        scalar_type,
+                        ", ".join(common_args + ["rowptr", "colidx", "packed_element_entries"]),
+                    ),
+                    "    if (graph_status != SFEM_SUCCESS) return graph_status;",
+                    "    return sfem::codegen::%s<%s>(%s);"
+                    % (packed_fill_impl, scalar_type, ", ".join(fill_args)),
+                    "}",
+                    "",
+                ]
+            )
+    return lines
+
+
+def _scalar_coo_triplet_matrix_scatter_lines(function_base, n_shape, n_fields=1):
+    if n_fields == 1:
+        return [
+            "template <typename scalar_t>",
+            "static SFEM_INLINE void %s_scatter_coo_triplets(" % function_base,
+            "        const idx_t *const SFEM_RESTRICT ev,",
+            "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+            "        const ptrdiff_t element,",
+            "        idx_t *const SFEM_RESTRICT rows,",
+            "        idx_t *const SFEM_RESTRICT cols,",
+            "        scalar_t *const SFEM_RESTRICT values) {",
+            "    static constexpr int N_SHAPE = %d;" % n_shape,
+            "    const ptrdiff_t element_offset = element * N_SHAPE * N_SHAPE;",
+            "    for (int i = 0; i < N_SHAPE; ++i) {",
+            "        const idx_t global_row = ev[i];",
+            "        for (int j = 0; j < N_SHAPE; ++j) {",
+            "            const ptrdiff_t entry = element_offset + i * N_SHAPE + j;",
+            "            rows[entry] = global_row;",
+            "            cols[entry] = ev[j];",
+            "            values[entry] = element_matrix[i * N_SHAPE + j];",
+            "        }",
+            "    }",
+            "}",
+            "",
+        ]
+    return [
+        "template <typename scalar_t>",
+        "static SFEM_INLINE void %s_scatter_coo_triplets(" % function_base,
+        "        const idx_t *const SFEM_RESTRICT ev,",
+        "        const ptrdiff_t out_stride,",
+        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+        "        const ptrdiff_t element,",
+        "        idx_t *const SFEM_RESTRICT rows,",
+        "        idx_t *const SFEM_RESTRICT cols,",
+        "        scalar_t *const SFEM_RESTRICT values) {",
+        "    static constexpr int N_SHAPE = %d;" % n_shape,
+        "    static constexpr int N_FIELDS = %d;" % n_fields,
+        "    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;",
+        "    const ptrdiff_t element_offset = element * N_STREAMS * N_STREAMS;",
+        "    for (int row_field = 0; row_field < N_FIELDS; ++row_field) {",
+        "        for (int row_shape = 0; row_shape < N_SHAPE; ++row_shape) {",
+        "            const int row_stream = row_field * N_SHAPE + row_shape;",
+        "            const idx_t global_row = ev[row_shape] * out_stride + row_field;",
+        "            for (int col_field = 0; col_field < N_FIELDS; ++col_field) {",
+        "                for (int col_shape = 0; col_shape < N_SHAPE; ++col_shape) {",
+        "                    const int col_stream = col_field * N_SHAPE + col_shape;",
+        "                    const ptrdiff_t entry = element_offset + row_stream * N_STREAMS + col_stream;",
+        "                    rows[entry] = global_row;",
+        "                    cols[entry] = ev[col_shape] * out_stride + col_field;",
+        "                    values[entry] = element_matrix[row_stream * N_STREAMS + col_stream];",
+        "                }",
+        "            }",
+        "        }",
+        "    }",
+        "}",
+        "",
+    ]
+
+
+def _scalar_coo_triplet_matrix_assembly_source(
+    system,
+    prefix,
+    local_prefix,
+    specialization,
+    dependencies,
+    basis_family,
+    geometry_family,
+    matrix_format_plan,
+):
+    matrix_formats = _matrix_format_values(matrix_format_plan)
+    if "coo" not in matrix_formats:
+        return []
+    if not dependencies.direction:
+        return []
+
+    rule = specialization.quadrature_rule
+    dim = system.dim
+    n_fields = len(system.fields)
+    n_shape = rule.n_shape
+    n_streams = n_fields * n_shape
+    n_qp = rule.n_qp
+    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
+    shape_order = (
+        tuple(range(n_shape))
+        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        else tensor_product_cartesian_shape_order(dim, n_shape)
+        if tensor_product
+        else tuple(range(n_shape))
+    )
+    field_stream_order = streams_in_shape_order(tuple(range(n_shape)), 1, shape_order)
+    if n_fields != 1:
+        field_stream_order = streams_in_shape_order(
+            tuple(range(n_streams)),
+            n_fields,
+            shape_order,
+        )
+    field_shape_order = _single_field_shape_order(n_shape, n_fields, field_stream_order)
+    field_streams_in_tensor_order = _stream_to_tensor_order(field_stream_order)
+    function_base = "%s_hessian_coo_triplet_isoparametric_mesh_soa" % prefix
+    impl = "%s_impl" % function_base
+    block = "%s_jacobian_action_block" % local_prefix
+    params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+        "const geom_t *const *const SFEM_RESTRICT points",
+    ]
+    params.extend(
+        "const scalar_t %s" % parameter for parameter in dependencies.parameters
+    )
+    state_dependencies = ResidualCodegenDependencies(
+        current=dependencies.current,
+        previous=dependencies.previous,
+        direction=False,
+        parameters=dependencies.parameters,
+        current_value=dependencies.current_value,
+        current_gradient=dependencies.current_gradient,
+        previous_value=dependencies.previous_value,
+        previous_gradient=dependencies.previous_gradient,
+        direction_value=False,
+        direction_gradient=False,
+        value_coefficients=dependencies.value_coefficients,
+        gradient_coefficients=dependencies.gradient_coefficients,
+    )
+    if state_dependencies.current:
+        params.append("const ptrdiff_t current_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % field.name
+            for field in system.fields
+        )
+    if state_dependencies.previous:
+        params.append("const ptrdiff_t previous_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
+            for field in system.fields
+        )
+    if n_fields != 1:
+        params.append("const ptrdiff_t out_stride")
+    params.extend(
+        [
+            "idx_t *const SFEM_RESTRICT rows",
+            "idx_t *const SFEM_RESTRICT cols",
+            "scalar_t *const SFEM_RESTRICT values",
+        ]
+    )
+
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+    ]
+    lines.extend(_scalar_coo_triplet_matrix_scatter_lines(function_base, n_shape, n_fields))
+    lines.extend(
+        [
+            "template <typename scalar_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for index, param in enumerate(params):
+        lines.append(
+            "        %s%s" % (param, "," if index + 1 < len(params) else "")
+        )
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_QP = %d;" % n_qp,
+            "    static constexpr int N_SHAPE = %d;" % n_shape,
+            "    static constexpr int N_FIELDS = %d;" % n_fields,
+            "    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;",
+            "    static constexpr int VECTOR_SIZE = 1;",
+            "    (void)nnodes;",
+        ]
+    )
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    field_element_lines, field_element_array = _single_field_element_alias_lines(
+        n_shape,
+        field_shape_order,
+        "    ",
+    )
+    lines.extend(field_element_lines)
+    coordinate_element_lines, coordinate_element_array = (
+        _coordinate_element_alias_lines(
+            dim,
+            n_shape,
+            rule.element_type,
+            "    ",
+        )
+        if tensor_product_geometry
+        else ([], "elements")
+    )
+    lines.extend(coordinate_element_lines)
+    lines.extend(
+        [
+            "",
+            "#pragma omp parallel for schedule(static)",
+            "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            "        const ptrdiff_t evbegin = element;",
+            "        const int nelems = 1;",
+            "        idx_t ev[N_SHAPE];",
+            "        scalar_t element_matrix[N_STREAMS * N_STREAMS];",
+            "        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];",
+            "        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];",
+            "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
+        ]
+    )
+    if state_dependencies.current:
+        lines.append("        scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
+    if state_dependencies.previous:
+        lines.append("        scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+    lines.extend(
+        [
+            "        scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
+            "        scalar_t block_output[N_STREAMS][VECTOR_SIZE];",
+            "        const geom_t *const coordinate_components[DIM] = {%s};"
+            % ", ".join("points[%d]" % d for d in range(dim)),
+            "",
+            "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+            "            const idx_t node = elements[shape][element];",
+            "            const idx_t coordinate_node = %s[shape][element];" % coordinate_element_array,
+            "            ev[shape] = node;",
+            "            for (int d = 0; d < DIM; ++d) {",
+            "                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);",
+            "            }",
+        ]
+    )
+    if state_dependencies.current:
+        if field_element_lines:
+            lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
+            for field_index, field in enumerate(system.fields):
+                lines.append(
+                    "            block_current[shape * N_FIELDS + %d][0] = %s[field_node * current_stride];"
+                    % (field_index, field.name)
+                )
+        else:
+            for field_index, field in enumerate(system.fields):
+                lines.append(
+                    "            block_current[%d * N_SHAPE + shape][0] = %s[node * current_stride];"
+                    % (field_index, field.name)
+                )
+    if state_dependencies.previous:
+        if field_element_lines and not state_dependencies.current:
+            lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
+        if field_element_lines:
+            for field_index, field in enumerate(system.fields):
+                lines.append(
+                    "            block_previous[shape * N_FIELDS + %d][0] = %s_old[field_node * previous_stride];"
+                    % (field_index, field.name)
+                )
+        else:
+            for field_index, field in enumerate(system.fields):
+                lines.append(
+                    "            block_previous[%d * N_SHAPE + shape][0] = %s_old[node * previous_stride];"
+                    % (field_index, field.name)
+                )
+    lines.extend(
+        [
+            "        }",
+            "",
+        ]
+    )
+    if tensor_product_geometry:
+        lines.extend(
+            tensor_product_gradient_isoparametric_geometry_lines(
+                dim=dim,
+                n_shape=n_shape,
+                n_qp=rule.n_qp,
+                local_prefix=local_prefix,
+                coordinate_streams="block_coordinates",
+                contiguous_coordinate_streams=True,
+                adjugate_target=lambda component, index: (
+                    "block_adjugate_data[%d][%s]" % (component, index)
+                ),
+                determinant_target=lambda index: (
+                    "block_determinant[%s]" % index
+                ),
+                adjugate_streams=tuple(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_determinant",
+                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
+                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+            )
+        )
+    else:
+        lines.extend(
+            [
+                "        scalar_t *block_adjugate_streams[DIM * DIM] = {%s};"
+                % ", ".join(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                "        for (int q = 0; q < N_QP; ++q) {",
+                "            const int lane = 0;",
+            ]
+        )
+        for i in range(dim):
+            for j in range(dim):
+                terms = [
+                    "block_coordinates[%d][lane] * %s[q * N_SHAPE + %d]"
+                    % (
+                        shape * dim + i,
+                        _mesh_reference_name(
+                            "isoparametric",
+                            sfem_simplex_grad_ref_name("grad_ref", j),
+                        ),
+                        shape,
+                    )
+                    for shape in range(n_shape)
+                ]
+                lines.append(
+                    "            const scalar_t J%d%d = %s;"
+                    % (i, j, " + ".join(terms))
+                )
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
+        lines.extend(["        }"])
+    if field_element_lines:
+        state_stream_args = {}
+        if state_dependencies.current:
+            state_stream_args["current"] = "block_current"
+        if state_dependencies.previous:
+            state_stream_args["previous"] = "block_previous"
+        direction_arg = "block_direction"
+        output_arg = "block_output"
+        block_function = "%s_contiguous" % block
+    else:
+        state_stream_args = {}
+        if state_dependencies.current:
+            current_lines, current_arg = _block_stream_argument(
+                "const scalar_t *",
+                "block_current_streams",
+                "block_current",
+                n_streams,
+                field_stream_order,
+                "        ",
+                mutable=False,
+            )
+            lines.extend(current_lines)
+            state_stream_args["current"] = current_arg
+        if state_dependencies.previous:
+            previous_lines, previous_arg = _block_stream_argument(
+                "const scalar_t *",
+                "block_previous_streams",
+                "block_previous",
+                n_streams,
+                field_stream_order,
+                "        ",
+                mutable=False,
+            )
+            lines.extend(previous_lines)
+            state_stream_args["previous"] = previous_arg
+        direction_lines, direction_arg = _block_stream_argument(
+            "const scalar_t *",
+            "block_direction_streams",
+            "block_direction",
+            n_streams,
+            field_stream_order,
+            "        ",
+            mutable=False,
+        )
+        output_lines, output_arg = _block_stream_argument(
+            "scalar_t *",
+            "block_output_streams",
+            "block_output",
+            n_streams,
+            field_stream_order,
+            "        ",
+            mutable=True,
+        )
+        lines.extend(direction_lines)
+        lines.extend(output_lines)
+        block_function = (
+            block
+            if direction_lines or output_lines
+            else "%s_contiguous" % block
+        )
+    lines.append(
+        "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
+        % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
+    )
+    call_args = [
+        "1",
+        "1",
+        "block_determinant",
+    ]
+    if dependencies.uses_adjugate:
+        call_args.append("block_adjugate")
+    if tensor_product:
+        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        if dependencies.uses_reference_gradients:
+            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+    else:
+        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        if dependencies.uses_reference_gradients:
+            call_args.extend(
+                _mesh_reference_name(
+                    "isoparametric",
+                    sfem_simplex_grad_ref_name("grad_ref", d),
+                )
+                for d in range(dim)
+            )
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+    if state_dependencies.current:
+        call_args.append(state_stream_args["current"])
+    if state_dependencies.previous:
+        call_args.append(state_stream_args["previous"])
+    call_args.append(direction_arg)
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.append(output_arg)
+    lines.extend(
+        [
+            "",
+            "        for (int entry = 0; entry < N_STREAMS * N_STREAMS; ++entry) {",
+            "            element_matrix[entry] = scalar_t(0);",
+            "        }",
+            "        static constexpr int TENSOR_STREAMS[N_STREAMS] = {%s};"
+            % ", ".join(str(stream) for stream in field_streams_in_tensor_order),
+            "        for (int trial = 0; trial < N_STREAMS; ++trial) {",
+            "            const int tensor_trial = TENSOR_STREAMS[trial];",
+            "            for (int stream = 0; stream < N_STREAMS; ++stream) {",
+            "                block_direction[stream][0] = scalar_t(0);",
+            "                block_output[stream][0] = scalar_t(0);",
+            "            }",
+            "            block_direction[tensor_trial][0] = scalar_t(1);",
+            "            %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block_function, ", ".join(call_args)),
+            "            for (int test = 0; test < N_STREAMS; ++test) {",
+            "                const int tensor_test = TENSOR_STREAMS[test];",
+            "                element_matrix[test * N_STREAMS + trial] = block_output[tensor_test][0];",
+            "            }",
+            "        }",
+            "",
+            (
+                "        %s_scatter_coo_triplets(ev, element_matrix, element, rows, cols, values);"
+                % function_base
+                if n_fields == 1
+                else "        %s_scatter_coo_triplets(ev, out_stride, element_matrix, element, rows, cols, values);"
+                % function_base
+            ),
+            "    }",
+            "",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("scalar_t", scalar_type) for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function_base, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append(
+                "        %s%s" % (param, "," if index + 1 < len(typed_params) else "")
+            )
+        call_args = ["nelements", "nnodes", "elements", "points"]
+        call_args.extend(map(str, dependencies.parameters))
+        if state_dependencies.current:
+            call_args.append("current_stride")
+            call_args.extend(field.name for field in system.fields)
+        if state_dependencies.previous:
+            call_args.append("previous_stride")
+            call_args.extend("%s_old" % field.name for field in system.fields)
+        if n_fields != 1:
+            call_args.append("out_stride")
+        call_args.extend(("rows", "cols", "values"))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _scalar_dia_matrix_scatter_lines(function_base, n_shape):
+    return [
+        "template <typename scalar_t>",
+        "static SFEM_INLINE int %s_scatter_dia(" % function_base,
+        "        const idx_t *const SFEM_RESTRICT ev,",
+        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+        "        const ptrdiff_t nnodes,",
+        "        const int *const SFEM_RESTRICT diag_offsets,",
+        "        const ptrdiff_t ndiag,",
+        "        scalar_t *const SFEM_RESTRICT values) {",
+        "    static constexpr int N_SHAPE = %d;" % n_shape,
+        "    ptrdiff_t diagonals[N_SHAPE * N_SHAPE];",
+        "    bool valid_diagonal_offsets = true;",
+        "    for (int i = 0; i < N_SHAPE; ++i) {",
+        "        for (int j = 0; j < N_SHAPE; ++j) {",
+        "            const int offset = (int)(ev[j] - ev[i]);",
+        "            ptrdiff_t diagonal = 0;",
+        "            while (diagonal < ndiag && diag_offsets[diagonal] != offset) ++diagonal;",
+        "            if (diagonal == ndiag) {",
+        "                if (valid_diagonal_offsets) {",
+        "                    std::fprintf(stderr, \"%s_scatter_dia missing diagonal offset %%d\\n\", offset);"
+        % function_base,
+        "                }",
+        "                diagonals[i * N_SHAPE + j] = 0;",
+        "                valid_diagonal_offsets = false;",
+        "            } else {",
+        "                diagonals[i * N_SHAPE + j] = diagonal;",
+        "            }",
+        "        }",
+        "    }",
+        "    if (!valid_diagonal_offsets) return SFEM_FAILURE;",
+        "    for (int i = 0; i < N_SHAPE; ++i) {",
+        "        for (int j = 0; j < N_SHAPE; ++j) {",
+        "            const ptrdiff_t diagonal = diagonals[i * N_SHAPE + j];",
+        "#pragma omp atomic update",
+        "            values[diagonal * nnodes + ev[i]] += element_matrix[i * N_SHAPE + j];",
+        "        }",
+        "    }",
+        "    return SFEM_SUCCESS;",
+        "}",
+        "",
+    ]
+
+
+def _scalar_dia_matrix_assembly_source(
+    system,
+    prefix,
+    local_prefix,
+    specialization,
+    dependencies,
+    basis_family,
+    geometry_family,
+    matrix_format_plan,
+):
+    matrix_formats = _matrix_format_values(matrix_format_plan)
+    if "dia" not in matrix_formats:
+        return []
+    if len(system.fields) != 1:
+        return []
+    if dependencies.current or dependencies.previous or not dependencies.direction:
+        return []
+
+    rule = specialization.quadrature_rule
+    dim = system.dim
+    n_shape = rule.n_shape
+    n_qp = rule.n_qp
+    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
+    shape_order = (
+        tuple(range(n_shape))
+        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        else tensor_product_cartesian_shape_order(dim, n_shape)
+        if tensor_product
+        else tuple(range(n_shape))
+    )
+    field_stream_order = streams_in_shape_order(tuple(range(n_shape)), 1, shape_order)
+    stream_to_tensor_order = _stream_to_tensor_order(field_stream_order)
+    use_contiguous_field_streams = not _identity_order(field_stream_order)
+    function_base = "%s_hessian_dia_isoparametric_mesh_soa" % prefix
+    impl = "%s_impl" % function_base
+    block = "%s_jacobian_action_block" % local_prefix
+    params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+        "const geom_t *const *const SFEM_RESTRICT points",
+    ]
+    params.extend(
+        "const scalar_t %s" % parameter for parameter in dependencies.parameters
+    )
+    params.extend(
+        [
+            "const int *const SFEM_RESTRICT diag_offsets",
+            "const ptrdiff_t ndiag",
+            "scalar_t *const SFEM_RESTRICT values",
+        ]
+    )
+
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+    ]
+    lines.extend(_scalar_dia_matrix_scatter_lines(function_base, n_shape))
+    lines.extend(
+        [
+            "template <typename scalar_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for index, param in enumerate(params):
+        lines.append(
+            "        %s%s" % (param, "," if index + 1 < len(params) else "")
+        )
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_QP = %d;" % n_qp,
+            "    static constexpr int N_SHAPE = %d;" % n_shape,
+            "    static constexpr int VECTOR_SIZE = 1;",
+            "    (void)nnodes;",
+        ]
+    )
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    coordinate_element_lines, coordinate_element_array = (
+        _coordinate_element_alias_lines(
+            dim,
+            n_shape,
+            rule.element_type,
+            "    ",
+        )
+        if tensor_product_geometry
+        else ([], "elements")
+    )
+    lines.extend(coordinate_element_lines)
+    lines.extend(
+        [
+            "",
+            "    int invalid_matrix_graph = 0;",
+            "#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)",
+            "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
+            "        const ptrdiff_t evbegin = element;",
+            "        const int nelems = 1;",
+            "        idx_t ev[N_SHAPE];",
+            "        scalar_t element_matrix[N_SHAPE * N_SHAPE];",
+            "        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];",
+            "        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];",
+            "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
+            "        scalar_t block_direction[N_SHAPE][VECTOR_SIZE];",
+            "        scalar_t block_output[N_SHAPE][VECTOR_SIZE];",
+            "        const geom_t *const coordinate_components[DIM] = {%s};"
+            % ", ".join("points[%d]" % d for d in range(dim)),
+            "",
+            "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+            "            const idx_t node = elements[shape][element];",
+            "            const idx_t coordinate_node = %s[shape][element];" % coordinate_element_array,
+            "            ev[shape] = node;",
+            "            for (int d = 0; d < DIM; ++d) {",
+            "                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);",
+            "            }",
+            "        }",
+            "",
+        ]
+    )
+    if tensor_product_geometry:
+        lines.extend(
+            tensor_product_gradient_isoparametric_geometry_lines(
+                dim=dim,
+                n_shape=n_shape,
+                n_qp=rule.n_qp,
+                local_prefix=local_prefix,
+                coordinate_streams="block_coordinates",
+                contiguous_coordinate_streams=True,
+                adjugate_target=lambda component, index: (
+                    "block_adjugate_data[%d][%s]" % (component, index)
+                ),
+                determinant_target=lambda index: (
+                    "block_determinant[%s]" % index
+                ),
+                adjugate_streams=tuple(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_determinant",
+                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
+                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+            )
+        )
+    else:
+        lines.extend(
+            [
+                "        scalar_t *block_adjugate_streams[DIM * DIM] = {%s};"
+                % ", ".join(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                "        for (int q = 0; q < N_QP; ++q) {",
+                "            const int lane = 0;",
+            ]
+        )
+        for i in range(dim):
+            for j in range(dim):
+                terms = [
+                    "block_coordinates[%d][lane] * %s[q * N_SHAPE + %d]"
+                    % (
+                        shape * dim + i,
+                        _mesh_reference_name(
+                            "isoparametric",
+                            sfem_simplex_grad_ref_name("grad_ref", j),
+                        ),
+                        shape,
+                    )
+                    for shape in range(n_shape)
+                ]
+                lines.append(
+                    "            const scalar_t J%d%d = %s;"
+                    % (i, j, " + ".join(terms))
+                )
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
+        lines.extend(["        }"])
+    if use_contiguous_field_streams:
+        direction_arg = "block_direction"
+        output_arg = "block_output"
+        block_function = "%s_contiguous" % block
+    else:
+        direction_lines, direction_arg = _block_stream_argument(
+            "const scalar_t *",
+            "block_direction_streams",
+            "block_direction",
+            n_shape,
+            field_stream_order,
+            "        ",
+            mutable=False,
+        )
+        output_lines, output_arg = _block_stream_argument(
+            "scalar_t *",
+            "block_output_streams",
+            "block_output",
+            n_shape,
+            field_stream_order,
+            "        ",
+            mutable=True,
+        )
+        lines.extend(direction_lines)
+        lines.extend(output_lines)
+        block_function = (
+            block
+            if direction_lines or output_lines
+            else "%s_contiguous" % block
+        )
+    lines.append(
+        "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
+        % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
+    )
+    call_args = [
+        "1",
+        "1",
+        "block_determinant",
+        "block_adjugate",
+    ]
+    if tensor_product:
+        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        if dependencies.uses_reference_gradients:
+            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+    else:
+        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        if dependencies.uses_reference_gradients:
+            call_args.extend(
+                _mesh_reference_name(
+                    "isoparametric",
+                    sfem_simplex_grad_ref_name("grad_ref", d),
+                )
+                for d in range(dim)
+            )
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+    call_args.append(direction_arg)
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.append(output_arg)
+    lines.extend(
+        [
+            "",
+            "        for (int entry = 0; entry < N_SHAPE * N_SHAPE; ++entry) {",
+            "            element_matrix[entry] = scalar_t(0);",
+            "        }",
+            "        static constexpr int TENSOR_STREAMS[N_SHAPE] = {%s};"
+            % ", ".join(str(stream) for stream in stream_to_tensor_order),
+            "        for (int trial = 0; trial < N_SHAPE; ++trial) {",
+            "            const int tensor_trial = TENSOR_STREAMS[trial];",
+            "            for (int stream = 0; stream < N_SHAPE; ++stream) {",
+            "                block_direction[stream][0] = scalar_t(0);",
+            "                block_output[stream][0] = scalar_t(0);",
+            "            }",
+            "            block_direction[tensor_trial][0] = scalar_t(1);",
+            "            %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block_function, ", ".join(call_args)),
+            "            for (int test = 0; test < N_SHAPE; ++test) {",
+            "                const int tensor_test = TENSOR_STREAMS[test];",
+            "                element_matrix[test * N_SHAPE + trial] = block_output[tensor_test][0];",
+            "            }",
+            "        }",
+            "",
+            "        invalid_matrix_graph |= (%s_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values) != SFEM_SUCCESS);"
+            % function_base,
+            "    }",
+            "",
+            "    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("scalar_t", scalar_type) for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function_base, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append(
+                "        %s%s" % (param, "," if index + 1 < len(typed_params) else "")
+            )
+        call_args = ["nelements", "nnodes", "elements", "points"]
+        call_args.extend(map(str, dependencies.parameters))
+        call_args.extend(("diag_offsets", "ndiag", "values"))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
                 "}",
                 "",
             ]
@@ -5267,6 +8206,24 @@ def _isoparametric_mesh_operator_source(
         ]
     )
     lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    field_shape_order = _single_field_shape_order(n_shape, n_fields, field_stream_order)
+    field_element_lines, field_element_array = _single_field_element_alias_lines(
+        n_shape,
+        field_shape_order,
+        "    ",
+    )
+    lines.extend(field_element_lines)
+    coordinate_element_lines, coordinate_element_array = (
+        _coordinate_element_alias_lines(
+            dim,
+            n_shape,
+            rule.element_type,
+            "    ",
+        )
+        if tensor_product_geometry
+        else ([], "elements")
+    )
+    lines.extend(coordinate_element_lines)
     lines.extend(
         [
             "",
@@ -5302,27 +8259,19 @@ def _isoparametric_mesh_operator_source(
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
         ]
     )
-    lines.extend(["", *_coordinate_gather_lines(dim, "        ")])
-    lines.extend(_field_gather_lines(system, dependencies, "        "))
+    lines.extend(["", *_coordinate_gather_lines(dim, "        ", coordinate_element_array)])
+    lines.extend(_field_gather_lines(system, dependencies, "        ", field_element_array))
     lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        ")])
     if tensor_product_geometry:
-        coordinate_streams, contiguous_coordinate_streams = (
-            _tensor_product_coordinate_stream_layout(
-                dim,
-                n_shape,
-                rule.element_type,
-                "block_coordinates",
-            )
-        )
         lines.append("")
         lines.extend(
-            tensor_product_evaluated_isoparametric_geometry_lines(
+            tensor_product_gradient_isoparametric_geometry_lines(
                 dim=dim,
                 n_shape=n_shape,
                 n_qp=rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams=coordinate_streams,
-                contiguous_coordinate_streams=contiguous_coordinate_streams,
+                coordinate_streams="block_coordinates",
+                contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
                     "block_adjugate_data[%d][%s]" % (component, index)
                 ),
@@ -5397,6 +8346,7 @@ def _isoparametric_mesh_operator_source(
         n_fields * n_shape,
         field_stream_order,
         "        ",
+        force_contiguous=bool(field_element_lines),
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
@@ -5463,7 +8413,7 @@ def _isoparametric_mesh_operator_source(
             "",
         ]
     )
-    lines.extend(_field_atomic_scatter_lines(system, "        "))
+    lines.extend(_field_atomic_scatter_lines(system, "        ", field_element_array))
     lines.extend(
         [
             "    }",
@@ -5506,6 +8456,1615 @@ def _isoparametric_mesh_operator_source(
             [
                 ") {",
                 "    return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _scalar_packed_jacobian_action_source(
+    system,
+    prefix,
+    local_prefix,
+    specialization,
+    dependencies,
+    coefficients,
+    basis_family=None,
+    geometry_family=None,
+    two_pass=False,
+):
+    if len(system.fields) != 1 or not dependencies.direction:
+        return []
+    rule = specialization.quadrature_rule
+    dim = system.dim
+    n_fields = len(system.fields)
+    n_shape = rule.n_shape
+    n_qp = rule.n_qp
+    tensor_product = _is_tensor_product_family(rule, basis_family)
+    tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
+    shape_order = (
+        tuple(range(n_shape))
+        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        else tensor_product_cartesian_shape_order(dim, n_shape)
+        if tensor_product
+        else tuple(range(n_shape))
+    )
+    field_stream_order = streams_in_shape_order(
+        tuple(range(n_fields * n_shape)),
+        n_fields,
+        shape_order,
+    )
+    packed_token = "jacobian_action_packed_two_pass_isoparametric_mesh_soa" if two_pass else "jacobian_action_packed_isoparametric_mesh_soa"
+    function = "%s_%s" % (prefix, packed_token)
+    impl = "%s_impl" % function
+    block = "%s_jacobian_action_block" % local_prefix
+    block_function = "%s_contiguous" % block
+    params = [
+        "const ptrdiff_t n_packs",
+        "const ptrdiff_t n_elements_per_pack",
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "const ptrdiff_t max_nodes_per_pack",
+        "uint16_t **const SFEM_RESTRICT elements",
+        "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
+        "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
+        "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
+        "const idx_t *const SFEM_RESTRICT ghost_idx",
+    ]
+    if two_pass:
+        params.extend(
+            [
+                "const ptrdiff_t n_ghost_entries",
+                "const ptrdiff_t n_ghost_reduce_rows",
+                "const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr",
+                "const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx",
+                "const idx_t *const SFEM_RESTRICT ghost_reduce_dest",
+                "scalar_t *const SFEM_RESTRICT ghost_buf",
+            ]
+        )
+    params.append("const geom_t *const *const SFEM_RESTRICT points")
+    params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
+    if dependencies.current:
+        params.append("const ptrdiff_t current_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % field.name
+            for field in system.fields
+        )
+    if dependencies.previous:
+        params.append("const ptrdiff_t previous_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
+            for field in system.fields
+        )
+    params.append("const ptrdiff_t direction_stride")
+    params.extend(
+        "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
+        for field in system.fields
+    )
+    params.append("const ptrdiff_t out_stride")
+    params.extend(
+        "scalar_t *const SFEM_RESTRICT %s_out" % field.name
+        for field in system.fields
+    )
+    coordinate_element_lines, coordinate_element_array = (
+        _coordinate_element_alias_lines(
+            dim,
+            n_shape,
+            rule.element_type,
+            "    ",
+            pointer_type="uint16_t",
+        )
+        if tensor_product_geometry
+        else ([], "elements")
+    )
+    field_shape_order = _single_field_shape_order(n_shape, n_fields, field_stream_order)
+    field_element_lines, field_element_array = _single_field_element_alias_lines(
+        n_shape,
+        field_shape_order,
+        "    ",
+        pointer_type="uint16_t",
+    )
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t>",
+        "%s int %s(" % (_function_qualifier(), impl),
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_QP = %d;" % n_qp,
+            "    static constexpr int N_SHAPE = %d;" % n_shape,
+            "    static constexpr int N_FIELDS = %d;" % n_fields,
+            "    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;",
+            "    static constexpr int VECTOR_SIZE = %d;" % specialization.vector_size,
+            "    (void)nnodes;",
+        ]
+    )
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    lines.extend(coordinate_element_lines)
+    lines.extend(field_element_lines)
+    lines.extend(
+        [
+            "",
+            "#pragma omp parallel",
+            "    {",
+            "        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);",
+        ]
+    )
+    if dependencies.current:
+        lines.append(
+            "        scalar_t *const SFEM_RESTRICT pack_current = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
+        )
+    if dependencies.previous:
+        lines.append(
+            "        scalar_t *const SFEM_RESTRICT pack_previous = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
+        )
+    lines.extend(
+        [
+            "        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);",
+            "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);",
+            "",
+            "#pragma omp for schedule(static)",
+            "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+            "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+            "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+            "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            const geom_t *const coordinate_components[DIM] = {%s};"
+            % ", ".join("points[%d]" % d for d in range(dim)),
+            "            for (int d = 0; d < DIM; ++d) {",
+            "                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;",
+            "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
+            "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "                    pack_coordinate[k] = scalar_t(coordinate_component[owned_nodes_ptr[pack] + k]);",
+            "                }",
+            "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[ghosts[k]]);",
+            "                }",
+            "            }",
+        ]
+    )
+    field = system.fields[0]
+    if dependencies.current:
+        lines.extend(
+            [
+                "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "                const idx_t node = owned_nodes_ptr[pack] + k;",
+                "                pack_current[k] = %s[node * current_stride];" % field.name,
+                "            }",
+                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "                pack_current[n_contiguous + k] = %s[ghosts[k] * current_stride];" % field.name,
+                "            }",
+            ]
+        )
+    if dependencies.previous:
+        lines.extend(
+            [
+                "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "                const idx_t node = owned_nodes_ptr[pack] + k;",
+                "                pack_previous[k] = %s_old[node * previous_stride];" % field.name,
+                "            }",
+                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "                pack_previous[n_contiguous + k] = %s_old[ghosts[k] * previous_stride];" % field.name,
+                "            }",
+            ]
+        )
+    lines.extend(
+        [
+            "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "                const idx_t node = owned_nodes_ptr[pack] + k;",
+            "                pack_direction[k] = %s_direction[node * direction_stride];" % field.name,
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field.name,
+            "            }",
+            "",
+            "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+            "                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+            "                scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];",
+            "                scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];",
+            "                scalar_t block_determinant[N_QP * VECTOR_SIZE];",
+        ]
+    )
+    if dependencies.current:
+        lines.append("                scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
+    if dependencies.previous:
+        lines.append("                scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+    lines.extend(
+        [
+            "                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
+            "                scalar_t block_output[N_STREAMS][VECTOR_SIZE];",
+            "",
+            "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
+            "                    const uint16_t *const SFEM_RESTRICT coordinate_shape = %s[shape];" % coordinate_element_array,
+            "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
+            "                    for (int d = 0; d < DIM; ++d) {",
+            "#pragma omp simd",
+            "                        for (int lane = 0; lane < nelems; ++lane) {",
+            "                            block_coordinates[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + coordinate_shape[evbegin + lane]];",
+            "                        }",
+            "                    }",
+        ]
+    )
+    if dependencies.current:
+        lines.extend(
+            [
+                "#pragma omp simd",
+                "                    for (int lane = 0; lane < nelems; ++lane) {",
+                "                        block_current[shape][lane] = pack_current[field_shape[evbegin + lane]];",
+                "                    }",
+            ]
+        )
+    if dependencies.previous:
+        lines.extend(
+            [
+                "#pragma omp simd",
+                "                    for (int lane = 0; lane < nelems; ++lane) {",
+                "                        block_previous[shape][lane] = pack_previous[field_shape[evbegin + lane]];",
+                "                    }",
+            ]
+        )
+    lines.extend(
+        [
+            "#pragma omp simd",
+            "                    for (int lane = 0; lane < nelems; ++lane) {",
+            "                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];",
+            "                        block_output[shape][lane] = scalar_t(0);",
+            "                    }",
+            "                }",
+        ]
+    )
+    if tensor_product_geometry:
+        lines.append("")
+        lines.extend(
+            tensor_product_gradient_isoparametric_geometry_lines(
+                dim=dim,
+                n_shape=n_shape,
+                n_qp=rule.n_qp,
+                local_prefix=local_prefix,
+                coordinate_streams="block_coordinates",
+                contiguous_coordinate_streams=True,
+                adjugate_target=lambda component, index: (
+                    "block_adjugate_data[%d][%s]" % (component, index)
+                ),
+                determinant_target=lambda index: ("block_determinant[%s]" % index),
+                adjugate_streams=tuple(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_determinant",
+                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
+                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+            )
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "                scalar_t *block_adjugate_streams[DIM * DIM] = {%s};"
+                % ", ".join(
+                    "block_adjugate_data[%d]" % component
+                    for component in range(dim * dim)
+                ),
+                "                for (int q = 0; q < N_QP; ++q) {",
+                *_work_item_loop_lines("                    "),
+            ]
+        )
+        for i in range(dim):
+            for j in range(dim):
+                terms = [
+                    "block_coordinates[%d][lane] * %s[q * N_SHAPE + %d]"
+                    % (
+                        shape * dim + i,
+                        _mesh_reference_name(
+                            "isoparametric",
+                            sfem_simplex_grad_ref_name("grad_ref", j),
+                        ),
+                        shape,
+                    )
+                    for shape in range(n_shape)
+                ]
+                lines.append(
+                    "                        const scalar_t J%d%d = %s;"
+                    % (i, j, " + ".join(terms))
+                )
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "                        "))
+        lines.extend(["                    }", "                }"])
+    if dependencies.uses_adjugate:
+        lines.append(
+            "                const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
+            % ", ".join(
+                "block_adjugate_data[%d]" % component
+                for component in range(dim * dim)
+            )
+        )
+    call_args = ["nelems", "VECTOR_SIZE", "block_determinant"]
+    if dependencies.uses_adjugate:
+        call_args.append("block_adjugate")
+    if tensor_product:
+        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        if dependencies.uses_reference_gradients:
+            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+    else:
+        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        if dependencies.uses_reference_gradients:
+            call_args.extend(
+                _mesh_reference_name(
+                    "isoparametric",
+                    sfem_simplex_grad_ref_name("grad_ref", d),
+                )
+                for d in range(dim)
+            )
+        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+    if dependencies.current:
+        call_args.append("block_current")
+    if dependencies.previous:
+        call_args.append("block_previous")
+    call_args.append("block_direction")
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.append("block_output")
+    lines.extend(
+        [
+            "",
+            "                %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block_function, ", ".join(call_args)),
+            "",
+            "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
+            "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];"
+            % field_element_array,
+            "                    for (int lane = 0; lane < nelems; ++lane) {",
+            "                        pack_out[field_shape[evbegin + lane]] += block_output[shape][lane];",
+            "                    }",
+            "                }",
+            "            }",
+            "",
+        ]
+    )
+    if two_pass:
+        lines.extend(
+            [
+                "            const ptrdiff_t ghost_off = ghost_ptr[pack];",
+                "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
+                "                pack_out[k] = scalar_t(0);",
+                "            }",
+                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "                ghost_buf[ghost_off + k] = pack_out[n_contiguous + k];",
+                "                pack_out[n_contiguous + k] = scalar_t(0);",
+                "            }",
+                "        }",
+                "    }",
+                "",
+                "#pragma omp parallel for schedule(static)",
+                "    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
+                "        const idx_t dest = ghost_reduce_dest[row];",
+                "        const ptrdiff_t begin = ghost_reduce_ptr[row];",
+                "        const ptrdiff_t end = ghost_reduce_ptr[row + 1];",
+                "        scalar_t sum = scalar_t(0);",
+                "        for (ptrdiff_t j = begin; j < end; ++j) {",
+                "            sum += ghost_buf[ghost_reduce_idx[j]];",
+                "        }",
+                "        %s_out[dest * out_stride] += sum;" % field.name,
+                "    }",
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
+                "                pack_out[k] = scalar_t(0);",
+                "            }",
+                "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+                "#pragma omp atomic update",
+                "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
+                "                pack_out[k] = scalar_t(0);",
+                "            }",
+                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "#pragma omp atomic update",
+                "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field.name,
+                "                pack_out[n_contiguous + k] = scalar_t(0);",
+                "            }",
+                "        }",
+                "    }",
+                "    return SFEM_SUCCESS;",
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [param.replace("scalar_t", scalar_type) for param in params]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        call_args = [
+            "n_packs",
+            "n_elements_per_pack",
+            "nelements",
+            "nnodes",
+            "max_nodes_per_pack",
+            "elements",
+            "owned_nodes_ptr",
+            "n_shared_nodes",
+            "ghost_ptr",
+            "ghost_idx",
+        ]
+        if two_pass:
+            call_args.extend(
+                [
+                    "n_ghost_entries",
+                    "n_ghost_reduce_rows",
+                    "ghost_reduce_ptr",
+                    "ghost_reduce_idx",
+                    "ghost_reduce_dest",
+                    "ghost_buf",
+                ]
+            )
+        call_args.append("points")
+        call_args.extend(map(str, dependencies.parameters))
+        if dependencies.current:
+            call_args.append("current_stride")
+            call_args.extend(field.name for field in system.fields)
+        if dependencies.previous:
+            call_args.append("previous_stride")
+            call_args.extend("%s_old" % field.name for field in system.fields)
+        call_args.append("direction_stride")
+        call_args.extend("%s_direction" % field.name for field in system.fields)
+        call_args.append("out_stride")
+        call_args.extend("%s_out" % field.name for field in system.fields)
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s>(%s);"
+                % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _laplace_tet4_packed_affine_jacobian_action_source(
+    function,
+    impl,
+    params,
+    kappa_name,
+    field_name,
+):
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t, bool UnitKappa>",
+        "%s int %s_kernel(" % (_function_qualifier(), impl),
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int VECTOR_SIZE = 64;",
+            "    (void)nnodes;",
+            "    (void)max_nodes_per_pack;",
+            "",
+            "#pragma omp parallel",
+            "    {",
+            "        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);",
+            "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);",
+            "        scalar_t out0[VECTOR_SIZE];",
+            "        scalar_t out1[VECTOR_SIZE];",
+            "        scalar_t out2[VECTOR_SIZE];",
+            "        scalar_t out3[VECTOR_SIZE];",
+            "        scalar_t u0[VECTOR_SIZE];",
+            "        scalar_t u1[VECTOR_SIZE];",
+            "        scalar_t u2[VECTOR_SIZE];",
+            "        scalar_t u3[VECTOR_SIZE];",
+            "        scalar_t fff0[VECTOR_SIZE];",
+            "        scalar_t fff1[VECTOR_SIZE];",
+            "        scalar_t fff2[VECTOR_SIZE];",
+            "        scalar_t fff3[VECTOR_SIZE];",
+            "        scalar_t fff4[VECTOR_SIZE];",
+            "        scalar_t fff5[VECTOR_SIZE];",
+            "",
+            "#pragma omp for schedule(static)",
+            "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+            "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+            "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+            "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "                pack_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field_name,
+            "            }",
+            "",
+            "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+            "                const scalar_t metric_factor = UnitKappa ? scalar_t(1) : %s;" % kappa_name,
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    fff0[lane] = metric_factor * scalar_t(g_geom_metric0[element]);",
+            "                    fff1[lane] = metric_factor * scalar_t(g_geom_metric1[element]);",
+            "                    fff2[lane] = metric_factor * scalar_t(g_geom_metric2[element]);",
+            "                    fff3[lane] = metric_factor * scalar_t(g_geom_metric3[element]);",
+            "                    fff4[lane] = metric_factor * scalar_t(g_geom_metric4[element]);",
+            "                    fff5[lane] = metric_factor * scalar_t(g_geom_metric5[element]);",
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    u0[lane] = pack_direction[elements[0][element]];",
+            "                    u1[lane] = pack_direction[elements[1][element]];",
+            "                    u2[lane] = pack_direction[elements[2][element]];",
+            "                    u3[lane] = pack_direction[elements[3][element]];",
+            "                }",
+            "",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    tet4_laplacian_apply_fff_soa_tpl<scalar_t, scalar_t>(",
+            "                            fff0[lane], fff1[lane], fff2[lane], fff3[lane], fff4[lane], fff5[lane],",
+            "                            u0[lane], u1[lane], u2[lane], u3[lane],",
+            "                            &out0[lane], &out1[lane], &out2[lane], &out3[lane]);",
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    pack_out[elements[0][element]] += out0[lane];",
+            "                    pack_out[elements[1][element]] += out1[lane];",
+            "                    pack_out[elements[2][element]] += out2[lane];",
+            "                    pack_out[elements[3][element]] += out3[lane];",
+            "                }",
+            "            }",
+            "",
+            "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field_name,
+            "                pack_out[n_contiguous + k] = scalar_t(0);",
+            "            }",
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "template <typename scalar_t, typename jacobian_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    if (%s == scalar_t(1)) {" % kappa_name,
+            "        return %s_kernel<scalar_t, jacobian_t, true>(" % impl,
+            "                n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
+            "                elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
+            "                g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+            "                %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
+            "    }",
+            "    return %s_kernel<scalar_t, jacobian_t, false>(" % impl,
+            "            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
+            "            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
+            "            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+            "            %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
+            for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(" % (impl, scalar_type),
+                "            n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack,",
+                "            elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx,",
+                "            g_geom_metric0, g_geom_metric1, g_geom_metric2, g_geom_metric3, g_geom_metric4, g_geom_metric5,",
+                "            %s, direction_stride, %s_direction, out_stride, %s_out);" % (kappa_name, field_name, field_name),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _laplace_direct_fff_packed_affine_jacobian_action_source(
+    function,
+    impl,
+    params,
+    kappa_name,
+    field_name,
+    n_shape,
+    vector_size,
+    primitive,
+    primitive_template,
+    metric_measure="scalar_t(1)",
+    primitive_shape_order=None,
+):
+    if primitive_shape_order is None:
+        primitive_shape_order = tuple(range(n_shape))
+    if len(primitive_shape_order) != n_shape:
+        raise ValueError("primitive_shape_order length must match n_shape")
+
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t, bool UnitKappa>",
+        "%s int %s_kernel(" % (_function_qualifier(), impl),
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+            "    (void)nnodes;",
+            "    (void)max_nodes_per_pack;",
+            "",
+            "#pragma omp parallel",
+            "    {",
+            "        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);",
+            "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append("        scalar_t out%d[VECTOR_SIZE];" % shape)
+    for shape in range(n_shape):
+        lines.append("        scalar_t u%d[VECTOR_SIZE];" % shape)
+    for component in range(6):
+        lines.append("        scalar_t fff%d[VECTOR_SIZE];" % component)
+    lines.extend(
+        [
+            "",
+            "#pragma omp for schedule(static)",
+            "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+            "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+            "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+            "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "                pack_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field_name,
+            "            }",
+            "",
+            "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+            "                const scalar_t metric_factor = UnitKappa ? scalar_t(1) : %s;" % kappa_name,
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    const scalar_t inv_det = (metric_factor * %s) / scalar_t(g_jacobian_determinant0[element]);" % metric_measure,
+        ]
+    )
+    for component in range(9):
+        lines.append(
+            "                    const scalar_t adj%d = scalar_t(g_jacobian_adjugate%d[element]);"
+            % (component, component)
+        )
+    metric_terms = (
+        (0, "adj0 * adj0 + adj1 * adj1 + adj2 * adj2"),
+        (1, "adj0 * adj3 + adj1 * adj4 + adj2 * adj5"),
+        (2, "adj0 * adj6 + adj1 * adj7 + adj2 * adj8"),
+        (3, "adj3 * adj3 + adj4 * adj4 + adj5 * adj5"),
+        (4, "adj3 * adj6 + adj4 * adj7 + adj5 * adj8"),
+        (5, "adj6 * adj6 + adj7 * adj7 + adj8 * adj8"),
+    )
+    for component, expr in metric_terms:
+        lines.append("                    fff%d[lane] = (%s) * inv_det;" % (component, expr))
+    lines.extend(
+        [
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append(
+            "                    u%d[lane] = pack_direction[elements[%d][element]];"
+            % (shape, primitive_shape_order[shape])
+        )
+    lines.extend(["                }", "", "#pragma omp simd", "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    primitive_args = (
+        ["fff%d[lane]" % component for component in range(6)]
+        + ["u%d[lane]" % shape for shape in range(n_shape)]
+        + ["&out%d[lane]" % shape for shape in range(n_shape)]
+    )
+    lines.append(
+        "                    %s%s(%s);"
+        % (primitive, primitive_template, ", ".join(primitive_args))
+    )
+    lines.extend(["                }", "", "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {", "                    const ptrdiff_t element = evbegin + lane;"])
+    for shape in range(n_shape):
+        lines.append(
+            "                    pack_out[elements[%d][element]] += out%d[lane];"
+            % (primitive_shape_order[shape], shape)
+        )
+    lines.extend(
+        [
+            "                }",
+            "            }",
+            "",
+            "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field_name,
+            "                pack_out[n_contiguous + k] = scalar_t(0);",
+            "            }",
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "template <typename scalar_t, typename jacobian_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    common_call_prefix = [
+        "n_packs",
+        "n_elements_per_pack",
+        "nelements",
+        "nnodes",
+        "max_nodes_per_pack",
+        "elements",
+        "owned_nodes_ptr",
+        "n_shared_nodes",
+        "ghost_ptr",
+        "ghost_idx",
+        *(("g_jacobian_adjugate%d" % component) for component in range(9)),
+        "g_jacobian_determinant0",
+        kappa_name,
+        "direction_stride",
+        "%s_direction" % field_name,
+        "out_stride",
+        "%s_out" % field_name,
+    ]
+    lines.extend(
+        [
+            ") {",
+            "    if (%s == scalar_t(1)) {" % kappa_name,
+            "        return %s_kernel<scalar_t, jacobian_t, true>(%s);" % (impl, ", ".join(common_call_prefix)),
+            "    }",
+            "    return %s_kernel<scalar_t, jacobian_t, false>(%s);" % (impl, ", ".join(common_call_prefix)),
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
+            for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(%s);" % (impl, scalar_type, ", ".join(common_call_prefix)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _laplace_metric_direct_packed_affine_jacobian_action_source(
+    function,
+    impl,
+    kappa_name,
+    field_name,
+    n_shape,
+    vector_size,
+    primitive,
+    primitive_template,
+    primitive_shape_order=None,
+):
+    if primitive_shape_order is None:
+        primitive_shape_order = tuple(range(n_shape))
+    if len(primitive_shape_order) != n_shape:
+        raise ValueError("primitive_shape_order length must match n_shape")
+
+    params = [
+        "const ptrdiff_t n_packs",
+        "const ptrdiff_t n_elements_per_pack",
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "const ptrdiff_t max_nodes_per_pack",
+        "uint16_t **const SFEM_RESTRICT elements",
+        "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
+        "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
+        "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
+        "const idx_t *const SFEM_RESTRICT ghost_idx",
+        "const jacobian_t *const SFEM_RESTRICT g_geom_metric",
+        "const scalar_t %s" % kappa_name,
+        "const ptrdiff_t direction_stride",
+        "const scalar_t *const SFEM_RESTRICT %s_direction" % field_name,
+        "const ptrdiff_t out_stride",
+        "scalar_t *const SFEM_RESTRICT %s_out" % field_name,
+    ]
+    call_args = [
+        "n_packs",
+        "n_elements_per_pack",
+        "nelements",
+        "nnodes",
+        "max_nodes_per_pack",
+        "elements",
+        "owned_nodes_ptr",
+        "n_shared_nodes",
+        "ghost_ptr",
+        "ghost_idx",
+        "g_geom_metric",
+        kappa_name,
+        "direction_stride",
+        "%s_direction" % field_name,
+        "out_stride",
+        "%s_out" % field_name,
+    ]
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t, bool UnitKappa>",
+        "%s int %s_kernel(" % (_function_qualifier(), impl),
+    ]
+    for i, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if i + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+            "    (void)nnodes;",
+            "    (void)max_nodes_per_pack;",
+            "    (void)direction_stride;",
+            "    (void)out_stride;",
+            "",
+            "#pragma omp parallel",
+            "    {",
+            "        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);",
+            "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append("        scalar_t out%d[VECTOR_SIZE];" % shape)
+    for shape in range(n_shape):
+        lines.append("        scalar_t u%d[VECTOR_SIZE];" % shape)
+    for component in range(6):
+        lines.append("        scalar_t fff%d[VECTOR_SIZE];" % component)
+    lines.extend(
+        [
+            "",
+            "#pragma omp for schedule(static)",
+            "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+            "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+            "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+            "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            scalar_t *const SFEM_RESTRICT ghost_out = &pack_out[n_contiguous];",
+            "            memcpy(pack_direction, &%s_direction[owned_nodes_ptr[pack]], (size_t)n_contiguous * sizeof(scalar_t));" % field_name,
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k]];" % field_name,
+            "            }",
+            "",
+            "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+            "                const ptrdiff_t nelems = MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+            "                const scalar_t metric_factor = UnitKappa ? scalar_t(1) : %s;" % kappa_name,
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+            "                    const ptrdiff_t metric_offset = element * 6;",
+        ]
+    )
+    for component in range(6):
+        lines.append(
+            "                    fff%d[lane] = metric_factor * scalar_t(g_geom_metric[metric_offset + %d]);"
+            % (component, component)
+        )
+    lines.extend(
+        [
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append(
+            "                    u%d[lane] = pack_direction[elements[%d][element]];"
+            % (shape, primitive_shape_order[shape])
+        )
+    primitive_args = (
+        ["fff%d[lane]" % c for c in range(6)]
+        + ["u%d[lane]" % s for s in range(n_shape)]
+        + ["&out%d[lane]" % s for s in range(n_shape)]
+    )
+    lines.extend(
+        [
+            "                }",
+            "",
+            "#pragma omp simd",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    %s%s(%s);" % (primitive, primitive_template, ", ".join(primitive_args)),
+            "                }",
+            "",
+            "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
+            "                    const ptrdiff_t element = evbegin + lane;",
+        ]
+    )
+    for shape in range(n_shape):
+        lines.append(
+            "                    pack_out[elements[%d][element]] += out%d[lane];"
+            % (primitive_shape_order[shape], shape)
+        )
+    lines.extend(
+        [
+            "                }",
+            "            }",
+            "",
+            "            scalar_t *const SFEM_RESTRICT acc = &%s_out[owned_nodes_ptr[pack]];" % field_name,
+            "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+            "                acc[k] += pack_out[k];",
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+            "#pragma omp atomic update",
+            "                acc[k] += pack_out[k];",
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[ghosts[k]] += ghost_out[k];" % field_name,
+            "                ghost_out[k] = scalar_t(0);",
+            "            }",
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "template <typename scalar_t, typename jacobian_t>",
+            "%s int %s(" % (_function_qualifier(), impl),
+        ]
+    )
+    for i, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if i + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    if (%s == scalar_t(1)) {" % kappa_name,
+            "        return %s_kernel<scalar_t, jacobian_t, true>(%s);" % (impl, ", ".join(call_args)),
+            "    }",
+            "    return %s_kernel<scalar_t, jacobian_t, false>(%s);" % (impl, ", ".join(call_args)),
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [p.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type) for p in params]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for i, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if i + 1 < len(typed_params) else ""))
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(%s);" % (impl, scalar_type, ", ".join(call_args)),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+def _scalar_packed_affine_jacobian_action_source(
+    system,
+    prefix,
+    local_prefix,
+    specialization,
+    dependencies,
+    coefficients,
+    basis_family=None,
+    two_pass=False,
+):
+    if len(system.fields) != 1 or not dependencies.direction:
+        return []
+    # Affine packed two-pass is covered by isoparametric packed two-pass emission and
+    # hand-written PackedLaplacian; skip incomplete specialized affine two-pass paths.
+    if two_pass:
+        return []
+    rule = specialization.quadrature_rule
+    dim = system.dim
+    n_fields = len(system.fields)
+    n_shape = rule.n_shape
+    n_qp = rule.n_qp
+    vector_size = specialization.vector_size
+    tensor_product = _is_tensor_product_family(rule, basis_family)
+    specialized_prefix = _constant_p1_affine_specialized_local_prefix(
+        local_prefix,
+        rule,
+    )
+    gradient_metric = (
+        None
+        if tensor_product or specialized_prefix is None
+        else simplex_gradient_metric_transformation(
+            system,
+            rule,
+            coefficients,
+            dependencies,
+        )
+    )
+    uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
+    omit_simplex_reference_basis_inputs = gradient_metric is not None
+    shape_order = (
+        tuple(range(n_shape))
+        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        else tensor_product_cartesian_shape_order(dim, n_shape)
+        if tensor_product
+        else tuple(range(n_shape))
+    )
+    field_stream_order = streams_in_shape_order(
+        tuple(range(n_fields * n_shape)),
+        n_fields,
+        shape_order,
+    )
+    packed_token = "jacobian_action_packed_two_pass_affine_mesh_soa" if two_pass else "jacobian_action_packed_affine_mesh_soa"
+    function = "%s_%s" % (prefix, packed_token)
+    impl = "%s_impl" % function
+    block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
+    block = "%s_jacobian_action_block" % block_prefix
+    block_function = "%s_contiguous" % block
+    affine_geometry_streams = (
+        (
+            tuple(
+                "geom_metric%d" % i
+                for i in range(gradient_metric.metric_components)
+            )
+            if uses_cached_affine_metric
+            else tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+            if dependencies.uses_adjugate
+            else ()
+        )
+        + (() if uses_cached_affine_metric else ("jacobian_determinant0",))
+    )
+    affine_geometry_stream_indices = {
+        stream: index for index, stream in enumerate(affine_geometry_streams)
+    }
+    params = [
+        "const ptrdiff_t n_packs",
+        "const ptrdiff_t n_elements_per_pack",
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "const ptrdiff_t max_nodes_per_pack",
+        "uint16_t **const SFEM_RESTRICT elements",
+        "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
+        "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
+        "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
+        "const idx_t *const SFEM_RESTRICT ghost_idx",
+    ]
+    if uses_cached_affine_metric:
+        params.extend(
+            "const jacobian_t *const SFEM_RESTRICT g_geom_metric%d" % i
+            for i in range(gradient_metric.metric_components)
+        )
+    elif dependencies.uses_adjugate:
+        params.extend(
+            "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
+            for i in range(dim * dim)
+        )
+    if not uses_cached_affine_metric:
+        params.append(
+            "const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0"
+        )
+    params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
+    if dependencies.current:
+        params.append("const ptrdiff_t current_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % field.name
+            for field in system.fields
+        )
+    if dependencies.previous:
+        params.append("const ptrdiff_t previous_stride")
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
+            for field in system.fields
+        )
+    params.append("const ptrdiff_t direction_stride")
+    params.extend(
+        "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
+        for field in system.fields
+    )
+    params.append("const ptrdiff_t out_stride")
+    params.extend(
+        "scalar_t *const SFEM_RESTRICT %s_out" % field.name
+        for field in system.fields
+    )
+    field = system.fields[0]
+    if (
+        not two_pass
+        and prefix == "laplace_tet4"
+        and dim == 3
+        and n_shape == 4
+        and n_fields == 1
+        and uses_cached_affine_metric
+        and not dependencies.current
+        and not dependencies.previous
+        and len(dependencies.parameters) == 1
+    ):
+        return _laplace_tet4_packed_affine_jacobian_action_source(
+            function,
+            impl,
+            params,
+            str(dependencies.parameters[0]),
+            field.name,
+        )
+    if (
+        not two_pass
+        and prefix == "laplace_proteus_hex8"
+        and dim == 3
+        and n_shape == 8
+        and n_fields == 1
+        and not uses_cached_affine_metric
+        and dependencies.uses_adjugate
+        and not dependencies.current
+        and not dependencies.previous
+        and len(dependencies.parameters) == 1
+    ):
+        return (
+            _laplace_metric_direct_packed_affine_jacobian_action_source(
+                "laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa",
+                "laplace_proteus_hex8_private_metric_jacobian_action_packed_mesh_soa_impl",
+                str(dependencies.parameters[0]),
+                field.name,
+                n_shape,
+                32,
+                "hex8_laplacian_apply_fff_integral_soa_tpl",
+                "<scalar_t>",
+                primitive_shape_order=(0, 1, 3, 2, 4, 5, 7, 6),
+            )
+            + _laplace_direct_fff_packed_affine_jacobian_action_source(
+            function,
+            impl,
+            params,
+            str(dependencies.parameters[0]),
+            field.name,
+            n_shape,
+            32,
+            "hex8_laplacian_apply_fff_integral_soa_tpl",
+            "<scalar_t>",
+            primitive_shape_order=(0, 1, 3, 2, 4, 5, 7, 6),
+            )
+        )
+    if (
+        not two_pass
+        and prefix == "laplace_tet10"
+        and dim == 3
+        and n_shape == 10
+        and n_fields == 1
+        and not uses_cached_affine_metric
+        and dependencies.uses_adjugate
+        and not dependencies.current
+        and not dependencies.previous
+        and len(dependencies.parameters) == 1
+    ):
+        return (
+            _laplace_metric_direct_packed_affine_jacobian_action_source(
+                "laplace_tet10_private_metric_jacobian_action_packed_mesh_soa",
+                "laplace_tet10_private_metric_jacobian_action_packed_mesh_soa_impl",
+                str(dependencies.parameters[0]),
+                field.name,
+                n_shape,
+                32,
+                "tet10_laplacian_apply_fff_soa_tpl",
+                "<scalar_t, scalar_t>",
+            )
+            + _laplace_direct_fff_packed_affine_jacobian_action_source(
+            function,
+            impl,
+            params,
+            str(dependencies.parameters[0]),
+            field.name,
+            n_shape,
+            32,
+            "tet10_laplacian_apply_fff_soa_tpl",
+            "<scalar_t, scalar_t>",
+            metric_measure="scalar_t(1.0 / 6.0)",
+            )
+        )
+    field_shape_order = _single_field_shape_order(n_shape, n_fields, field_stream_order)
+    field_element_lines, field_element_array = _single_field_element_alias_lines(
+        n_shape,
+        field_shape_order,
+        "    ",
+        pointer_type="uint16_t",
+    )
+    lines = [
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+        "template <typename scalar_t, typename jacobian_t>",
+        "%s int %s(" % (_function_qualifier(), impl),
+    ]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_QP = %d;" % n_qp,
+            "    static constexpr int N_SHAPE = %d;" % n_shape,
+            "    static constexpr int N_FIELDS = %d;" % n_fields,
+            "    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;",
+            "    static constexpr int VECTOR_SIZE = %d;" % vector_size,
+            "    (void)nnodes;",
+            "    (void)max_nodes_per_pack;",
+        ]
+    )
+    lines.extend(
+        _mesh_reference_alias_lines(
+            prefix,
+            rule,
+            "affine",
+            emit_reference_basis=not omit_simplex_reference_basis_inputs,
+        )
+    )
+    lines.extend(field_element_lines)
+    lines.extend(
+        [
+            "",
+            "#pragma omp parallel",
+            "    {",
+        ]
+    )
+    if dependencies.current:
+        lines.append(
+            "        scalar_t *const SFEM_RESTRICT pack_current = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
+        )
+    if dependencies.previous:
+        lines.append(
+            "        scalar_t *const SFEM_RESTRICT pack_previous = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
+        )
+    lines.extend(
+        [
+            "        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);",
+            "        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);",
+            "",
+            "#pragma omp for schedule(static)",
+            "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
+            "            const ptrdiff_t e_start = pack * n_elements_per_pack;",
+            "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
+            "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
+            "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
+            "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
+            "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
+            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+        ]
+    )
+    if dependencies.current:
+        lines.extend(
+            [
+                "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "                const idx_t node = owned_nodes_ptr[pack] + k;",
+                "                pack_current[k] = %s[node * current_stride];" % field.name,
+                "            }",
+                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "                pack_current[n_contiguous + k] = %s[ghosts[k] * current_stride];" % field.name,
+                "            }",
+            ]
+        )
+    if dependencies.previous:
+        lines.extend(
+            [
+                "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                "                const idx_t node = owned_nodes_ptr[pack] + k;",
+                "                pack_previous[k] = %s_old[node * previous_stride];" % field.name,
+                "            }",
+                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                "                pack_previous[n_contiguous + k] = %s_old[ghosts[k] * previous_stride];" % field.name,
+                "            }",
+            ]
+        )
+    lines.extend(
+        [
+            "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+            "                const idx_t node = owned_nodes_ptr[pack] + k;",
+            "                pack_direction[k] = %s_direction[node * direction_stride];" % field.name,
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "                pack_direction[n_contiguous + k] = %s_direction[ghosts[k] * direction_stride];" % field.name,
+            "            }",
+            "",
+            "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
+            "                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
+        ]
+    )
+    if dependencies.current:
+        lines.append("                scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
+    if dependencies.previous:
+        lines.append("                scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+    lines.extend(
+        [
+            "                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
+            "                scalar_t block_output[N_STREAMS][VECTOR_SIZE];",
+            "",
+            "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
+            "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
+        ]
+    )
+    if dependencies.current:
+        lines.extend(
+            [
+                "#pragma omp simd",
+                "                    for (int lane = 0; lane < nelems; ++lane) {",
+                "                        block_current[shape][lane] = pack_current[field_shape[evbegin + lane]];",
+                "                    }",
+            ]
+        )
+    if dependencies.previous:
+        lines.extend(
+            [
+                "#pragma omp simd",
+                "                    for (int lane = 0; lane < nelems; ++lane) {",
+                "                        block_previous[shape][lane] = pack_previous[field_shape[evbegin + lane]];",
+                "                    }",
+            ]
+        )
+    lines.extend(
+        [
+            "#pragma omp simd",
+            "                    for (int lane = 0; lane < nelems; ++lane) {",
+            "                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];",
+            "                        block_output[shape][lane] = scalar_t(0);",
+            "                    }",
+            "                }",
+        ]
+    )
+    lines.extend(_affine_geometry_stream_conversion_lines(affine_geometry_streams, "                "))
+    if dependencies.uses_adjugate and not uses_cached_affine_metric:
+        lines.extend(
+            [
+                "                const scalar_t *block_adjugate[%d];" % (dim * dim),
+                "                for (int component = 0; component < %d; ++component) {"
+                % (dim * dim),
+                "                    block_adjugate[component] = block_affine_geometry_streams[component];",
+                "                }",
+            ]
+        )
+    if uses_cached_affine_metric:
+        lines.append(
+            "                const scalar_t *const block_geom_metric[%d] = {%s};"
+            % (
+                gradient_metric.metric_components,
+                _indexed_geometry_metric_stream_initializer(
+                    "block_affine_geometry_streams",
+                    dim,
+                    getattr(
+                        gradient_metric,
+                        "affine_geometry_component_order",
+                        "upper_column_major",
+                    ),
+                ),
+            )
+        )
+        lines.append(
+            "                static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};"
+        )
+    elif gradient_metric is not None:
+        lines.append(
+            "                scalar_t block_geom_metric_data[%d][VECTOR_SIZE];"
+            % gradient_metric.metric_components
+        )
+        lines.extend(["", *_work_item_loop_lines("                ")])
+        lines.extend(
+            _geometry_metric_grouping_lines(
+                dim,
+                "block_affine_geometry_streams[%d][lane]"
+                % affine_geometry_stream_indices["jacobian_determinant0"],
+                lambda component: "block_affine_geometry_streams[%d][lane]"
+                % affine_geometry_stream_indices["jacobian_adjugate%d" % component],
+                lambda component: "block_geom_metric_data[%d][lane]" % component,
+                "                    ",
+                "metric",
+            )
+        )
+        lines.append("                }")
+        lines.append(
+            "                const scalar_t *const block_geom_metric[%d] = %s;"
+            % (
+                gradient_metric.metric_components,
+                _geometry_metric_stream_initializer(
+                    "block_geom_metric_data",
+                    dim,
+                ),
+            )
+        )
+    call_args = ["nelems", "0"]
+    if gradient_metric is not None:
+        call_args.append("block_geom_metric")
+    else:
+        call_args.append(
+            "block_affine_geometry_streams[%d]"
+            % affine_geometry_stream_indices["jacobian_determinant0"]
+        )
+    if dependencies.uses_adjugate and gradient_metric is None:
+        call_args.append("block_adjugate")
+    if tensor_product:
+        call_args.append(_mesh_reference_name("affine", "shape_1d"))
+        if dependencies.uses_reference_gradients:
+            call_args.append(_mesh_reference_name("affine", "grad_1d"))
+        call_args.append(_mesh_reference_name("affine", "q_weight_1d"))
+    else:
+        if not omit_simplex_reference_basis_inputs:
+            call_args.append(_mesh_reference_name("affine", "shape"))
+            if dependencies.uses_reference_gradients:
+                call_args.extend(
+                    _mesh_reference_name(
+                        "affine",
+                        sfem_simplex_grad_ref_name("grad_ref", d),
+                    )
+                    for d in range(dim)
+                )
+        call_args.append(
+            "cached_affine_metric_q_weight"
+            if uses_cached_affine_metric
+            else _mesh_reference_name("affine", "q_weight")
+        )
+    if dependencies.current:
+        call_args.append("block_current")
+    if dependencies.previous:
+        call_args.append("block_previous")
+    call_args.append("block_direction")
+    call_args.extend(map(str, dependencies.parameters))
+    call_args.append("block_output")
+    lines.extend(
+        [
+            "",
+            "                %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
+            % (block_function, ", ".join(call_args)),
+            "",
+            "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
+            "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
+            "                    for (int lane = 0; lane < nelems; ++lane) {",
+            "                        pack_out[field_shape[evbegin + lane]] += block_output[shape][lane];",
+            "                    }",
+            "                }",
+            "            }",
+            "",
+            "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
+            "                pack_out[k] = scalar_t(0);",
+            "            }",
+            "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+            "#pragma omp atomic update",
+            "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field.name,
+            "                pack_out[n_contiguous + k] = scalar_t(0);",
+            "            }",
+            "        }",
+            "    }",
+            "    return SFEM_SUCCESS;",
+            "}",
+            "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+        ]
+    )
+    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        typed_params = [
+            param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
+            for param in params
+        ]
+        lines.append('extern "C" int %s%s(' % (function, suffix))
+        for index, param in enumerate(typed_params):
+            lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
+        call_args = [
+            "n_packs",
+            "n_elements_per_pack",
+            "nelements",
+            "nnodes",
+            "max_nodes_per_pack",
+            "elements",
+            "owned_nodes_ptr",
+            "n_shared_nodes",
+            "ghost_ptr",
+            "ghost_idx",
+        ]
+        if uses_cached_affine_metric:
+            call_args.extend(
+                "g_geom_metric%d" % i
+                for i in range(gradient_metric.metric_components)
+            )
+        elif dependencies.uses_adjugate:
+            call_args.extend(
+                "g_jacobian_adjugate%d" % i for i in range(dim * dim)
+            )
+        if not uses_cached_affine_metric:
+            call_args.append("g_jacobian_determinant0")
+        call_args.extend(map(str, dependencies.parameters))
+        if dependencies.current:
+            call_args.append("current_stride")
+            call_args.extend(field.name for field in system.fields)
+        if dependencies.previous:
+            call_args.append("previous_stride")
+            call_args.extend("%s_old" % field.name for field in system.fields)
+        call_args.append("direction_stride")
+        call_args.extend("%s_direction" % field.name for field in system.fields)
+        call_args.append("out_stride")
+        call_args.extend("%s_out" % field.name for field in system.fields)
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s<%s, geom_t>(%s);"
                 % (impl, scalar_type, ", ".join(call_args)),
                 "}",
                 "",

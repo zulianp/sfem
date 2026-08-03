@@ -672,15 +672,15 @@ class CoupledResidualSystemTest(unittest.TestCase):
         )
         source_by_path = {generated.path: generated.source for generated in files}
         local_source = source_by_path["coupled_diffusion_hex27_d3_tensor_product_local.hpp"]
-        operator_source = source_by_path["coupled_diffusion_hex27_hex27_operator.cpp"]
+        operator_source = source_by_path["coupled_diffusion_hex27_operator.cpp"]
         tensor_source = source_by_path["tensor_product_kernels.hpp"]
         marker = (
             "static SFEM_INLINE int "
-            "coupled_diffusion_hex27_hex27_residual_isoparametric_mesh_soa_impl"
+            "coupled_diffusion_hex27_residual_isoparametric_mesh_soa_impl"
         )
         section = operator_source.split(marker, 1)[1].split(
             'extern "C" int '
-            "coupled_diffusion_hex27_hex27_residual_isoparametric_mesh_soa",
+            "coupled_diffusion_hex27_residual_isoparametric_mesh_soa",
             1,
         )[0]
         self.assertIn(
@@ -717,7 +717,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     "-fopenmp-simd",
                     "-Werror",
                     "-c",
-                    os.path.join(tmpdir, "coupled_diffusion_hex27_hex27_operator.cpp"),
+                    os.path.join(tmpdir, "coupled_diffusion_hex27_operator.cpp"),
                     "-I",
                     tmpdir,
                     "-o",
