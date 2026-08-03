@@ -305,7 +305,7 @@ namespace sfem {
             ////////////////////////////////////////////////////////////////////////////////////
 
             bool enable_coarse_space_preconditioner = true;
-            bool enable_mixed_precision             = true;
+            bool enable_mixed_precision             = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", true);
 
             bool collect_energy_norm_correction = true;
             bool coarse_solver_verbose          = false;
