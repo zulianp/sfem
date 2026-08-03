@@ -5,6 +5,7 @@
 #include "smesh_base.hpp"
 #include "smesh_env.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_mesh_reorder.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -41,7 +42,9 @@ namespace {
         const smesh::Path mesh_path("/private/tmp/sfem_parallel_laplacian_apply_mesh");
 
         if (comm->rank() == 0) {
-            auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 40, 30, 20, -1, -0.5, 0.25, 1, 1.5, 2.0);
+            auto mesh       = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 80, 60, 40, -1, -0.5, 0.25, 1, 1.5, 2.0);
+            auto reordering = smesh::SFC::create_from_env();
+            reordering->reorder(*mesh);
             make_mesh_nonuniform(mesh);
             SFEM_TEST_ASSERT(mesh->write(mesh_path) == SFEM_SUCCESS);
         }
@@ -173,7 +176,8 @@ namespace {
             const ptrdiff_t n_global_dofs = (comm->size() > 1) ? parallel_mesh->distributed()->n_nodes_global() : n_serial_dofs;
             const double    serial_rate   = static_cast<double>(n_serial_dofs) * static_cast<double>(bench_reps) / serial_elapsed;
             const double parallel_rate = static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / parallel_elapsed;
-            std::printf("Laplacian apply DOF rates: serial %.6e dof/s, parallel %.6e dof/s, speedup %.3f, reps %d\n",
+            std::printf("Laplacian apply(%ld) DOF rates: serial %.6e dof/s, parallel %.6e dof/s, speedup %.3f, reps %d\n",
+                        n_global_dofs,
                         serial_rate,
                         parallel_rate,
                         parallel_rate / serial_rate,

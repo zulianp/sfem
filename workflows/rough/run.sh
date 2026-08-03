@@ -5,6 +5,7 @@ set -e
 rm -rf  rough_surface surf_tri3
 
 db_to_raw rock.vtk rock
+sfc rock rock
 db_to_raw rough_surface.vtk rough_surface
 echo "element_type: QUAD4" > rough_surface/meta.yaml
 
