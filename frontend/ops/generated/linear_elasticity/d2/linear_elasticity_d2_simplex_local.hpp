@@ -8,8 +8,8 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-#include "../kernel_math.hpp"
-#include "../tensor_product_kernels.hpp"
+#include "../../kernel_math.hpp"
+#include "../../tensor_product_kernels.hpp"
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
@@ -37,8 +37,8 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_objective_block(
         const scalar_t *const SFEM_RESTRICT grad_ref_x,
         const scalar_t *const SFEM_RESTRICT grad_ref_y,
         const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT value
 ) {
@@ -116,8 +116,8 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_tri3_objective_block(
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate3,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
         const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT value
 ) {
@@ -159,8 +159,8 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_gradient_block(
         const scalar_t *const SFEM_RESTRICT grad_ref_x,
         const scalar_t *const SFEM_RESTRICT grad_ref_y,
         const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2]
 ) {
@@ -267,8 +267,8 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_tri3_gradient_block(
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate3,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
         const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2]
 ) {
@@ -327,8 +327,8 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_apply_block(
         const scalar_t *const SFEM_RESTRICT grad_ref_x,
         const scalar_t *const SFEM_RESTRICT grad_ref_y,
         const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2]
 ) {
@@ -435,8 +435,8 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_tri3_apply_block(
         const scalar_t *const SFEM_RESTRICT jacobian_adjugate3,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant0,
         const scalar_t *const SFEM_RESTRICT q_weight,
-        const scalar_t mu,
         const scalar_t lmbda,
+        const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * 2],
         scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * 2]
 ) {

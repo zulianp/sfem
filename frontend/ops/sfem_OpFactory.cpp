@@ -2,6 +2,7 @@
 
 #include <map>
 #include "sfem_BoundaryMass.hpp"
+#include "sfem_BDF2InertiaPotential.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "generated/sfem_generated_ops_registration.hpp"
@@ -22,6 +23,7 @@
 #include "sfem_PackedLaplacian.hpp"
 #include "sfem_PlugInOp.hpp"
 #include "sfem_SemiStructuredEMLaplacian.hpp"
+#include "sfem_SemiStructuredEMLinearElasticity.hpp"
 #include "sfem_SpectralElementLaplacian.hpp"
 #include "sfem_VectorLaplacian.hpp"
 
@@ -43,6 +45,8 @@ namespace sfem {
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
             instance_.private_register_op("ss:KelvinVoigtNewmark", KelvinVoigtNewmark::create);
+            instance_.private_register_op("BDF2InertiaPotential", BDF2InertiaPotential::create);
+            instance_.private_register_op("ss:BDF2InertiaPotential", BDF2InertiaPotential::create);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("ss:LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
@@ -51,6 +55,7 @@ namespace sfem {
             instance_.private_register_op("ss:Laplacian", Laplacian::create);
             instance_.private_register_op("ss:LumpedMass", LumpedMass::create);
             instance_.private_register_op("ss:em:Laplacian", SemiStructuredEMLaplacian::create);
+            instance_.private_register_op("ss:em:LinearElasticity", SemiStructuredEMLinearElasticity::create);
             instance_.private_register_op("ss:SpectralElementLaplacian", SpectralElementLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);

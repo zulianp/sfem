@@ -20,6 +20,7 @@ namespace sfem {
         static OperatorType CRS_SYM     = "CRS_SYM";
         static OperatorType BSR         = "BSR";
         static OperatorType BSR_SYM     = "BSR_SYM";
+        static OperatorType DIA         = "DIA";
         static OperatorType COO_SYM     = "COO_SYM";
         static OperatorType SPLITDACRS  = "SPLITDACRS";
         static OperatorType SELL        = "SELL";

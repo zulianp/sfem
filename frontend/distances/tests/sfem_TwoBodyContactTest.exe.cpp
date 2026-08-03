@@ -62,7 +62,7 @@ struct EnvOptions {
                 smesh::Env::read("SFEM_PENALTY", real_t(10)),
                 smesh::Env::read("SFEM_SOLVER_TOL", real_t(1e-6)),
                 smesh::Env::read("SFEM_ENABLE_CCD", false),
-                smesh::Env::read("SFEM_ELEM_TYPE", smesh::TET4),
+                smesh::Env::read("SFEM_ELEM_TYPE", smesh::HEX8),
                 smesh::Env::read("SFEM_ENABLE_AUGMENTATION", false),
                 smesh::Env::read("SFEM_TOI_SCALE", real_t(1)),
                 smesh::Env::read("SFEM_SEARCH_RADIUS", real_t(0.1)),

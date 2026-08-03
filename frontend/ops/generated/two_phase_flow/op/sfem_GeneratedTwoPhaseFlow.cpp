@@ -1,6 +1,8 @@
 #include "sfem_GeneratedTwoPhaseFlow.hpp"
 #include "sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
 
+
+
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -224,6 +226,16 @@ namespace sfem {
             return 0;
         }
 
+        int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+                                       const smesh::Mesh::Block &block) {
+            for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+                if (packed.block_name(i) == block.name()) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        }
+
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian;
             std::shared_ptr<smesh::FFF> metric_soa;
@@ -341,6 +353,7 @@ namespace sfem {
                     return 0;
             }
         }
+
     }  // namespace
 
     class GeneratedTwoPhaseFlow::Impl {
@@ -349,6 +362,7 @@ namespace sfem {
 
         std::shared_ptr<FunctionSpace> space;
         std::shared_ptr<MultiDomainOp> domains;
+
         std::shared_ptr<Buffer<real_t>> previous_buffer;
         const real_t *previous{nullptr};
         const real_t *current{nullptr};
@@ -382,12 +396,10 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
+            const ptrdiff_t nelements = domain.block->n_elements();
 
-                default:
-                    break;
-            }
             return SFEM_SUCCESS;
         });
 
@@ -400,12 +412,10 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
+            const ptrdiff_t nelements = domain.block->n_elements();
 
-                default:
-                    break;
-            }
             return SFEM_SUCCESS;
         });
 
@@ -418,30 +428,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = two_phase_flow_residual_element_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = two_phase_flow_residual_element_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -455,30 +459,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_tri3_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = two_phase_flow_residual_element_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_tet4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = two_phase_flow_residual_element_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_quad4_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->residual_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_hex8_residual_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -492,30 +490,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = two_phase_flow_jacobian_action_element_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = two_phase_flow_jacobian_action_element_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -529,30 +521,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_tri3_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = two_phase_flow_jacobian_action_element_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_tet4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = two_phase_flow_jacobian_action_element_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_quad4_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->jacobian_action_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(two_phase_flow_hex8_jacobian_action_element_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -577,12 +563,14 @@ namespace sfem {
                 (impl_->residual_uses_affine && false) ||
                 (impl_->jacobian_action_uses_affine && false);
         if (needs_affine_jacobian || needs_affine_metric) {
-            return cache_affine_geometry(impl_->space,
-                                         *impl_->domains,
-                                         needs_affine_jacobian,
-                                         needs_affine_metric_soa,
-                                         needs_affine_metric_aos);
+            const int status = cache_affine_geometry(impl_->space,
+                                                     *impl_->domains,
+                                                     needs_affine_jacobian,
+                                                     needs_affine_metric_soa,
+                                                     needs_affine_metric_aos);
+            if (status != SFEM_SUCCESS) return status;
         }
+
         return SFEM_SUCCESS;
     }
 
@@ -654,52 +642,35 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
             const real_t *const previous = impl_->previous;
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 2;
                     const real_t *const SFEM_RESTRICT p_w_data = state + 0;
                     const real_t *const SFEM_RESTRICT p_c_data = state + 1;
                     const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
                     const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
                     real_t *const SFEM_RESTRICT p_w_out = out + 0;
                     real_t *const SFEM_RESTRICT p_c_out = out + 1;
-                    return impl_->residual_uses_affine ? two_phase_flow_tri3_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_tri3_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
+                if (impl_->residual_uses_affine) {
+                    return two_phase_flow_residual_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
                 }
-                case smesh::TET4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = state + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = state + 1;
-                    const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
-                    const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
-                    return impl_->residual_uses_affine ? two_phase_flow_tet4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_tet4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
-                }
-                case smesh::QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = state + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = state + 1;
-                    const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
-                    const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
-                    return impl_->residual_uses_affine ? two_phase_flow_quad4_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_quad4_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
-                }
-                case smesh::HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = state + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = state + 1;
-                    const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
-                    const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
-                    return impl_->residual_uses_affine ? two_phase_flow_hex8_residual_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_hex8_residual_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
-                }
-                default:
-                    SFEM_ERROR("GeneratedTwoPhaseFlow does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+                return two_phase_flow_residual_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = state + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = state + 1;
+                    const real_t *const SFEM_RESTRICT p_w_old_data = previous + 0;
+                    const real_t *const SFEM_RESTRICT p_c_old_data = previous + 1;
+                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
+                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                if (impl_->residual_uses_affine) {
+                    return two_phase_flow_residual_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
+                }
+                return two_phase_flow_residual_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_old_data, p_c_old_data, FIELD_STRIDE, p_w_out, p_c_out);
+            }
+            SFEM_ERROR("two_phase_flow residual does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -714,6 +685,7 @@ namespace sfem {
         }
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
@@ -758,52 +730,35 @@ namespace sfem {
                             mesh->spatial_dimension(),
                             storage);
 
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 2;
                     const real_t *const SFEM_RESTRICT p_w_data = current + 0;
                     const real_t *const SFEM_RESTRICT p_c_data = current + 1;
                     const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
                     const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
                     real_t *const SFEM_RESTRICT p_w_out = out + 0;
                     real_t *const SFEM_RESTRICT p_c_out = out + 1;
-                    return impl_->jacobian_action_uses_affine ? two_phase_flow_tri3_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_tri3_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+                if (impl_->jacobian_action_uses_affine) {
+                    return two_phase_flow_jacobian_action_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
                 }
-                case smesh::TET4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
-                    const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
-                    const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
-                    return impl_->jacobian_action_uses_affine ? two_phase_flow_tet4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_tet4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
-                }
-                case smesh::QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
-                    const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
-                    const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
-                    return impl_->jacobian_action_uses_affine ? two_phase_flow_quad4_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_quad4_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
-                }
-                case smesh::HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
-                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
-                    const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
-                    const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
-                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
-                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
-                    return impl_->jacobian_action_uses_affine ? two_phase_flow_hex8_jacobian_action_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out) : two_phase_flow_hex8_jacobian_action_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
-                }
-                default:
-                    SFEM_ERROR("GeneratedTwoPhaseFlow does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+                return two_phase_flow_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
             }
+            else if (dim == 3) {
+                static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT p_w_data = current + 0;
+                    const real_t *const SFEM_RESTRICT p_c_data = current + 1;
+                    const real_t *const SFEM_RESTRICT p_w_direction_data = direction + 0;
+                    const real_t *const SFEM_RESTRICT p_c_direction_data = direction + 1;
+                    real_t *const SFEM_RESTRICT p_w_out = out + 0;
+                    real_t *const SFEM_RESTRICT p_c_out = out + 1;
+                if (impl_->jacobian_action_uses_affine) {
+                    return two_phase_flow_jacobian_action_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+                }
+                return two_phase_flow_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+            }
+            SFEM_ERROR("two_phase_flow jacobian_action does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -922,11 +877,27 @@ namespace sfem {
     }
 #endif  // SFEM_ENABLE_RYAML
 
-    int GeneratedTwoPhaseFlow::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
+    int GeneratedTwoPhaseFlow::hessian_crs(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::hessian_crs");
+        return SFEM_FAILURE;
+    }
+
+    int GeneratedTwoPhaseFlow::hessian_bsr(const real_t *const state,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::hessian_bsr");
+        return SFEM_FAILURE;
+    }
+
+    int GeneratedTwoPhaseFlow::hessian_dia(const real_t *const state,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::hessian_dia");
         return SFEM_FAILURE;
     }
 

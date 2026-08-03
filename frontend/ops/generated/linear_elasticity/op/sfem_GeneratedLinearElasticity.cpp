@@ -1,5 +1,7 @@
 #include "sfem_GeneratedLinearElasticity.hpp"
 #include "sfem_GeneratedLinearElasticity_c_abi.hpp"
+#include "packed_thread_scratch.hpp"
+#include "smesh_env.hpp"
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -11,6 +13,7 @@
 #include <algorithm>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 
 
@@ -176,6 +179,16 @@ namespace sfem {
             return 0;
         }
 
+        int packed_block_id_for_domain(const FunctionSpace::PackedMesh &packed,
+                                       const smesh::Mesh::Block &block) {
+            for (ptrdiff_t i = 0; i < packed.n_blocks(); ++i) {
+                if (packed.block_name(i) == block.name()) {
+                    return static_cast<int>(i);
+                }
+            }
+            return -1;
+        }
+
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
@@ -220,6 +233,8 @@ namespace sfem {
         bool objective_uses_affine{false};
         bool gradient_uses_affine{false};
         bool apply_uses_affine{false};
+        bool use_packed_two_pass{false};
+        std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     };
 
     std::unique_ptr<Op> GeneratedLinearElasticity::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -245,70 +260,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tri3_tri3_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tri3_tri3_objective_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_objective_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tri6_tri6_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tri6_tri6_objective_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_objective_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_quad4_quad4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_quad4_quad4_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet4_tet4_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet4_tet4_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet10_tet10_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet10_tet10_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_hex8_hex8_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_hex8_hex8_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_hex27_hex27_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_hex27_hex27_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex27_proteus_hex27_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex27_proteus_hex27_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex64_proteus_hex64_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex64_proteus_hex64_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX125: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex125_proteus_hex125_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex125_proteus_hex125_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX729: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex729_proteus_hex729_objective_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex729_proteus_hex729_objective_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -322,70 +291,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tri3_tri3_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tri3_tri3_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_objective_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tri6_tri6_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tri6_tri6_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_objective_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_quad4_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_quad4_quad4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tet4_tet4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tet4_tet4_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tet10_tet10_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tet10_tet10_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_hex8_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_hex8_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_hex27_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_hex27_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex8_proteus_hex8_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex27_proteus_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex27_proteus_hex27_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex64_proteus_hex64_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex64_proteus_hex64_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX125: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex125_proteus_hex125_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex125_proteus_hex125_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX729: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex729_proteus_hex729_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex729_proteus_hex729_objective_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -399,70 +322,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tri3_tri3_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tri3_tri3_gradient_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_gradient_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tri6_tri6_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tri6_tri6_gradient_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_gradient_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_quad4_quad4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_quad4_quad4_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet4_tet4_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet4_tet4_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet10_tet10_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet10_tet10_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_hex8_hex8_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_hex8_hex8_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_hex27_hex27_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_hex27_hex27_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex27_proteus_hex27_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex27_proteus_hex27_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex64_proteus_hex64_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex64_proteus_hex64_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX125: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex125_proteus_hex125_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex125_proteus_hex125_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX729: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex729_proteus_hex729_gradient_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex729_proteus_hex729_gradient_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -476,70 +353,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tri3_tri3_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tri3_tri3_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_gradient_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tri6_tri6_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tri6_tri6_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_gradient_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_quad4_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_quad4_quad4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tet4_tet4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tet4_tet4_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tet10_tet10_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tet10_tet10_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_hex8_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_hex8_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_hex27_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_hex27_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex8_proteus_hex8_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex27_proteus_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex27_proteus_hex27_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex64_proteus_hex64_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex64_proteus_hex64_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX125: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex125_proteus_hex125_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex125_proteus_hex125_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX729: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex729_proteus_hex729_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex729_proteus_hex729_gradient_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -553,70 +384,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tri3_tri3_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tri3_tri3_apply_soa_diagnostics(), nelements);
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_apply_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tri6_tri6_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tri6_tri6_apply_soa_diagnostics(), nelements);
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_apply_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_quad4_quad4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_quad4_quad4_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet4_tet4_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet4_tet4_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet10_tet10_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet10_tet10_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_hex8_hex8_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_hex8_hex8_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_hex27_hex27_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_hex27_hex27_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex27_proteus_hex27_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex27_proteus_hex27_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex64_proteus_hex64_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex64_proteus_hex64_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX125: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex125_proteus_hex125_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex125_proteus_hex125_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                case smesh::PROTEUS_HEX729: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_proteus_hex729_proteus_hex729_apply_soa_diagnostics(), nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_proteus_hex729_proteus_hex729_apply_soa_diagnostics(), nelements);
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -630,70 +415,24 @@ namespace sfem {
             return total;
         }
 
+        const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
-            switch (domain.element_type) {
-                case smesh::TRI3: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tri3_tri3_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tri3_tri3_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_apply_2d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::TRI6: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tri6_tri6_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tri6_tri6_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
+            }
+            if (dim == 3) {
+                {
+                    const sfem::codegen::KernelDiagnostics *const diagnostics = linear_elasticity_apply_3d_soa_diagnostics(domain.element_type);
+                    if (diagnostics) {
+                        total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+                    }
                 }
-                case smesh::QUAD4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_quad4_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_quad4_quad4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET4: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tet4_tet4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tet4_tet4_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::TET10: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tet10_tet10_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tet10_tet10_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_hex8_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_hex8_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_hex27_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_hex27_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX8: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex8_proteus_hex8_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX27: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex27_proteus_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex27_proteus_hex27_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX64: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex64_proteus_hex64_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex64_proteus_hex64_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX125: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex125_proteus_hex125_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex125_proteus_hex125_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                case smesh::PROTEUS_HEX729: {
-                    const ptrdiff_t nelements = domain.block->n_elements();
-                    total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_proteus_hex729_proteus_hex729_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_proteus_hex729_proteus_hex729_apply_soa_diagnostics(), nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    break;
-                }
-                default:
-                    break;
             }
             return SFEM_SUCCESS;
         });
@@ -734,6 +473,23 @@ namespace sfem {
             }
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
+        impl_->use_packed_two_pass = smesh::Env::read("SFEM_PACKED_TWO_PASS", false);
+        if (impl_->space->has_packed_mesh()) {
+            auto packed = impl_->space->packed_mesh();
+            const ptrdiff_t max_nodes_per_pack = packed->max_nodes_per_pack();
+            const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+            const size_t scratch_size = (size_t)dim * (size_t)max_nodes_per_pack;
+            sfem::codegen::prealloc_thread_scratch<real_t>(0, scratch_size);
+            sfem::codegen::prealloc_thread_scratch<real_t>(1, scratch_size);
+            sfem::codegen::prealloc_thread_scratch<real_t>(2, scratch_size);
+            sfem::codegen::prealloc_thread_scratch<real_t>(3, scratch_size);
+            impl_->packed_ghost_buf.resize((size_t)packed->n_blocks());
+            for (int b = 0; b < packed->n_blocks(); ++b) {
+                const ptrdiff_t n_ghost = packed->n_ghost_entries(b);
+                const ptrdiff_t n_slots = (n_ghost > 0 ? n_ghost : 1) * (ptrdiff_t)dim;
+                impl_->packed_ghost_buf[b] = create_host_buffer<real_t>(n_slots);
+            }
+        }
         return SFEM_SUCCESS;
     }
 
@@ -767,39 +523,75 @@ namespace sfem {
                             cache->jacobian_aos->jacobian_determinant()->data());
                 }
             }
-            switch (domain.element_type) {
-                case smesh::TRI3:
-                    return impl_->gradient_uses_affine ? linear_elasticity_tri3_tri3_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : linear_elasticity_tri3_tri3_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
-                case smesh::TRI6:
-                    return impl_->gradient_uses_affine ? linear_elasticity_tri6_tri6_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : linear_elasticity_tri6_tri6_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
-                case smesh::QUAD4:
-                    return impl_->gradient_uses_affine ? linear_elasticity_quad4_quad4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1) : linear_elasticity_quad4_quad4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, out + 0, out + 1);
-                case smesh::TET4:
-                    if (impl_->gradient_uses_affine) {
-                        return adjugate_aos ? linear_elasticity_tet4_tet4_gradient_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet4_tet4_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+            if (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {
+                auto packed = impl_->space->packed_mesh();
+                const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                if (packed_block >= 0) {
+                    auto packed_elements = packed->elements(packed_block);
+                    auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                    auto n_shared_nodes = packed->n_shared(packed_block);
+                    auto ghost_ptr = packed->ghost_ptr(packed_block);
+                    auto ghost_idx = packed->ghost_idx(packed_block);
+                    auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+                    auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+                    auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+                    const int dim = mesh->spatial_dimension();
+                    if (dim == 2) {
+                        if (impl_->use_packed_two_pass) {
+                            return linear_elasticity_gradient_packed_two_pass_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                        }
+                        return linear_elasticity_gradient_packed_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                     }
-                    return linear_elasticity_tet4_tet4_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::TET10:
-                    return impl_->gradient_uses_affine ? linear_elasticity_tet10_tet10_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet10_tet10_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::HEX8:
-                    return impl_->gradient_uses_affine ? linear_elasticity_hex8_hex8_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_hex8_hex8_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::HEX27:
-                    return impl_->gradient_uses_affine ? linear_elasticity_hex27_hex27_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_hex27_hex27_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX8:
-                    return impl_->gradient_uses_affine ? linear_elasticity_proteus_hex8_proteus_hex8_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex8_proteus_hex8_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX27:
-                    return impl_->gradient_uses_affine ? linear_elasticity_proteus_hex27_proteus_hex27_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex27_proteus_hex27_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX64:
-                    return impl_->gradient_uses_affine ? linear_elasticity_proteus_hex64_proteus_hex64_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex64_proteus_hex64_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX125:
-                    return impl_->gradient_uses_affine ? linear_elasticity_proteus_hex125_proteus_hex125_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex125_proteus_hex125_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX729:
-                    return impl_->gradient_uses_affine ? linear_elasticity_proteus_hex729_proteus_hex729_gradient_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex729_proteus_hex729_gradient_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
-                default:
-                    SFEM_ERROR("GeneratedLinearElasticity does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+                    else if (dim == 3) {
+                        if (impl_->use_packed_two_pass) {
+                            return linear_elasticity_gradient_packed_two_pass_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                        }
+                        return linear_elasticity_gradient_packed_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                    }
+                }
             }
+            if (!impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {
+                auto packed = impl_->space->packed_mesh();
+                const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                if (packed_block >= 0) {
+                    auto packed_elements = packed->elements(packed_block);
+                    auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                    auto n_shared_nodes = packed->n_shared(packed_block);
+                    auto ghost_ptr = packed->ghost_ptr(packed_block);
+                    auto ghost_idx = packed->ghost_idx(packed_block);
+                    auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+                    auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+                    auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+                    const int dim = mesh->spatial_dimension();
+                    if (dim == 2) {
+                        if (impl_->use_packed_two_pass) {
+                            return linear_elasticity_gradient_packed_two_pass_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                        }
+                        return linear_elasticity_gradient_packed_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                    }
+                    else if (dim == 3) {
+                        if (impl_->use_packed_two_pass) {
+                            return linear_elasticity_gradient_packed_two_pass_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                        }
+                        return linear_elasticity_gradient_packed_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                    }
+                }
+            }
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                if (impl_->gradient_uses_affine) {
+                    return linear_elasticity_gradient_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                }
+                return linear_elasticity_gradient_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+            }
+            else if (dim == 3) {
+                if (impl_->gradient_uses_affine) {
+                    return linear_elasticity_gradient_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                }
+                return linear_elasticity_gradient_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+            }
+            SFEM_ERROR("linear_elasticity gradient does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -835,39 +627,93 @@ namespace sfem {
                             cache->jacobian_aos->jacobian_determinant()->data());
                 }
             }
-            switch (domain.element_type) {
-                case smesh::TRI3:
-                    return impl_->apply_uses_affine ? linear_elasticity_tri3_tri3_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1) : linear_elasticity_tri3_tri3_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1);
-                case smesh::TRI6:
-                    return impl_->apply_uses_affine ? linear_elasticity_tri6_tri6_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1) : linear_elasticity_tri6_tri6_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1);
-                case smesh::QUAD4:
-                    return impl_->apply_uses_affine ? linear_elasticity_quad4_quad4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1) : linear_elasticity_quad4_quad4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, h + 0, h + 1, 2, out + 0, out + 1);
-                case smesh::TET4:
-                    if (impl_->apply_uses_affine) {
-                        return adjugate_aos ? linear_elasticity_tet4_tet4_apply_affine_mesh_soa_aos_unit(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate_aos, determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet4_tet4_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                if (impl_->apply_uses_affine) {
+                    if (impl_->space->has_packed_mesh()) {
+                        auto packed = impl_->space->packed_mesh();
+                        const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                        if (packed_block >= 0) {
+                            auto packed_elements = packed->elements(packed_block);
+                            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                            auto n_shared_nodes = packed->n_shared(packed_block);
+                            auto ghost_ptr = packed->ghost_ptr(packed_block);
+                            auto ghost_idx = packed->ghost_idx(packed_block);
+                            auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+                            auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+                            auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+                            if (impl_->use_packed_two_pass) {
+                                return linear_elasticity_apply_packed_two_pass_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
+                            }
+                            return linear_elasticity_apply_packed_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
+                        }
                     }
-                    return linear_elasticity_tet4_tet4_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::TET10:
-                    return impl_->apply_uses_affine ? linear_elasticity_tet10_tet10_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_tet10_tet10_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::HEX8:
-                    return impl_->apply_uses_affine ? linear_elasticity_hex8_hex8_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_hex8_hex8_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::HEX27:
-                    return impl_->apply_uses_affine ? linear_elasticity_hex27_hex27_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_hex27_hex27_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX8:
-                    return impl_->apply_uses_affine ? linear_elasticity_proteus_hex8_proteus_hex8_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex8_proteus_hex8_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX27:
-                    return impl_->apply_uses_affine ? linear_elasticity_proteus_hex27_proteus_hex27_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex27_proteus_hex27_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX64:
-                    return impl_->apply_uses_affine ? linear_elasticity_proteus_hex64_proteus_hex64_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex64_proteus_hex64_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX125:
-                    return impl_->apply_uses_affine ? linear_elasticity_proteus_hex125_proteus_hex125_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex125_proteus_hex125_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                case smesh::PROTEUS_HEX729:
-                    return impl_->apply_uses_affine ? linear_elasticity_proteus_hex729_proteus_hex729_apply_affine_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2) : linear_elasticity_proteus_hex729_proteus_hex729_apply_isoparametric_mesh_soa(domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
-                default:
-                    SFEM_ERROR("GeneratedLinearElasticity does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+                    return linear_elasticity_apply_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
+                }
+                if (impl_->space->has_packed_mesh()) {
+                    auto packed = impl_->space->packed_mesh();
+                    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                    if (packed_block >= 0) {
+                        auto packed_elements = packed->elements(packed_block);
+                        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                        auto n_shared_nodes = packed->n_shared(packed_block);
+                        auto ghost_ptr = packed->ghost_ptr(packed_block);
+                        auto ghost_idx = packed->ghost_idx(packed_block);
+                        auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+                        auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+                        auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+                        if (impl_->use_packed_two_pass) {
+                            return linear_elasticity_apply_packed_two_pass_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
+                        }
+                        return linear_elasticity_apply_packed_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
+                    }
+                }
+                return linear_elasticity_apply_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
             }
+            else if (dim == 3) {
+                if (impl_->apply_uses_affine) {
+                    if (impl_->space->has_packed_mesh()) {
+                        auto packed = impl_->space->packed_mesh();
+                        const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                        if (packed_block >= 0) {
+                            auto packed_elements = packed->elements(packed_block);
+                            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                            auto n_shared_nodes = packed->n_shared(packed_block);
+                            auto ghost_ptr = packed->ghost_ptr(packed_block);
+                            auto ghost_idx = packed->ghost_idx(packed_block);
+                            auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+                            auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+                            auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+                            if (impl_->use_packed_two_pass) {
+                                return linear_elasticity_apply_packed_two_pass_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                            }
+                            return linear_elasticity_apply_packed_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                        }
+                    }
+                    return linear_elasticity_apply_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                }
+                if (impl_->space->has_packed_mesh()) {
+                    auto packed = impl_->space->packed_mesh();
+                    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                    if (packed_block >= 0) {
+                        auto packed_elements = packed->elements(packed_block);
+                        auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                        auto n_shared_nodes = packed->n_shared(packed_block);
+                        auto ghost_ptr = packed->ghost_ptr(packed_block);
+                        auto ghost_idx = packed->ghost_idx(packed_block);
+                        auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+                        auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+                        auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+                        if (impl_->use_packed_two_pass) {
+                            return linear_elasticity_apply_packed_two_pass_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                        }
+                        return linear_elasticity_apply_packed_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                    }
+                }
+                return linear_elasticity_apply_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+            }
+            SFEM_ERROR("linear_elasticity apply does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
         });
     }
 
@@ -896,47 +742,24 @@ namespace sfem {
                       impl_->element_values.get() + nelements,
                       0);
             int status = SFEM_FAILURE;
-            switch (domain.element_type) {
-                case smesh::TRI3:
-                    status = impl_->objective_uses_affine ? linear_elasticity_tri3_tri3_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get()) : linear_elasticity_tri3_tri3_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get());
-                    break;
-                case smesh::TRI6:
-                    status = impl_->objective_uses_affine ? linear_elasticity_tri6_tri6_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get()) : linear_elasticity_tri6_tri6_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get());
-                    break;
-                case smesh::QUAD4:
-                    status = impl_->objective_uses_affine ? linear_elasticity_quad4_quad4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get()) : linear_elasticity_quad4_quad4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, impl_->element_values.get());
-                    break;
-                case smesh::TET4:
-                    status = impl_->objective_uses_affine ? linear_elasticity_tet4_tet4_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_tet4_tet4_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::TET10:
-                    status = impl_->objective_uses_affine ? linear_elasticity_tet10_tet10_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_tet10_tet10_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::HEX8:
-                    status = impl_->objective_uses_affine ? linear_elasticity_hex8_hex8_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_hex8_hex8_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::HEX27:
-                    status = impl_->objective_uses_affine ? linear_elasticity_hex27_hex27_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_hex27_hex27_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX8:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex8_proteus_hex8_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_proteus_hex8_proteus_hex8_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX27:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex27_proteus_hex27_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_proteus_hex27_proteus_hex27_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX64:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex64_proteus_hex64_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_proteus_hex64_proteus_hex64_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX125:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex125_proteus_hex125_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_proteus_hex125_proteus_hex125_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX729:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex729_proteus_hex729_objective_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get()) : linear_elasticity_proteus_hex729_proteus_hex729_objective_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                    break;
-                default:
-                    SFEM_ERROR("GeneratedLinearElasticity does not support element type %d\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                if (impl_->objective_uses_affine) {
+                    status = linear_elasticity_objective_2d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
+                } else {
+                    status = linear_elasticity_objective_2d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
+                }
+            }
+            else if (dim == 3) {
+                if (impl_->objective_uses_affine) {
+                    status = linear_elasticity_objective_3d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
+                } else {
+                    status = linear_elasticity_objective_3d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
+                }
+            }
+            if (dim != 2 && dim != 3) {
+                SFEM_ERROR("linear_elasticity objective does not support spatial dimension %d\n", dim);
+                return SFEM_FAILURE;
             }
             if (status != SFEM_SUCCESS) return status;
             real_t sum = 0;
@@ -985,47 +808,62 @@ namespace sfem {
                       impl_->element_values.get() + nvalues,
                       real_t(0));
             int status = SFEM_FAILURE;
-            switch (domain.element_type) {
-                case smesh::TRI3:
-                    status = impl_->objective_uses_affine ? linear_elasticity_tri3_tri3_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : linear_elasticity_tri3_tri3_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::TRI6:
-                    status = impl_->objective_uses_affine ? linear_elasticity_tri6_tri6_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : linear_elasticity_tri6_tri6_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::QUAD4:
-                    status = impl_->objective_uses_affine ? linear_elasticity_quad4_quad4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get()) : linear_elasticity_quad4_quad4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::TET4:
-                    status = impl_->objective_uses_affine ? linear_elasticity_tet4_tet4_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_tet4_tet4_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::TET10:
-                    status = impl_->objective_uses_affine ? linear_elasticity_tet10_tet10_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_tet10_tet10_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::HEX8:
-                    status = impl_->objective_uses_affine ? linear_elasticity_hex8_hex8_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_hex8_hex8_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::HEX27:
-                    status = impl_->objective_uses_affine ? linear_elasticity_hex27_hex27_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_hex27_hex27_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX8:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_proteus_hex8_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX27:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex27_proteus_hex27_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_proteus_hex27_proteus_hex27_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX64:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex64_proteus_hex64_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_proteus_hex64_proteus_hex64_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX125:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex125_proteus_hex125_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_proteus_hex125_proteus_hex125_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                case smesh::PROTEUS_HEX729:
-                    status = impl_->objective_uses_affine ? linear_elasticity_proteus_hex729_proteus_hex729_objective_steps_affine_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get()) : linear_elasticity_proteus_hex729_proteus_hex729_objective_steps_isoparametric_mesh_soa(nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("mu"), domain.parameters->require_real_value("lmbda"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
-                    break;
-                default:
-                    SFEM_ERROR("GeneratedLinearElasticity does not support element type %d\n",
-                               domain.element_type);
+            if (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {
+                auto packed = impl_->space->packed_mesh();
+                const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                if (packed_block >= 0) {
+                    auto packed_elements = packed->elements(packed_block);
+                    auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                    auto n_shared_nodes = packed->n_shared(packed_block);
+                    auto ghost_ptr = packed->ghost_ptr(packed_block);
+                    auto ghost_idx = packed->ghost_idx(packed_block);
+                    const int dim = mesh->spatial_dimension();
+                    if (dim == 2) {
+                        status = linear_elasticity_objective_steps_packed_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    }
+                    else if (dim == 3) {
+                        status = linear_elasticity_objective_steps_packed_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    }
+                }
+            }
+            if (!impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {
+                auto packed = impl_->space->packed_mesh();
+                const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
+                if (packed_block >= 0) {
+                    auto packed_elements = packed->elements(packed_block);
+                    auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+                    auto n_shared_nodes = packed->n_shared(packed_block);
+                    auto ghost_ptr = packed->ghost_ptr(packed_block);
+                    auto ghost_idx = packed->ghost_idx(packed_block);
+                    const int dim = mesh->spatial_dimension();
+                    if (dim == 2) {
+                        status = linear_elasticity_objective_steps_packed_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    }
+                    else if (dim == 3) {
+                        status = linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    }
+                }
+            }
+            if (status == SFEM_FAILURE) {
+                const int dim = mesh->spatial_dimension();
+                if (dim == 2) {
+                    if (impl_->objective_uses_affine) {
+                        status = linear_elasticity_objective_steps_2d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    } else {
+                        status = linear_elasticity_objective_steps_2d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                    }
+                }
+                else if (dim == 3) {
+                    if (impl_->objective_uses_affine) {
+                        status = linear_elasticity_objective_steps_3d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    } else {
+                        status = linear_elasticity_objective_steps_3d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                    }
+                }
+                if (dim != 2 && dim != 3) {
+                    SFEM_ERROR("linear_elasticity objective_steps does not support spatial dimension %d\n", dim);
                     return SFEM_FAILURE;
+                }
             }
             if (status != SFEM_SUCCESS) return status;
             for (int step = 0; step < nsteps; ++step) {
@@ -1040,16 +878,146 @@ namespace sfem {
         });
     }
 
-    int GeneratedLinearElasticity::hessian_crs(const real_t *const,
-                            const count_t *const,
-                            const idx_t *const,
-                            real_t *const) {
+    int GeneratedLinearElasticity::hessian_crs(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_crs");
-        return SFEM_FAILURE;
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_crs requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                SFEM_ERROR("linear_elasticity hessian_crs 2d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            else if (dim == 3) {
+                SFEM_ERROR("linear_elasticity hessian_crs 3d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            SFEM_ERROR("linear_elasticity hessian_crs does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_bsr(const real_t *const x,
+                            const count_t *const rowptr,
+                            const idx_t *const colidx,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_bsr");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_bsr requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                return linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
+            }
+            else if (dim == 3) {
+                return linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), rowptr, colidx, values);
+            }
+            SFEM_ERROR("linear_elasticity hessian_bsr does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_dia(const real_t *const x,
+                            const int *const diag_offsets,
+                            const ptrdiff_t ndiag,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_dia");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_dia requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                SFEM_ERROR("linear_elasticity hessian_dia 2d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            else if (dim == 3) {
+                SFEM_ERROR("linear_elasticity hessian_dia 3d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            SFEM_ERROR("linear_elasticity hessian_dia does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_coo(const real_t *const x,
+                            const ptrdiff_t nnz,
+                            const idx_t *const rows,
+                            const idx_t *const cols,
+                            real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_coo");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_coo requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                SFEM_ERROR("linear_elasticity hessian_coo 2d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            else if (dim == 3) {
+                SFEM_ERROR("linear_elasticity hessian_coo 3d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            SFEM_ERROR("linear_elasticity hessian_coo does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_patch(const real_t *const x,
+                              const count_t *const rowptr,
+                              const idx_t *const colidx,
+                              real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_patch");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedLinearElasticity::hessian_patch requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                SFEM_ERROR("linear_elasticity hessian_patch 2d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            else if (dim == 3) {
+                SFEM_ERROR("linear_elasticity hessian_patch 3d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            SFEM_ERROR("linear_elasticity hessian_patch does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
     }
 
     void GeneratedLinearElasticity::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::set_option");
+        if (name == "PACKED_TWO_PASS" || name == "two_pass") {
+            impl_->use_packed_two_pass = val;
+            return;
+        }
         AffineOption options[] = {
             {"ASSUME_AFFINE_OBJECTIVE", &impl_->objective_uses_affine},
             {"objective_assume_affine", &impl_->objective_uses_affine},

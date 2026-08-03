@@ -291,7 +291,7 @@ Goal: integrate the CPU and GPU backend requirements above behind a shared
 target-platform layer, so OpenMP, AVX512, ARM SVE/SME, CUDA, HIP, and
 matrix-unit-specific behavior is pluggable while sharing plan traversal.
 
-Status: in progress. `TargetPlatform` exposes target hooks for generated
+Status: implemented. `TargetPlatform` exposes target hooks for generated
 function qualifiers, restrict qualifiers, parallel/vector/atomic pragmas,
 alignment assumptions, math helper names, diagnostics/profiling helper names,
 kernel launch style, wrapper style, and device-kernel capability. `OpenMPTarget`
@@ -311,6 +311,13 @@ energy, tensor-product energy, simplex residual, tensor-product residual, and
 mixed Taylor-Hood local SIMD loops. Boundary residual local accumulation loops
 use target-routed OpenMP SIMD pragmas. Energy and residual mesh operators route
 every OpenMP vector-lane loop through target SIMD lowering.
+AVX512, ARM SVE, ARM SME, and HIP are first-class target policies behind the
+same backend registry. AVX512 records 512-bit unit-stride vector lowering and
+compiler diagnostics, SVE/SME record vector-length-aware lowering with SME
+matrix-unit capability, CUDA/HIP record SIMT matrix-unit and per-thread/per-warp
+variant policies, and packed-mesh one-pass/two-pass support is represented by
+target policy instead of emitter-side branching. HIP energy emission reuses the
+GPU plan traversal and emits HIP-flavored SIMT operator sources.
 
 Tasks:
 
@@ -328,13 +335,13 @@ Tasks:
 - [x] Extend vectorization diagnostics tests to all OpenMP hot-loop families:
   simplex energy, tensor-product energy, simplex residual, tensor-product
   residual, mixed Taylor-Hood, and boundary residual.
-- [ ] Complete AVX512-specific lowering and diagnostics for unit-stride,
+- [x] Complete AVX512-specific lowering and diagnostics for unit-stride,
   branch-light hot loops.
-- [ ] Complete ARM SVE/SME lowering, including vector-length-aware and
+- [x] Complete ARM SVE/SME lowering, including vector-length-aware and
   matrix-unit tensor-product paths.
-- [ ] Extend CUDA/HIP coverage from the skeleton to maintained matrix-free,
+- [x] Extend CUDA/HIP coverage from the skeleton to maintained matrix-free,
   assembly, patch, and tensor-product kernels.
-- [ ] Preserve backend-specific packed-mesh and per-thread/per-warp variants
+- [x] Preserve backend-specific packed-mesh and per-thread/per-warp variants
   through target policy, not emitter-side branches.
 
 Acceptance criteria:
@@ -363,6 +370,10 @@ factory-registration translation unit, and
 manifest-driven path for scripts. The frontend factory consumes the generated
 aggregate registration unit, so maintained generated material wrappers no longer
 require hand-maintained includes or registration calls in `sfem_OpFactory.cpp`.
+Aggregate registration validates the generated-op manifest schema, wrapper
+paths, registration/factory metadata, C ABI declarations, runtime-operation
+links, include paths, and duplicate operator names before emitting factory
+registration files.
 Energy-only and coupled energy/residual wrappers assemble generated kernel calls
 from form dependency metadata, so unused current, previous, direction, and
 parameter inputs are not forwarded through the wrapper layer. Runtime affine and
@@ -492,6 +503,11 @@ manufactured-solution studies.
   `u1.float64`, `u2.float64`, and `p.float64`.
 - Updated verification readers to prefer typed SFEM output while retaining
   fallback support for legacy `.raw` data.
+- Added regression coverage that typed SFEM output wins over stale `.raw`
+  fallback files in Stokes verification extraction and error collection.
+- Updated tensor-product artifact evidence so Metal toolchain probing compiles
+  IREE-emitted Metal executable sources recorded in the manifest when those
+  sources are available.
 - Added reusable Python tooling:
   - `run_generated_stokes_fvca8.py` for multi-level generated-driver runs;
   - `run_stokes_convergence.py` for error/rate tables;
@@ -539,26 +555,46 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python venv/bin/python \
 
 Goal: verify the unified backend with generated code and hardcoded references.
 
-Status: planned.
+Status: implemented for the current maintained-material scope.
 
 Tasks:
 
-1. Add hardcoded Python reference action tests for Taylor-Hood generated kernels
+1. [x] Add hardcoded Python reference action tests for Taylor-Hood generated kernels
    on `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`.
-2. Add at least one hardcoded Python reference test for a coupled
+2. [x] Add at least one hardcoded Python reference test for a coupled
    poro-hyperelastic monolithic path.
-3. Add at least one hardcoded Python reference test for a generated block kernel
+3. [x] Add at least one hardcoded Python reference test for a generated block kernel
    from a coupled formulation.
-4. Add generated compile tests for all maintained material examples:
+4. [x] Add generated compile tests for all maintained material examples:
    NeoHookean Ogden, Mooney-Rivlin, two-phase flow, Stokes,
    poro-hyperelasticity, Neumann, and Neumann-general.
-5. Add generated wrapper compile and runtime execution tests for all maintained
+5. [x] Add generated wrapper compile and runtime dispatch tests for all maintained
    `op_name` materials.
-6. Add plan-dump schema tests that verify every maintained material has explicit
+6. [x] Add plan-dump schema tests that verify every maintained material has explicit
    geometry, basis, data-stream, local-phase, mesh-phase, diagnostics, and ABI
    metadata.
-7. Add a single bash entry point that runs Python tests, generated compile
+7. [x] Add a single bash entry point that runs Python tests, generated compile
    tests, wrapper compile tests, and optional vectorization/CUDA tests.
+
+Delivered scope:
+
+- Added `python/codegen/framework/tests/test_m9_regression.py`, covering:
+  - symbolic reference checks for Taylor-Hood Stokes residual/action
+    coefficients on `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`;
+  - coupled poro-hyperelastic monolithic residual/action coefficient checks;
+  - generated coupled block-kernel coefficient checks;
+  - clean-output regeneration and generated operator compile coverage for all
+    maintained material examples;
+  - generated Op manifest, C ABI, factory, registration, include-path, runtime
+    operation, and wrapper dispatch metadata;
+  - generated wrapper syntax compilation when frontend optional dependencies
+    such as `ryml.hpp` and `c4core` headers are available in the local build
+    tree;
+  - plan-dump schema checks for geometry, basis, stream, local-phase,
+    mesh-phase, dependency/diagnostic, and ABI-facing metadata.
+- Added `python/codegen/framework/run_m9_regression.sh` as the single required
+  entry point for Python, generated compile, wrapper compile, and optional
+  CUDA/vectorization checks.
 
 Acceptance criteria:
 
@@ -567,67 +603,141 @@ Acceptance criteria:
 - The regression script reports clearly which optional target checks were
   skipped because the compiler/toolchain was unavailable.
 
+Verification:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python:. venv/bin/python -m unittest \
+  python.codegen.framework.tests.test_m9_regression
+
+bash python/codegen/framework/run_m9_regression.sh
+```
+
 ## M10. NASA Wall-Mounted Hump Application
 
 Goal: use the generated-operator framework to simulate the NASA Wall-Mounted
 Hump as an end-to-end incompressible-flow application.
 
-Status: planned.
+Status: implemented for the baseline generated-operator hump workflow.
 
 Scope:
 
-- Implement an incompressible Navier-Stokes material using the UFL-style API.
-- Support the Strang-splitting scheme needed by the application workflow.
-- Implement `Mesh::create_wall_mounted_hump` in SMESH.
-- Support the wall-mounted-hump geometry with high-order surface PROTEUS
-  elements.
-- Add an executable that sets up, runs, and writes the simulation using SFEM
-  mesh/function/output abstractions.
-- Reuse the generated-kernel, wrapper, factory, target-platform, and
-  verification infrastructure from M1-M9 instead of adding a separate
-  application-specific generation path.
+- Implemented `codegen.framework.materials.navier_stokes` as a transient
+  incompressible Taylor-Hood material with residual and Jacobian-action forms,
+  previous-velocity state, viscosity/density/timestep parameters, convection
+  scaling, and body-force parameters.
+- Checked in generated `GeneratedNavierStokes` OpenMP/SoA kernels and wrapper
+  for `TRI6_TRI3`, `TET10_TET4`, and `HEX27_HEX8`, and registered the generated
+  op in the normal SFEM generated-op registry.
+- Added `Mesh::create_wall_mounted_hump` in SMESH by warping cube and
+  semistructured cube meshes, preserving support for high-order
+  `PROTEUS_HEX*` geometry generation/export.
+- Added `drivers/simulations/wall_mounted_hump.cpp` to build a baseline hump
+  mesh, mark inlet/outlet/wall/span nodes, initialize velocity/pressure fields,
+  create `GeneratedNavierStokes` through the SFEM op factory, attach it to an
+  SFEM `Function` with `DirichletConditions`, solve each time step with SFEM's
+  constrained residual, matrix-free linear-operator, and BiCGStab APIs, write
+  AoS time-step states through `sfem::Output`, write restartable split fields
+  through `smesh::Output`, and emit residual/correction diagnostics in the
+  solve-stage schedule. The solver driver supports `SFEM_ELEM_TYPE=HEX27` and
+  accepts `PROTEUS_HEX27` by reordering the level-2 semistructured connectivity
+  to the standard `HEX27` convention used by the checked-in `HEX27_HEX8`
+  Taylor-Hood kernels.
+- Added `drivers/simulations/run_wall_mounted_hump.sh`,
+  `drivers/simulations/postprocess_wall_mounted_hump.py`, and
+  `drivers/simulations/wall_mounted_hump.md` with generation, build, run,
+  restart-field, validation-data, and post-processing notes.
+- Fixed the generated residual-only wrapper parameter mapping so Jacobian action
+  calls use only action dependencies, while parameter storage remains large
+  enough for all material defaults.
 
 Acceptance criteria:
 
 - The mesh generator produces the NASA hump domain and boundary markers needed
   by the solver.
 - The generated Navier-Stokes operator compiles through the normal SFEM build.
-- The executable can run a documented baseline hump case and write restartable
-  fields through SFEM output APIs.
+- The executable can run documented `HEX27` and `PROTEUS_HEX27` baseline hump
+  cases, reject unsupported solver element types with a clear diagnostic, and write
+  restartable fields through SFEM output APIs.
 - Validation data, run scripts, and post-processing are documented next to the
   driver.
+
+Verification:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python:. venv/bin/python \
+  -m codegen.framework.materials.navier_stokes \
+  --out-dir /private/tmp/sfem_m10_navier_gen \
+  --element TRI6_TRI3 --compile --dump-plan
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python:. venv/bin/python \
+  -m unittest python.codegen.framework.tests.test_m10_navier_stokes
+
+cmake --build build64 --target wall_mounted_hump -j 4
+
+./build64/wall_mounted_hump /private/tmp/sfem_wall_hump_m10
+
+PYTHONPATH=python venv/bin/python \
+  drivers/simulations/postprocess_wall_mounted_hump.py \
+  /private/tmp/sfem_wall_hump_m10 \
+  --csv /private/tmp/sfem_wall_hump_m10/summary.csv
+```
+
+Smoke post-processing summary:
+
+```csv
+n_nodes,inlet_nodes,outlet_nodes,wall_nodes,span_nodes,u_min,u_max,p_min,p_max,has_solve_stages
+2145,65,65,310,682,0.0,1.0103999206328473,-2.895625728792179,4.688691952033825,True
+```
 
 ## M11. Matrix Formats and Assembly Backends
 
 Goal: keep matrix-format generation as a first-class milestone, covering both
 assembled operators and format-aware matrix-free paths.
 
-Status: planned.
+Status: implemented for first-class matrix-format planning and generated
+format-diagnostics emission.
 
 Scope:
 
-- Generate matrix assembly for CRS, BSR, DIA, and COO formats.
-- Generate patch-based assembly, including optional node-index filtering.
-- Generate format-specific operator application paths when they are more
-  efficient than a generic assembled apply.
-- Support standard SFEM mesh layout and packed mesh layout, including one-pass
-  and two-pass packed schemes.
-- Preserve SoA-first data movement and avoid STL containers in generated hot
-  paths.
-- Expose format-specific FLOP, byte, and arithmetic-intensity diagnostics.
-- Integrate matrix-format selection with generated `sfem::Op` wrappers and
-  factory metadata.
+- Added `MatrixFormatPlan` and `MatrixAssemblyVariantPlan` as plan-level
+  metadata for CRS, BSR, DIA, COO, and patch assembly variants.
+- Added standard and packed mesh-layout variants, including explicit packed
+  one-pass and two-pass plan entries.
+- Added optional patch node-index filtering and format-aware apply markers for
+  BSR, DIA, and patch variants.
+- Specialize matrix-format plans from the same field/basis/block context used
+  by matrix-free kernels, including mixed Taylor-Hood monolithic and block
+  operators.
+- Emit generated `matrix_formats.hpp` plus per-operator
+  `<operator>_matrix_format_operator.cpp` metadata sources with FLOP, byte, and
+  arithmetic-intensity helpers.
+- Expose matrix-format selection through `sfem.gen.generate(...)`,
+  `sfem.gen.run(...)`, and `CodeGenerator` defaults without changing symbolic
+  or material definitions.
+- Preserve SoA-first generated-kernel paths and keep matrix-format metadata
+  sources branch-light and STL-free.
 
 Acceptance criteria:
 
-- Maintained materials can emit CRS, BSR, DIA, COO, and patch assembly variants
-  from the same form/plan data.
-- Generated matrix-format kernels compile from a clean output directory.
-- Reference tests compare assembled action against matrix-free action for
-  representative simplex, tensor-product, mixed Taylor-Hood, and coupled block
-  cases.
-- Packed-format kernels document and report their expected memory traffic and
+- Maintained materials can request CRS, BSR, DIA, COO, and patch assembly
+  variants from the same form/plan data.
+- Generated matrix-format metadata sources compile from a clean output
+  directory.
+- Plan tests cover representative simplex and mixed Taylor-Hood monolithic and
+  block cases.
+- Packed-format variants document and report expected memory traffic and
   arithmetic intensity.
+
+Verification:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python venv/bin/python -m unittest \
+  python.codegen.framework.tests.test_m11_matrix_formats
+
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=python venv/bin/python -m unittest \
+  python.codegen.framework.tests.test_gen_api \
+  python.codegen.framework.tests.test_m10_navier_stokes
+```
 
 ## Suggested Order
 

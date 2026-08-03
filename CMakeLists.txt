@@ -12,6 +12,7 @@ project(
 
 # Std CMake imports
 include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
 # Our CMake imports
 include(cmake/SFEMCompilerFeatures.cmake)
@@ -40,6 +41,7 @@ set(SFEM_MODULES
     algebra/bsr
     algebra/bsr_soa
     algebra/crs
+    algebra/dia
     algebra/crs_x_bsr
     algebra/ell
     algebra/mg
@@ -56,6 +58,7 @@ set(SFEM_MODULES
     operators/cvfem_tet4
     operators/cvfem_tri3
     operators/edgeshell2
+    operators/edgeshell3
     operators/generic
     operators/hex8
     operators/hierarchical
@@ -128,6 +131,8 @@ list(APPEND SFEM_MODULES
     frontend/ops/generated
     frontend/ops/generated/laplace
     frontend/ops/generated/laplace/op
+    frontend/ops/generated/linear_elasticity
+    frontend/ops/generated/linear_elasticity/op
     frontend/ops/generated/neohookean_ogden
     frontend/ops/generated/neohookean_ogden/op
     frontend/ops/generated/two_phase_flow
@@ -362,6 +367,26 @@ foreach(DRIVER ${DRIVERS})
     endif()
 endforeach()
 
+if(SFEM_ENABLE_CUDA)
+    add_executable(bench_packed_laplacian_cuda
+        bench/cuda/bench_packed_laplacian.cpp
+        bench/cuda/bench_packed_laplacian.cu)
+    target_link_libraries(bench_packed_laplacian_cuda PRIVATE sfem)
+    # if(SFEM_ENABLE_OPENMP)
+    #     if(OPENMP_DIR)
+    #         target_compile_options(bench_packed_laplacian_cuda PRIVATE
+    #             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+    #     elseif(OpenMP_CXX_FLAGS)
+    #         separate_arguments(SFEM_OPENMP_CXX_OPTIONS NATIVE_COMMAND "${OpenMP_CXX_FLAGS}")
+    #         foreach(SFEM_OPENMP_CXX_OPTION ${SFEM_OPENMP_CXX_OPTIONS})
+    #             target_compile_options(bench_packed_laplacian_cuda PRIVATE
+    #                 $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${SFEM_OPENMP_CXX_OPTION}>)
+    #         endforeach()
+    #     endif()
+    # endif()
+    list(APPEND SFEM_TARGETS bench_packed_laplacian_cuda)
+endif()
+
 # if(TARGET bench_hyperelasticity)
 #     target_sources(
 #         bench_hyperelasticity
@@ -441,6 +466,16 @@ if(SFEM_ENABLE_TESTING)
         if(TARGET ssdf)
             target_link_libraries(sfem_MaMALTest PRIVATE ssdf)
         endif()
+    endif()
+
+    if(SFEM_ENABLE_MPI)
+        add_executable(sfem_ParallelLaplacianApplyTest frontend/tests/mpi/sfem_ParallelLaplacianApplyTest.cpp)
+        target_link_libraries(sfem_ParallelLaplacianApplyTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelLaplacianApplyTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelLaplacianApplyTest>)
+        set_tests_properties(sfem_ParallelLaplacianApplyTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelLaplacianApplyTest)
     endif()
 endif()
 

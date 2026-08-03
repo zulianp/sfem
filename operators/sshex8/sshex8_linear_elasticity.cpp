@@ -1255,6 +1255,114 @@ int affine_sshex8_linear_elasticity_block_diag_sym(const int                    
     return SFEM_SUCCESS;
 }
 
+int sshex8_linear_elasticity_element_matrix(int                           level,
+                                            const ptrdiff_t               nelements,
+                                            const ptrdiff_t               nnodes,
+                                            idx_t **const SFEM_RESTRICT   elements,
+                                            geom_t **const SFEM_RESTRICT  points,
+                                            const real_t                  mu,
+                                            const real_t                  lambda,
+                                            scalar_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+    const scalar_t      h = 1. / level;
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+        scalar_t adjugate[9];
+        scalar_t determinant;
+        scalar_t sub_adjugate[9];
+        scalar_t sub_determinant;
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, adjugate, &determinant);
+        hex8_sub_adj_0(adjugate, determinant, h, sub_adjugate, &sub_determinant);
+        hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, &values[i * 24 * 24]);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int sshex8_linear_elasticity_element_matrix_cartesian(int                           level,
+                                                      const ptrdiff_t               nelements,
+                                                      const ptrdiff_t               nnodes,
+                                                      idx_t **const SFEM_RESTRICT   elements,
+                                                      geom_t **const SFEM_RESTRICT  points,
+                                                      const real_t                  mu,
+                                                      const real_t                  lambda,
+                                                      scalar_t *const SFEM_RESTRICT values) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+    const scalar_t      h = 1. / level;
+
+    // Standard HEX8 -> cartesian bit-ordering (x + 2*y + 4*z)
+    static const int hex8_to_cartesian[8] = {0, 1, 3, 2, 4, 5, 7, 6};
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[8];
+
+        scalar_t lx[8];
+        scalar_t ly[8];
+        scalar_t lz[8];
+        scalar_t adjugate[9];
+        scalar_t determinant;
+        scalar_t sub_adjugate[9];
+        scalar_t sub_determinant;
+        scalar_t element_matrix[24 * 24];
+
+        for (int v = 0; v < 8; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        for (int v = 0; v < 8; v++) {
+            lx[v] = x[ev[v]];
+            ly[v] = y[ev[v]];
+            lz[v] = z[ev[v]];
+        }
+
+        hex8_adjugate_and_det(lx, ly, lz, 0.5, 0.5, 0.5, adjugate, &determinant);
+        hex8_sub_adj_0(adjugate, determinant, h, sub_adjugate, &sub_determinant);
+        hex8_linear_elasticity_matrix(mu, lambda, sub_adjugate, sub_determinant, element_matrix);
+
+        scalar_t *const SFEM_RESTRICT out = &values[i * 24 * 24];
+        for (int row_c = 0; row_c < 3; row_c++) {
+            for (int row_n = 0; row_n < 8; row_n++) {
+                for (int col_c = 0; col_c < 3; col_c++) {
+                    for (int col_n = 0; col_n < 8; col_n++) {
+                        const int std_idx  = (row_c * 8 + row_n) * 24 + (col_c * 8 + col_n);
+                        const int cart_idx = (row_c * 8 + hex8_to_cartesian[row_n]) * 24 +
+                                             (col_c * 8 + hex8_to_cartesian[col_n]);
+                        out[cart_idx] = element_matrix[std_idx];
+                    }
+                }
+            }
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int sshex8_linear_elasticity_objective_steps(int                               level,
                                              const ptrdiff_t                   nelements,
                                              const ptrdiff_t                   stride,

@@ -1,9 +1,8 @@
 #include "sfem_base.hpp"
-#include "sfem_defs.hpp"
 #include "sfem_macros.hpp"
 
 #include <math.h>
-#include "../../kernel_math.hpp"
+#include "../../../kernel_math.hpp"
 
 namespace sfem {
 namespace codegen {

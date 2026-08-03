@@ -186,11 +186,12 @@ struct TensorProductWeakOps;
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
-    static %(inline_qualifier)s void gradient(
+    template <typename StreamContainer>
+    static %(inline_qualifier)s void gradient_impl(
             const int nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
-            const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 2],
+            const StreamContainer streams,
             const int component,
             scalar_t *const SFEM_RESTRICT gradient) {
         static constexpr int Q = integer_root(N_QP, 2);
@@ -230,6 +231,26 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
                 }
             }
         }
+    }
+
+    static %(inline_qualifier)s void gradient(
+            const int nelems,
+            const scalar_t *const SFEM_RESTRICT shape_1d,
+            const scalar_t *const SFEM_RESTRICT grad_1d,
+            const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 2],
+            const int component,
+            scalar_t *const SFEM_RESTRICT gradient) {
+        gradient_impl(nelems, shape_1d, grad_1d, streams, component, gradient);
+    }
+
+    static %(inline_qualifier)s void gradient_contiguous(
+            const int nelems,
+            const scalar_t *const SFEM_RESTRICT shape_1d,
+            const scalar_t *const SFEM_RESTRICT grad_1d,
+            const scalar_t streams[N_SHAPE * 2][VECTOR_SIZE],
+            const int component,
+            scalar_t *const SFEM_RESTRICT gradient) {
+        gradient_impl(nelems, shape_1d, grad_1d, streams, component, gradient);
     }
 
     static %(inline_qualifier)s void test(
@@ -278,11 +299,12 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2> {
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
 struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
-    static %(inline_qualifier)s void gradient(
+    template <typename StreamContainer>
+    static %(inline_qualifier)s void gradient_impl(
             const int nelems,
             const scalar_t *const SFEM_RESTRICT shape_1d,
             const scalar_t *const SFEM_RESTRICT grad_1d,
-            const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 3],
+            const StreamContainer streams,
             const int component,
             scalar_t *const SFEM_RESTRICT gradient) {
         static constexpr int Q = integer_root(N_QP, 3);
@@ -353,6 +375,26 @@ struct TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3> {
                 }
             }
         }
+    }
+
+    static %(inline_qualifier)s void gradient(
+            const int nelems,
+            const scalar_t *const SFEM_RESTRICT shape_1d,
+            const scalar_t *const SFEM_RESTRICT grad_1d,
+            const scalar_t *const SFEM_RESTRICT streams[N_SHAPE * 3],
+            const int component,
+            scalar_t *const SFEM_RESTRICT gradient) {
+        gradient_impl(nelems, shape_1d, grad_1d, streams, component, gradient);
+    }
+
+    static %(inline_qualifier)s void gradient_contiguous(
+            const int nelems,
+            const scalar_t *const SFEM_RESTRICT shape_1d,
+            const scalar_t *const SFEM_RESTRICT grad_1d,
+            const scalar_t streams[N_SHAPE * 3][VECTOR_SIZE],
+            const int component,
+            scalar_t *const SFEM_RESTRICT gradient) {
+        gradient_impl(nelems, shape_1d, grad_1d, streams, component, gradient);
     }
 
     static %(inline_qualifier)s void test(
@@ -440,6 +482,18 @@ static %(inline_qualifier)s void tensor_gradient(
         const int component,
         scalar_t *const SFEM_RESTRICT gradient) {
     TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::gradient(
+            nelems, shape_1d, grad_1d, streams, component, gradient);
+}
+
+template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE, int DIM>
+static %(inline_qualifier)s void tensor_gradient_contiguous(
+        const int nelems,
+        const scalar_t *const SFEM_RESTRICT shape_1d,
+        const scalar_t *const SFEM_RESTRICT grad_1d,
+        const scalar_t streams[N_SHAPE * DIM][VECTOR_SIZE],
+        const int component,
+        scalar_t *const SFEM_RESTRICT gradient) {
+    TensorProductWeakOps<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM>::gradient_contiguous(
             nelems, shape_1d, grad_1d, streams, component, gradient);
 }
 

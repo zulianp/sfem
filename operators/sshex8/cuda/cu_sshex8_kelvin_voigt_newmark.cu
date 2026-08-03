@@ -238,14 +238,8 @@ int cu_affine_sshex8_kelvin_voigt_newmark_apply_warp_tpl(const ptrdiff_t        
                                                          void                                    *stream) {
     SFEM_DEBUG_SYNCHRONIZE();
 
-    int device_id;
-    cudaGetDevice(&device_id);
-
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, device_id);
-
     dim3 block_size(LEVEL, LEVEL, LEVEL);
-    dim3 n_blocks(MIN(nelements, prop.maxGridSize[0]), 1, 1);
+    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
     if (stream) {
         cudaStream_t s = *static_cast<cudaStream_t *>(stream);

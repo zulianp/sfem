@@ -69,9 +69,10 @@ extern "C" int cu_resample_weight_local(
     }
 }
 
+// Lumped-mass pseudo-inverse (same pattern as blas.reciprocal / host resample_gap).
 __global__ void cu_in_place_div(const ptrdiff_t n, real_t* const SFEM_RESTRICT inout, const real_t* const SFEM_RESTRICT w) {
     for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-        inout[i] /= w[i];
+        if (w[i]) inout[i] /= w[i];
     }
 }
 
