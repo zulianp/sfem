@@ -29,6 +29,8 @@ RSYNC_EXCLUDES=(
     --exclude 'benchmark/db'
     --exclude '.vscode'
     --exclude '.venv'
+    --exclude '.mypy_cache'
+    --exclude '.symbolsarchive'
 )
 
 set -x
