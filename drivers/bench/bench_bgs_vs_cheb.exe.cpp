@@ -145,31 +145,36 @@ namespace {
         }
     }
 
-    SharedBuffer<real_t> build_block_inv_sqrt(const SharedBuffer<real_t>& sym6, const ptrdiff_t nnodes) {
+    // Symmetric Dirichlet clamp: for each constrained component c, set row/col c of B
+    // to e_c so B = blkdiag(I_c, B_ff). Then B^{-1/2} = blkdiag(I_c, B_ff^{-1/2}).
+    SFEM_INLINE void clamp_constrained_components_sym(real_t B[9], const bool constrained[BS]) {
+        for (int c = 0; c < BS; c++) {
+            if (!constrained[c]) continue;
+            for (int k = 0; k < BS; k++) {
+                B[c * BS + k] = 0;
+                B[k * BS + c] = 0;
+            }
+            B[c * BS + c] = 1;
+        }
+    }
+
+    SharedBuffer<real_t> build_block_inv_sqrt(const SharedBuffer<real_t>& sym6,
+                                              const mask_t* const         mask,
+                                              const ptrdiff_t             nnodes) {
         auto S = create_host_buffer<real_t>(nnodes * BS * BS);
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < nnodes; i++) {
             real_t B[9];
             sym6_to_full9(&sym6->data()[i * 6], B);
+
+            bool constrained[BS];
+            for (int d = 0; d < BS; d++) {
+                constrained[d] = mask_get(i * BS + d, mask) != 0;
+            }
+            clamp_constrained_components_sym(B, constrained);
             inv_sqrt_sym3(B, &S->data()[i * 9]);
         }
         return S;
-    }
-
-    // Avoid mixing constrained and free components under the block scaling.
-    void set_S_identity_on_constrained(const SharedBuffer<real_t>& S_blocks, const mask_t* const mask, const ptrdiff_t nnodes) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < nnodes; i++) {
-            real_t* const Si = &S_blocks->data()[i * 9];
-            for (int d = 0; d < BS; d++) {
-                if (!mask_get(i * BS + d, mask)) continue;
-                for (int k = 0; k < BS; k++) {
-                    Si[d * BS + k] = 0;
-                    Si[k * BS + d] = 0;
-                }
-                Si[d * BS + d] = 1;
-            }
-        }
     }
 
     void apply_block_diag(const ptrdiff_t                   nnodes,
@@ -193,7 +198,7 @@ namespace {
                 n,
                 [=](const real_t* const x, real_t* const y) {
                     apply_block_diag(nnodes, S_blocks->data(), x, t1->data());
-                    A->apply(t1->data(), y);  // BSR with scale_output=0 zeros y then accumulates
+                    A->apply(t1->data(), y);
                     apply_block_diag(nnodes, S_blocks->data(), y, t2->data());
                     std::memcpy(y, t2->data(), size_t(n) * sizeof(real_t));
                 },
@@ -212,7 +217,6 @@ namespace {
         const ptrdiff_t n    = f->space()->n_dofs();
         blas->zeros(n, g_work);
         f->gradient(x, g_work);
-        f->apply_zero_constraints(g_work);
         return blas->norm2(n, g_work);
     }
 
@@ -235,12 +239,10 @@ namespace {
         auto blas = make_openmp_blas<real_t>();
 
         auto residual_correct = [&](real_t* const delta) {
-            // r = b - A delta (free dofs); delta += M^{-1} r
+            // r = b - A delta; delta += M^{-1} r
             A->apply(delta, tmp_work);
             blas->zaxpby(ndofs, 1, b, -1, tmp_work, r_work);
-            f->apply_zero_constraints(r_work);
             apply_once(r_work, delta);
-            f->apply_zero_constraints(delta);
         };
 
         // Warmup
@@ -283,8 +285,8 @@ int main(int argc, char** argv) {
 
     const int SFEM_BASE_RESOLUTION = smesh::Env::read("SFEM_BASE_RESOLUTION", 16);
     const int SFEM_REPEAT          = smesh::Env::read("SFEM_REPEAT", 10);
-    const int SFEM_CHEB_IT         = smesh::Env::read("SFEM_CHEB_IT", 40);
-    const int SFEM_BGS_IT          = smesh::Env::read("SFEM_BGS_IT", 40);
+    const int SFEM_CHEB_IT         = smesh::Env::read("SFEM_CHEB_IT", 20);
+    const int SFEM_BGS_IT          = smesh::Env::read("SFEM_BGS_IT", 20);
     const int SFEM_BGS_SYMMETRIC   = smesh::Env::read("SFEM_BGS_SYMMETRIC", 0);
     const int SFEM_SMOOTH_SWEEPS   = smesh::Env::read("SFEM_SMOOTH_SWEEPS", 5);
 
@@ -335,14 +337,13 @@ int main(int argc, char** argv) {
             nnodes, nnodes, BS, graph->rowptr(), graph->colidx(), values, static_cast<real_t>(0));
     auto A = compose_constraints_op(f, A_raw);
 
-    // Block-diagonal B (sym-6) → S = B^{-1/2}, identity on constrained dofs
+    // Block-diagonal B (sym-6) → clamp BC components → S = B^{-1/2}
     auto B_sym6 = create_host_buffer<real_t>(nnodes * 6);
     if (f->hessian_block_diag_sym(x0->data(), B_sym6->data()) != SFEM_SUCCESS) {
         fprintf(stderr, "[Error] hessian_block_diag_sym failed\n");
         return EXIT_FAILURE;
     }
-    auto S_blocks = build_block_inv_sqrt(B_sym6, nnodes);
-    set_S_identity_on_constrained(S_blocks, mask->data(), nnodes);
+    auto S_blocks = build_block_inv_sqrt(B_sym6, mask->data(), nnodes);
 
     auto t1  = create_host_buffer<real_t>(ndofs);
     auto t2  = create_host_buffer<real_t>(ndofs);
@@ -374,7 +375,6 @@ int main(int argc, char** argv) {
     blas->zeros(ndofs, b->data());
     f->gradient(x0->data(), b->data());
     blas->scal(ndofs, -1, b->data());
-    f->apply_zero_constraints(b->data());
 
     const real_t r0 = free_gradient_norm(f, x0->data(), g->data());
 
@@ -385,18 +385,16 @@ int main(int argc, char** argv) {
 
     auto apply_bgs = [&](const real_t* const rhs, real_t* const xx) {
         bgs->apply(rhs, xx);
+        // Raw BSR GS updates Dirichlet dofs; zero them so A_fc δ_c does not pollute free residual.
         f->apply_zero_constraints(xx);
     };
 
     auto apply_cheb = [&](const real_t* const rhs, real_t* const xx) {
         // r_s = S * rhs; solve SAS x_s = r_s; physical correction += S * x_s
         apply_block_diag(nnodes, S_blocks->data(), rhs, rs->data());
-        f->apply_zero_constraints(rs->data());
         blas->zeros(ndofs, xs->data());
         cheb->apply(rs->data(), xs->data());
-        f->apply_zero_constraints(xs->data());
         apply_block_diag(nnodes, S_blocks->data(), xs->data(), corr->data());
-        f->apply_zero_constraints(corr->data());
         blas->axpy(ndofs, 1, corr->data(), xx);
     };
 

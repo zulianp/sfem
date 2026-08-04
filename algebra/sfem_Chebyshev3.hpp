@@ -149,14 +149,18 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
+            // Iteration 0
+            if (max_it <= 0) {
+                iterations_ = 0;
+                return 0;
+            }
+
             const ptrdiff_t n = this->rows();
 
             const T eig_max  = this->eig_max * scale_eig_max;
             const T eig_min  = scale_eig_min * eig_max;
             const T eig_avg  = (eig_min + eig_max) / 2;
             const T eig_diff = (eig_min - eig_max) / 2;
-
-            // Iteration 0
 
             // Params
             T alpha = 1 / eig_avg;
@@ -174,6 +178,10 @@ namespace sfem {
             }
 
             blas->axpy(n, -alpha, p, x);
+            iterations_ = 1;
+            if (max_it == 1) {
+                return 0;
+            }
 
             // Iteration 1
             // Params
@@ -194,9 +202,13 @@ namespace sfem {
                 apply_op(x, p);
             }
             blas->axpy(n, -alpha, p, x);
+            iterations_ = 2;
+            if (max_it == 2) {
+                return 0;
+            }
 
             // Iteration i>=2
-            for (iterations_ = 2; iterations_ < max_it; iterations_++) {
+            for (; iterations_ < max_it; iterations_++) {
                 dea   = eig_diff * alpha;
                 beta  = 0.25 * dea * dea;
                 alpha = 1 / (eig_avg - (beta / alpha));
