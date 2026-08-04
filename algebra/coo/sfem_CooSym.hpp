@@ -21,7 +21,7 @@ namespace sfem {
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         std::function<void(const T* const, T* const)> apply_;
         ptrdiff_t ndofs{SFEM_PTRDIFF_INVALID};
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
 
         SharedBuffer<mask_t> bdy_dofs;
         SharedBuffer<R> offdiag_rowidx;
@@ -30,7 +30,7 @@ namespace sfem {
         SharedBuffer<T> diag_values;
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
             apply_ = [=](const T* const x, T* const y) { return coo_sym_spmv_(x, y); };
         }

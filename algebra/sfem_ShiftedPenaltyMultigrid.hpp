@@ -232,30 +232,30 @@ namespace sfem {
             SharedBuffer<T> x_old;
             if (collect_energy_norm_correction_) {
                 x_old = make_buffer(n_dofs);
-                blas_.copy(n_dofs, x, x_old->data());
+                blas_->copy(n_dofs, x, x_old->data());
             }
 
             if (debug && constraints_op_) {
-                blas_.zeros(n_dofs, mem->work->data());
+                blas_->zeros(n_dofs, mem->work->data());
 
                 // Solution space to constraints space
                 constraints_op_->apply(mem->solution->data(), correction->data());
 
                 // Constraints space to solution space
-                blas_.zeros(n_constrained_dofs, mem->work->data());
+                blas_->zeros(n_constrained_dofs, mem->work->data());
                 impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
-                blas_.zeros(n_dofs, correction->data());
+                blas_->zeros(n_dofs, correction->data());
 
                 // Constraints space to solution space
                 constraints_op_transpose_->apply(mem->work->data(), correction->data());
 
-                blas_.zeros(n_dofs, mem->work->data());
+                blas_->zeros(n_dofs, mem->work->data());
                 op->apply(mem->solution->data(), mem->work->data());
-                blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
-                blas_.axpy(n_dofs, 1, correction->data(), mem->work->data());
+                blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
 
-                const T r_pen_norm = blas_.norm2(n_dofs, mem->work->data());
+                const T r_pen_norm = blas_->norm2(n_dofs, mem->work->data());
 
                 if (debug) {
                     printf("||g|| start: %e\n", (double)r_pen_norm);
@@ -275,32 +275,32 @@ namespace sfem {
                     }
 
                     if (constraints_op_) {
-                        blas_.zeros(n_constrained_dofs, correction->data());
+                        blas_->zeros(n_constrained_dofs, correction->data());
 
                         // Solution space to constraints space
                         constraints_op_->apply(mem->solution->data(), correction->data());
 
                         // Constraints space to solution space
-                        blas_.zeros(n_constrained_dofs, mem->work->data());
+                        blas_->zeros(n_constrained_dofs, mem->work->data());
                         impl_.calc_r_pen(
                                 n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
-                        blas_.zeros(n_dofs, correction->data());
+                        blas_->zeros(n_dofs, correction->data());
 
                         // Constraints space to solution space
                         constraints_op_transpose_->apply(mem->work->data(), correction->data());
 
-                        blas_.zeros(n_dofs, mem->work->data());
+                        blas_->zeros(n_dofs, mem->work->data());
                         op->apply(mem->solution->data(), mem->work->data());
-                        blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
-                        blas_.axpy(n_dofs, 1, correction->data(), mem->work->data());
+                        blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                        blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
 
                     } else {
-                        blas_.zeros(n_dofs, mem->work->data());
+                        blas_->zeros(n_dofs, mem->work->data());
 
                         // Compute material residual
                         op->apply(x, mem->work->data());
-                        blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                        blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
 
                         // Compute penalty residual
                         impl_.calc_r_pen(n_dofs,
@@ -313,7 +313,7 @@ namespace sfem {
                                          mem->work->data());
                     }
 
-                    const T r_pen_norm = blas_.norm2(n_dofs, mem->work->data());
+                    const T r_pen_norm = blas_->norm2(n_dofs, mem->work->data());
 
                     if (debug) {
                         printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)r_pen_norm, omega);
@@ -333,7 +333,7 @@ namespace sfem {
                 auto Tx = x;
 
                 if (constraints_op_) {
-                    blas_.zeros(n_constrained_dofs, correction->data());
+                    blas_->zeros(n_constrained_dofs, correction->data());
                     constraints_op_->apply(x, correction->data());
                     Tx = correction->data();
                 }
@@ -342,7 +342,7 @@ namespace sfem {
                                 ((lb) ? impl_.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
 
                 const T norm_pen  = std::sqrt(e_pen);
-                const T norm_rpen = blas_.norm2(n_dofs, mem->work->data());
+                const T norm_rpen = blas_->norm2(n_dofs, mem->work->data());
 
                 if (enable_shift) {
                     if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
@@ -372,11 +372,11 @@ namespace sfem {
                 }
 
                 if (debug && ub) {
-                    printf("lagr_ub: %e\n", blas_.norm2(n_constrained_dofs, lagr_ub->data()));
+                    printf("lagr_ub: %e\n", blas_->norm2(n_constrained_dofs, lagr_ub->data()));
                 }
 
                 if (debug && lb) {
-                    printf("lagr_lb: %e\n", blas_.norm2(n_constrained_dofs, lagr_lb->data()));
+                    printf("lagr_lb: %e\n", blas_->norm2(n_constrained_dofs, lagr_lb->data()));
                 }
 
                 monitor(iterations_ + 1,
@@ -392,11 +392,11 @@ namespace sfem {
                 if (collect_energy_norm_correction_) {
                     SFEM_TRACE_SCOPE("collect_energy_norm_correction");
 
-                    blas_.zaxpby(n_dofs, 1, x, -1, x_old->data(), correction->data());
-                    blas_.zeros(n_dofs, x_old->data());
+                    blas_->zaxpby(n_dofs, 1, x, -1, x_old->data(), correction->data());
+                    blas_->zeros(n_dofs, x_old->data());
                     op->apply(correction->data(), x_old->data());
-                    energy_norm_correction = sqrt(blas_.dot(n_dofs, x_old->data(), correction->data()));
-                    blas_.copy(n_dofs, x, x_old->data());
+                    energy_norm_correction = sqrt(blas_->dot(n_dofs, x_old->data(), correction->data()));
+                    blas_->copy(n_dofs, x, x_old->data());
                 }
 
                 collect_stats({.count_iter             = iterations_ + 1,
@@ -447,7 +447,7 @@ namespace sfem {
         }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas_);
+            blas_ = make_openmp_blas<T>();
             OpenMP_ShiftedPenalty<T>::build(impl_);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
@@ -469,12 +469,13 @@ namespace sfem {
 
         void set_update_constraints(std::function<void(const T* const)> fun) { update_constraints_ = fun; }
 
-        BLAS_Tpl<T>&           blas() { return blas_; }
+        std::shared_ptr<BLAS<T>>& blas() { return blas_; }
         ShiftedPenalty_Tpl<T>& impl() { return impl_; }
 
     private:
         SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
-            return Buffer<T>::own(n, blas_.allocate(n), blas_.destroy, (enum MemorySpace)execution_space());
+            auto blas_impl = blas_;
+            return Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); }, (enum MemorySpace)execution_space());
         }
 
         inline int finest_level() const { return 0; }
@@ -544,51 +545,51 @@ namespace sfem {
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
             if (debug > 1) {
-                printf("Residual: %g\n", blas_.norm2(n_dofs, mem->work->data()));
+                printf("Residual: %g\n", blas_->norm2(n_dofs, mem->work->data()));
                 if (ub) {
-                    printf("UB: %g, LUB %g\n", blas_.norm2(n_constrained_dofs, ub), blas_.norm2(n_constrained_dofs, l_ub));
+                    printf("UB: %g, LUB %g\n", blas_->norm2(n_constrained_dofs, ub), blas_->norm2(n_constrained_dofs, l_ub));
                 }
                 if (lb) {
-                    printf("LB: %g, LLB %g\n", blas_.norm2(n_constrained_dofs, lb), blas_.norm2(n_constrained_dofs, l_lb));
+                    printf("LB: %g, LLB %g\n", blas_->norm2(n_constrained_dofs, lb), blas_->norm2(n_constrained_dofs, l_lb));
                 }
             }
 
             if (constraints_op_) {
                 // Jacobian
-                blas_.zeros(n_constrained_dofs, correction->data());
+                blas_->zeros(n_constrained_dofs, correction->data());
 
                 // Solution space to constraints space
                 constraints_op_->apply(mem->solution->data(), correction->data());
-                blas_.zeros(n_constrained_dofs, mem->diag->data());
+                blas_->zeros(n_constrained_dofs, mem->diag->data());
 
-                blas_.zeros(n_constrained_dofs, mem->diag->data());
+                blas_->zeros(n_constrained_dofs, mem->diag->data());
                 impl_.calc_J_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
 
                 // Residual
-                blas_.zeros(n_constrained_dofs, mem->work->data());
+                blas_->zeros(n_constrained_dofs, mem->work->data());
                 impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
-                blas_.zeros(n_dofs, correction->data());
+                blas_->zeros(n_dofs, correction->data());
 
                 // Constraints space to solution space
                 constraints_op_transpose_->apply(mem->work->data(), correction->data());
 
-                blas_.zeros(n_dofs, mem->work->data());
+                blas_->zeros(n_dofs, mem->work->data());
                 op->apply(mem->solution->data(), mem->work->data());
-                blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
-                blas_.axpy(n_dofs, 1, correction->data(), mem->work->data());
+                blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
 
             } else {
-                blas_.zeros(n_dofs, mem->work->data());
+                blas_->zeros(n_dofs, mem->work->data());
 
                 // Compute material residual
                 op->apply(mem->solution->data(), mem->work->data());
-                blas_.axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
 
                 // Compute penalty residual
                 impl_.calc_r_pen(n_dofs, mem->solution->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
-                blas_.zeros(n_dofs, mem->diag->data());
+                blas_->zeros(n_dofs, mem->diag->data());
                 impl_.calc_J_pen(n_dofs, mem->solution->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
             }
         }
@@ -598,7 +599,7 @@ namespace sfem {
 
             for (int l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
                 auto mem_coarse = memory_[coarser_level(l)];
-                blas_.zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
+                blas_->zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
 
                 if (constraints_op_) {
                     constraints_restriction_[l]->apply(memory_[l]->diag->data(), mem_coarse->diag->data());
@@ -627,9 +628,9 @@ namespace sfem {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
-                blas_.zeros(n_dofs, correction->data());
+                blas_->zeros(n_dofs, correction->data());
                 smoother->apply(mem->work->data(), correction->data());
-                blas_.axpy(n_dofs, 1, correction->data(), mem->solution->data());
+                blas_->axpy(n_dofs, 1, correction->data(), mem->solution->data());
 
                 count_smoothing_steps += smoother->iterations();
             }
@@ -657,9 +658,9 @@ namespace sfem {
                 eval_residual_and_jacobian();
 
                 // Restriction
-                blas_.zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                blas_->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                 restriction->apply(mem->work->data(), mem_coarse->rhs->data());
-                blas_.zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
+                blas_->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
             }
 
             if (!skip_coarse) {
@@ -673,24 +674,24 @@ namespace sfem {
 
                 {
                     // Prolongation
-                    blas_.zeros(correction->size(), correction->data());
+                    blas_->zeros(correction->size(), correction->data());
                     prolongation->apply(mem_coarse->solution->data(), correction->data());
 
                     if (enable_line_search_) {
                         // ATTENTION to code changes and side-effects
 
                         //  dot(c, (b - A * x))
-                        T numerator = blas_.dot(correction->size(), correction->data(), mem->work->data());
-                        blas_.zeros(mem->work->size(), mem->work->data());
+                        T numerator = blas_->dot(correction->size(), correction->data(), mem->work->data());
+                        blas_->zeros(mem->work->size(), mem->work->data());
                         sop->apply(correction->data(), mem->work->data());
 
                         // dot(c, A * c)
-                        T denominator = blas_.dot(correction->size(), correction->data(), mem->work->data());
+                        T denominator = blas_->dot(correction->size(), correction->data(), mem->work->data());
                         T alpha       = numerator / (denominator == 0 ? T(1e-16) : denominator);
 
                         if (debug) printf("alpha = %g\n", alpha);
 
-                        blas_.scal(correction->size(), alpha, correction->data());
+                        blas_->scal(correction->size(), alpha, correction->data());
                     }
 
                     // FIXME if we find a good reason for this add GPU support here
@@ -709,7 +710,7 @@ namespace sfem {
 
                     } else {
                         // Apply coarse space correction
-                        blas_.axpby(mem->size(), 1, correction->data(), 1, mem->solution->data());
+                        blas_->axpby(mem->size(), 1, correction->data(), 1, mem->solution->data());
                     }
                 }
             }
@@ -739,7 +740,7 @@ namespace sfem {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
-                blas_.zeros(mem->solution->size(), mem->solution->data());
+                blas_->zeros(mem->solution->size(), mem->solution->data());
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
                     return CYCLE_CONTINUE;
                 } else {
@@ -765,27 +766,27 @@ namespace sfem {
 
                 {
                     // Compute residual
-                    blas_.zeros(mem->size(), mem->work->data());
+                    blas_->zeros(mem->size(), mem->work->data());
                     sop->apply(mem->solution->data(), mem->work->data());
-                    blas_.axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    blas_->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
                 }
 
                 {
                     // Restriction
-                    blas_.zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                    blas_->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                     restriction->apply(mem->work->data(), mem_coarse->rhs->data());
-                    blas_.zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
+                    blas_->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
                 }
 
                 CycleReturnCode ret = cycle(coarser_level(level));
 
                 {
                     // Prolongation
-                    blas_.zeros(mem->work->size(), mem->work->data());
+                    blas_->zeros(mem->work->size(), mem->work->data());
                     prolongation->apply(mem_coarse->solution->data(), mem->work->data());
 
                     // Apply coarse space correction
-                    blas_.axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                    blas_->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());
@@ -886,7 +887,7 @@ namespace sfem {
         int                       debug{0};
         std::vector<struct Stats> stats;
 
-        BLAS_Tpl<T>           blas_;
+        std::shared_ptr<BLAS<T>> blas_;
         ShiftedPenalty_Tpl<T> impl_;
     };
 

@@ -19,10 +19,10 @@ namespace sfem {
         ptrdiff_t fine_dim{SFEM_PTRDIFF_INVALID};
         ptrdiff_t coarse_dim{SFEM_PTRDIFF_INVALID};
         bool transposed{false};
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 

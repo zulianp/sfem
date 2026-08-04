@@ -22,7 +22,7 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> left_preconditioner_op;
         std::function<void(const T* const, T* const)> right_preconditioner_op;
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
         int iterations_{0};
 
         // x[i] += r[i] / d[i];
@@ -64,7 +64,7 @@ namespace sfem {
         ExecutionSpace execution_space() const override { return execution_space_; }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -72,7 +72,7 @@ namespace sfem {
             assert(apply_op);
             assert(smooth_);
 
-            return blas.good() && apply_op && smooth_;
+            return blas->good() && apply_op && smooth_;
         }
 
         void monitor(const int iter, const T residual) {
@@ -86,16 +86,16 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            T* r = blas.allocate(n);
+            T* r = blas->allocate(n);
 
             // Residual
             apply_op(x, r);
-            blas.axpby(n, 1, b, -1, r);
+            blas->axpby(n, 1, b, -1, r);
 
-            const T norm_r0 = blas.dot(n, r, r);
+            const T norm_r0 = blas->dot(n, r, r);
             T norm_r = norm_r0;
             if (sqrt(norm_r) < tol) {
-                blas.destroy(r);
+                blas->destroy(r);
                 return 0;
             }
 
@@ -104,10 +104,10 @@ namespace sfem {
                 smooth_(n, b, x);
 
                 if (iterations_ % check_each == 0) {
-                    blas.zeros(n, r);
+                    blas->zeros(n, r);
                     apply_op(x, r);
-                    blas.axpby(n, 1, b, -1, r);
-                    const T norm_r = sqrt(blas.dot(n, r, r));
+                    blas->axpby(n, 1, b, -1, r);
+                    const T norm_r = sqrt(blas->dot(n, r, r));
                     monitor(iterations_, norm_r);
 
                     if (norm_r < tol || norm_r != norm_r) {
@@ -119,7 +119,7 @@ namespace sfem {
             }
 
             if (verbose) {
-                const T norm_r = sqrt(blas.dot(n, r, r));
+                const T norm_r = sqrt(blas->dot(n, r, r));
                 std::printf("Finished at iteration %d with |r| = %g, reduction %g\n",
                             iterations_,
                             (double)norm_r,
@@ -127,7 +127,7 @@ namespace sfem {
             }
 
             // clean-up
-            blas.destroy(r);
+            blas->destroy(r);
             return info;
         }
 

@@ -26,7 +26,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>> preconditioner;
         bool                         verbose{false};
         bool                         use_arg_as_first_residual{false};
-        BLAS_Tpl<T>                  blas;
+        std::shared_ptr<BLAS<T>> blas;
 
         int iterations_{0};
 
@@ -36,12 +36,13 @@ namespace sfem {
 
         void ensure_workspace() {
             if (!workspace || workspace->size() != n_dofs) {
-                workspace = Buffer<T>::own(n_dofs, blas.allocate(n_dofs), this->blas.destroy);
+                auto blas_impl = blas;
+                workspace = Buffer<T>::own(n_dofs, blas_impl->allocate(n_dofs), [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
             }
         }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -61,11 +62,11 @@ namespace sfem {
 
             T* r = workspace->data();
             for (; iterations_ < max_it; iterations_++) {
-                blas.zeros(workspace->size(), r);
+                blas->zeros(workspace->size(), r);
                 op->apply(x, r);
-                blas.axpby(n_dofs, 1.0, b, -1.0, r);
+                blas->axpby(n_dofs, 1.0, b, -1.0, r);
                 if (verbose) {
-                    T norm_residual = this->blas.norm2(workspace->size(), r);
+                    T norm_residual = this->blas->norm2(workspace->size(), r);
                     printf("%d : %f\n", iterations_, (double)norm_residual);
                 }
                 preconditioner->apply(r, x);

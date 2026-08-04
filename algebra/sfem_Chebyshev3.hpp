@@ -21,7 +21,7 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> preconditioner_op;
 
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
         std::shared_ptr<PowerMethod<T>> power_method;
 
         SharedBuffer<T> p_, temp_;
@@ -66,21 +66,22 @@ namespace sfem {
         }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(this->blas);
+            this->blas = make_openmp_blas<T>();
             ensure_power_method();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void ensure_power_method() {
             if (!power_method) {
+                auto blas_impl = this->blas;
                 power_method = std::make_shared<PowerMethod<T>>();
-                power_method->norm2 = this->blas.norm2;
-                power_method->scal = this->blas.scal;
-                power_method->zeros = this->blas.zeros;
+                power_method->norm2 = [blas_impl](const std::ptrdiff_t n, const T* const x) { return blas_impl->norm2(n, x); };
+                power_method->scal = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) { blas_impl->scal(n, alpha, x); };
+                power_method->zeros = [blas_impl](const std::size_t n, T* const x) { blas_impl->zeros(n, x); };
             }
         }
 
-        bool good() const { return blas.good() && apply_op; }
+        bool good() const { return blas->good() && apply_op; }
 
         void monitor(const int iter, const T residual) {
             if (iter == max_it || iter % 100 == 0 || residual < atol) {
@@ -99,15 +100,17 @@ namespace sfem {
         }
 
         void init_with_ones() {
-            T* work = blas.allocate(this->rows());
-            auto ones = Buffer<T>::own(this->rows(), work, blas.destroy);
-            this->blas.values(n_dofs, 1, ones->data());
+            T* work = blas->allocate(this->rows());
+            auto blas_impl = blas;
+            auto ones = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            this->blas->values(n_dofs, 1, ones->data());
             init(ones->data());
         }
 
         void init_with_random() {
-            T* work = blas.allocate(this->rows());
-            auto random_vector = Buffer<T>::own(this->rows(), work, blas.destroy);
+            T* work = blas->allocate(this->rows());
+            auto blas_impl = blas;
+            auto random_vector = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
             assert(execution_space_ == EXECUTION_SPACE_HOST);
 
             auto v = random_vector->data();
@@ -119,17 +122,18 @@ namespace sfem {
         }
 
         void init(const T* const guess_eigenvector) {
-            T* eigenvector = blas.allocate(this->rows());
-            T* work = blas.allocate(this->rows());
-            blas.copy(this->rows(), guess_eigenvector, eigenvector);
+            T* eigenvector = blas->allocate(this->rows());
+            T* work = blas->allocate(this->rows());
+            blas->copy(this->rows(), guess_eigenvector, eigenvector);
 
             eig_max = max_eigen_value(eigenvector, work);
 
             // destroy(eigenvector);  // Maybe we want to keep this around?
             // destroy(work);
 
-            p_ = Buffer<T>::own(this->rows(), work, blas.destroy);
-            temp_ = Buffer<T>::own(this->rows(), eigenvector, blas.destroy);
+            auto blas_impl = blas;
+            p_ = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            temp_ = Buffer<T>::own(this->rows(), eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
         }
 
         int apply(const T* const b, T* const x) override {
@@ -160,15 +164,15 @@ namespace sfem {
 
             // Vectors
             if (is_initial_guess_zero) {
-                blas.copy(n, rhs, p);
-                blas.scal(n, -1, p);
+                blas->copy(n, rhs, p);
+                blas->scal(n, -1, p);
             } else {
-                blas.zeros(n, p);
+                blas->zeros(n, p);
                 apply_op(x, p);
-                blas.axpy(n, -1, rhs, p);
+                blas->axpy(n, -1, rhs, p);
             }
 
-            blas.axpy(n, -alpha, p, x);
+            blas->axpy(n, -alpha, p, x);
 
             // Iteration 1
             // Params
@@ -177,18 +181,18 @@ namespace sfem {
             alpha = 1 / (eig_avg - (beta / alpha));
 
             // Vectors
-            blas.axpby(n, -1, rhs, beta, p);
+            blas->axpby(n, -1, rhs, beta, p);
 
             if (temp) {
-                blas.zeros(n, temp);
+                blas->zeros(n, temp);
                 apply_op(x, temp);
-                blas.axpy(n, 1, temp, p);
+                blas->axpy(n, 1, temp, p);
             } else {
                 // This can only be used if boundary conditions are
                 // already satified or applied with a matrix
                 apply_op(x, p);
             }
-            blas.axpy(n, -alpha, p, x);
+            blas->axpy(n, -alpha, p, x);
 
             // Iteration i>=2
             for (iterations_ = 2; iterations_ < max_it; iterations_++) {
@@ -196,19 +200,19 @@ namespace sfem {
                 beta = 0.25 * dea * dea;
                 alpha = 1 / (eig_avg - (beta / alpha));
 
-                blas.axpby(n, -1, rhs, beta, p);
+                blas->axpby(n, -1, rhs, beta, p);
 
                 if (temp) {
-                    blas.zeros(n, temp);
+                    blas->zeros(n, temp);
                     apply_op(x, temp);
-                    blas.axpy(n, 1, temp, p);
+                    blas->axpy(n, 1, temp, p);
                 } else {
                     // This can only be used if boundary conditions are
                     // already satified or applied with a matrix
                     apply_op(x, p);
                 }
 
-                blas.axpy(n, -alpha, p, x);
+                blas->axpy(n, -alpha, p, x);
             }
 
             return 0;
