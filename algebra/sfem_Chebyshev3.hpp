@@ -21,25 +21,25 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> preconditioner_op;
 
-        std::shared_ptr<BLAS<T>> blas;
+        std::shared_ptr<BLAS<T>>        blas;
         std::shared_ptr<PowerMethod<T>> power_method;
 
         SharedBuffer<T> p_, temp_;
 
         // Solver parameters
-        T atol{1e-10};
-        T rtol{1e-10};
-        T eigen_solver_tol{1e-6};
+        T   atol{1e-10};
+        T   rtol{1e-10};
+        T   eigen_solver_tol{1e-6};
         int eigen_solver_max_it{1000};
         int max_it{3};
         int iterations_{0};
 
-        T eig_max{0};
-        T scale_eig_max{1};
-        T scale_eig_min{0.06};
+        T         eig_max{0};
+        T         scale_eig_max{1};
+        T         scale_eig_min{0.06};
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
-        bool is_initial_guess_zero{false};
-        bool verbose{true};
+        bool      is_initial_guess_zero{false};
+        bool      verbose{true};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
@@ -55,15 +55,13 @@ namespace sfem {
         void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
 
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
-            n_dofs = op->rows();
+            n_dofs         = op->rows();
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>&) override { assert(false); }
 
-        void set_preconditioner(std::function<void(const T* const, T* const)>&& in) {
-            preconditioner_op = in;
-        }
+        void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
 
         void default_init() {
             this->blas = make_openmp_blas<T>();
@@ -73,10 +71,12 @@ namespace sfem {
 
         void ensure_power_method() {
             if (!power_method) {
-                auto blas_impl = this->blas;
-                power_method = std::make_shared<PowerMethod<T>>();
+                auto blas_impl      = this->blas;
+                power_method        = std::make_shared<PowerMethod<T>>();
                 power_method->norm2 = [blas_impl](const std::ptrdiff_t n, const T* const x) { return blas_impl->norm2(n, x); };
-                power_method->scal = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) { blas_impl->scal(n, alpha, x); };
+                power_method->scal  = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) {
+                    blas_impl->scal(n, alpha, x);
+                };
                 power_method->zeros = [blas_impl](const std::size_t n, T* const x) { blas_impl->zeros(n, x); };
             }
         }
@@ -91,25 +91,23 @@ namespace sfem {
 
         T max_eigen_value(T* const guess_eigenvector, T* const work) {
             assert(power_method);
-            return power_method->max_eigen_value(apply_op,
-                                                 eigen_solver_max_it,
-                                                 this->eigen_solver_tol,
-                                                 this->rows(),
-                                                 guess_eigenvector,
-                                                 work);
+            return power_method->max_eigen_value(
+                    apply_op, eigen_solver_max_it, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
         }
 
         void init_with_ones() {
-            T* work = blas->allocate(this->rows());
+            SFEM_TRACE_SCOPE("Chebyshev3::init_with_ones");
+            T*   work      = blas->allocate(this->rows());
             auto blas_impl = blas;
-            auto ones = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            auto ones      = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
             this->blas->values(n_dofs, 1, ones->data());
             init(ones->data());
         }
 
         void init_with_random() {
-            T* work = blas->allocate(this->rows());
-            auto blas_impl = blas;
+            SFEM_TRACE_SCOPE("Chebyshev3::init_with_random");
+            T*   work          = blas->allocate(this->rows());
+            auto blas_impl     = blas;
             auto random_vector = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
             assert(execution_space_ == EXECUTION_SPACE_HOST);
 
@@ -123,7 +121,7 @@ namespace sfem {
 
         void init(const T* const guess_eigenvector) {
             T* eigenvector = blas->allocate(this->rows());
-            T* work = blas->allocate(this->rows());
+            T* work        = blas->allocate(this->rows());
             blas->copy(this->rows(), guess_eigenvector, eigenvector);
 
             eig_max = max_eigen_value(eigenvector, work);
@@ -132,35 +130,38 @@ namespace sfem {
             // destroy(work);
 
             auto blas_impl = blas;
-            p_ = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
-            temp_ = Buffer<T>::own(this->rows(), eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            p_             = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            temp_          = Buffer<T>::own(this->rows(), eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
         }
 
         int apply(const T* const b, T* const x) override {
+            SFEM_TRACE_SCOPE("Chebyshev3::apply");
             precond_apply(b, x, p_->data(), temp_->data());
             return 0;
         }
 
-        int precond_apply(const T* const rhs, T* const x,
+        int precond_apply(const T* const rhs,
+                          T* const       x,
                           // work-buffers
-                          T* const p, T* const temp) {
+                          T* const p,
+                          T* const temp) {
             if (!good()) {
                 return SFEM_FAILURE;
             }
 
             const ptrdiff_t n = this->rows();
 
-            const T eig_max = this->eig_max * scale_eig_max;
-            const T eig_min = scale_eig_min * eig_max;
-            const T eig_avg = (eig_min + eig_max) / 2;
+            const T eig_max  = this->eig_max * scale_eig_max;
+            const T eig_min  = scale_eig_min * eig_max;
+            const T eig_avg  = (eig_min + eig_max) / 2;
             const T eig_diff = (eig_min - eig_max) / 2;
 
             // Iteration 0
 
             // Params
             T alpha = 1 / eig_avg;
-            T beta = 0;
-            T dea = 0;
+            T beta  = 0;
+            T dea   = 0;
 
             // Vectors
             if (is_initial_guess_zero) {
@@ -176,8 +177,8 @@ namespace sfem {
 
             // Iteration 1
             // Params
-            dea = eig_diff * alpha;
-            beta = 0.5 * dea * dea;
+            dea   = eig_diff * alpha;
+            beta  = 0.5 * dea * dea;
             alpha = 1 / (eig_avg - (beta / alpha));
 
             // Vectors
@@ -196,8 +197,8 @@ namespace sfem {
 
             // Iteration i>=2
             for (iterations_ = 2; iterations_ < max_it; iterations_++) {
-                dea = eig_diff * alpha;
-                beta = 0.25 * dea * dea;
+                dea   = eig_diff * alpha;
+                beta  = 0.25 * dea * dea;
                 alpha = 1 / (eig_avg - (beta / alpha));
 
                 blas->axpby(n, -1, rhs, beta, p);
@@ -218,15 +219,15 @@ namespace sfem {
             return 0;
         }
 
-        void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
-        void set_max_it(const int it) override { max_it = it; }
+        void                  set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
+        void                  set_max_it(const int it) override { max_it = it; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
     };
 
     template <typename T>
     std::shared_ptr<Chebyshev3<T>> h_cheb3(const std::shared_ptr<Operator<T>>& op) {
-        auto ret = std::make_shared<Chebyshev3<T>>();
+        auto ret    = std::make_shared<Chebyshev3<T>>();
         ret->n_dofs = op->rows();
         ret->set_op(op);
         ret->default_init();
