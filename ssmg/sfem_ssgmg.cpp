@@ -29,7 +29,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             // FIXME this should not be here!
-            CUDA_BLAS<real_t>::build_blas(mg->blas());
+            mg->blas() = make_cuda_blas<real_t>();
             mg->execution_space_ = EXECUTION_SPACE_DEVICE;
         } else
 #endif

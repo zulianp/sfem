@@ -1,6 +1,8 @@
 #include "sfem_BSR.hpp"
+#include "sfem_BSRBlockGaussSeidel.hpp"
 #include "sfem_test.hpp"
 
+#include <cmath>
 #include <initializer_list>
 #include <vector>
 
@@ -208,6 +210,55 @@ int test_bsr_rap() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_bsr_block_gauss_seidel() {
+    using R = sfem::count_t;
+    using C = sfem::idx_t;
+    using T = sfem::real_t;
+
+    // Scalar BSR (1x1 blocks): A = [[2,-1],[-1,2]], b = [1,1]
+    auto rowptr = make_buffer<R>({0, 2, 4});
+    auto colidx = make_buffer<C>({0, 1, 0, 1});
+    auto values = make_buffer<T>({2, -1, -1, 2});
+
+    auto a   = sfem::h_bsr_spmv<R, C, T>(2, 2, 1, rowptr, colidx, values, static_cast<T>(0));
+    auto bgs = sfem::h_bsr_block_gauss_seidel(a);
+    SFEM_TEST_EQ(bgs->rows(), static_cast<ptrdiff_t>(2));
+    SFEM_TEST_EQ(bgs->cols(), static_cast<ptrdiff_t>(2));
+    SFEM_TEST_EQ(bgs->execution_space(), sfem::EXECUTION_SPACE_HOST);
+
+    const T b[2] = {1, 1};
+    T       x[2] = {0, 0};
+    SFEM_TEST_ASSERT(bgs->apply(b, x) == SFEM_SUCCESS);
+
+    // One forward sweep from zero: x0 = 1/2, x1 = (1 - (-1)*x0)/2
+    const T expected_one_sweep[] = {T(0.5), T(0.75)};
+    SFEM_ASSERT_ARRAY_APPROX_EQ(2, x, expected_one_sweep, 1e-12);
+
+    // Many sweeps should approach the exact solution [1, 1]
+    bgs->set_max_it(50);
+    x[0] = 0;
+    x[1] = 0;
+    SFEM_TEST_ASSERT(bgs->apply(b, x) == SFEM_SUCCESS);
+    SFEM_TEST_APPROXEQ(x[0], T(1), 1e-10);
+    SFEM_TEST_APPROXEQ(x[1], T(1), 1e-10);
+
+    // Block-size 2: diagonal blocks only → GS == Jacobi accumulate
+    auto d_rowptr = make_buffer<R>({0, 1, 2});
+    auto d_colidx = make_buffer<C>({0, 1});
+    // diag(0)=[[2,0],[0,3]], diag(1)=[[4,0],[0,5]]
+    auto d_values = make_buffer<T>({2, 0, 0, 3, 4, 0, 0, 5});
+    auto d        = sfem::h_bsr_spmv<R, C, T>(2, 2, 2, d_rowptr, d_colidx, d_values, static_cast<T>(0));
+    auto d_bgs    = sfem::h_bsr_block_gauss_seidel(d);
+
+    const T rb[4] = {2, 6, 8, 10};
+    T       xd[4] = {0, 0, 0, 0};
+    SFEM_TEST_ASSERT(d_bgs->apply(rb, xd) == SFEM_SUCCESS);
+    const T expected_diag[] = {1, 2, 2, 2};
+    SFEM_ASSERT_ARRAY_APPROX_EQ(4, xd, expected_diag, 1e-12);
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char* argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
@@ -216,6 +267,7 @@ int main(int argc, char* argv[]) {
     SFEM_RUN_TEST(test_bsr_mm_rectangular);
     SFEM_RUN_TEST(test_bsr_mm_apply);
     SFEM_RUN_TEST(test_bsr_rap);
+    SFEM_RUN_TEST(test_bsr_block_gauss_seidel);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
