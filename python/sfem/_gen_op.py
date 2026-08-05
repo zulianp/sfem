@@ -335,7 +335,9 @@ def _header(material, residual):
         int hessian_patch(const real_t *const x,
                           const count_t *const rowptr,
                           const idx_t *const colidx,
-                          real_t *const values);"""
+                          real_t *const values);
+        int hessian_block_diag_sym(const real_t *const x,
+                                   real_t *const values) override;"""
     return """#pragma once
 
 #include "sfem_Op.hpp"
@@ -1095,11 +1097,7 @@ namespace sfem {
                             const idx_t *const colidx,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("%(op)s::hessian_crs requires a current state\\n");
-            return SFEM_FAILURE;
-        }
+%(hessian_crs_current_prologue)s
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1112,11 +1110,7 @@ namespace sfem {
                             const idx_t *const colidx,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("%(op)s::hessian_bsr requires a current state\\n");
-            return SFEM_FAILURE;
-        }
+%(hessian_bsr_current_prologue)s
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1129,11 +1123,7 @@ namespace sfem {
                             const ptrdiff_t ndiag,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("%(op)s::hessian_dia");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("%(op)s::hessian_dia requires a current state\\n");
-            return SFEM_FAILURE;
-        }
+%(hessian_dia_current_prologue)s
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1147,11 +1137,7 @@ namespace sfem {
                             const idx_t *const cols,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("%(op)s::hessian_coo");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("%(op)s::hessian_coo requires a current state\\n");
-            return SFEM_FAILURE;
-        }
+%(hessian_coo_current_prologue)s
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1164,15 +1150,22 @@ namespace sfem {
                               const idx_t *const colidx,
                               real_t *const values) {
         SFEM_TRACE_SCOPE("%(op)s::hessian_patch");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("%(op)s::hessian_patch requires a current state\\n");
-            return SFEM_FAILURE;
-        }
+%(hessian_patch_current_prologue)s
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
 %(hessian_patch_dispatch_body)s
+        });
+    }
+
+    int %(op)s::hessian_block_diag_sym(const real_t *const x,
+                                       real_t *const values) {
+        SFEM_TRACE_SCOPE("%(op)s::hessian_block_diag_sym");
+%(hessian_block_diag_sym_current_prologue)s
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+%(hessian_block_diag_sym_dispatch_body)s
         });
     }
 
@@ -1325,6 +1318,11 @@ namespace sfem {
             ("rowptr", "colidx", "values"),
             indent="            ",
         ),
+        "hessian_crs_current_prologue": _hyperelastic_hessian_current_prologue(
+            material.op_name,
+            "hessian_crs",
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+        ),
         "hessian_bsr_dispatch_body": _hyperelastic_hessian_dispatch_body(
             material.name,
             "hessian_bsr",
@@ -1332,6 +1330,11 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("rowptr", "colidx", "values"),
             indent="            ",
+        ),
+        "hessian_bsr_current_prologue": _hyperelastic_hessian_current_prologue(
+            material.op_name,
+            "hessian_bsr",
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "hessian_dia_dispatch_body": _hyperelastic_hessian_dispatch_body(
             material.name,
@@ -1341,6 +1344,11 @@ namespace sfem {
             ("diag_offsets", "ndiag", "values"),
             indent="            ",
         ),
+        "hessian_dia_current_prologue": _hyperelastic_hessian_current_prologue(
+            material.op_name,
+            "hessian_dia",
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+        ),
         "hessian_coo_dispatch_body": _hyperelastic_hessian_dispatch_body(
             material.name,
             "hessian_coo",
@@ -1349,6 +1357,11 @@ namespace sfem {
             ("nnz", "rows", "cols", "values"),
             indent="            ",
         ),
+        "hessian_coo_current_prologue": _hyperelastic_hessian_current_prologue(
+            material.op_name,
+            "hessian_coo",
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+        ),
         "hessian_patch_dispatch_body": _hyperelastic_hessian_dispatch_body(
             material.name,
             "hessian_patch",
@@ -1356,6 +1369,24 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("rowptr", "colidx", "values"),
             indent="            ",
+        ),
+        "hessian_patch_current_prologue": _hyperelastic_hessian_current_prologue(
+            material.op_name,
+            "hessian_patch",
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+        ),
+        "hessian_block_diag_sym_dispatch_body": _hyperelastic_hessian_dispatch_body(
+            material.name,
+            "hessian_block_diag_sym",
+            kernel_sources,
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
+            ("values",),
+            indent="            ",
+        ),
+        "hessian_block_diag_sym_current_prologue": _hyperelastic_hessian_current_prologue(
+            material.op_name,
+            "hessian_block_diag_sym",
+            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "performance_methods": _performance_methods(material.op_name, material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(
@@ -4925,6 +4956,7 @@ def _is_replaced_tensor_product_source(path, kernel_sources):
 
 _RUNTIME_OPERATION_MARKERS = (
     ("jacobian_action", "_jacobian_action_"),
+    ("hessian_block_diag_sym", "_hessian_block_diag_sym_"),
     ("hessian_bsr", "_hessian_bsr_"),
     ("hessian_coo_triplet", "_hessian_coo_triplet_"),
     ("hessian_coo", "_hessian_coo_"),
@@ -6781,6 +6813,25 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
         ]
     )
     return "\n".join(lines)
+
+
+def _hyperelastic_hessian_current_prologue(op_name, operation, apply_dependencies_by_dim):
+    uses_current = any(
+        bool(getattr(dependencies, "current", False))
+        for dependencies in apply_dependencies_by_dim.values()
+    )
+    if not uses_current:
+        return "        (void)x;"
+    return "\n".join(
+        (
+            "        const real_t *const current = x;",
+            "        if (!current) {",
+            '            SFEM_ERROR("%s::%s requires a current state\\n");'
+            % (op_name, operation),
+            "            return SFEM_FAILURE;",
+            "        }",
+        )
+    )
 
 
 def _dual_case(element, flag, affine_function, affine_arguments, isoparametric_function, isoparametric_arguments):

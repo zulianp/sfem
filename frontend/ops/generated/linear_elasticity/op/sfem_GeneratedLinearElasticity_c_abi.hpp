@@ -1411,6 +1411,50 @@ extern "C" int linear_elasticity_gradient_packed_two_pass_3d_isoparametric_mesh_
         float *const SFEM_RESTRICT outz
 );
 
+extern "C" int linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa_float(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        float *const SFEM_RESTRICT values
+);
+
+extern "C" int linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        double *const SFEM_RESTRICT values
+);
+
+extern "C" int linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa_float(
+        const smesh::ElemType element_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        float *const SFEM_RESTRICT values
+);
+
 extern "C" int linear_elasticity_hessian_bsr_2d_isoparametric_mesh_soa(
         const smesh::ElemType element_type,
         const ptrdiff_t nelements,
