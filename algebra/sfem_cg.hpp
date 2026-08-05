@@ -28,7 +28,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>> apply_op;
         std::shared_ptr<Operator<T>> preconditioner_op;
 
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
 
         std::function<void(T*)> interceptor;
 
@@ -111,11 +111,11 @@ namespace sfem {
         void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        bool good() const { return blas.good() && apply_op; }
+        bool good() const { return blas->good() && apply_op; }
 
         void monitor(const int iter, const T residual, const T relative_residual, const T alpha) {
             if (!verbose) return;
@@ -158,25 +158,25 @@ namespace sfem {
         ptrdiff_t work_n_{-1};
 
         void destroy_workspace() {
-            if (!blas.destroy) {
+            if (!blas) {
                 work_r_ = work_z_ = work_p_ = work_Ap_ = nullptr;
                 work_n_                                = -1;
                 return;
             }
             if (work_r_) {
-                blas.destroy(work_r_);
+                blas->destroy(work_r_);
                 work_r_ = nullptr;
             }
             if (work_z_) {
-                blas.destroy(work_z_);
+                blas->destroy(work_z_);
                 work_z_ = nullptr;
             }
             if (work_p_) {
-                blas.destroy(work_p_);
+                blas->destroy(work_p_);
                 work_p_ = nullptr;
             }
             if (work_Ap_) {
-                blas.destroy(work_Ap_);
+                blas->destroy(work_Ap_);
                 work_Ap_ = nullptr;
             }
             work_n_ = -1;
@@ -188,11 +188,11 @@ namespace sfem {
             }
 
             destroy_workspace();
-            work_r_  = blas.allocate(n);
-            work_p_  = blas.allocate(n);
-            work_Ap_ = blas.allocate(n);
+            work_r_  = blas->allocate(n);
+            work_p_  = blas->allocate(n);
+            work_Ap_ = blas->allocate(n);
             if (need_z) {
-                work_z_ = blas.allocate(n);
+                work_z_ = blas->allocate(n);
             }
             work_n_ = n;
         }
@@ -210,9 +210,9 @@ namespace sfem {
 
             apply_op->apply(x, r);
 
-            blas.axpby(n, 1, b, -1, r);
+            blas->axpby(n, 1, b, -1, r);
 
-            const T rtr0    = blas.dot(n, r, r);
+            const T rtr0    = blas->dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
             monitor(0, r_norm0, 1, 0);
 
@@ -223,29 +223,29 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
-            blas.copy(n, r, p);
+            blas->copy(n, r, p);
 
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                blas.zeros(n, Ap);
+                blas->zeros(n, Ap);
                 apply_op->apply(p, Ap);
 
-                const T ptAp  = blas.dot(n, p, Ap);
+                const T ptAp  = blas->dot(n, p, Ap);
                 const T alpha = rtr / ptAp;
 
                 assert(ptAp == ptAp);
                 assert(alpha == alpha);
 
-                blas.axpby(n, alpha, p, 1, x);
-                blas.axpby(n, -alpha, Ap, 1, r);
+                blas->axpby(n, alpha, p, 1, x);
+                blas->axpby(n, -alpha, Ap, 1, r);
 
                 assert(rtr != 0);
                 assert(rtr == rtr);
 
-                const T rtr_new = blas.dot(n, r, r);
+                const T rtr_new = blas->dot(n, r, r);
                 const T beta    = rtr_new / rtr;
                 rtr             = rtr_new;
-                blas.axpby(n, 1, r, beta, p);
+                blas->axpby(n, 1, r, beta, p);
 
                 T r_norm = sqrt(rtr_new);
                 assert(r_norm == r_norm);
@@ -275,11 +275,11 @@ namespace sfem {
             T* p  = work_p_;
             T* Ap = work_Ap_;
 
-            blas.zeros(n, r);
+            blas->zeros(n, r);
             apply_op->apply(x, r);
-            blas.axpby(n, 1, b, -1, r);
+            blas->axpby(n, 1, b, -1, r);
 
-            const T rtr0    = blas.dot(n, r, r);
+            const T rtr0    = blas->dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
             monitor(0, r_norm0, 1, 0);
 
@@ -288,12 +288,12 @@ namespace sfem {
             }
 
             preconditioner_op->apply(r, z);
-            blas.copy(n, z, p);
+            blas->copy(n, z, p);
 
-            blas.zeros(n, Ap);
+            blas->zeros(n, Ap);
             apply_op->apply(p, Ap);
 
-            const T rtz0 = blas.dot(n, r, z);
+            const T rtz0 = blas->dot(n, r, z);
             T       rtz  = rtz0;
 
             if (rtz == 0) {
@@ -301,36 +301,36 @@ namespace sfem {
             }
 
             {
-                const T ptAp = blas.dot(n, p, Ap);
+                const T ptAp = blas->dot(n, p, Ap);
 
                 assert(ptAp != 0);
                 const T alpha = rtz / ptAp;
 
-                blas.axpby(n, alpha, p, 1, x);
-                blas.axpby(n, -alpha, Ap, 1, r);
+                blas->axpby(n, alpha, p, 1, x);
+                blas->axpby(n, -alpha, Ap, 1, r);
             }
 
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                blas.zeros(n, z);
+                blas->zeros(n, z);
                 preconditioner_op->apply(r, z);
 
-                const T rtz_new = blas.dot(n, r, z);
+                const T rtz_new = blas->dot(n, r, z);
 
                 assert(rtz != 0);
                 const T beta = rtz_new / rtz;
                 rtz          = rtz_new;
 
-                blas.axpby(n, 1, z, beta, p);
+                blas->axpby(n, 1, z, beta, p);
 
-                blas.zeros(n, Ap);
+                blas->zeros(n, Ap);
                 apply_op->apply(p, Ap);
 
-                const T ptAp  = blas.dot(n, p, Ap);
+                const T ptAp  = blas->dot(n, p, Ap);
                 const T alpha = rtz / ptAp;
 
-                blas.axpby(n, alpha, p, 1, x);
-                blas.axpby(n, -alpha, Ap, 1, r);
+                blas->axpby(n, alpha, p, 1, x);
+                blas->axpby(n, -alpha, Ap, 1, r);
 
                 auto anorm = sqrt(rtz);
                 auto rnorm = anorm / sqrt(rtz0);

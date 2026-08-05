@@ -14,17 +14,17 @@ namespace sfem {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
         SharedBuffer<T> inv_diag;
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         /* Operator */
         int apply(const T* const b, T* const x) override {
-            blas.xypaz(n_dofs, inv_diag->data(), b, 1, x);
+            blas->xypaz(n_dofs, inv_diag->data(), b, 1, x);
             return SFEM_SUCCESS;
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }

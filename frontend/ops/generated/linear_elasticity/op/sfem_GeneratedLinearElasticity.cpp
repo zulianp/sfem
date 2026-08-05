@@ -883,11 +883,7 @@ namespace sfem {
                             const idx_t *const colidx,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_crs");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("GeneratedLinearElasticity::hessian_crs requires a current state\n");
-            return SFEM_FAILURE;
-        }
+        (void)x;
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -910,11 +906,7 @@ namespace sfem {
                             const idx_t *const colidx,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_bsr");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("GeneratedLinearElasticity::hessian_bsr requires a current state\n");
-            return SFEM_FAILURE;
-        }
+        (void)x;
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -935,11 +927,7 @@ namespace sfem {
                             const ptrdiff_t ndiag,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_dia");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("GeneratedLinearElasticity::hessian_dia requires a current state\n");
-            return SFEM_FAILURE;
-        }
+        (void)x;
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -963,11 +951,7 @@ namespace sfem {
                             const idx_t *const cols,
                             real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_coo");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("GeneratedLinearElasticity::hessian_coo requires a current state\n");
-            return SFEM_FAILURE;
-        }
+        (void)x;
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -990,11 +974,7 @@ namespace sfem {
                               const idx_t *const colidx,
                               real_t *const values) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_patch");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("GeneratedLinearElasticity::hessian_patch requires a current state\n");
-            return SFEM_FAILURE;
-        }
+        (void)x;
         auto mesh = impl_->space->mesh_ptr();
         auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1008,6 +988,25 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
             SFEM_ERROR("linear_elasticity hessian_patch does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
+
+    int GeneratedLinearElasticity::hessian_block_diag_sym(const real_t *const x,
+                                       real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_block_diag_sym");
+        (void)x;
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                return linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), values);
+            }
+            else if (dim == 3) {
+                return linear_elasticity_hessian_block_diag_sym_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), values);
+            }
+            SFEM_ERROR("linear_elasticity hessian_block_diag_sym does not support spatial dimension %d\n", dim);
             return SFEM_FAILURE;
         });
     }

@@ -149,7 +149,7 @@ namespace {
                          real_t *const                                  out,
                          const ptrdiff_t                                ndofs,
                          const int                                      repeat,
-                         const std::shared_ptr<sfem::BLAS_Tpl<real_t>> &blas) {
+                         const std::shared_ptr<sfem::BLAS<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
         const double t0 = MPI_Wtime();
@@ -165,7 +165,7 @@ namespace {
                       real_t *const                                  out,
                       const ptrdiff_t                                ndofs,
                       const int                                      repeat,
-                      const std::shared_ptr<sfem::BLAS_Tpl<real_t>> &blas) {
+                      const std::shared_ptr<sfem::BLAS<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
         const double t0 = MPI_Wtime();

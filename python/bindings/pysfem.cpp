@@ -198,21 +198,17 @@ NB_MODULE(pysfem, m) {
               return sfem::create_shifted_penalty(f, contact_conds, in);
           });
 
-    // Add BLAS_Tpl class binding
-    nb::class_<BLAS_Tpl<real_t>>(m, "BLAS_Tpl")
-            .def("good", &BLAS_Tpl<real_t>::good)
+    // Add BLAS class binding
+    nb::class_<BLAS<real_t>>(m, "BLAS")
+            .def("good", &BLAS<real_t>::good)
             .def("zeros",
-                 [](BLAS_Tpl<real_t> &blas, std::shared_ptr<sfem::Buffer<real_t>> x) { blas.zeros(x->size(), x->data()); })
-            .def("values", [](BLAS_Tpl<real_t> &blas, const real_t value, std::shared_ptr<sfem::Buffer<real_t>> x) {
+                 [](BLAS<real_t> &blas, std::shared_ptr<sfem::Buffer<real_t>> x) { blas.zeros(x->size(), x->data()); })
+            .def("values", [](BLAS<real_t> &blas, const real_t value, std::shared_ptr<sfem::Buffer<real_t>> x) {
                 blas.values(x->size(), value, x->data());
             });
 
     // Add blas function binding
-    m.def("blas", [](const enum ExecutionSpace es) -> BLAS_Tpl<real_t> {
-        BLAS_Tpl<real_t> blas;
-        OpenMP_BLAS<real_t>::build_blas(blas);
-        return blas;
-    });
+    m.def("blas", [](const enum ExecutionSpace es) -> std::shared_ptr<BLAS<real_t>> { return sfem::blas<real_t>(es); });
 
     nb::class_<Mesh>(m, "Mesh")  //
             .def(nb::init<>())

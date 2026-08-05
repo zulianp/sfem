@@ -5481,6 +5481,29 @@ static SFEM_INLINE int linear_elasticity_proteus_hex64_hessian_isoparametric_mes
     return SFEM_SUCCESS;
 }
 
+template <typename scalar_t>
+static SFEM_INLINE void linear_elasticity_proteus_hex64_hessian_isoparametric_mesh_soa_scatter_block_diag_sym(
+        const idx_t *const SFEM_RESTRICT ev,
+        const scalar_t *const SFEM_RESTRICT element_matrix,
+        scalar_t *const SFEM_RESTRICT values) {
+    static constexpr int DIM = 3;
+    static constexpr int N_SHAPE = 64;
+    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int SYM_DIM = (DIM * (DIM + 1)) / 2;
+    for (int i = 0; i < N_SHAPE; ++i) {
+        scalar_t *const block = &values[(ptrdiff_t)ev[i] * SYM_DIM];
+        int sym = 0;
+        for (int bi = 0; bi < DIM; ++bi) {
+            const int row = bi * N_SHAPE + i;
+            for (int bj = bi; bj < DIM; ++bj) {
+                const int col = bj * N_SHAPE + i;
+#pragma omp atomic update
+                block[sym++] += element_matrix[row * NDOFS + col];
+            }
+        }
+    }
+}
+
 template <typename scalar_t, typename geometry_t, int FORMAT>
 static int linear_elasticity_proteus_hex64_hessian_isoparametric_mesh_soa_assemble_impl(
         const ptrdiff_t nelements,
@@ -5568,6 +5591,8 @@ static int linear_elasticity_proteus_hex64_hessian_isoparametric_mesh_soa_assemb
 
         if constexpr (FORMAT == 1) {
             invalid_matrix_graph |= (linear_elasticity_proteus_hex64_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
+        } else if constexpr (FORMAT == 6) {
+            linear_elasticity_proteus_hex64_hessian_isoparametric_mesh_soa_scatter_block_diag_sym(ev, element_matrix, values);
         } else {
             invalid_matrix_graph |= 1;
         }
@@ -5605,4 +5630,28 @@ extern "C" int linear_elasticity_proteus_hex64_hessian_bsr_isoparametric_mesh_so
         float *const SFEM_RESTRICT values
 ) {
     return sfem::codegen::linear_elasticity_proteus_hex64_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+}
+
+extern "C" int linear_elasticity_proteus_hex64_hessian_block_diag_sym_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        double *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::linear_elasticity_proteus_hex64_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+}
+
+extern "C" int linear_elasticity_proteus_hex64_hessian_block_diag_sym_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        float *const SFEM_RESTRICT values
+) {
+    return sfem::codegen::linear_elasticity_proteus_hex64_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 6>(nelements, nnodes, elements, points, lmbda, mu, nullptr, nullptr, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
 }
