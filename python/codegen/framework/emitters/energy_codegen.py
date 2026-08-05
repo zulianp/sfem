@@ -7638,6 +7638,19 @@ def _sfem_soa_element_api_header(
         )
         return "\n".join(["#ifndef %s" % guard, "#define %s" % guard, "", "#endif", ""])
 
+    alias = _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes)
+    if alias is not None:
+        return _sfem_soa_element_api_alias_header(
+            forms,
+            prefix,
+            alias,
+            dim,
+            n_nodes,
+            n_qp,
+            vector_size,
+            source_builder,
+        )
+
     forms_by_name = {form.name: form for form in forms}
     guard = "%s_ELEMENT_API_%s" % (
         _cpp_macro_name(prefix),
@@ -7733,6 +7746,197 @@ def _sfem_soa_element_api_header(
         lines.append("")
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
     return "\n".join(lines)
+
+
+def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
+    aliases = (
+        ("quad4", "proteus_quad4", 2, 4),
+        ("hex8", "proteus_hex8", 3, 8),
+        ("hex27", "proteus_hex27", 3, 27),
+    )
+    for element_name, proteus_name, alias_dim, alias_n_nodes in aliases:
+        suffix = "_%s" % element_name
+        proteus_suffix = "_%s" % proteus_name
+        if dim == alias_dim and n_nodes == alias_n_nodes and prefix.endswith(suffix) and not prefix.endswith(proteus_suffix):
+            return {
+                "element_name": element_name,
+                "proteus_name": proteus_name,
+                "target_prefix": "%s_%s" % (prefix[: -len(suffix)], proteus_name),
+                "include": "../%s/%s_%s_element.hpp" % (
+                    proteus_name,
+                    prefix[: -len(suffix)],
+                    proteus_name,
+                ),
+                "shape_order": tensor_product_cartesian_shape_order(dim, n_nodes),
+            }
+    return None
+
+
+def _sfem_soa_element_api_alias_header(
+    forms,
+    prefix,
+    alias,
+    dim,
+    n_nodes,
+    n_qp,
+    vector_size,
+    source_builder,
+):
+    guard = "%s_ELEMENT_API_%s" % (
+        _cpp_macro_name(prefix),
+        source_builder.header_guard_suffix(),
+    )
+    forms_by_name = {form.name: form for form in forms}
+    lines = [
+        "#ifndef %s" % guard,
+        "#define %s" % guard,
+        "",
+        '#include "%s"' % alias["include"],
+        "",
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+    ]
+    for operation in ("objective", "gradient"):
+        form = forms_by_name.get(operation)
+        if form is None or form.weak_form is None:
+            continue
+        public = "energy" if operation == "objective" else "gradient"
+        output_param = "scalar_t *const SFEM_RESTRICT values" if public == "energy" else "scalar_t *const *const SFEM_RESTRICT out_streams"
+        for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
+            name = "%s_%s_element_%ssoa" % (prefix, public, ("%s_" % suffix) if suffix else "")
+            target_name = "%s_%s_element_%ssoa" % (
+                alias["target_prefix"],
+                public,
+                ("%s_" % suffix) if suffix else "",
+            )
+            params = _sfem_soa_element_api_common_params(form, dim, include_coords)
+            params.append(output_param)
+            lines.extend(
+                _sfem_soa_element_api_alias_function_lines(
+                    name,
+                    target_name,
+                    params,
+                    alias["shape_order"],
+                    dim,
+                    n_nodes,
+                    n_qp,
+                    vector_size,
+                )
+            )
+            lines.append("")
+    apply_form = forms_by_name.get("apply")
+    if apply_form is not None and apply_form.weak_form is not None:
+        for suffix, include_coords in (("geometry", False), ("coords", True), ("", True)):
+            name = "%s_hessian_element_%ssoa" % (prefix, ("%s_" % suffix) if suffix else "")
+            target_name = "%s_hessian_element_%ssoa" % (alias["target_prefix"], ("%s_" % suffix) if suffix else "")
+            params = _sfem_soa_element_api_common_params(apply_form, dim, include_coords)
+            params.append("scalar_t *const *const SFEM_RESTRICT matrix_streams")
+            lines.extend(
+                _sfem_soa_element_api_alias_function_lines(
+                    name,
+                    target_name,
+                    params,
+                    alias["shape_order"],
+                    dim,
+                    n_nodes,
+                    n_qp,
+                    vector_size,
+                )
+            )
+            lines.append("")
+    lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
+    return "\n".join(lines)
+
+
+def _sfem_soa_element_api_alias_function_lines(
+    name,
+    target_name,
+    params,
+    shape_order,
+    dim,
+    n_nodes,
+    n_qp,
+    vector_size,
+):
+    lines = [
+        "template <typename scalar_t, int VECTOR_SIZE = %d>" % vector_size,
+        "static SFEM_INLINE int %s(" % name,
+    ]
+    for idx, param in enumerate(params):
+        comma = "," if idx + 1 < len(params) else ""
+        lines.append("        %s%s" % (param, comma))
+    lines.extend(
+        [
+            ") {",
+            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int N_SHAPE = %d;" % n_nodes,
+            "    static constexpr int N_QP = %d;" % n_qp,
+            "    static constexpr int NDOFS = DIM * N_SHAPE;",
+            "    static constexpr int SHAPE_ORDER[N_SHAPE] = {%s};" % ", ".join(str(i) for i in shape_order),
+        ]
+    )
+    param_names = [_cpp_argument_name(param) for param in params]
+    if "coords" in param_names:
+        lines.extend(_sfem_soa_element_api_alias_stream_lines("coords", "ordered_coords", "const scalar_t *", False))
+    if "u_streams" in param_names:
+        lines.extend(_sfem_soa_element_api_alias_stream_lines("u_streams", "ordered_u_streams", "const scalar_t *", False))
+    if "out_streams" in param_names:
+        lines.extend(_sfem_soa_element_api_alias_stream_lines("out_streams", "ordered_out_streams", "scalar_t *", False))
+    if "matrix_streams" in param_names:
+        lines.extend(_sfem_soa_element_api_alias_stream_lines("matrix_streams", "ordered_matrix_streams", "scalar_t *", True))
+
+    args = []
+    for name_ in param_names:
+        if name_ == "coords":
+            args.append("ordered_coords")
+        elif name_ == "u_streams":
+            args.append("ordered_u_streams")
+        elif name_ == "out_streams":
+            args.append("ordered_out_streams")
+        elif name_ == "matrix_streams":
+            args.append("ordered_matrix_streams")
+        else:
+            args.append(name_)
+    lines.append("    return %s<scalar_t, VECTOR_SIZE>(%s);" % (target_name, ", ".join(args)))
+    lines.append("}")
+    return lines
+
+
+def _sfem_soa_element_api_alias_stream_lines(source_name, ordered_name, pointer_type, matrix):
+    lines = ["    %s%s[NDOFS%s];" % (pointer_type, ordered_name, " * NDOFS" if matrix else "")]
+    if matrix:
+        lines.extend(
+            [
+                "    for (int row_shape = 0; row_shape < N_SHAPE; ++row_shape) {",
+                "        const int source_row_shape = SHAPE_ORDER[row_shape];",
+                "        for (int row_component = 0; row_component < DIM; ++row_component) {",
+                "            const int row = row_shape * DIM + row_component;",
+                "            const int source_row = source_row_shape * DIM + row_component;",
+                "            for (int col_shape = 0; col_shape < N_SHAPE; ++col_shape) {",
+                "                const int source_col_shape = SHAPE_ORDER[col_shape];",
+                "                for (int col_component = 0; col_component < DIM; ++col_component) {",
+                "                    const int col = col_shape * DIM + col_component;",
+                "                    const int source_col = source_col_shape * DIM + col_component;",
+                "                    %s[row * NDOFS + col] = %s[source_row * NDOFS + source_col];" % (ordered_name, source_name),
+                "                }",
+                "            }",
+                "        }",
+                "    }",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "    for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                "        const int source_shape = SHAPE_ORDER[shape];",
+                "        for (int component = 0; component < DIM; ++component) {",
+                "            %s[shape * DIM + component] = %s[source_shape * DIM + component];" % (ordered_name, source_name),
+                "        }",
+                "    }",
+            ]
+        )
+    return lines
 
 
 def _sfem_soa_element_api_common_params(form, dim, include_coords):
