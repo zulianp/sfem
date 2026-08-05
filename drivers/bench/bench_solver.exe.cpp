@@ -273,7 +273,9 @@ int main(int argc, char** argv) {
 
     std::vector<SolverResult> results;
 
-    auto run_cg = [&](const char* name, const std::shared_ptr<Operator<real_t>>& precond) {
+    auto run_cg = [&](const char*                                 name,
+                      const std::shared_ptr<Operator<real_t>>&     precond,
+                      const bool                                   host_fusion = true) {
         if (!solver_enabled(SFEM_SOLVERS, name)) {
             return;
         }
@@ -282,9 +284,7 @@ int main(int argc, char** argv) {
         cg->set_rtol(SFEM_RTOL);
         cg->set_atol(SFEM_ATOL);
         cg->verbose = false;
-        if (SFEM_OP_FORMAT == op_type::BSR || SFEM_OP_FORMAT == op_type::BSR_SYM) {
-            cg->set_apply_overwrites_output(true);
-        }
+        cg->set_host_fusion(host_fusion);
         if (precond) {
             cg->set_preconditioner_op(precond);
         }
@@ -330,9 +330,12 @@ int main(int argc, char** argv) {
                 [&]() { return bcgs->iterations(); }));
     };
 
-    run_cg("cg", nullptr);
-    run_cg("cg_jacobi", jacobi);
-    run_cg("cg_bjacobi", bjacobi);
+    // cg_blas / cg_bjacobi_blas: separate BLAS axpby+dot (pre-fusion baseline)
+    run_cg("cg_blas", nullptr, false);
+    run_cg("cg", nullptr, true);
+    run_cg("cg_jacobi", jacobi, true);
+    run_cg("cg_bjacobi_blas", bjacobi, false);
+    run_cg("cg_bjacobi", bjacobi, true);
     run_bcgs("bcgs", nullptr);
     run_bcgs("bcgs_jacobi", jacobi);
 
@@ -390,8 +393,8 @@ int main(int argc, char** argv) {
     }
 
     printf("\nSolvers\n");
-    printf("+---------------+------+--------------+--------------+--------------+--------------+--------+\n");
-    printf("| %-13s | %4s | %12s | %12s | %12s | %12s | %6s |\n",
+    printf("+------------------+------+--------------+--------------+--------------+--------------+--------+\n");
+    printf("| %-16s | %4s | %12s | %12s | %12s | %12s | %6s |\n",
            "solver",
            "it",
            "time_s",
@@ -399,10 +402,10 @@ int main(int argc, char** argv) {
            "r_final",
            "r_final/r0",
            "ok");
-    printf("+---------------+------+--------------+--------------+--------------+--------------+--------+\n");
+    printf("+------------------+------+--------------+--------------+--------------+--------------+--------+\n");
     for (const auto& res : results) {
         const double ratio = (res.r0 > 0) ? double(res.r_final / res.r0) : 0;
-        printf("| %-13s | %4d | %12.6e | %12.3f | %12.6e | %12.6e | %6s |\n",
+        printf("| %-16s | %4d | %12.6e | %12.3f | %12.6e | %12.6e | %6s |\n",
                res.name,
                res.iterations,
                res.time_s,
@@ -411,13 +414,14 @@ int main(int argc, char** argv) {
                ratio,
                res.ok == SFEM_SUCCESS ? "yes" : "no");
     }
-    printf("+---------------+------+--------------+--------------+--------------+--------------+--------+\n");
+    printf("+------------------+------+--------------+--------------+--------------+--------------+--------+\n");
     printf("# MDOF/s = ndofs * iterations / time  (work rate, not time-to-solution)\n");
     printf("# Krylov stop: rtol=%g atol=%g; smoothers use fixed SFEM_SMOOTH_IT=%d\n",
            double(SFEM_RTOL),
            double(SFEM_ATOL),
            SFEM_SMOOTH_IT);
-    printf("# Filter with SFEM_SOLVERS=cg,cg_jacobi,... or all\n");
+    printf("# cg_blas / cg_*_blas: host_fusion=0 (separate BLAS axpby+dot); cg / cg_bjacobi: fused\n");
+    printf("# Filter with SFEM_SOLVERS=cg,cg_blas,cg_bjacobi,... or all\n");
 
     return EXIT_SUCCESS;
 }
