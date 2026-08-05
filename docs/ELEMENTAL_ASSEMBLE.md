@@ -6,7 +6,7 @@ This note explains how to call the generated header-only NeoHookean dense local 
 #include "sfem_GeneratedNeoHookeanOgden_element_api.hpp"
 
 sfem::codegen::neohookean_ogden_hessian_2d_element_soa<real_t, VECTOR_SIZE>(
-        element_type, nelements, coords, lmbda, mu, u_local, H_local);
+        element_type, nelements, coords, lmbda, mu, u_streams, matrix_streams);
 ```
 
 The function evaluates dense element matrices only. It does not gather from global arrays, does not use connectivity, and does not scatter into CRS/BSR. The caller gathers local element data before the call and scatters or stores the dense matrices after the call.
@@ -22,8 +22,8 @@ NDOFS = DIM * N_SHAPE
 
 local dof = shape * DIM + component
 coords[dof][lane]
-u_local[dof][lane]
-H_local[row * NDOFS + col][lane]
+u_soa[dof][lane]
+hessian_soa[row * NDOFS + col][lane]
 ```
 
 `NDOFS` is the active number of local degrees of freedom for the current element. `MAX_NDOFS` is only a compile-time capacity used by fixed scratch arrays; it must be greater than or equal to `NDOFS`, but it is not used in element indexing formulas.
@@ -38,7 +38,7 @@ dof 3 = shape 1, y
 ...
 ```
 
-`H_local` stores a full dense `NDOFS x NDOFS` matrix in row-major local-dof order, with one vector lane per element in the batch.
+`hessian_soa` stores a full dense `NDOFS x NDOFS` matrix in row-major local-dof order, with one vector lane per element in the batch.
 
 ## SoA, AoS, And Vectorization
 
@@ -54,7 +54,7 @@ AoS is often more convenient for users after assembly. A common pattern is:
 
 1. Gather global data into thread-local SoA batch buffers.
 2. Call the generated `*_element_soa` function.
-3. Convert the active `H_local[row * ndofs + col][lane]` entries to `element_matrix_aos[element][row][col]`.
+3. Convert the active `hessian_soa[row * ndofs + col][lane]` entries to `element_matrix_aos[element][row][col]`.
 
 ## Minimal Batched Call
 
@@ -91,14 +91,14 @@ for (int shape = 0; shape < nshape; ++shape) {
 int status = SFEM_FAILURE;
 if (dim == 2) {
     status = sfem::codegen::neohookean_ogden_hessian_2d_element_soa<real_t, VECTOR_SIZE>(
-            element_type, nelems, coords, lmbda, mu, u_local, H_local);
+            element_type, nelems, coords, lmbda, mu, u_soa, hessian_soa);
 } else if (dim == 3) {
     status = sfem::codegen::neohookean_ogden_hessian_3d_element_soa<real_t, VECTOR_SIZE>(
-            element_type, nelems, coords, lmbda, mu, u_local, H_local);
+            element_type, nelems, coords, lmbda, mu, u_soa, hessian_soa);
 }
 
 if (status != SFEM_SUCCESS) {
-    // Unsupported element type or invalid call.
+    return status;
 }
 ```
 
@@ -123,7 +123,7 @@ Use the 3D dispatch wrapper:
 
 ```cpp
 sfem::codegen::neohookean_ogden_hessian_3d_element_soa<real_t, VECTOR_SIZE>(
-        element_type, nelems, coords, lmbda, mu, u_local, H_local);
+        element_type, nelems, coords, lmbda, mu, u_streams, matrix_streams);
 ```
 
 The layout is the same, but:
@@ -144,7 +144,7 @@ See `drivers/bench/neohookean_assemble.exe.cpp` for a complete example that:
 
 - creates a mesh,
 - gathers thread-local SoA batches,
-- uses fixed `MAX_NDOFS` storage and binds the generated API pointer views,
+- uses fixed local storage and binds the generated API pointer views,
 - calls the generated NeoHookean dense Hessian API,
 - stores the result as global AoS dense element matrices,
 - compares the result against current BSR assembly.
