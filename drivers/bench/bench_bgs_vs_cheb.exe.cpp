@@ -38,12 +38,47 @@ namespace {
     SFEM_INLINE void matvec3(const real_t* const SFEM_RESTRICT a,
                              const real_t* const SFEM_RESTRICT x,
                              real_t* const SFEM_RESTRICT       y) {
-        for (int d1 = 0; d1 < BS; d1++) {
-            real_t acc = 0;
-            for (int d2 = 0; d2 < BS; d2++) {
-                acc += a[d1 * BS + d2] * x[d2];
+        const real_t x0 = x[0];
+        const real_t x1 = x[1];
+        const real_t x2 = x[2];
+        y[0]            = a[0] * x0 + a[1] * x1 + a[2] * x2;
+        y[1]            = a[3] * x0 + a[4] * x1 + a[5] * x2;
+        y[2]            = a[6] * x0 + a[7] * x1 + a[8] * x2;
+    }
+
+    // C = A * B  (3x3 row-major)
+    SFEM_INLINE void matmul3(const real_t* const SFEM_RESTRICT a,
+                             const real_t* const SFEM_RESTRICT b,
+                             real_t* const SFEM_RESTRICT       c) {
+        for (int i = 0; i < BS; i++) {
+            const real_t* const ai = &a[i * BS];
+            for (int j = 0; j < BS; j++) {
+                c[i * BS + j] = ai[0] * b[j] + ai[1] * b[BS + j] + ai[2] * b[2 * BS + j];
             }
-            y[d1] = acc;
+        }
+    }
+
+    // In-place Ã_ij ← S_i A_ij S_j  (symmetric Jacobi scaling absorbed into BSR values).
+    // Leaves A available for BGS; call on a copy of the value array.
+    void absorb_s_into_bsr(const ptrdiff_t                   nnodes,
+                           const count_t* const SFEM_RESTRICT rowptr,
+                           const idx_t* const SFEM_RESTRICT   colidx,
+                           const real_t* const SFEM_RESTRICT  S_blocks,
+                           real_t* const SFEM_RESTRICT        values) {
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < nnodes; i++) {
+            const real_t* const Si = &S_blocks[i * 9];
+            const count_t       begin = rowptr[i];
+            const count_t       end   = rowptr[i + 1];
+            for (count_t k = begin; k < end; k++) {
+                const ptrdiff_t     j  = colidx[k];
+                const real_t* const Sj = &S_blocks[j * 9];
+                real_t* const       a  = &values[k * 9];
+
+                real_t asj[9];
+                matmul3(a, Sj, asj);   // Aij * Sj
+                matmul3(Si, asj, a);   // Si * (Aij * Sj)
+            }
         }
     }
 
@@ -296,6 +331,25 @@ namespace {
         return TimedApply{time_per_call, mdofs_per_s};
     }
 
+    TimedApply time_block_diag(const ptrdiff_t                   ndofs,
+                               const ptrdiff_t                   nnodes,
+                               const int                         repeat,
+                               const real_t* const SFEM_RESTRICT S_blocks,
+                               const real_t* const SFEM_RESTRICT x,
+                               real_t* const SFEM_RESTRICT       y) {
+        for (int w = 0; w < 2; w++) {
+            apply_block_diag(nnodes, S_blocks, x, y);
+        }
+        const double tick = smesh::time_seconds();
+        for (int rr = 0; rr < repeat; rr++) {
+            apply_block_diag(nnodes, S_blocks, x, y);
+        }
+        const double tock          = smesh::time_seconds();
+        const double time_per_call = (tock - tick) / double(repeat);
+        const double mdofs_per_s   = 1e-6 * double(ndofs) / time_per_call;
+        return TimedApply{time_per_call, mdofs_per_s};
+    }
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -376,19 +430,33 @@ int main(int argc, char** argv) {
     }
     auto S_blocks = build_block_inv_sqrt(B_sym6, mask->data(), nnodes);
 
-    auto temp = create_host_buffer<real_t>(ndofs);
-    auto SAS  = make_sas_op(A, S_blocks, temp, nnodes);
+    // Absorbed Ã = S A S (copy of BSR values). Chebyshev then pays one SpMV per apply_op,
+    // instead of two block-diag passes + SpMV. BGS keeps the unscaled A.
+    const int SFEM_SAS_ABSORB = smesh::Env::read("SFEM_SAS_ABSORB", 1);
+    auto      values_sas      = create_host_buffer<real_t>(graph->nnz() * BS * BS);
+    std::memcpy(values_sas->data(), values->data(), size_t(graph->nnz() * BS * BS) * sizeof(real_t));
+    const double absorb_tick = smesh::time_seconds();
+    absorb_s_into_bsr(nnodes, graph->rowptr()->data(), graph->colidx()->data(), S_blocks->data(), values_sas->data());
+    const double absorb_time = smesh::time_seconds() - absorb_tick;
+
+    auto A_sas = h_bsr_spmv<count_t, idx_t, real_t>(
+            nnodes, nnodes, BS, graph->rowptr(), graph->colidx(), values_sas, static_cast<real_t>(0));
+
+    auto temp     = create_host_buffer<real_t>(ndofs);
+    auto SAS_comp = make_sas_op(A, S_blocks, temp, nnodes);
 
     // BGS on raw BSR (corrections zeroed on constrained dofs after apply)
     auto bgs = h_bsr_block_gauss_seidel(A);
     bgs->set_max_it(SFEM_BGS_IT);
     bgs->set_symmetric(SFEM_BGS_SYMMETRIC != 0);
 
-    // Chebyshev on S A S
-    auto cheb = create_cheb3<real_t>(SAS, es);
+    // Chebyshev on Ã (absorbed) or composed S A S
+    auto cheb_op = SFEM_SAS_ABSORB ? A_sas : SAS_comp;
+    auto cheb    = create_cheb3<real_t>(cheb_op, es);
     cheb->set_max_it(SFEM_CHEB_IT);
     cheb->verbose = false;
     cheb->set_initial_guess_zero(true);
+    cheb->set_apply_overwrites_output(true);  // BSR SpMV scale_output==0
     cheb->init_with_ones();
 
     // Free residual at Dirichlet lift: b = -P g(x0)
@@ -408,13 +476,15 @@ int main(int argc, char** argv) {
 
     const real_t r0 = free_gradient_norm(f, x0->data(), g->data());
 
-    const auto bsr_spmv = time_apply(ndofs, SFEM_REPEAT, A, b->data(), a_tmp->data());
-    const auto sas_op   = time_apply(ndofs, SFEM_REPEAT, SAS, b->data(), a_tmp->data());
+    const auto bsr_spmv   = time_apply(ndofs, SFEM_REPEAT, A, b->data(), a_tmp->data());
+    const auto s_diag     = time_block_diag(ndofs, nnodes, SFEM_REPEAT, S_blocks->data(), b->data(), a_tmp->data());
+    const auto sas_comp   = time_apply(ndofs, SFEM_REPEAT, SAS_comp, b->data(), a_tmp->data());
+    const auto sas_absorb = time_apply(ndofs, SFEM_REPEAT, A_sas, b->data(), a_tmp->data());
 
     auto apply_bgs = [&](const real_t* const rhs, real_t* const xx) { bgs->apply(rhs, xx); };
 
     auto apply_cheb = [&](const real_t* const rhs, real_t* const xx) {
-        // r_s = S * rhs; solve SAS x_s = r_s; physical correction += S * x_s
+        // r_s = S * rhs; solve Ã x_s = r_s (or S A S); physical correction += S * x_s
         apply_block_diag(nnodes, S_blocks->data(), rhs, rs->data());
         blas->zeros(ndofs, xs->data());
         cheb->apply(rs->data(), xs->data());
@@ -469,6 +539,8 @@ int main(int argc, char** argv) {
     printf("| %-22s | %30d |\n", "repeat", SFEM_REPEAT);
     printf("| %-22s | %30d |\n", "smooth_sweeps", SFEM_SMOOTH_SWEEPS);
     printf("| %-22s | %30s |\n", "bgs_symmetric", SFEM_BGS_SYMMETRIC ? "yes" : "no");
+    printf("| %-22s | %30s |\n", "sas_absorb", SFEM_SAS_ABSORB ? "yes (Atilde=SAS)" : "no (compose S*A*S)");
+    printf("| %-22s | %30.6e |\n", "absorb_setup_s", absorb_time);
     printf("+------------------------+--------------------------------+\n");
 
     printf("\nProblem\n");
@@ -483,12 +555,29 @@ int main(int argc, char** argv) {
     printf("+------------------------+--------------------------------+\n");
 
     printf("\nOperator apply\n");
-    printf("+------------+--------------+--------------+\n");
-    printf("| %-10s | %12s | %12s |\n", "operator", "time_s", "MDOF/s");
-    printf("+------------+--------------+--------------+\n");
-    printf("| %-10s | %12.6e | %12.3f |\n", "BSR SpMV", bsr_spmv.time_per_call, bsr_spmv.mdofs_per_s);
-    printf("| %-10s | %12.6e | %12.3f |\n", "SAS", sas_op.time_per_call, sas_op.mdofs_per_s);
-    printf("+------------+--------------+--------------+\n");
+    printf("+---------------+--------------+--------------+------------------+\n");
+    printf("| %-13s | %12s | %12s | %-16s |\n", "operator", "time_s", "MDOF/s", "speedup_vs_SpMV");
+    printf("+---------------+--------------+--------------+------------------+\n");
+    printf("| %-13s | %12.6e | %12.3f | %16s |\n", "BSR SpMV", bsr_spmv.time_per_call, bsr_spmv.mdofs_per_s, "1.00x");
+    printf("| %-13s | %12.6e | %12.3f | %15.2fx |\n",
+           "S block-diag",
+           s_diag.time_per_call,
+           s_diag.mdofs_per_s,
+           bsr_spmv.time_per_call / s_diag.time_per_call);
+    printf("| %-13s | %12.6e | %12.3f | %15.2fx |\n",
+           "SAS compose",
+           sas_comp.time_per_call,
+           sas_comp.mdofs_per_s,
+           bsr_spmv.time_per_call / sas_comp.time_per_call);
+    printf("| %-13s | %12.6e | %12.3f | %15.2fx |\n",
+           "SAS absorb",
+           sas_absorb.time_per_call,
+           sas_absorb.mdofs_per_s,
+           bsr_spmv.time_per_call / sas_absorb.time_per_call);
+    printf("+---------------+--------------+--------------+------------------+\n");
+    printf("# sas_compose = S*(A*(S*x)); sas_absorb = Ãx with Ãij=Si Aij Sj (one SpMV)\n");
+    printf("# speedup_vs_SpMV = t_SpMV / t_op  (>1 faster than SpMV)\n");
+    printf("# cheb uses %s\n", SFEM_SAS_ABSORB ? "sas_absorb" : "sas_compose");
 
     printf("\nSmoothers\n");
     printf("+----------+------+--------------+--------------+--------------+\n");
@@ -518,3 +607,4 @@ int main(int argc, char** argv) {
 
     return EXIT_SUCCESS;
 }
+
