@@ -56,6 +56,24 @@ extern "C" int linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_f
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
+extern "C" int linear_elasticity_proteus_quad4_hessian_block_diag_sym_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        double *const SFEM_RESTRICT values
+);
+extern "C" int linear_elasticity_proteus_quad4_hessian_block_diag_sym_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        float *const SFEM_RESTRICT values
+);
 extern "C" int linear_elasticity_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -902,6 +920,42 @@ extern "C" int linear_elasticity_quad4_gradient_isoparametric_mesh_soa_float(
         elements[2]
     };
     return linear_elasticity_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+}
+
+extern "C" int linear_elasticity_quad4_hessian_block_diag_sym_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double lmbda,
+        const double mu,
+        double *const SFEM_RESTRICT values
+) {
+    idx_t *proteus_elements[4] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2]
+    };
+    return linear_elasticity_proteus_quad4_hessian_block_diag_sym_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, values);
+}
+
+extern "C" int linear_elasticity_quad4_hessian_block_diag_sym_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float lmbda,
+        const float mu,
+        float *const SFEM_RESTRICT values
+) {
+    idx_t *proteus_elements[4] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2]
+    };
+    return linear_elasticity_proteus_quad4_hessian_block_diag_sym_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, values);
 }
 
 extern "C" int linear_elasticity_quad4_hessian_bsr_isoparametric_mesh_soa(

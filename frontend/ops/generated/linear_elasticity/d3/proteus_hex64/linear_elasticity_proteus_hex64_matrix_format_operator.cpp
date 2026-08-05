@@ -31,16 +31,45 @@ static const MatrixAssemblyDiagnostics linear_elasticity_proteus_hex64_bsr_stand
     size_t(591360),
 };
 
-static const MatrixAssemblyDiagnostics *const linear_elasticity_proteus_hex64_matrix_assembly_variants[1] = {
+static const MatrixAssemblyDiagnostics linear_elasticity_proteus_hex64_block_diag_sym_standard_matrix_assembly_diagnostics_data = {
+    "block_diag_sym",
+    "standard",
+    "none",
+    "unspecified",
+    "block_diag_sym",
+    "unspecified",
+    "unspecified",
+    "unspecified",
+    "unspecified",
+    "unspecified",
+    0,
+    1,
+    1,
+    1,
+    192,
+    192,
+    36864,
+    1,
+    192,
+    192,
+    36864,
+    384,
+    384,
+    73728,
+    size_t(299520),
+};
+
+static const MatrixAssemblyDiagnostics *const linear_elasticity_proteus_hex64_matrix_assembly_variants[2] = {
     &linear_elasticity_proteus_hex64_bsr_standard_matrix_assembly_diagnostics_data,
+    &linear_elasticity_proteus_hex64_block_diag_sym_standard_matrix_assembly_diagnostics_data,
 };
 
 int linear_elasticity_proteus_hex64_matrix_assembly_variant_count() {
-    return 1;
+    return 2;
 }
 
 const MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex64_matrix_assembly_variant(const int variant) {
-    return (variant >= 0 && variant < 1) ? linear_elasticity_proteus_hex64_matrix_assembly_variants[variant] : nullptr;
+    return (variant >= 0 && variant < 2) ? linear_elasticity_proteus_hex64_matrix_assembly_variants[variant] : nullptr;
 }
 
 void linear_elasticity_proteus_hex64_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements) {

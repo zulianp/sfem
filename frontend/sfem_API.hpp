@@ -993,7 +993,7 @@ namespace sfem {
                                                                                                astype<half_t>(values),
                                                                                                (real_t)1));
             }
-#ifndef SFEM_REAL_T_IS_FLOAT32
+#if !SFEM_REAL_T_IS_FLOAT32
             case 4:
                 return compose_constraints_op(f,
                                               sfem::h_bsr_spmv<count_t, idx_t, float, real_t>(crs_graph->n_nodes(),
@@ -1064,7 +1064,7 @@ namespace sfem {
                                                                                                astype<half_t>(diag_values),
                                                                                                astype<half_t>(off_diag_values),
                                                                                                (real_t)1));
-#ifndef SFEM_REAL_T_IS_FLOAT32
+#if !SFEM_REAL_T_IS_FLOAT32
             case 4:
                 return compose_constraints_op(f,
                                               sfem::h_bcrs_sym<count_t, idx_t, float, real_t>(crs_graph->n_nodes(),
@@ -1366,7 +1366,7 @@ namespace sfem {
                 case 2:
                     return sfem::h_crs_spmv<count_t, idx_t, half_t, real_t>(
                             crs->rows(), crs->cols(), crs->row_ptr, crs->col_idx, astype<half_t>(crs->values), (real_t)1);
-#ifndef SFEM_REAL_T_IS_FLOAT32
+#if !SFEM_REAL_T_IS_FLOAT32
                 case 4:
                     return sfem::h_crs_spmv<count_t, idx_t, float, real_t>(
                             crs->rows(), crs->cols(), crs->row_ptr, crs->col_idx, astype<float>(crs->values), (real_t)1);

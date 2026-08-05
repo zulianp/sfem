@@ -31,16 +31,45 @@ static const MatrixAssemblyDiagnostics linear_elasticity_tet4_bsr_standard_matri
     size_t(2400),
 };
 
-static const MatrixAssemblyDiagnostics *const linear_elasticity_tet4_matrix_assembly_variants[1] = {
+static const MatrixAssemblyDiagnostics linear_elasticity_tet4_block_diag_sym_standard_matrix_assembly_diagnostics_data = {
+    "block_diag_sym",
+    "standard",
+    "none",
+    "unspecified",
+    "block_diag_sym",
+    "unspecified",
+    "unspecified",
+    "unspecified",
+    "unspecified",
+    "unspecified",
+    0,
+    1,
+    1,
+    1,
+    12,
+    12,
+    144,
+    1,
+    12,
+    12,
+    144,
+    24,
+    24,
+    288,
+    size_t(1440),
+};
+
+static const MatrixAssemblyDiagnostics *const linear_elasticity_tet4_matrix_assembly_variants[2] = {
     &linear_elasticity_tet4_bsr_standard_matrix_assembly_diagnostics_data,
+    &linear_elasticity_tet4_block_diag_sym_standard_matrix_assembly_diagnostics_data,
 };
 
 int linear_elasticity_tet4_matrix_assembly_variant_count() {
-    return 1;
+    return 2;
 }
 
 const MatrixAssemblyDiagnostics *linear_elasticity_tet4_matrix_assembly_variant(const int variant) {
-    return (variant >= 0 && variant < 1) ? linear_elasticity_tet4_matrix_assembly_variants[variant] : nullptr;
+    return (variant >= 0 && variant < 2) ? linear_elasticity_tet4_matrix_assembly_variants[variant] : nullptr;
 }
 
 void linear_elasticity_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements) {

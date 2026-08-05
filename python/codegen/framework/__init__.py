@@ -179,6 +179,7 @@ from .plans.diagnostics import (
     validate_diagnostics_plan_names,
 )
 from .plans.matrix_formats import (
+    BlockDiagSymAssemblyPlan,
     BSRAssemblyPlan,
     COOAssemblyPlan,
     CRSAssemblyPlan,
@@ -363,6 +364,7 @@ __all__ = [
     "LocalPhasePlan",
     "MeshKernelPlan",
     "MeshKernelSignature",
+    "BlockDiagSymAssemblyPlan",
     "BSRAssemblyPlan",
     "COOAssemblyPlan",
     "CRSAssemblyPlan",

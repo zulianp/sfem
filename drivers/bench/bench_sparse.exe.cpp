@@ -179,17 +179,37 @@ int main(int argc, char *argv[]) {
 
         const ptrdiff_t scalar_nnz = static_cast<ptrdiff_t>(node_graph->nnz()) * block_entries;
 
-        auto bsr = sfem::h_bsr_spmv(node_graph->n_nodes(),
-                                    node_graph->n_nodes(),
-                                    block_size,
-                                    node_graph->rowptr(),
-                                    node_graph->colidx(),
-                                    values,
-                                    (real_t)0);
+        // Match hessian_bsr / SFEM_ENABLE_MIXED_PRECISION: SpMV uses requested value storage width.
+        const int prec = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t));
 
-        const double apply = measure(SFEM_REPEAT, [&]() { bsr->apply(x_apply->data(), y->data()); });
+        std::shared_ptr<sfem::Operator<real_t>> bsr_op;
+        size_t                                  apply_nbytes = nbytes;
+#if !SFEM_REAL_T_IS_FLOAT32
+        if (prec == 4) {
+            auto values_f = sfem::astype<float>(values);
+            apply_nbytes  = node_graph->rowptr()->nbytes() + node_graph->colidx()->nbytes() + values_f->nbytes();
+            bsr_op        = sfem::h_bsr_spmv<sfem::count_t, sfem::idx_t, float, real_t>(node_graph->n_nodes(),
+                                                                                node_graph->n_nodes(),
+                                                                                block_size,
+                                                                                node_graph->rowptr(),
+                                                                                node_graph->colidx(),
+                                                                                values_f,
+                                                                                (real_t)0);
+        } else
+#endif
+        {
+            bsr_op = sfem::h_bsr_spmv(node_graph->n_nodes(),
+                                      node_graph->n_nodes(),
+                                      block_size,
+                                      node_graph->rowptr(),
+                                      node_graph->colidx(),
+                                      values,
+                                      (real_t)0);
+        }
 
-        benches[nbenches++] = {"BSR", space->n_dofs(), scalar_nnz, nbytes, assembly, apply};
+        const double apply = measure(SFEM_REPEAT, [&]() { bsr_op->apply(x_apply->data(), y->data()); });
+
+        benches[nbenches++] = {"BSR", space->n_dofs(), scalar_nnz, apply_nbytes, assembly, apply};
 
         auto soa_values = sfem::create_host_buffer_fake_SoA<real_t>(block_size, node_graph->nnz() * block_size);
 
@@ -219,6 +239,7 @@ int main(int argc, char *argv[]) {
     printf("#nodes %td\n", mesh->n_nodes());
     printf("#dofs %td\n", space->n_dofs());
     printf("#element_type %s\n", type_to_string(element_type));
+    printf("#value_storage_bytes %d\n", smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", (int)sizeof(real_t)));
     printf("%s", SparseBench::header());
     for (int i = 0; i < nbenches; ++i) {
         benches[i].print();

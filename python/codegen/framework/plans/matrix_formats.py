@@ -28,6 +28,7 @@ class MatrixFormat(Enum):
     DIA = "dia"
     COO = "coo"
     PATCH = "patch"
+    BLOCK_DIAG_SYM = "block_diag_sym"
 
 
 class MatrixMeshLayout(Enum):
@@ -255,6 +256,43 @@ class PatchAssemblyPlan:
 
 
 @dataclass(frozen=True)
+class BlockDiagSymAssemblyPlan:
+    value_stream: str = "values"
+    element_connectivity: str = "elements"
+    mesh_access: str = "standard_block_elements"
+    pack_index_type: str = "idx_t"
+    pack_partition: str = "none"
+    packed_node_partition: str = "none"
+    value_mapping: str = "identity"
+    value_layout: str = "node_major_upper_symmetric_aos"
+    accumulation_policy: str = "add_node_diagonal_blocks"
+    structural_compatibility: str = "requires_square_vector_block"
+    reduction_policy: str = "atomic_add"
+    block_size: int = 1
+    symmetric_entries_per_node: int = 1
+    value_writes_per_element: int = 0
+
+    def to_dict(self):
+        return {
+            "kind": "block_diag_sym",
+            "value_stream": self.value_stream,
+            "element_connectivity": self.element_connectivity,
+            "mesh_access": self.mesh_access,
+            "pack_index_type": self.pack_index_type,
+            "pack_partition": self.pack_partition,
+            "packed_node_partition": self.packed_node_partition,
+            "value_mapping": self.value_mapping,
+            "value_layout": self.value_layout,
+            "accumulation_policy": self.accumulation_policy,
+            "structural_compatibility": self.structural_compatibility,
+            "reduction_policy": self.reduction_policy,
+            "block_size": self.block_size,
+            "symmetric_entries_per_node": self.symmetric_entries_per_node,
+            "value_writes_per_element": self.value_writes_per_element,
+        }
+
+
+@dataclass(frozen=True)
 class MatrixAssemblyVariantPlan:
     matrix_format: MatrixFormat
     mesh_layout: MatrixMeshLayout = MatrixMeshLayout.STANDARD
@@ -419,12 +457,16 @@ def specialize_matrix_format_plan(plan, unit, context):
                 index_reads_per_element=index_reads,
                 value_writes_per_element=_value_writes_per_element(
                     variant,
+                    row_layouts,
+                    column_layouts,
                     row_dofs,
                     entries,
                 ),
                 expected_flops_per_element=_expected_flops_per_element(variant, flops),
                 expected_bytes_per_element=_expected_bytes_per_element(
                     variant,
+                    row_layouts,
+                    column_layouts,
                     row_dofs,
                     entries,
                     index_reads,
@@ -544,9 +586,17 @@ def _matrix_fields(unit):
     return names, names
 
 
-def _value_writes_per_element(variant, row_dofs, entries):
+def _value_writes_per_element(variant, row_layouts, column_layouts, row_dofs, entries):
     if variant.matrix_format is MatrixFormat.DIA:
         return max(1, row_dofs)
+    if variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
+        block_size = _component_block_size(row_layouts)
+        if (
+            block_size != _component_block_size(column_layouts)
+            or not _single_matching_field_layout(row_layouts, column_layouts)
+        ):
+            return 0
+        return max(1, (row_dofs // block_size) * block_size * (block_size + 1) // 2)
     return entries
 
 
@@ -556,11 +606,22 @@ def _expected_flops_per_element(variant, flops):
     return flops
 
 
-def _expected_bytes_per_element(variant, row_dofs, entries, index_reads):
+def _expected_bytes_per_element(variant, row_layouts, column_layouts, row_dofs, entries, index_reads):
     scalar_bytes = 8
     index_bytes = 4
     pass_multiplier = 2 if variant.packed_pass is PackedAssemblyPass.TWO_PASS else 1
-    output_entries = entries if variant.matrix_format is not MatrixFormat.DIA else max(1, row_dofs)
+    if variant.matrix_format is MatrixFormat.DIA:
+        output_entries = max(1, row_dofs)
+    elif variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
+        output_entries = _value_writes_per_element(
+            variant,
+            row_layouts,
+            column_layouts,
+            row_dofs,
+            entries,
+        )
+    else:
+        output_entries = entries
     return pass_multiplier * (
         output_entries * scalar_bytes
         + index_reads * index_bytes
@@ -619,6 +680,28 @@ def _assembly_plan_for_variant(
             row_dofs_per_patch=row_dofs,
             column_dofs_per_patch=column_dofs,
             entries_per_patch=entries,
+        )
+    if variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
+        block_size = _component_block_size(row_layouts)
+        square_vector_block = (
+            block_size == _component_block_size(column_layouts)
+            and _single_matching_field_layout(row_layouts, column_layouts)
+        )
+        if not square_vector_block:
+            return BlockDiagSymAssemblyPlan(
+                **mesh_contract,
+                block_size=0,
+                symmetric_entries_per_node=0,
+                value_writes_per_element=0,
+                structural_compatibility="unsupported_mixed_or_asymmetric_block_diag_sym",
+                reduction_policy="not_emitted",
+            )
+        symmetric_entries = block_size * (block_size + 1) // 2
+        return BlockDiagSymAssemblyPlan(
+            **mesh_contract,
+            block_size=block_size,
+            symmetric_entries_per_node=symmetric_entries,
+            value_writes_per_element=_block_count(row_dofs, block_size) * symmetric_entries,
         )
     raise ValueError("unsupported matrix format '%s'" % variant.matrix_format.value)
 
