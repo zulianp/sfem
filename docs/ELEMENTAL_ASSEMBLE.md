@@ -89,8 +89,6 @@ for (int shape = 0; shape < nshape; ++shape) {
 }
 
 int status = SFEM_FAILURE;
-// `coords`, `u_local`, and `H_local` are the generated API views over
-// coords_soa, u_soa, and hessian_soa. The reference example shows the binding.
 if (dim == 2) {
     status = sfem::codegen::neohookean_ogden_hessian_2d_element_soa<real_t, VECTOR_SIZE>(
             element_type, nelems, coords, lmbda, mu, u_local, H_local);
