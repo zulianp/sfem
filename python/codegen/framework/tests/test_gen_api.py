@@ -1346,12 +1346,17 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
         with tempfile.TemporaryDirectory() as out_dir:
             le_dir = os.path.join(out_dir, "linear_elasticity")
             nh_dir = os.path.join(out_dir, "neohookean")
-            le_result = gen.generate(linear_elasticity, le_dir, elements=("TET4",))
+            le_result = gen.generate(linear_elasticity, le_dir, elements=("TET4", "HEX8"))
             nh_result = gen.generate(neohookean_ogden, nh_dir, elements=("TET4", "HEX8"))
 
             le_names = _relative_sources(le_result, le_dir)
             nh_names = _relative_sources(nh_result, nh_dir)
             self.assertIn(os.path.join("d3", "tet4", "linear_elasticity_tet4_element.hpp"), le_names)
+            self.assertIn(os.path.join("d3", "hex8", "linear_elasticity_hex8_element.hpp"), le_names)
+            self.assertIn(
+                os.path.join("d3", "proteus_hex8", "linear_elasticity_proteus_hex8_element.hpp"),
+                le_names,
+            )
             self.assertIn(os.path.join("op", "sfem_GeneratedLinearElasticity_element_api.hpp"), le_names)
             self.assertIn(os.path.join("d3", "tet4", "neohookean_ogden_tet4_element.hpp"), nh_names)
             self.assertIn(os.path.join("d3", "hex8", "neohookean_ogden_hex8_element.hpp"), nh_names)
@@ -1363,6 +1368,9 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
 
             le_header = read(
                 os.path.join(le_dir, "d3", "tet4", "linear_elasticity_tet4_element.hpp")
+            )
+            le_hex8_header = read(
+                os.path.join(le_dir, "d3", "hex8", "linear_elasticity_hex8_element.hpp")
             )
             nh_header = read(
                 os.path.join(nh_dir, "d3", "tet4", "neohookean_ogden_tet4_element.hpp")
@@ -1411,6 +1419,8 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             self.assertIn("matrix_streams", le_hessian)
             self.assertNotIn("u_streams", le_hessian)
             self.assertIn("u_streams", nh_hessian)
+            self.assertIn("linear_elasticity_proteus_hex8_hessian_element_soa", le_hex8_header)
+            self.assertIn("SHAPE_ORDER[N_SHAPE] = {0, 1, 3, 2, 4, 5, 7, 6}", le_hex8_header)
             self.assertIn("neohookean_ogden_hex8_hessian_element_soa", nh_hex8_header)
             self.assertIn("q * nelements + evbegin + lane", le_header)
             self.assertIn("template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>", le_dispatch)
@@ -1504,7 +1514,26 @@ int main() {
     return status;
 }
 '''
+            le_hex8_include_only = r'''
+#include "op/sfem_GeneratedLinearElasticity_element_api.hpp"
+int main() {
+    constexpr int N = 1;
+    double data[576][N] = {};
+    const double *coords[24];
+    double *matrix_streams[576];
+    for (int i = 0; i < 24; ++i) {
+        coords[i] = data[i];
+    }
+    for (int i = 0; i < 576; ++i) {
+        matrix_streams[i] = data[i];
+    }
+    int status = sfem::codegen::linear_elasticity_hex8_hessian_element_soa<double>(N, coords, 1.0, 1.0, matrix_streams);
+    status |= sfem::codegen::linear_elasticity_hessian_3d_element_soa<double>(8, N, coords, 1.0, 1.0, matrix_streams);
+    return status;
+}
+'''
             _compile_include_only(self, compiler, le_dir, le_include_only, "le_element_api_include_only")
+            _compile_include_only(self, compiler, le_dir, le_hex8_include_only, "le_hex8_element_api_include_only")
             _compile_include_only(self, compiler, nh_dir, nh_include_only, "nh_element_api_include_only")
             _compile_include_only(self, compiler, nh_dir, nh_hex8_include_only, "nh_hex8_element_api_include_only")
 

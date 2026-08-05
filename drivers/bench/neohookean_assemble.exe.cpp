@@ -82,33 +82,7 @@ namespace {
             shape_map[i] = i;
         }
 
-        if (element_type == smesh::QUAD4 && nshape == 4) {
-            const int map[4] = {0, 1, 3, 2};
-            for (int i = 0; i < 4; ++i) shape_map[i] = map[i];
-            return SFEM_SUCCESS;
-        }
-
-        if (element_type == smesh::HEX8 && nshape == 8) {
-            const int map[8] = {0, 1, 3, 2, 4, 5, 7, 6};
-            for (int i = 0; i < 8; ++i) shape_map[i] = map[i];
-            return SFEM_SUCCESS;
-        }
-
-        if (element_type == smesh::HEX27 && nshape == 27) {
-            const int map[27] = {0,  8,  1,  11, 24, 9,  3, 10, 2,  16, 20, 17, 23, 26,
-                                 21, 19, 22, 18, 4,  12, 5, 15, 25, 13, 7,  14, 6};
-            for (int i = 0; i < 27; ++i) shape_map[i] = map[i];
-            return SFEM_SUCCESS;
-        }
-
         return SFEM_SUCCESS;
-    }
-
-    static smesh::ElemType dense_api_element_type(const smesh::ElemType element_type) {
-        if (element_type == smesh::QUAD4) return smesh::PROTEUS_QUAD4;
-        if (element_type == smesh::HEX8) return smesh::PROTEUS_HEX8;
-        if (element_type == smesh::HEX27) return smesh::PROTEUS_HEX27;
-        return element_type;
     }
 
     static void assign_const_streams(const int            nstreams,
@@ -395,7 +369,6 @@ int main(int argc, char *argv[]) {
 
     const int             dim                      = mesh->spatial_dimension();
     const smesh::ElemType element_type             = mesh->element_type(0);
-    const smesh::ElemType api_element_type         = dense_api_element_type(element_type);
     const int             nshape                   = mesh->n_nodes_per_element(0);
     const int             ndofs_per_element        = dim * nshape;
     const ptrdiff_t       nnodes                   = mesh->n_nodes();
@@ -447,7 +420,7 @@ int main(int argc, char *argv[]) {
 #endif
 
     BatchedElementAssemblyContext<ELEMENT_BATCH_SIZE> element_ctx;
-    element_ctx.element_type       = api_element_type;
+    element_ctx.element_type       = element_type;
     element_ctx.mesh               = mesh.get();
     element_ctx.dim                = dim;
     element_ctx.nshape             = nshape;
