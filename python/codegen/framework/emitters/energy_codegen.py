@@ -5977,6 +5977,11 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
             "invalid_matrix_graph |= (%s_scatter_patch(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);"
             % function_base,
         ),
+        (
+            "block_diag_sym",
+            6,
+            "%s_scatter_block_diag_sym(ev, element_matrix, values);" % function_base,
+        ),
     )
 
     lines = []
@@ -6114,6 +6119,8 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats):
         lines.extend(_sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes))
     if "patch" in formats:
         lines.extend(_sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes))
+    if "block_diag_sym" in formats:
+        lines.extend(_sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes))
     return lines
 
 
@@ -6486,6 +6493,34 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
     ]
 
 
+def _sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes):
+    return [
+        "template <typename scalar_t>",
+        "static SFEM_INLINE void %s_scatter_block_diag_sym(" % function_base,
+        "        const idx_t *const SFEM_RESTRICT ev,",
+        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
+        "        scalar_t *const SFEM_RESTRICT values) {",
+        "    static constexpr int DIM = %d;" % dim,
+        "    static constexpr int N_SHAPE = %d;" % n_nodes,
+        "    static constexpr int NDOFS = DIM * N_SHAPE;",
+        "    static constexpr int SYM_DIM = (DIM * (DIM + 1)) / 2;",
+        "    for (int i = 0; i < N_SHAPE; ++i) {",
+        "        scalar_t *const block = &values[(ptrdiff_t)ev[i] * SYM_DIM];",
+        "        int sym = 0;",
+        "        for (int bi = 0; bi < DIM; ++bi) {",
+        "            const int row = bi * N_SHAPE + i;",
+        "            for (int bj = bi; bj < DIM; ++bj) {",
+        "                const int col = bj * N_SHAPE + i;",
+        "#pragma omp atomic update",
+        "                block[sym++] += element_matrix[row * NDOFS + col];",
+        "            }",
+        "        }",
+        "    }",
+        "}",
+        "",
+    ]
+
+
 def _sfem_soa_hessian_matrix_public_wrappers(
     function_base,
     implementation_name,
@@ -6495,7 +6530,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     uses_current,
     packed_crs_passes=(),
 ):
-    format_tags = {"crs": 0, "bsr": 1, "dia": 2, "coo": 3, "patch": 4, "coo_triplet": 5}
+    format_tags = {"crs": 0, "bsr": 1, "dia": 2, "coo": 3, "patch": 4, "coo_triplet": 5, "block_diag_sym": 6}
     lines = []
     for matrix_format in formats:
         emitted_formats = ("coo", "coo_triplet") if matrix_format == "coo" else (matrix_format,)
@@ -6718,6 +6753,8 @@ def _hessian_matrix_public_params(
                 "%s *const SFEM_RESTRICT values" % scalar_type,
             ]
         )
+    elif matrix_format == "block_diag_sym":
+        params.append("%s *const SFEM_RESTRICT values" % scalar_type)
     else:
         raise ValueError("unsupported matrix format '%s'" % matrix_format)
     return params
@@ -6848,6 +6885,21 @@ def _hessian_matrix_impl_args(
             [
                 "rowptr",
                 "colidx",
+                "values",
+                "nullptr",
+                "0",
+                "0",
+                "nullptr",
+                "nullptr",
+                "nullptr",
+                "nullptr",
+            ]
+        )
+    elif matrix_format == "block_diag_sym":
+        args.extend(
+            [
+                "nullptr",
+                "nullptr",
                 "values",
                 "nullptr",
                 "0",

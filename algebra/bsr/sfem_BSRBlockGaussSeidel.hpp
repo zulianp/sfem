@@ -66,17 +66,16 @@ namespace sfem {
             }
         }
 
-        template <typename T>
-        static SFEM_INLINE void matvec_set(const int                     bs,
-                                           const T* const SFEM_RESTRICT  a,
-                                           const T* const SFEM_RESTRICT  x,
-                                           T* const SFEM_RESTRICT        y) {
-            for (int d1 = 0; d1 < bs; d1++) {
+        template <int BS, typename T>
+        static SFEM_INLINE void matvec_add(const T* const SFEM_RESTRICT a,
+                                           const T* const SFEM_RESTRICT x,
+                                           T* const SFEM_RESTRICT       y) {
+            for (int d1 = 0; d1 < BS; d1++) {
                 T acc = 0;
-                for (int d2 = 0; d2 < bs; d2++) {
-                    acc += a[d1 * bs + d2] * x[d2];
+                for (int d2 = 0; d2 < BS; d2++) {
+                    acc += a[d1 * BS + d2] * x[d2];
                 }
-                y[d1] = acc;
+                y[d1] += acc;
             }
         }
 
@@ -122,11 +121,22 @@ namespace sfem {
             T* const        delta = workspace_->data();
             blas_->zeros(n, delta);
 
-            for (int it = 0; it < max_it_; it++) {
-                forward_sweep(b, delta);
-                if (symmetric_) {
-                    backward_sweep(b, delta);
-                }
+            switch (bsr_->block_size()) {
+                case 1:
+                    sweep<1>(b, delta);
+                    break;
+                case 2:
+                    sweep<2>(b, delta);
+                    break;
+                case 3:
+                    sweep<3>(b, delta);
+                    break;
+                case 4:
+                    sweep<4>(b, delta);
+                    break;
+                default:
+                    SFEM_ERROR("BSRBlockGaussSeidel: block size %d not supported\n", bsr_->block_size());
+                    break;
             }
 
             blas_->axpy(n, T(1), delta, x);
@@ -183,8 +193,18 @@ namespace sfem {
             }
         }
 
+        template <int BS>
+        void sweep(const T* const b, T* const x) const {
+            for (int it = 0; it < max_it_; it++) {
+                forward_sweep<BS>(b, x);
+                if (symmetric_) {
+                    backward_sweep<BS>(b, x);
+                }
+            }
+        }
+
+        template <int BS>
         void sweep_row(const ptrdiff_t i,
-                       const int       bs,
                        const R         begin,
                        const R         end,
                        const C* const  colidx,
@@ -192,31 +212,27 @@ namespace sfem {
                        const T* const  invd,
                        const T* const  b,
                        T* const        x) const {
-            T r[MAX_BLOCK_SIZE];
-            for (int d = 0; d < bs; d++) {
-                r[d] = b[i * bs + d];
+            T r[BS];
+            for (int d = 0; d < BS; d++) {
+                r[d] = b[i * BS + d];
             }
 
             for (R k = begin; k < end; k++) {
-                const ptrdiff_t j = colidx[k];
-                if (j == i) {
-                    continue;
-                }
-
-                const T* const aij = &values[k * bs * bs];
-                const T* const xj  = &x[j * bs];
-                for (int d1 = 0; d1 < bs; d1++) {
-                    for (int d2 = 0; d2 < bs; d2++) {
-                        r[d1] -= aij[d1 * bs + d2] * xj[d2];
+                const ptrdiff_t j   = colidx[k];
+                const T* const  aij = &values[k * BS * BS];
+                const T* const  xj  = &x[j * BS];
+                for (int d1 = 0; d1 < BS; d1++) {
+                    for (int d2 = 0; d2 < BS; d2++) {
+                        r[d1] -= aij[d1 * BS + d2] * xj[d2];
                     }
                 }
             }
 
-            bsr_bgs_private_::matvec_set(bs, &invd[i * bs * bs], r, &x[i * bs]);
+            bsr_bgs_private_::matvec_add<BS>(&invd[i * BS * BS], r, &x[i * BS]);
         }
 
+        template <int BS>
         void forward_sweep(const T* const b, T* const x) const {
-            const int       bs       = bsr_->block_size();
             const ptrdiff_t n_blocks = bsr_->row_ptr->size() - 1;
             const R* const  rowptr   = bsr_->row_ptr->data();
             const C* const  colidx   = bsr_->col_idx->data();
@@ -224,12 +240,12 @@ namespace sfem {
             const T* const  invd     = inv_diag_->data();
 
             for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                sweep_row(i, bs, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
+                sweep_row<BS>(i, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
             }
         }
 
+        template <int BS>
         void backward_sweep(const T* const b, T* const x) const {
-            const int       bs       = bsr_->block_size();
             const ptrdiff_t n_blocks = bsr_->row_ptr->size() - 1;
             const R* const  rowptr   = bsr_->row_ptr->data();
             const C* const  colidx   = bsr_->col_idx->data();
@@ -237,7 +253,7 @@ namespace sfem {
             const T* const  invd     = inv_diag_->data();
 
             for (ptrdiff_t i = n_blocks - 1; i >= 0; i--) {
-                sweep_row(i, bs, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
+                sweep_row<BS>(i, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
             }
         }
 
@@ -251,12 +267,10 @@ namespace sfem {
     };
 
     template <typename R = count_t, typename C = idx_t, typename T = real_t>
-    std::shared_ptr<BSRBlockGaussSeidel<R, C, T>> h_bsr_block_gauss_seidel(
-            const std::shared_ptr<BSR<R, C, T, T>>& bsr) {
+    std::shared_ptr<BSRBlockGaussSeidel<R, C, T>> h_bsr_block_gauss_seidel(const std::shared_ptr<BSR<R, C, T, T>>& bsr) {
         return std::make_shared<BSRBlockGaussSeidel<R, C, T>>(bsr);
     }
 
 }  // namespace sfem
 
 #endif  // SFEM_BSR_BLOCK_GAUSS_SEIDEL_HPP
-

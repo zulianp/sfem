@@ -259,6 +259,40 @@ int test_bsr_block_gauss_seidel() {
     return SFEM_TEST_SUCCESS;
 }
 
+#if !SFEM_REAL_T_IS_FLOAT32
+int test_bsr_spmv_mixed_precision_float_storage() {
+    using R        = sfem::count_t;
+    using C        = sfem::idx_t;
+    using TStorage = float;
+    using T        = sfem::real_t;
+
+    // 1 block-row, 2 neighbors, 3x3 blocks: y = A0*x0 + A1*x1
+    auto rowptr = make_buffer<R>({0, 2});
+    auto colidx = make_buffer<C>({0, 1});
+    auto values = make_buffer<TStorage>({1, 0, 0, 0, 2, 0, 0, 0, 3,   // A00 diag(1,2,3)
+                                         0, 1, 0, 0, 0, 1, 1, 0, 0});  // A01
+
+    auto a = sfem::h_bsr_spmv<R, C, TStorage, T>(1, 2, 3, rowptr, colidx, values, static_cast<T>(0));
+
+    const T x[6] = {1, 1, 1, 2, 3, 4};
+    T       y[3] = {-1, -1, -1};  // overwritten when scale_output==0
+    SFEM_TEST_ASSERT(a->apply(x, y) == SFEM_SUCCESS);
+
+    // y = [1,2,3] + [3,4,2] = [4,6,5]
+    const T expected[] = {4, 6, 5};
+    SFEM_ASSERT_ARRAY_APPROX_EQ(3, y, expected, 1e-12);
+
+    // scale_output==1 accumulates
+    T y_acc[3] = {1, 1, 1};
+    auto a_add = sfem::h_bsr_spmv<R, C, TStorage, T>(1, 2, 3, rowptr, colidx, values, static_cast<T>(1));
+    SFEM_TEST_ASSERT(a_add->apply(x, y_acc) == SFEM_SUCCESS);
+    const T expected_acc[] = {5, 7, 6};
+    SFEM_ASSERT_ARRAY_APPROX_EQ(3, y_acc, expected_acc, 1e-12);
+
+    return SFEM_TEST_SUCCESS;
+}
+#endif
+
 int main(int argc, char* argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
@@ -268,6 +302,9 @@ int main(int argc, char* argv[]) {
     SFEM_RUN_TEST(test_bsr_mm_apply);
     SFEM_RUN_TEST(test_bsr_rap);
     SFEM_RUN_TEST(test_bsr_block_gauss_seidel);
+#if !SFEM_REAL_T_IS_FLOAT32
+    SFEM_RUN_TEST(test_bsr_spmv_mixed_precision_float_storage);
+#endif
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

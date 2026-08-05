@@ -189,18 +189,17 @@ namespace {
 
     std::shared_ptr<Operator<real_t>> make_sas_op(const std::shared_ptr<Operator<real_t>>& A,
                                                   const SharedBuffer<real_t>&              S_blocks,
-                                                  const SharedBuffer<real_t>&              t1,
-                                                  const SharedBuffer<real_t>&              t2,
+                                                  const SharedBuffer<real_t>&              temp,
                                                   const ptrdiff_t                          nnodes) {
         const ptrdiff_t n = nnodes * BS;
         return make_op<real_t>(
                 n,
                 n,
                 [=](const real_t* const x, real_t* const y) {
-                    apply_block_diag(nnodes, S_blocks->data(), x, t1->data());
-                    A->apply(t1->data(), y);
-                    apply_block_diag(nnodes, S_blocks->data(), y, t2->data());
-                    std::memcpy(y, t2->data(), size_t(n) * sizeof(real_t));
+                    SFEM_TRACE_SCOPE("SASOp::apply");
+                    apply_block_diag(nnodes, S_blocks->data(), x, y);
+                    A->apply(y, temp->data());
+                    apply_block_diag(nnodes, S_blocks->data(), temp->data(), y);
                 },
                 EXECUTION_SPACE_HOST);
     }
@@ -212,6 +211,11 @@ namespace {
         int    it{0};
     };
 
+    struct TimedApply {
+        double time_per_call{0};
+        double mdofs_per_s{0};
+    };
+
     real_t free_gradient_norm(const std::shared_ptr<Function>& f, const real_t* const x, real_t* const g_work) {
         auto            blas = make_openmp_blas<real_t>();
         const ptrdiff_t n    = f->space()->n_dofs();
@@ -221,8 +225,7 @@ namespace {
     }
 
     template <typename ApplyFn>
-    TimedResult time_smoother(const char*                              name,
-                              const int                                it,
+    TimedResult time_smoother(const int                                it,
                               const ptrdiff_t                          ndofs,
                               const int                                repeat,
                               const int                                smooth_sweeps,
@@ -271,9 +274,26 @@ namespace {
 
         const real_t r_norm = free_gradient_norm(f, x_phys, g_work);
 
-        printf("| %-8s | %3d | %10.6e | %10.3f | %10.6e |\n", name, it, time_per_call, mdofs_per_s, double(r_norm));
-
         return TimedResult{time_per_call, mdofs_per_s, r_norm, it};
+    }
+
+    TimedApply time_apply(const ptrdiff_t                          ndofs,
+                          const int                                repeat,
+                          const std::shared_ptr<Operator<real_t>>& A,
+                          const real_t* const                      x,
+                          real_t* const                            y) {
+        for (int w = 0; w < 2; w++) {
+            A->apply(x, y);
+        }
+
+        const double tick = smesh::time_seconds();
+        for (int rr = 0; rr < repeat; rr++) {
+            A->apply(x, y);
+        }
+        const double tock          = smesh::time_seconds();
+        const double time_per_call = (tock - tick) / double(repeat);
+        const double mdofs_per_s   = 1e-6 * double(ndofs) / time_per_call;
+        return TimedApply{time_per_call, mdofs_per_s};
     }
 
 }  // namespace
@@ -283,20 +303,31 @@ int main(int argc, char** argv) {
 
     const auto es = EXECUTION_SPACE_HOST;
 
-    const int SFEM_BASE_RESOLUTION = smesh::Env::read("SFEM_BASE_RESOLUTION", 16);
-    const int SFEM_REPEAT          = smesh::Env::read("SFEM_REPEAT", 10);
-    const int SFEM_CHEB_IT         = smesh::Env::read("SFEM_CHEB_IT", 20);
-    const int SFEM_BGS_IT          = smesh::Env::read("SFEM_BGS_IT", 20);
-    const int SFEM_BGS_SYMMETRIC   = smesh::Env::read("SFEM_BGS_SYMMETRIC", 0);
-    const int SFEM_SMOOTH_SWEEPS   = smesh::Env::read("SFEM_SMOOTH_SWEEPS", 5);
+    const int             SFEM_BASE_RESOLUTION = smesh::Env::read("SFEM_BASE_RESOLUTION", 16);
+    const int             SFEM_REPEAT          = smesh::Env::read("SFEM_REPEAT", 10);
+    const int             SFEM_CHEB_IT         = smesh::Env::read("SFEM_CHEB_IT", 40);
+    const int             SFEM_BGS_IT          = smesh::Env::read("SFEM_BGS_IT", 40);
+    const int             SFEM_BGS_SYMMETRIC   = smesh::Env::read("SFEM_BGS_SYMMETRIC", 0);
+    const int             SFEM_SMOOTH_SWEEPS   = smesh::Env::read("SFEM_SMOOTH_SWEEPS", 5);
+    const smesh::ElemType SFEM_ELEM_TYPE       = smesh::Env::read("SFEM_ELEM_TYPE", smesh::ElemType::HEX8);
+    auto                  SFEM_OPERATOR        = smesh::Env::read_string("SFEM_OPERATOR", std::string("LinearElasticity"));
 
     const geom_t Lx   = 1;
-    auto         mesh = Mesh::create_hex8_cube(
-            Communicator::world(), SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, SFEM_BASE_RESOLUTION, 0, 0, 0, Lx, 1, 1);
+    auto         mesh = Mesh::create_cube(Communicator::world(),
+                                  SFEM_ELEM_TYPE,
+                                  SFEM_BASE_RESOLUTION,
+                                  SFEM_BASE_RESOLUTION,
+                                  SFEM_BASE_RESOLUTION,
+                                  0,
+                                  0,
+                                  0,
+                                  Lx,
+                                  1,
+                                  1);
 
     auto fs = FunctionSpace::create(mesh, BS);
     auto f  = Function::create(fs);
-    auto op = create_op(fs, "LinearElasticity", es);
+    auto op = create_op(fs, SFEM_OPERATOR, es);
     op->initialize();
     f->add_operator(op);
 
@@ -333,9 +364,9 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    auto A_raw = h_bsr_spmv<count_t, idx_t, real_t>(
+    auto A = h_bsr_spmv<count_t, idx_t, real_t>(
             nnodes, nnodes, BS, graph->rowptr(), graph->colidx(), values, static_cast<real_t>(0));
-    auto A = compose_constraints_op(f, A_raw);
+    // auto A = compose_constraints_op(f, A_raw);
 
     // Block-diagonal B (sym-6) → clamp BC components → S = B^{-1/2}
     auto B_sym6 = create_host_buffer<real_t>(nnodes * 6);
@@ -345,12 +376,11 @@ int main(int argc, char** argv) {
     }
     auto S_blocks = build_block_inv_sqrt(B_sym6, mask->data(), nnodes);
 
-    auto t1  = create_host_buffer<real_t>(ndofs);
-    auto t2  = create_host_buffer<real_t>(ndofs);
-    auto SAS = make_sas_op(A, S_blocks, t1, t2, nnodes);
+    auto temp = create_host_buffer<real_t>(ndofs);
+    auto SAS  = make_sas_op(A, S_blocks, temp, nnodes);
 
     // BGS on raw BSR (corrections zeroed on constrained dofs after apply)
-    auto bgs = h_bsr_block_gauss_seidel(A_raw);
+    auto bgs = h_bsr_block_gauss_seidel(A);
     bgs->set_max_it(SFEM_BGS_IT);
     bgs->set_symmetric(SFEM_BGS_SYMMETRIC != 0);
 
@@ -378,16 +408,10 @@ int main(int argc, char** argv) {
 
     const real_t r0 = free_gradient_norm(f, x0->data(), g->data());
 
-    printf("ndofs=%td nnodes=%td nnz_blocks=%td\n", ndofs, nnodes, (ptrdiff_t)graph->nnz());
-    printf("r0_free_grad=%g  cheb_eig_max=%g (scaled SAS)\n", double(r0), double(cheb->eig_max));
-    printf("| smoother |  it |     time_s |    MDOF/s | r_grad_free |\n");
-    printf("|----------|-----|------------|-----------|-------------|\n");
+    const auto bsr_spmv = time_apply(ndofs, SFEM_REPEAT, A, b->data(), a_tmp->data());
+    const auto sas_op   = time_apply(ndofs, SFEM_REPEAT, SAS, b->data(), a_tmp->data());
 
-    auto apply_bgs = [&](const real_t* const rhs, real_t* const xx) {
-        bgs->apply(rhs, xx);
-        // Raw BSR GS updates Dirichlet dofs; zero them so A_fc δ_c does not pollute free residual.
-        f->apply_zero_constraints(xx);
-    };
+    auto apply_bgs = [&](const real_t* const rhs, real_t* const xx) { bgs->apply(rhs, xx); };
 
     auto apply_cheb = [&](const real_t* const rhs, real_t* const xx) {
         // r_s = S * rhs; solve SAS x_s = r_s; physical correction += S * x_s
@@ -398,8 +422,7 @@ int main(int argc, char** argv) {
         blas->axpy(ndofs, 1, corr->data(), xx);
     };
 
-    const auto bgs_res = time_smoother("BGS",
-                                       SFEM_BGS_IT,
+    const auto bgs_res = time_smoother(SFEM_BGS_IT,
                                        ndofs,
                                        SFEM_REPEAT,
                                        SFEM_SMOOTH_SWEEPS,
@@ -414,8 +437,7 @@ int main(int argc, char** argv) {
                                        g->data(),
                                        apply_bgs);
 
-    const auto cheb_res = time_smoother("ChebSAS",
-                                        SFEM_CHEB_IT,
+    const auto cheb_res = time_smoother(SFEM_CHEB_IT,
                                         ndofs,
                                         SFEM_REPEAT,
                                         SFEM_SMOOTH_SWEEPS,
@@ -431,8 +453,68 @@ int main(int argc, char** argv) {
                                         apply_cheb);
 
     const double speedup = cheb_res.time_per_call / bgs_res.time_per_call;
-    printf("speedup_bgs_vs_cheb=%.4f  ( >1 means BGS faster )\n", speedup);
-    printf("r_grad_bgs=%g r_grad_cheb=%g (free dofs via f->gradient)\n", double(bgs_res.r_norm), double(cheb_res.r_norm));
+
+    printf("\n");
+    printf("BSR Block Gauss-Seidel vs Chebyshev/SAS\n");
+    printf("=======================================\n");
+
+    printf("\nRun setup\n");
+    printf("+------------------------+--------------------------------+\n");
+    printf("| %-22s | %-30s |\n", "field", "value");
+    printf("+------------------------+--------------------------------+\n");
+    printf("| %-22s | %-30s |\n", "operator", SFEM_OPERATOR.c_str());
+    printf("| %-22s | %-30s |\n", "element", type_to_string(mesh->element_type(0)));
+    printf("| %-22s | %30d |\n", "base_resolution", SFEM_BASE_RESOLUTION);
+    printf("| %-22s | %30d |\n", "block_size", BS);
+    printf("| %-22s | %30d |\n", "repeat", SFEM_REPEAT);
+    printf("| %-22s | %30d |\n", "smooth_sweeps", SFEM_SMOOTH_SWEEPS);
+    printf("| %-22s | %30s |\n", "bgs_symmetric", SFEM_BGS_SYMMETRIC ? "yes" : "no");
+    printf("+------------------------+--------------------------------+\n");
+
+    printf("\nProblem\n");
+    printf("+------------------------+--------------------------------+\n");
+    printf("| %-22s | %-30s |\n", "field", "value");
+    printf("+------------------------+--------------------------------+\n");
+    printf("| %-22s | %30td |\n", "nodes", nnodes);
+    printf("| %-22s | %30td |\n", "dofs", ndofs);
+    printf("| %-22s | %30td |\n", "nnz_blocks", (ptrdiff_t)graph->nnz());
+    printf("| %-22s | %30.6e |\n", "r0_free_grad", double(r0));
+    printf("| %-22s | %30.6e |\n", "cheb_eig_max", double(cheb->eig_max));
+    printf("+------------------------+--------------------------------+\n");
+
+    printf("\nOperator apply\n");
+    printf("+------------+--------------+--------------+\n");
+    printf("| %-10s | %12s | %12s |\n", "operator", "time_s", "MDOF/s");
+    printf("+------------+--------------+--------------+\n");
+    printf("| %-10s | %12.6e | %12.3f |\n", "BSR SpMV", bsr_spmv.time_per_call, bsr_spmv.mdofs_per_s);
+    printf("| %-10s | %12.6e | %12.3f |\n", "SAS", sas_op.time_per_call, sas_op.mdofs_per_s);
+    printf("+------------+--------------+--------------+\n");
+
+    printf("\nSmoothers\n");
+    printf("+----------+------+--------------+--------------+--------------+\n");
+    printf("| %-8s | %4s | %12s | %12s | %12s |\n", "smoother", "it", "time_s", "MDOF/s", "r_grad_free");
+    printf("+----------+------+--------------+--------------+--------------+\n");
+    printf("| %-8s | %4d | %12.6e | %12.3f | %12.6e |\n",
+           "BGS",
+           bgs_res.it,
+           bgs_res.time_per_call,
+           bgs_res.mdofs_per_s,
+           double(bgs_res.r_norm));
+    printf("| %-8s | %4d | %12.6e | %12.3f | %12.6e |\n",
+           "ChebSAS",
+           cheb_res.it,
+           cheb_res.time_per_call,
+           cheb_res.mdofs_per_s,
+           double(cheb_res.r_norm));
+    printf("+----------+------+--------------+--------------+--------------+\n");
+
+    printf("\nComparison\n");
+    printf("+------------------------+--------------------------------+\n");
+    printf("| %-22s | %-30s |\n", "metric", "value");
+    printf("+------------------------+--------------------------------+\n");
+    printf("| %-22s | %30.4f |\n", "speedup_bgs_vs_cheb", speedup);
+    printf("| %-22s | %-30s |\n", "speedup_meaning", ">1 means BGS faster");
+    printf("+------------------------+--------------------------------+\n");
 
     return EXIT_SUCCESS;
 }
