@@ -12,6 +12,7 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
 #include "smesh_types.hpp"
 
 namespace sfem {
@@ -511,10 +512,25 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    // Host SpMV microkernel tuned for Apple Silicon (M1): fuse y-scale, keep y in
-    // registers, fully unroll dense blocks, and block the neighbor loop for ILP.
-    // TStorage may differ from T (mixed precision); values are promoted to T before FMA.
-    enum : int { SFEM_BSR_SPMV_NNZ_BLOCK = 4 };
+    // -------------------------------------------------------------------------
+    // Host BSR SpMV
+    // Portable: fused scale, register y, unrolled 3x3, nnz blocking, software
+    // prefetch of upcoming x/A blocks. TStorage may differ from T (mixed precision).
+    // Platform SIMD left to the compiler for the short 3-wide microkernel —
+    // explicit NEON/AVX horizontal reductions were slower on M1.
+    // -------------------------------------------------------------------------
+    enum : int {
+        SFEM_BSR_SPMV_NNZ_BLOCK     = 4,
+        SFEM_BSR_SPMV_PREFETCH_DIST = 2
+    };
+
+    SFEM_FORCE_INLINE void bsr_spmv_prefetch_r(const void* const addr) {
+#if defined(__GNUC__) || defined(__clang__)
+        __builtin_prefetch(addr, 0, 1);
+#else
+        (void)addr;
+#endif
+    }
 
     template <int RowBlockSize, int ColBlockSize, typename TStorage, typename T>
     SFEM_FORCE_INLINE void bsr_spmv_block_fma(const TStorage* const SFEM_RESTRICT aij,
@@ -531,6 +547,9 @@ namespace sfem {
         }
     }
 
+    // Default portable 3x3 microkernel. Prefer this over explicit NEON/AVX dots:
+    // on M1 the compiler already emits FMAs, and horizontal reductions from
+    // hand-written SIMD hurt the short 3-wide dependency chain.
     template <typename TStorage, typename T>
     SFEM_FORCE_INLINE void bsr_spmv_block_fma_3x3(const TStorage* const SFEM_RESTRICT aij,
                                                   const T* const SFEM_RESTRICT        block_x,
@@ -554,8 +573,10 @@ namespace sfem {
                              const T                             scale_output,
                              const T* const SFEM_RESTRICT        x,
                              T* const SFEM_RESTRICT              y) {
-        constexpr int BS       = 3;
-        constexpr int BENTRIES = BS * BS;
+        constexpr int BS            = 3;
+        constexpr int BENTRIES      = BS * BS;
+        constexpr int NNZ_BLOCK     = SFEM_BSR_SPMV_NNZ_BLOCK;
+        constexpr int PREFETCH_DIST = SFEM_BSR_SPMV_PREFETCH_DIST;
 
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < block_rows; i++) {
@@ -579,13 +600,17 @@ namespace sfem {
                 y2 = scale_output * yi[2];
             }
 
-            // Neighbor blocking: four independent unrolled 3x3 FMAs raise ILP on M1
-            // without spilling y into a stack partial array.
-            constexpr int NNZ_BLOCK = SFEM_BSR_SPMV_NNZ_BLOCK;
-            const R       n_blocks  = extent / NNZ_BLOCK;
-            const R       b_extent  = n_blocks * NNZ_BLOCK;
+            const R n_blocks = extent / NNZ_BLOCK;
+            const R b_extent = n_blocks * NNZ_BLOCK;
 
             for (R k = 0; k < b_extent; k += NNZ_BLOCK) {
+                if (k + PREFETCH_DIST < extent) {
+                    bsr_spmv_prefetch_r(&x[cols[k + PREFETCH_DIST] * BS]);
+                    bsr_spmv_prefetch_r(&vals[(k + PREFETCH_DIST) * BENTRIES]);
+                }
+                if (k + PREFETCH_DIST + 1 < extent) {
+                    bsr_spmv_prefetch_r(&x[cols[k + PREFETCH_DIST + 1] * BS]);
+                }
 #pragma unroll(NNZ_BLOCK)
                 for (int b = 0; b < NNZ_BLOCK; b++) {
                     bsr_spmv_block_fma_3x3<TStorage, T>(&vals[(k + b) * BENTRIES], &x[cols[k + b] * BS], y0, y1, y2);
@@ -615,6 +640,7 @@ namespace sfem {
 
         constexpr int block_matrix_size = RowBlockSize * ColBlockSize;
         constexpr int NNZ_BLOCK         = SFEM_BSR_SPMV_NNZ_BLOCK;
+        constexpr int PREFETCH_DIST     = SFEM_BSR_SPMV_PREFETCH_DIST;
 
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < block_rows; i++) {
@@ -641,6 +667,10 @@ namespace sfem {
             const R b_extent = n_blocks * NNZ_BLOCK;
 
             for (R k = 0; k < b_extent; k += NNZ_BLOCK) {
+                if (k + PREFETCH_DIST < extent) {
+                    bsr_spmv_prefetch_r(&x[cols[k + PREFETCH_DIST] * ColBlockSize]);
+                    bsr_spmv_prefetch_r(&vals[(k + PREFETCH_DIST) * block_matrix_size]);
+                }
 #pragma unroll(NNZ_BLOCK)
                 for (int b = 0; b < NNZ_BLOCK; b++) {
                     bsr_spmv_block_fma<RowBlockSize, ColBlockSize, TStorage, T>(

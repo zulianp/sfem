@@ -13,43 +13,19 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
 #include "smesh_alloc.hpp"
 #include "smesh_types.hpp"
 
 namespace sfem {
 
-    template <typename R, typename TStorage, typename T = TStorage>
-    static inline T bsr_soa_dot(const R extent, const TStorage* const SFEM_RESTRICT vals, const T* const SFEM_RESTRICT x) {
-        T acc = 0;
-
-        const static int BLOCK_SIZE       = 16;
-        const R          n_blocks         = extent / BLOCK_SIZE;
-        const R          b_extent         = n_blocks * BLOCK_SIZE;
-        T                buff[BLOCK_SIZE] = {0};
-
-        for (R k = 0; k < b_extent; k += BLOCK_SIZE) {
-            auto* v  = &vals[k];
-            auto* xx = &x[k];
-#pragma omp simd
-            for (int b = 0; b < BLOCK_SIZE; b++) {
-                buff[b] += v[b] * xx[b];
-            }
-        }
-
-        if (b_extent) {
-#pragma omp simd reduction(+ : acc)
-            for (int b = 0; b < BLOCK_SIZE; b++) {
-                acc += buff[b];
-            }
-        }
-
-        for (R k = b_extent; k < extent; k++) {
-            const T aij = vals[k];
-
-            acc += aij * x[k];
-        }
-
-        return acc;
+    template <typename T>
+    SFEM_FORCE_INLINE void bsr_soa_prefetch_r(const void* const addr) {
+#if defined(__GNUC__) || defined(__clang__)
+        __builtin_prefetch(addr, 0, 1);
+#else
+        (void)addr;
+#endif
     }
 
     template <typename T>
@@ -60,61 +36,76 @@ namespace sfem {
                 y[i] = 0;
             }
         } else if (scale_output != 1) {
-#pragma omp      parallel for schedule(static)
+#pragma omp parallel for schedule(static)
             for (ptrdiff_t i = 0; i < rows; i++) {
                 y[i] *= scale_output;
             }
         }
     }
 
+    // SoA values, AoS (node-major) x/y — matches Operator / AoS BSR vector layout.
     template <int RowBlockSize, int ColBlockSize, typename R, typename C, typename TStorage, typename T = TStorage>
     void bsr_soa_spmv_static(const ptrdiff_t                      block_rows,
-                                  const ptrdiff_t                      block_cols,
-                                  const R* const SFEM_RESTRICT         rowptr,
-                                  const C* const SFEM_RESTRICT         colidx,
-                                  TStorage* const* const SFEM_RESTRICT values,
-                                  const T* const SFEM_RESTRICT         x,
-                                  T* const* const SFEM_RESTRICT        x_workspace,
-                                  T* const SFEM_RESTRICT               y) {
+                             const ptrdiff_t                      block_cols,
+                             const R* const SFEM_RESTRICT         rowptr,
+                             const C* const SFEM_RESTRICT         colidx,
+                             TStorage* const* const SFEM_RESTRICT values,
+                             const T                              scale_output,
+                             const T* const SFEM_RESTRICT         x,
+                             T* const* const SFEM_RESTRICT        x_workspace,
+                             T* const SFEM_RESTRICT               y) {
         static_assert(RowBlockSize > 0, "RowBlockSize must be positive");
         static_assert(ColBlockSize > 0, "ColBlockSize must be positive");
         (void)block_cols;
+        (void)x_workspace;
 
-#pragma omp parallel
-        {
-            int tid = 0;
-#ifdef _OPENMP
-            tid = omp_get_thread_num();
-#endif
-            T* const SFEM_RESTRICT x_row = x_workspace[tid];
+        constexpr int PREFETCH_DIST = 2;
 
-#pragma omp for schedule(static)
-            for (ptrdiff_t i = 0; i < block_rows; i++) {
-                const R row_begin = rowptr[i];
-                const R row_end   = rowptr[i + 1];
-                const R row_nnz   = row_end - row_begin;
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < block_rows; i++) {
+            const R row_begin = rowptr[i];
+            const R extent    = rowptr[i + 1] - row_begin;
 
-                for (R k = 0; k < row_nnz; k++) {
-                    const C                col     = colidx[row_begin + k];
-                    T* const SFEM_RESTRICT x_block = &x_row[k * ColBlockSize];
-#pragma unroll(ColBlockSize)
-                    for (int d2 = 0; d2 < ColBlockSize; d2++) {
-                        x_block[d2] = x[col * ColBlockSize + d2];
+            const C* const SFEM_RESTRICT cols = &colidx[row_begin];
+            T* const SFEM_RESTRICT       yi   = &y[i * RowBlockSize];
+
+            T y_acc[RowBlockSize];
+#pragma unroll(RowBlockSize)
+            for (int d1 = 0; d1 < RowBlockSize; d1++) {
+                if (scale_output == T(0)) {
+                    y_acc[d1] = T(0);
+                } else if (scale_output == T(1)) {
+                    y_acc[d1] = yi[d1];
+                } else {
+                    y_acc[d1] = scale_output * yi[d1];
+                }
+            }
+
+            for (R k = 0; k < extent; k++) {
+                if (k + PREFETCH_DIST < extent) {
+                    bsr_soa_prefetch_r<T>(&x[cols[k + PREFETCH_DIST] * ColBlockSize]);
+#pragma unroll(RowBlockSize)
+                    for (int d1 = 0; d1 < RowBlockSize; d1++) {
+                        bsr_soa_prefetch_r<T>(&values[d1][(row_begin + k + PREFETCH_DIST) * ColBlockSize]);
                     }
                 }
 
-                const R scalar_extent = row_nnz * ColBlockSize;
-
+                const T* const SFEM_RESTRICT block_x = &x[cols[k] * ColBlockSize];
 #pragma unroll(RowBlockSize)
                 for (int d1 = 0; d1 < RowBlockSize; d1++) {
-                    T* const SFEM_RESTRICT              y_comp = &y[d1 * block_rows];
-                    const TStorage* const SFEM_RESTRICT vals   = &values[d1][row_begin * ColBlockSize];
-                    T                                   val    = y_comp[i];
-
-                    val += bsr_soa_dot<R, TStorage, T>(scalar_extent, vals, x_row);
-
-                    y_comp[i] = val;
+                    const TStorage* const SFEM_RESTRICT arow = &values[d1][(row_begin + k) * ColBlockSize];
+                    T                                   sum  = y_acc[d1];
+#pragma unroll(ColBlockSize)
+                    for (int d2 = 0; d2 < ColBlockSize; d2++) {
+                        sum += static_cast<T>(arow[d2]) * block_x[d2];
+                    }
+                    y_acc[d1] = sum;
                 }
+            }
+
+#pragma unroll(RowBlockSize)
+            for (int d1 = 0; d1 < RowBlockSize; d1++) {
+                yi[d1] = y_acc[d1];
             }
         }
     }
@@ -127,42 +118,61 @@ namespace sfem {
                               const R* const SFEM_RESTRICT         rowptr,
                               const C* const SFEM_RESTRICT         colidx,
                               TStorage* const* const SFEM_RESTRICT values,
+                              const T                              scale_output,
                               const T* const SFEM_RESTRICT         x,
                               T* const* const SFEM_RESTRICT        x_workspace,
                               T* const SFEM_RESTRICT               y) {
         (void)block_cols;
+        (void)x_workspace;
 
-#pragma omp parallel
-        {
-            int tid = 0;
-#ifdef _OPENMP
-            tid = omp_get_thread_num();
-#endif
-            T* const SFEM_RESTRICT x_row = x_workspace[tid];
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < block_rows; i++) {
+            const R row_begin = rowptr[i];
+            const R row_end   = rowptr[i + 1];
 
-#pragma omp for schedule(static)
-            for (ptrdiff_t i = 0; i < block_rows; i++) {
-                const R row_begin = rowptr[i];
-                const R row_end   = rowptr[i + 1];
-                const R row_nnz   = row_end - row_begin;
+            T* const SFEM_RESTRICT yi = &y[i * row_block_size];
 
-                const C* const SFEM_RESTRICT cols = &colidx[row_begin];
+            constexpr int kMaxStackBs = 16;
+            T             y_stack[kMaxStackBs];
+            T* const SFEM_RESTRICT y_acc = (row_block_size <= kMaxStackBs) ? y_stack : yi;
 
-                for (R k = 0; k < row_nnz; k++) {
-                    T* const SFEM_RESTRICT       x_block = &x_row[k * col_block_size];
-                    const T* const SFEM_RESTRICT xx      = &x[cols[k] * col_block_size];
-                    for (int d2 = 0; d2 < col_block_size; d2++) {
-                        x_block[d2] = xx[d2];
+            if (y_acc == yi) {
+                if (scale_output == T(0)) {
+                    for (int d1 = 0; d1 < row_block_size; d1++) {
+                        yi[d1] = T(0);
+                    }
+                } else if (scale_output != T(1)) {
+                    for (int d1 = 0; d1 < row_block_size; d1++) {
+                        yi[d1] *= scale_output;
                     }
                 }
-                const R scalar_extent = row_nnz * col_block_size;
-
+            } else {
                 for (int d1 = 0; d1 < row_block_size; d1++) {
-                    T* const SFEM_RESTRICT              y_comp = &y[d1 * block_rows];
-                    const TStorage* const SFEM_RESTRICT vals   = &values[d1][row_begin * col_block_size];
-                    const T                             val    = bsr_soa_dot<R, TStorage, T>(scalar_extent, vals, x_row);
+                    if (scale_output == T(0)) {
+                        y_acc[d1] = T(0);
+                    } else if (scale_output == T(1)) {
+                        y_acc[d1] = yi[d1];
+                    } else {
+                        y_acc[d1] = scale_output * yi[d1];
+                    }
+                }
+            }
 
-                    y_comp[i] += val;
+            for (R k = row_begin; k < row_end; k++) {
+                const T* const SFEM_RESTRICT block_x = &x[colidx[k] * col_block_size];
+                for (int d1 = 0; d1 < row_block_size; d1++) {
+                    const TStorage* const SFEM_RESTRICT arow = &values[d1][k * col_block_size];
+                    T                                   sum  = y_acc[d1];
+                    for (int d2 = 0; d2 < col_block_size; d2++) {
+                        sum += static_cast<T>(arow[d2]) * block_x[d2];
+                    }
+                    y_acc[d1] = sum;
+                }
+            }
+
+            if (y_acc != yi) {
+                for (int d1 = 0; d1 < row_block_size; d1++) {
+                    yi[d1] = y_acc[d1];
                 }
             }
         }
@@ -176,20 +186,34 @@ namespace sfem {
                                const R* const SFEM_RESTRICT         rowptr,
                                const C* const SFEM_RESTRICT         colidx,
                                TStorage* const* const SFEM_RESTRICT values,
+                               const T                              scale_output,
                                const T* const SFEM_RESTRICT         x,
                                T* const* const SFEM_RESTRICT        x_workspace,
                                T* const SFEM_RESTRICT               y) {
         if (row_block_size == 3 && col_block_size == 3) {
-            bsr_soa_spmv_static<3, 3>(block_rows, block_cols, rowptr, colidx, values, x, x_workspace, y);
+            bsr_soa_spmv_static<3, 3>(
+                    block_rows, block_cols, rowptr, colidx, values, scale_output, x, x_workspace, y);
         } else if (row_block_size == 6 && col_block_size == 6) {
-            bsr_soa_spmv_static<6, 6>(block_rows, block_cols, rowptr, colidx, values, x, x_workspace, y);
+            bsr_soa_spmv_static<6, 6>(
+                    block_rows, block_cols, rowptr, colidx, values, scale_output, x, x_workspace, y);
         } else if (row_block_size == 3 && col_block_size == 6) {
-            bsr_soa_spmv_static<3, 6>(block_rows, block_cols, rowptr, colidx, values, x, x_workspace, y);
+            bsr_soa_spmv_static<3, 6>(
+                    block_rows, block_cols, rowptr, colidx, values, scale_output, x, x_workspace, y);
         } else if (row_block_size == 6 && col_block_size == 3) {
-            bsr_soa_spmv_static<6, 3>(block_rows, block_cols, rowptr, colidx, values, x, x_workspace, y);
+            bsr_soa_spmv_static<6, 3>(
+                    block_rows, block_cols, rowptr, colidx, values, scale_output, x, x_workspace, y);
         } else {
-            bsr_soa_spmv_dynamic(
-                    block_rows, block_cols, row_block_size, col_block_size, rowptr, colidx, values, x, x_workspace, y);
+            bsr_soa_spmv_dynamic(block_rows,
+                                 block_cols,
+                                 row_block_size,
+                                 col_block_size,
+                                 rowptr,
+                                 colidx,
+                                 values,
+                                 scale_output,
+                                 x,
+                                 x_workspace,
+                                 y);
         }
     }
 
@@ -205,8 +229,17 @@ namespace sfem {
                       const T* const SFEM_RESTRICT         x,
                       T* const* const SFEM_RESTRICT        x_workspace,
                       T* const SFEM_RESTRICT               y) {
-        bsr_soa_scale_output(block_rows * row_block_size, scale_output, y);
-        bsr_soa_spmv_dispatch(block_rows, block_cols, row_block_size, col_block_size, rowptr, colidx, values, x, x_workspace, y);
+        bsr_soa_spmv_dispatch(block_rows,
+                              block_cols,
+                              row_block_size,
+                              col_block_size,
+                              rowptr,
+                              colidx,
+                              values,
+                              scale_output,
+                              x,
+                              x_workspace,
+                              y);
     }
 
     template <typename R, typename C, typename TStorage, typename T = TStorage>

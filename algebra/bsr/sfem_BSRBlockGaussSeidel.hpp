@@ -2,6 +2,7 @@
 #define SFEM_BSR_BLOCK_GAUSS_SEIDEL_HPP
 
 #include "sfem_BSR.hpp"
+#include "sfem_base.hpp"
 #include "sfem_openmp_blas.hpp"
 
 #include <cassert>
@@ -10,6 +11,16 @@
 namespace sfem {
 
     namespace bsr_bgs_private_ {
+
+        enum : int { SFEM_BGS_PREFETCH_DIST = 2 };
+
+        SFEM_FORCE_INLINE void prefetch_r(const void* const addr) {
+#if defined(__GNUC__) || defined(__clang__)
+            __builtin_prefetch(addr, 0, 1);
+#else
+            (void)addr;
+#endif
+        }
 
         template <typename T>
         static SFEM_INLINE void invert1(const T a00, T* const out) {
@@ -66,12 +77,41 @@ namespace sfem {
             }
         }
 
+        // Fully unrolled 3x3: r -= A * x
+        template <typename T>
+        static SFEM_FORCE_INLINE void matvec_sub_3x3(const T* const SFEM_RESTRICT a,
+                                                     const T* const SFEM_RESTRICT x,
+                                                     T&                           r0,
+                                                     T&                           r1,
+                                                     T&                           r2) {
+            const T x0 = x[0];
+            const T x1 = x[1];
+            const T x2 = x[2];
+            r0 -= a[0] * x0 + a[1] * x1 + a[2] * x2;
+            r1 -= a[3] * x0 + a[4] * x1 + a[5] * x2;
+            r2 -= a[6] * x0 + a[7] * x1 + a[8] * x2;
+        }
+
+        // Fully unrolled 3x3: y += A * r  (correction-style diagonal apply)
+        template <typename T>
+        static SFEM_FORCE_INLINE void matvec_add_3x3(const T* const SFEM_RESTRICT a,
+                                                     const T                      r0,
+                                                     const T                      r1,
+                                                     const T                      r2,
+                                                     T* const SFEM_RESTRICT       y) {
+            y[0] += a[0] * r0 + a[1] * r1 + a[2] * r2;
+            y[1] += a[3] * r0 + a[4] * r1 + a[5] * r2;
+            y[2] += a[6] * r0 + a[7] * r1 + a[8] * r2;
+        }
+
         template <int BS, typename T>
-        static SFEM_INLINE void matvec_add(const T* const SFEM_RESTRICT a,
-                                           const T* const SFEM_RESTRICT x,
-                                           T* const SFEM_RESTRICT       y) {
+        static SFEM_FORCE_INLINE void matvec_add(const T* const SFEM_RESTRICT a,
+                                                 const T* const SFEM_RESTRICT x,
+                                                 T* const SFEM_RESTRICT       y) {
+#pragma unroll(BS)
             for (int d1 = 0; d1 < BS; d1++) {
                 T acc = 0;
+#pragma unroll(BS)
                 for (int d2 = 0; d2 < BS; d2++) {
                     acc += a[d1 * BS + d2] * x[d2];
                 }
@@ -82,10 +122,16 @@ namespace sfem {
     }  // namespace bsr_bgs_private_
 
     /**
-     * Host block Gauss–Seidel smoother for square BSR matrices.
+     * Host block Gauss–Seidel smoother for square BSR matrices (serial sweeps).
      *
      * Operator semantics match ShiftableJacobi: apply(b, x) computes a correction
      * delta ≈ A^{-1} b via GS sweeps (from zero) and accumulates x += delta.
+     *
+     * Correction-style row update (no diagonal-index array):
+     *   r = b_i − Σ_j Aij xj   (includes diagonal)
+     *   x_i += (ω D^{-1}) r    → algebraically x := (1−ω)x + ω D^{-1}(b−off)
+     *
+     * Serial microkernel: fully unroll BS=3, software-prefetch neighbors.
      */
     template <typename R = count_t, typename C = idx_t, typename T = real_t>
     class BSRBlockGaussSeidel final : public Operator<T> {
@@ -203,32 +249,73 @@ namespace sfem {
             }
         }
 
+        // Correction-style: full residual (incl. diag) + x += invD * r. No diag index.
         template <int BS>
-        void sweep_row(const ptrdiff_t i,
-                       const R         begin,
-                       const R         end,
-                       const C* const  colidx,
-                       const T* const  values,
-                       const T* const  invd,
-                       const T* const  b,
-                       T* const        x) const {
+        SFEM_FORCE_INLINE void sweep_row(const ptrdiff_t i,
+                                         const R         begin,
+                                         const R         end,
+                                         const C* const  colidx,
+                                         const T* const  values,
+                                         const T* const  invd,
+                                         const T* const  b,
+                                         T* const        x) const {
+            constexpr int BENTRIES      = BS * BS;
+            constexpr int PREFETCH_DIST = bsr_bgs_private_::SFEM_BGS_PREFETCH_DIST;
+
             T r[BS];
+#pragma unroll(BS)
             for (int d = 0; d < BS; d++) {
                 r[d] = b[i * BS + d];
             }
 
             for (R k = begin; k < end; k++) {
-                const ptrdiff_t j   = colidx[k];
-                const T* const  aij = &values[k * BS * BS];
-                const T* const  xj  = &x[j * BS];
+                if (k + PREFETCH_DIST < end) {
+                    bsr_bgs_private_::prefetch_r(&x[colidx[k + PREFETCH_DIST] * BS]);
+                    bsr_bgs_private_::prefetch_r(&values[(k + PREFETCH_DIST) * BENTRIES]);
+                }
+
+                const T* const aij = &values[k * BENTRIES];
+                const T* const xj  = &x[colidx[k] * BS];
+#pragma unroll(BS)
                 for (int d1 = 0; d1 < BS; d1++) {
+                    T acc = r[d1];
+#pragma unroll(BS)
                     for (int d2 = 0; d2 < BS; d2++) {
-                        r[d1] -= aij[d1 * BS + d2] * xj[d2];
+                        acc -= aij[d1 * BS + d2] * xj[d2];
                     }
+                    r[d1] = acc;
                 }
             }
 
-            bsr_bgs_private_::matvec_add<BS>(&invd[i * BS * BS], r, &x[i * BS]);
+            bsr_bgs_private_::matvec_add<BS>(&invd[i * BENTRIES], r, &x[i * BS]);
+        }
+
+        SFEM_FORCE_INLINE void sweep_row_3(const ptrdiff_t i,
+                                           const R         begin,
+                                           const R         end,
+                                           const C* const  colidx,
+                                           const T* const  values,
+                                           const T* const  invd,
+                                           const T* const  b,
+                                           T* const        x) const {
+            constexpr int BS            = 3;
+            constexpr int BENTRIES      = 9;
+            constexpr int PREFETCH_DIST = bsr_bgs_private_::SFEM_BGS_PREFETCH_DIST;
+
+            const ptrdiff_t i3 = i * BS;
+            T               r0 = b[i3 + 0];
+            T               r1 = b[i3 + 1];
+            T               r2 = b[i3 + 2];
+
+            for (R k = begin; k < end; k++) {
+                if (k + PREFETCH_DIST < end) {
+                    bsr_bgs_private_::prefetch_r(&x[colidx[k + PREFETCH_DIST] * BS]);
+                    bsr_bgs_private_::prefetch_r(&values[(k + PREFETCH_DIST) * BENTRIES]);
+                }
+                bsr_bgs_private_::matvec_sub_3x3(&values[k * BENTRIES], &x[colidx[k] * BS], r0, r1, r2);
+            }
+
+            bsr_bgs_private_::matvec_add_3x3(&invd[i * BENTRIES], r0, r1, r2, &x[i3]);
         }
 
         template <int BS>
@@ -239,8 +326,14 @@ namespace sfem {
             const T* const  values   = bsr_->values->data();
             const T* const  invd     = inv_diag_->data();
 
-            for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                sweep_row<BS>(i, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
+            if constexpr (BS == 3) {
+                for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                    sweep_row_3(i, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
+                }
+            } else {
+                for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                    sweep_row<BS>(i, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
+                }
             }
         }
 
@@ -252,8 +345,14 @@ namespace sfem {
             const T* const  values   = bsr_->values->data();
             const T* const  invd     = inv_diag_->data();
 
-            for (ptrdiff_t i = n_blocks - 1; i >= 0; i--) {
-                sweep_row<BS>(i, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
+            if constexpr (BS == 3) {
+                for (ptrdiff_t i = n_blocks - 1; i >= 0; i--) {
+                    sweep_row_3(i, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
+                }
+            } else {
+                for (ptrdiff_t i = n_blocks - 1; i >= 0; i--) {
+                    sweep_row<BS>(i, rowptr[i], rowptr[i + 1], colidx, values, invd, b, x);
+                }
             }
         }
 
@@ -274,3 +373,4 @@ namespace sfem {
 }  // namespace sfem
 
 #endif  // SFEM_BSR_BLOCK_GAUSS_SEIDEL_HPP
+
