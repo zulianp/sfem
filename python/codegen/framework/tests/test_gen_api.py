@@ -87,6 +87,68 @@ def _manifest_runtime_variants(metadata, operation):
     return set()
 
 
+def _repo_root():
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+
+
+def _generated_function_signature(source, function_name):
+    match = re.search(
+        r"static SFEM_INLINE int %s\(\n(?P<params>.*?)\n\) \{"
+        % re.escape(function_name),
+        source,
+        flags=re.S,
+    )
+    if match is None:
+        raise AssertionError("missing generated function %s" % function_name)
+    return match.group("params")
+
+
+def _compile_include_only(test_case, compiler, out_dir, source, object_name):
+    source_path = os.path.join(out_dir, "%s.cpp" % object_name)
+    object_path = os.path.join(out_dir, "%s.o" % object_name)
+    with open(source_path, "w", encoding="utf-8") as output_file:
+        output_file.write(source)
+    root = _repo_root()
+    include_dirs = [
+        out_dir,
+        os.path.join(root, "base"),
+        os.path.join(root, "external", "smesh", "src", "base"),
+        os.path.join(root, "external", "smesh", "src", "mesh"),
+    ]
+    for generated_smesh_dir in (
+        os.path.join(root, "build64"),
+        os.path.join(root, "build"),
+        os.path.join(root, "build64", "external", "smesh"),
+        os.path.join(root, "build", "external", "smesh"),
+    ):
+        if os.path.isdir(generated_smesh_dir):
+            include_dirs.append(generated_smesh_dir)
+    include_flags = []
+    for include_dir in include_dirs:
+        include_flags.extend(("-I", include_dir))
+    completed = subprocess.run(
+        [
+            compiler,
+            "-std=c++14",
+            "-O2",
+            "-fopenmp-simd",
+            *include_flags,
+            "-c",
+            source_path,
+            "-o",
+            object_path,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if completed.returncode != 0:
+        test_case.fail(
+            "include-only generated element API did not compile:\n%s"
+            % (completed.stdout + completed.stderr)
+        )
+
+
 def _compiler_vectorization_flags(compiler):
     version = subprocess.run(
         [compiler, "--version"],
@@ -1251,19 +1313,19 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             wrapper = read_generated("sfem_GeneratedLinearElasticity.cpp")
             self.assertIn("double GeneratedLinearElasticity::flops_apply() const", wrapper)
             self.assertIn(
-                "KernelDiagnostics_total_flops_affine_mesh(linear_elasticity_tet4_apply_soa_diagnostics()",
+                "linear_elasticity_apply_3d_soa_diagnostics(domain.element_type)",
                 wrapper,
             )
             self.assertIn(
-                "KernelDiagnostics_total_flops_isoparametric_mesh(linear_elasticity_tet4_apply_soa_diagnostics()",
+                "KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements)",
                 wrapper,
             )
             self.assertIn(
-                "KernelDiagnostics_total_bytes_affine_mesh(linear_elasticity_tet4_gradient_soa_diagnostics()",
+                "KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements)",
                 wrapper,
             )
             self.assertIn(
-                "KernelDiagnostics_total_bytes_isoparametric_mesh(linear_elasticity_tet4_gradient_soa_diagnostics()",
+                "linear_elasticity_gradient_3d_soa_diagnostics(domain.element_type)",
                 wrapper,
             )
             apply_calls = re.findall(
@@ -1273,6 +1335,178 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             self.assertTrue(apply_calls)
             for call in apply_calls:
                 self.assertNotIn("x +", call)
+
+    def test_generated_dense_element_api_headers_are_local_and_include_only(self):
+        compiler = shutil.which("c++")
+
+        def read(path):
+            with open(path, encoding="utf-8") as input_file:
+                return input_file.read()
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            le_dir = os.path.join(out_dir, "linear_elasticity")
+            nh_dir = os.path.join(out_dir, "neohookean")
+            le_result = gen.generate(linear_elasticity, le_dir, elements=("TET4",))
+            nh_result = gen.generate(neohookean_ogden, nh_dir, elements=("TET4", "HEX8"))
+
+            le_names = _relative_sources(le_result, le_dir)
+            nh_names = _relative_sources(nh_result, nh_dir)
+            self.assertIn(os.path.join("d3", "tet4", "linear_elasticity_tet4_element.hpp"), le_names)
+            self.assertIn(os.path.join("op", "sfem_GeneratedLinearElasticity_element_api.hpp"), le_names)
+            self.assertIn(os.path.join("d3", "tet4", "neohookean_ogden_tet4_element.hpp"), nh_names)
+            self.assertIn(os.path.join("d3", "hex8", "neohookean_ogden_hex8_element.hpp"), nh_names)
+            self.assertIn(
+                os.path.join("d3", "proteus_hex8", "neohookean_ogden_proteus_hex8_element.hpp"),
+                nh_names,
+            )
+            self.assertIn(os.path.join("op", "sfem_GeneratedNeoHookeanOgden_element_api.hpp"), nh_names)
+
+            le_header = read(
+                os.path.join(le_dir, "d3", "tet4", "linear_elasticity_tet4_element.hpp")
+            )
+            nh_header = read(
+                os.path.join(nh_dir, "d3", "tet4", "neohookean_ogden_tet4_element.hpp")
+            )
+            nh_hex8_header = read(
+                os.path.join(nh_dir, "d3", "hex8", "neohookean_ogden_hex8_element.hpp")
+            )
+            le_dispatch = read(
+                os.path.join(le_dir, "op", "sfem_GeneratedLinearElasticity_element_api.hpp")
+            )
+
+            for operation in ("energy", "gradient", "hessian"):
+                for suffix in ("", "_coords", "_geometry"):
+                    self.assertIn(
+                        "linear_elasticity_tet4_%s_element%s_soa"
+                        % (operation, suffix),
+                        le_header,
+                    )
+                    self.assertIn(
+                        "linear_elasticity_%s_3d_element%s_soa"
+                        % (operation, suffix),
+                        le_dispatch,
+                    )
+
+            forbidden_signature_inputs = (
+                "idx_t **",
+                "points",
+                "rowptr",
+                "colidx",
+                "values_to_write",
+            )
+            le_hessian = _generated_function_signature(
+                le_header,
+                "linear_elasticity_tet4_hessian_element_soa",
+            )
+            nh_hessian = _generated_function_signature(
+                nh_header,
+                "neohookean_ogden_tet4_hessian_element_soa",
+            )
+            for token in forbidden_signature_inputs:
+                self.assertNotIn(token, le_hessian)
+                self.assertNotIn(token, nh_hessian)
+            self.assertNotRegex(le_hessian, r"\belements\b")
+            self.assertNotRegex(nh_hessian, r"\belements\b")
+            self.assertIn("coords", le_hessian)
+            self.assertIn("matrix_streams", le_hessian)
+            self.assertNotIn("u_streams", le_hessian)
+            self.assertIn("u_streams", nh_hessian)
+            self.assertIn("neohookean_ogden_hex8_hessian_element_soa", nh_hex8_header)
+            self.assertIn("q * nelements + evbegin + lane", le_header)
+            self.assertIn("template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>", le_dispatch)
+            self.assertNotIn("smesh_mesh.hpp", le_dispatch)
+            self.assertNotIn("smesh_elem_type.hpp", le_dispatch)
+
+            with open(
+                os.path.join(le_dir, "op", "sfem_GeneratedLinearElasticity_manifest.json"),
+                encoding="utf-8",
+            ) as input_file:
+                le_manifest = json.load(input_file)
+            header_api = {entry["header"]: entry for entry in le_manifest["header_api"]}
+            self.assertEqual(
+                header_api["d3/tet4/linear_elasticity_tet4_element.hpp"]["kind"],
+                "dense_element",
+            )
+            self.assertEqual(
+                header_api["op/sfem_GeneratedLinearElasticity_element_api.hpp"]["kind"],
+                "dense_element_dispatch",
+            )
+            self.assertEqual(
+                header_api["d3/tet4/linear_elasticity_tet4_element.hpp"]["gather_scatter"],
+                "external",
+            )
+
+            if compiler is None:
+                self.skipTest("c++ compiler is not available")
+
+            le_include_only = r'''
+#include "op/sfem_GeneratedLinearElasticity_element_api.hpp"
+int main() {
+    constexpr int N = 1;
+    double data[144][N] = {};
+    const double *coords[12];
+    const double *u_streams[12];
+    double *out_streams[12];
+    double *matrix_streams[144];
+    double values[N] = {};
+    for (int i = 0; i < 12; ++i) {
+        coords[i] = data[i];
+        u_streams[i] = data[i];
+        out_streams[i] = data[i];
+    }
+    for (int i = 0; i < 144; ++i) {
+        matrix_streams[i] = data[i];
+    }
+    int status = sfem::codegen::linear_elasticity_tet4_energy_element_soa<double>(N, coords, 1.0, 1.0, u_streams, values);
+    status |= sfem::codegen::linear_elasticity_tet4_gradient_element_soa<double>(N, coords, 1.0, 1.0, u_streams, out_streams);
+    status |= sfem::codegen::linear_elasticity_tet4_hessian_element_soa<double>(N, coords, 1.0, 1.0, matrix_streams);
+    status |= sfem::codegen::linear_elasticity_hessian_3d_element_soa<double>(4, N, coords, 1.0, 1.0, matrix_streams);
+    return status;
+}
+'''
+            nh_include_only = r'''
+#include "op/sfem_GeneratedNeoHookeanOgden_element_api.hpp"
+int main() {
+    constexpr int N = 1;
+    double data[144][N] = {};
+    const double *coords[12];
+    const double *u_streams[12];
+    double *matrix_streams[144];
+    for (int i = 0; i < 12; ++i) {
+        coords[i] = data[i];
+        u_streams[i] = data[i];
+    }
+    for (int i = 0; i < 144; ++i) {
+        matrix_streams[i] = data[i];
+    }
+    int status = sfem::codegen::neohookean_ogden_tet4_hessian_element_soa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
+    status |= sfem::codegen::neohookean_ogden_hessian_3d_element_soa<double>(4, N, coords, 1.0, 1.0, u_streams, matrix_streams);
+    return status;
+}
+'''
+            nh_hex8_include_only = r'''
+#include "op/sfem_GeneratedNeoHookeanOgden_element_api.hpp"
+int main() {
+    constexpr int N = 1;
+    double data[576][N] = {};
+    const double *coords[24];
+    const double *u_streams[24];
+    double *matrix_streams[576];
+    for (int i = 0; i < 24; ++i) {
+        coords[i] = data[i];
+        u_streams[i] = data[i];
+    }
+    for (int i = 0; i < 576; ++i) {
+        matrix_streams[i] = data[i];
+    }
+    int status = sfem::codegen::neohookean_ogden_hex8_hessian_element_soa<double>(N, coords, 1.0, 1.0, u_streams, matrix_streams);
+    status |= sfem::codegen::neohookean_ogden_hessian_3d_element_soa<double>(8, N, coords, 1.0, 1.0, u_streams, matrix_streams);
+    return status;
+}
+'''
+            _compile_include_only(self, compiler, le_dir, le_include_only, "le_element_api_include_only")
+            _compile_include_only(self, compiler, nh_dir, nh_include_only, "nh_element_api_include_only")
+            _compile_include_only(self, compiler, nh_dir, nh_hex8_include_only, "nh_hex8_element_api_include_only")
 
     def test_tet4_linear_elasticity_expands_constant_simplex_gradients(self):
         with tempfile.TemporaryDirectory() as out_dir:

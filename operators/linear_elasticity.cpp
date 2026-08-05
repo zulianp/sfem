@@ -356,6 +356,41 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 e
     return SFEM_FAILURE;
 }
 
+int linear_elasticity_apply_adjugate_soa(const smesh::ElemType                          element_type,
+                                         const ptrdiff_t                                nelements,
+                                         const ptrdiff_t                                nnodes,
+                                         idx_t **const SFEM_RESTRICT                    elements,
+                                         geom_t **const SFEM_RESTRICT                   points,
+                                         const jacobian_t *const SFEM_RESTRICT *const   jacobian_adjugate,
+                                         const geom_t *const SFEM_RESTRICT              jacobian_determinant,
+                                         const real_t                                   mu,
+                                         const real_t                                   lambda,
+                                         const real_t *const SFEM_RESTRICT              u,
+                                         real_t *const SFEM_RESTRICT                    values) {
+    SFEM_UNUSED(points);
+
+    if (element_type == smesh::HEX8) {
+        return affine_hex8_linear_elasticity_apply_adjugate_soa(nelements,
+                                                                nnodes,
+                                                                elements,
+                                                                jacobian_adjugate,
+                                                                jacobian_determinant,
+                                                                mu,
+                                                                lambda,
+                                                                3,
+                                                                &u[0],
+                                                                &u[1],
+                                                                &u[2],
+                                                                3,
+                                                                &values[0],
+                                                                &values[1],
+                                                                &values[2]);
+    }
+
+    SFEM_ERROR("linear_elasticity_apply_adjugate_soa not implemented for type %s\n", type_to_string(element_type));
+    return SFEM_FAILURE;
+}
+
 int linear_elasticity_crs_soa(const smesh::ElemType              element_type,
                               const ptrdiff_t                    nelements,
                               const ptrdiff_t                    nnodes,

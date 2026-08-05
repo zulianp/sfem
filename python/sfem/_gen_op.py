@@ -21,6 +21,7 @@ def generate_op_files(material, elements, kernel_sources=None):
         if c_abi_header
         else {}
     )
+    element_api_sources = _element_api_sources(material, elements, kernel_sources)
     abi_sources = dict(kernel_sources)
     abi_sources.update(dispatch_sources)
     systems_by_dim = _systems_by_dim(material, elements)
@@ -62,6 +63,7 @@ def generate_op_files(material, elements, kernel_sources=None):
         registration_source: _registration_source(material, wrapper_header),
     }
     files.update(dispatch_sources)
+    files.update(element_api_sources)
     if c_abi_header:
         c_abi_path = "op/%s" % c_abi_header
         files[c_abi_path] = _c_abi_header(material, abi_sources)
@@ -72,6 +74,7 @@ def generate_op_files(material, elements, kernel_sources=None):
             wrapper_source,
             registration_source,
             c_abi_path,
+            element_api_sources,
         )
     return files
 
@@ -4267,6 +4270,202 @@ def _safe_identifier(name):
     return re.sub(r"[^0-9A-Za-z_]", "_", str(name))
 
 
+def _element_api_sources(material, elements, kernel_sources):
+    element_headers = _element_api_headers(material, elements, kernel_sources)
+    if not element_headers:
+        return {}
+    header_path = "op/sfem_%s_element_api.hpp" % material.op_name
+    return {header_path: _element_api_dispatch_header(material, element_headers)}
+
+
+def _element_api_headers(material, elements, kernel_sources):
+    entries = []
+    for element in elements:
+        dim = _element_dim(element)
+        label = _element_name(element).lower()
+        suffix = "/%s_%s_element.hpp" % (material.name, label)
+        for path in sorted(kernel_sources):
+            if path.endswith(suffix):
+                entries.append(
+                    {
+                        "element": element,
+                        "dim": dim,
+                        "label": label,
+                        "header": path,
+                        "source": kernel_sources[path],
+                    }
+                )
+                break
+    return tuple(entries)
+
+
+def _element_api_dispatch_header(material, entries):
+    lines = [
+        "#pragma once",
+        "",
+        "#include <cstddef>",
+        "",
+        "#ifndef SFEM_SUCCESS",
+        "#define SFEM_SUCCESS 0",
+        "#endif",
+        "#ifndef SFEM_FAILURE",
+        "#define SFEM_FAILURE 1",
+        "#endif",
+        "",
+    ]
+    for header in sorted({entry["header"] for entry in entries}):
+        lines.append('#include "../%s"' % header)
+    lines.extend(["", "namespace sfem {", "namespace codegen {", ""])
+
+    for operation in ("energy", "gradient", "hessian"):
+        for suffix in ("", "coords", "geometry"):
+            for dim in sorted({entry["dim"] for entry in entries}):
+                group = tuple(
+                    entry for entry in entries
+                    if entry["dim"] == dim
+                    and _element_api_function_params(
+                        entry["source"],
+                        _element_api_function_name(material.name, entry["label"], operation, suffix),
+                    )
+                )
+                if not group:
+                    continue
+                function_name = "%s_%s_%dd_element%s_soa" % (
+                    material.name,
+                    operation,
+                    dim,
+                    "_%s" % suffix if suffix else "",
+                )
+                first_element_function = _element_api_function_name(
+                    material.name,
+                    group[0]["label"],
+                    operation,
+                    suffix,
+                )
+                params = _element_api_function_params(group[0]["source"], first_element_function)
+                lines.extend(_element_api_dispatch_function_lines(function_name, operation, suffix, group, params, material.name))
+                lines.append("")
+
+    lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
+    return "\n".join(lines)
+
+
+def _element_api_function_name(material_name, label, operation, suffix):
+    suffix_part = "_%s" % suffix if suffix else ""
+    return "%s_%s_%s_element%s_soa" % (material_name, label, operation, suffix_part)
+
+
+def _element_api_function_params(source, function_name):
+    marker = "static SFEM_INLINE int %s(" % function_name
+    start = source.find(marker)
+    if start < 0:
+        return ()
+    start = source.find("\n", start)
+    end = source.find("\n) {", start)
+    if start < 0 or end < 0:
+        return ()
+    params = []
+    for line in source[start:end].splitlines():
+        param = line.strip()
+        if not param:
+            continue
+        if param.endswith(","):
+            param = param[:-1].rstrip()
+        params.append(param)
+    return tuple(params)
+
+
+def _element_api_dispatch_function_lines(function_name, operation, suffix, entries, params, material_name):
+    lines = [
+        "template <typename scalar_t, int VECTOR_SIZE = 16, typename elem_type_t>",
+        "static SFEM_INLINE int %s(" % function_name,
+        "        const elem_type_t element_type%s" % ("," if params else ""),
+    ]
+    for idx, param in enumerate(params):
+        comma = "," if idx + 1 < len(params) else ""
+        lines.append("        %s%s" % (param, comma))
+    arg_names = ", ".join(_element_api_param_name(param) for param in params)
+    lines.extend(
+        [
+            ") {",
+            "    switch ((int)element_type) {",
+        ]
+    )
+    for entry in entries:
+        element_function = _element_api_function_name(
+            material_name,
+            entry["label"],
+            operation,
+            suffix,
+        )
+        if not _element_api_function_params(entry["source"], element_function):
+            continue
+        lines.extend(
+            [
+                "        case %d:" % _smesh_elem_type_value(_mesh_element_name(entry["element"])),
+                "            return %s<scalar_t, VECTOR_SIZE>(%s);" % (element_function, arg_names),
+            ]
+        )
+    lines.extend(
+        [
+            "        default:",
+            "            return SFEM_FAILURE;",
+            "    }",
+            "}",
+        ]
+    )
+    return lines
+
+
+def _element_api_param_name(param):
+    return param.replace(",", "").split()[-1]
+
+
+def _smesh_elem_type_value(name):
+    values = {
+        "NODE1": 1,
+        "EDGE2": 2,
+        "EDGE3": 11,
+        "TRI3": 3,
+        "TRI6": 6,
+        "TRI10": 1010,
+        "QUAD4": 40,
+        "QUAD9": 9,
+        "TET4": 4,
+        "TET10": 10,
+        "TET15": 15,
+        "TET20": 20,
+        "HEX8": 8,
+        "HEX27": 27,
+        "WEDGE6": 1006,
+        "MACRO": 200,
+        "MACRO_TRI3": 203,
+        "MACRO_TET4": 204,
+        "PROTEUS_HEX8": 100008,
+        "PROTEUS_HEX27": 270000,
+        "PROTEUS_HEX64": 640000,
+        "PROTEUS_HEX125": 1250000,
+        "PROTEUS_HEX216": 2160000,
+        "PROTEUS_HEX343": 3430000,
+        "PROTEUS_HEX512": 5120000,
+        "PROTEUS_HEX729": 7290000,
+        "PROTEUS_HEX4913": 49130000,
+        "PROTEUS_QUAD4": 400000,
+        "PROTEUS_QUAD9": 900000,
+        "PROTEUS_QUAD16": 1600000,
+        "PROTEUS_QUAD25": 2500000,
+        "PROTEUS_QUAD36": 3600000,
+        "PROTEUS_QUAD49": 4900000,
+        "PROTEUS_QUAD64": 6400000,
+        "PROTEUS_QUAD81": 8100000,
+        "PROTEUS_QUAD289": 28900000,
+    }
+    try:
+        return values[name]
+    except KeyError as exc:
+        raise ValueError("unsupported generated element API dispatch element %s" % name) from exc
+
+
 def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
     declarations = _extract_c_abi_declarations(kernel_sources, public_only=False)
     groups = _dispatch_groups(material, elements, declarations)
@@ -4725,7 +4924,15 @@ def _registration_function(material):
     return "register_%s_generated_op" % _safe_identifier(material.op_name)
 
 
-def _op_manifest(material, kernel_sources, wrapper_header, wrapper_source, registration_source, c_abi_header):
+def _op_manifest(
+    material,
+    kernel_sources,
+    wrapper_header,
+    wrapper_source,
+    registration_source,
+    c_abi_header,
+    element_api_sources=None,
+):
     declarations = _extract_c_abi_declarations(kernel_sources, public_only=True)
     c_abi = [
         {
@@ -4754,11 +4961,39 @@ def _op_manifest(material, kernel_sources, wrapper_header, wrapper_source, regis
             "create_from_yaml": "sfem::%s::create_from_yaml" % material.op_name,
         },
         "generated_include_paths": _generated_include_paths(kernel_sources),
+        "header_api": _header_api_sources(kernel_sources, element_api_sources or {}),
         "matrix_formats": _matrix_format_sources(kernel_sources),
         "runtime_operations": _runtime_operations(c_abi),
         "c_abi": c_abi,
     }
     return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+
+
+def _header_api_sources(kernel_sources, element_api_sources):
+    headers = []
+    for path in sorted(kernel_sources):
+        if path.endswith("_element.hpp"):
+            headers.append(
+                {
+                    "kind": "dense_element",
+                    "header": path,
+                    "layout": "soa_streams",
+                    "scope": "element_local",
+                    "gather_scatter": "external",
+                }
+            )
+    for path in sorted(element_api_sources):
+        if path.endswith("_element_api.hpp"):
+            headers.append(
+                {
+                    "kind": "dense_element_dispatch",
+                    "header": path,
+                    "layout": "soa_streams",
+                    "scope": "element_local",
+                    "gather_scatter": "external",
+                }
+            )
+    return tuple(headers)
 
 
 def _generated_include_paths(kernel_sources):

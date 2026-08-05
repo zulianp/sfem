@@ -327,9 +327,6 @@ if(NOT SFEM_ENABLE_MPI)
     list(APPEND SFEM_EXCLUDED_EXEC "partition")
 endif()
 
-# Empty placeholder driver (no implementation yet)
-list(APPEND SFEM_EXCLUDED_EXEC "neohookean_assemble")
-
 if(SFEM_ENABLE_RESAMPLING)
     file(GLOB RESAMPLING_C_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.c")
     file(GLOB RESAMPLING_CXX_EXAMPLES CONFIGURE_DEPENDS "drivers/resampling/*.cpp")

@@ -183,6 +183,20 @@ namespace sfem {
             auto element_type = domain.element_type;
             if (domain.user_data) {
                 auto jac = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(domain.user_data);
+                if (element_type == smesh::HEX8) {
+                    SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_soa");
+                    return linear_elasticity_apply_adjugate_soa(element_type,
+                                                                block->n_elements(),
+                                                                mesh.n_nodes(),
+                                                                block->elements()->data(),
+                                                                mesh.points()->data(),
+                                                                jac->jacobian_adjugate_SoA()->data(),
+                                                                jac->jacobian_determinant()->data(),
+                                                                mu,
+                                                                lambda,
+                                                                h,
+                                                                out);
+                }
                 SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_aos");
                 return linear_elasticity_apply_adjugate_aos(element_type,
                                                             block->n_elements(),
@@ -252,9 +266,17 @@ namespace sfem {
             if (!domain_supports_adjugate_cache(domain.element_type)) {
                 continue;
             }
+            if (!impl_->use_affine_approximation) {
+                continue;
+            }
 
             const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
-            auto jac = smesh::JacobianAdjugateAndDeterminant::create_AoS(mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jac;
+            if (domain.element_type == smesh::HEX8) {
+                jac = smesh::JacobianAdjugateAndDeterminant::create_SoA(mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            } else {
+                jac = smesh::JacobianAdjugateAndDeterminant::create_AoS(mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            }
             if (!jac) {
                 return SFEM_FAILURE;
             }
