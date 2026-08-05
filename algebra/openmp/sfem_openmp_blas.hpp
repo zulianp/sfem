@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -18,16 +19,17 @@
 namespace sfem {
 
     template <typename T>
-    struct OpenMP_BLAS {
-        static auto allocate(const std::ptrdiff_t n) -> T* { return (T*)calloc(n, sizeof(T)); }
+    class OpenMP_BLAS final : public BLAS<T> {
+    public:
+        auto allocate(const std::size_t n) -> T* override { return (T*)calloc(n, sizeof(T)); }
 
-        static void destroy(void* a) { free(a); }
+        void destroy(void* a) override { free(a); }
 
-        static void copy(const ptrdiff_t n, const T* const src, T* const dest) {
+        void copy(const ptrdiff_t n, const T* const src, T* const dest) override {
             memcpy(dest, src, n * sizeof(T));
         }
 
-        static auto dot(const ptrdiff_t n, const T* const l, const T* const r) -> T {
+        auto dot(const ptrdiff_t n, const T* const l, const T* const r) -> T override {
             T ret = 0;
 
 #pragma omp parallel for reduction(+ : ret)
@@ -38,23 +40,30 @@ namespace sfem {
             return ret;
         }
 
-        static void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
-                          T* const y) {
+        void axpy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) override {
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; i++) {
+                y[i] += alpha * x[i];
+            }
+        }
+
+        void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
+                   T* const y) override {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
                 y[i] = alpha * x[i] + beta * y[i];
             }
         }
 
-        static void zaxpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
-                           const T* const y, T* const z) {
+        void zaxpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
+                    const T* const y, T* const z) override {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
                 z[i] = alpha * x[i] + beta * y[i];
             }
         }
 
-        static void zeros(const std::size_t size, T* const x) {
+        void zeros(const std::size_t size, T* const x) override {
 #ifdef _OPENMP
 #pragma omp parallel
             {
@@ -72,7 +81,7 @@ namespace sfem {
 #endif
         }
 
-        static auto norm2(const ptrdiff_t n, const T* const x) -> T {
+        auto norm2(const ptrdiff_t n, const T* const x) -> T override {
             T ret = 0;
 
 #pragma omp parallel for reduction(+ : ret)
@@ -83,57 +92,40 @@ namespace sfem {
             return sqrt(ret);
         }
 
-        static void values(const std::ptrdiff_t n, const T v, T* const x) {
+        void values(const std::size_t n, const T v, T* const x) override {
 #pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; i++) {
+            for (std::ptrdiff_t i = 0; i < (std::ptrdiff_t)n; i++) {
                 x[i] = v;
             }
         }
 
-        static void scal(const std::ptrdiff_t n, const T alpha, T* const x) {
+        void scal(const std::ptrdiff_t n, const T alpha, T* const x) override {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
                 x[i] *= alpha;
             }
         }
 
-        static void reciprocal(const std::ptrdiff_t n, const T alpha, T* const x) {
+        void reciprocal(const std::ptrdiff_t n, const T alpha, T* const x) override {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
                 if (x[i]) x[i] = alpha / x[i];
             }
         }
 
-        static void xypaz(const std::ptrdiff_t n, const T* const x, const T* const y, const T alpha,
-                          T* const z) {
+        void xypaz(const std::ptrdiff_t n, const T* const x, const T* const y, const T alpha,
+                   T* const z) override {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; i++) {
                 z[i] = x[i] * y[i] + alpha * z[i];
             }
         }
-
-        static void build_blas(struct BLAS_Tpl<T>& tpl) {
-            tpl.allocate = allocate;
-            tpl.destroy = destroy;
-            tpl.copy = copy;
-            tpl.dot = dot;
-            tpl.norm2 = norm2;
-            tpl.axpy = [](const ptrdiff_t n, const T alpha, const T* const x, T* const y) {
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n; i++) {
-                    y[i] += alpha * x[i];
-                }
-            };
-
-            tpl.axpby = axpby;
-            tpl.zaxpby = zaxpby;
-            tpl.zeros = zeros;
-            tpl.values = values;
-            tpl.scal = scal;
-            tpl.reciprocal = reciprocal;
-            tpl.xypaz = xypaz;
-        }
     };
+
+    template <typename T>
+    std::shared_ptr<BLAS<T>> make_openmp_blas() {
+        return std::make_shared<OpenMP_BLAS<T>>();
+    }
 
 }  // namespace sfem
 

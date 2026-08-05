@@ -2,49 +2,36 @@
 #define SFEM_TPL_BLAS_HPP
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
-#include <functional>
 
 namespace sfem {
 
     template <typename T>
-    struct BLAS_Tpl {
-        std::function<T*(const std::size_t)> allocate;
-        std::function<void(void*)> destroy;
+    class BLAS {
+    public:
+        virtual ~BLAS() = default;
 
-        std::function<void(const std::size_t, T* const x)> zeros;
-        std::function<void(const std::size_t, const T value, T* const x)> values;
+        virtual T*   allocate(const std::size_t n) = 0;
+        virtual void destroy(void* a)              = 0;
 
-        std::function<void(const ptrdiff_t, const T* const, T* const)> copy;
+        virtual void zeros(const std::size_t size, T* const x)                 = 0;
+        virtual void values(const std::size_t size, const T value, T* const x) = 0;
 
-        std::function<T(const ptrdiff_t, const T* const, const T* const)> dot;
-        std::function<void(const ptrdiff_t, const T, const T* const, T* const)> axpy;
-        std::function<void(const ptrdiff_t, const T, const T* const, const T, T* const)> axpby;
-        std::function<void(const std::ptrdiff_t, const T, T* const)> scal;
-        std::function<void(const std::ptrdiff_t, const T, T* const)> reciprocal;
-        std::function<T(const ptrdiff_t, const T* const)> norm2;
-        std::function<
-                void(const ptrdiff_t, const T, const T* const, const T, const T* const, T* const)>
-                zaxpby;
+        virtual void copy(const ptrdiff_t n, const T* const src, T* const dest) = 0;
+
+        virtual T    dot(const ptrdiff_t n, const T* const l, const T* const r)                                             = 0;
+        virtual void axpy(const ptrdiff_t n, const T alpha, const T* const x, T* const y)                                   = 0;
+        virtual void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y)                    = 0;
+        virtual void scal(const std::ptrdiff_t n, const T alpha, T* const x)                                                = 0;
+        virtual void reciprocal(const std::ptrdiff_t n, const T alpha, T* const x)                                          = 0;
+        virtual T    norm2(const ptrdiff_t n, const T* const x)                                                             = 0;
+        virtual void zaxpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta, const T* const y, T* const z) = 0;
 
         /// $z = x * y + \alpha * z$
-        std::function<void(const ptrdiff_t, const T*const, const T*const, const T, T*const)> xypaz;
+        virtual void xypaz(const ptrdiff_t n, const T* const x, const T* const y, const T alpha, T* const z) = 0;
 
-        bool good() const {
-            assert(allocate);
-            assert(destroy);
-            assert(copy);
-            assert(zeros);
-            assert(values);
-            assert(dot);
-            assert(norm2);
-            assert(axpy);
-            assert(axpby);
-            assert(scal);
-
-            return allocate && destroy && copy && zeros && values && dot && norm2 && axpy &&
-                   axpby && zaxpby && scal && reciprocal;
-        }
+        virtual bool good() const { return true; }
     };
 
 }  // namespace sfem

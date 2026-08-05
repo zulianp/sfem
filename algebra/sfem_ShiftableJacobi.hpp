@@ -16,30 +16,30 @@ namespace sfem {
     class ShiftableJacobi final : public ShiftableOperator<T> {
     public:
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
-        BLAS_Tpl<T>    blas;
+        std::shared_ptr<BLAS<T>> blas;
 
         SharedBuffer<T> diag;
         SharedBuffer<T> inv_diag;
         T                          relaxation_parameter{0.3};
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void set_diag(const SharedBuffer<T>& d) {
             diag     = d;
             inv_diag = create_buffer<T>(d->size(), execution_space());
-            blas.copy(diag->size(), diag->data(), inv_diag->data());
-            blas.reciprocal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            blas->copy(diag->size(), diag->data(), inv_diag->data());
+            blas->reciprocal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }
 
         int shift(const SharedBuffer<T>& d) override {
             assert(d->size() == diag->size());
 
-            blas.copy(diag->size(), diag->data(), inv_diag->data());
-            blas.axpy(diag->size(), 1, d->data(), inv_diag->data());
-            blas.reciprocal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            blas->copy(diag->size(), diag->data(), inv_diag->data());
+            blas->axpy(diag->size(), 1, d->data(), inv_diag->data());
+            blas->reciprocal(inv_diag->size(), relaxation_parameter, inv_diag->data());
             return SFEM_SUCCESS;
         }
 
@@ -47,7 +47,7 @@ namespace sfem {
         int apply(const T* const b, T* const x) override {
             SFEM_TRACE_SCOPE("ShiftableJacobi::apply");
 
-            blas.xypaz(inv_diag->size(), inv_diag->data(), b, 1, x);
+            blas->xypaz(inv_diag->size(), inv_diag->data(), b, 1, x);
             return SFEM_SUCCESS;
         }
 
@@ -68,7 +68,7 @@ namespace sfem {
     class ShiftableBlockSymJacobi final : public ShiftableOperator<T> {
     public:
         ExecutionSpace                 execution_space_{EXECUTION_SPACE_INVALID};
-        BLAS_Tpl<T>                    blas;
+        std::shared_ptr<BLAS<T>> blas;
         ShiftableBlockSymJacobi_Tpl<T> impl;
 
         SharedBuffer<T>      diag;
@@ -79,7 +79,7 @@ namespace sfem {
         bool                            is_symmetric{true};
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             ShiftableBlockSymJacobi_OpenMP<T>::build(block_size, impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
@@ -98,7 +98,7 @@ namespace sfem {
             impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
-            blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }
 
         int shift(const SharedBuffer<T>& d) override {
@@ -111,7 +111,7 @@ namespace sfem {
             impl.add_sym_diag_to_diag(n_blocks, d->data(), inv_diag->data());
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
-            blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
             return SFEM_SUCCESS;
         }
 
@@ -126,7 +126,7 @@ namespace sfem {
 
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
-            blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
             return SFEM_SUCCESS;
         }
 

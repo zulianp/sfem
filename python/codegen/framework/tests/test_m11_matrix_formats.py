@@ -10,6 +10,7 @@ from pathlib import Path
 from sfem import gen
 
 from codegen.framework.materials.laplace import material as laplace
+from codegen.framework.materials.linear_elasticity import material as linear_elasticity
 from codegen.framework.materials.mooney_rivlin import material as mooney_rivlin
 from codegen.framework.materials.navier_stokes import material as navier_stokes
 from codegen.framework.materials.neohookean_ogden import material as neohookean_ogden
@@ -19,6 +20,7 @@ from codegen.framework.materials.poro_hyperelasticity import material as poro_hy
 from codegen.framework.materials.stokes import material as stokes
 from codegen.framework.materials.two_phase_flow import material as two_phase_flow
 from codegen.framework.plans.matrix_formats import (
+    BlockDiagSymAssemblyPlan,
     BSRAssemblyPlan,
     COOAssemblyPlan,
     CRSAssemblyPlan,
@@ -316,6 +318,96 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("isoparametric_grad_1d, block_coordinate_data,", proteus_hessian)
         self.assertIn("for (int shape = 0; shape < N_SHAPE; ++shape)", proteus_hessian)
 
+    def test_generated_block_diag_sym_hessian_for_neohookean_and_linear_elasticity(self):
+        if not (shutil.which("mpic++") or shutil.which("mpicxx") or shutil.which("c++")):
+            self.skipTest("C++ compiler is not available")
+        for material_name, material, op_name in (
+            ("neohookean_ogden", neohookean_ogden, "GeneratedNeoHookeanOgden"),
+            ("linear_elasticity", linear_elasticity, "GeneratedLinearElasticity"),
+        ):
+            with self.subTest(material=material_name):
+                with tempfile.TemporaryDirectory() as out_dir:
+                    result = gen.generate(
+                        material,
+                        out_dir,
+                        elements=("TET4",),
+                        clean=True,
+                        compile=True,
+                        dump_plan=True,
+                        matrix_formats=("block_diag_sym",),
+                    )
+                    root = Path(out_dir)
+                    source = (
+                        root
+                        / "d3"
+                        / "tet4"
+                        / ("%s_tet4_operator.cpp" % material_name)
+                    ).read_text()
+                    wrapper_source = (
+                        root / "op" / ("sfem_%s.cpp" % op_name)
+                    ).read_text()
+                    wrapper_header = (
+                        root / "op" / ("sfem_%s.hpp" % op_name)
+                    ).read_text()
+                    c_abi_header = (
+                        root / "op" / ("sfem_%s_c_abi.hpp" % op_name)
+                    ).read_text()
+                    manifest = json.loads(
+                        (root / "op" / ("sfem_%s_manifest.json" % op_name)).read_text()
+                    )
+
+                    assembly_base = "%s_tet4_hessian_isoparametric_mesh_soa" % material_name
+                    public_name = "%s_hessian_block_diag_sym_3d_isoparametric_mesh_soa" % material_name
+                    self.assertIn("%s_scatter_block_diag_sym" % assembly_base, source)
+                    self.assertIn("static constexpr int SYM_DIM = (DIM * (DIM + 1)) / 2;", source)
+                    self.assertIn("values[(ptrdiff_t)ev[i] * SYM_DIM]", source)
+                    self.assertIn("for (int bj = bi; bj < DIM; ++bj)", source)
+                    self.assertIn("block[sym++] += element_matrix[row * NDOFS + col];", source)
+                    self.assertNotIn("%s_scatter_bsr" % assembly_base, source)
+                    self.assertIn(public_name, c_abi_header)
+                    self.assertIn("real_t *const values) override", wrapper_header)
+                    self.assertIn("%s::hessian_block_diag_sym" % op_name, wrapper_source)
+                    self.assertIn("%s(domain.element_type" % public_name, wrapper_source)
+                    method_begin = wrapper_source.index("%s::hessian_block_diag_sym" % op_name)
+                    method_end = wrapper_source.index("void %s::set_option" % op_name, method_begin)
+                    block_diag_method = wrapper_source[method_begin:method_end]
+                    if material_name == "linear_elasticity":
+                        self.assertIn("(void)x;", block_diag_method)
+                        self.assertNotIn("requires a current state", block_diag_method)
+                    else:
+                        self.assertIn("const real_t *const current = x;", block_diag_method)
+                        self.assertIn("requires a current state", block_diag_method)
+
+                    runtime_variants = _manifest_runtime_variants(
+                        manifest,
+                        "hessian_block_diag_sym",
+                    )
+                    self.assertTrue(
+                        any(variant["function"] == public_name for variant in runtime_variants)
+                    )
+                    plan = Path(result.plan_dump).read_text()
+                    self.assertIn('"format": "block_diag_sym"', plan)
+                    self.assertIn('"kind": "block_diag_sym"', plan)
+
+    def test_block_diag_sym_plan_specializes_vector_block(self):
+        matrix_plan = gen.matrix_format_plan_from_request(("block_diag_sym",), ("standard",))
+        stage, plan = _generation_plan(linear_elasticity, "TET4", matrix_plan)
+        unit = next(
+            unit
+            for unit in plan.emission_kernels_for_context(stage.element_contexts[0])
+            if unit.name == "linear_elasticity"
+        )
+        variant = unit.matrix_format_plan.variants[0]
+        self.assertEqual(variant.name, "block_diag_sym_standard")
+        self.assertEqual(variant.row_dofs_per_element, 12)
+        self.assertEqual(variant.column_dofs_per_element, 12)
+        self.assertIsInstance(variant.assembly_plan, BlockDiagSymAssemblyPlan)
+        self.assertEqual(variant.assembly_plan.block_size, 3)
+        self.assertEqual(variant.assembly_plan.symmetric_entries_per_node, 6)
+        self.assertEqual(variant.value_writes_per_element, 24)
+        self.assertEqual(variant.assembly_plan.value_writes_per_element, 24)
+        self.assertEqual(variant.assembly_plan.value_layout, "node_major_upper_symmetric_aos")
+
     def test_matrix_format_request_specializes_simplex_diagnostics(self):
         matrix_plan = gen.matrix_format_plan_from_request(
             ("crs", "bsr", "dia", "coo", "patch"),
@@ -528,7 +620,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 (Path(out_dir) / "op/sfem_GeneratedStokes_manifest.json").read_text()
             )
             coo_triplet_variants = _manifest_runtime_variants(manifest, "hessian_coo_triplet")
-            self.assertEqual(len(coo_triplet_variants), 6)
+            self.assertEqual(len(coo_triplet_variants), 8)
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedStokes_c_abi.hpp").read_text()
             self.assertIn("stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa", c_abi_header)

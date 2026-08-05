@@ -4,6 +4,8 @@
 #include "sfem_base.hpp"
 #include "sfem_tpl_blas.hpp"
 
+#include <memory>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -50,9 +52,30 @@ void d_zaxpby(const ptrdiff_t,
 namespace sfem {
 
     template <typename T>
-    struct CUDA_BLAS {
-        static void build_blas(struct BLAS_Tpl<T>& tpl);
+    class CUDA_BLAS final : public BLAS<T> {
+    public:
+        T* allocate(const std::size_t n) override;
+        void destroy(void* a) override;
+
+        void zeros(const std::size_t size, T* const x) override;
+        void values(const std::size_t size, const T value, T* const x) override;
+
+        void copy(const ptrdiff_t n, const T* const src, T* const dest) override;
+
+        T dot(const ptrdiff_t n, const T* const l, const T* const r) override;
+        void axpy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) override;
+        void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) override;
+        void scal(const std::ptrdiff_t n, const T alpha, T* const x) override;
+        void reciprocal(const std::ptrdiff_t n, const T alpha, T* const x) override;
+        T norm2(const ptrdiff_t n, const T* const x) override;
+        void zaxpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta, const T* const y, T* const z) override;
+        void xypaz(const ptrdiff_t n, const T* const x, const T* const y, const T alpha, T* const z) override;
     };
+
+    template <typename T>
+    std::shared_ptr<BLAS<T>> make_cuda_blas() {
+        return std::make_shared<CUDA_BLAS<T>>();
+    }
 
     void device_synchronize();
     bool is_ptr_device(const void* ptr);

@@ -281,7 +281,7 @@ namespace sfem {
         bool                                   debug{false};
         bool                                   variational{false};
         enum ExecutionSpace                    execution_space { EXECUTION_SPACE_HOST };
-        std::shared_ptr<BLAS_Tpl<real_t>>      blas_;
+        std::shared_ptr<BLAS<real_t>>          blas_;
 
         ~Impl() {}
 

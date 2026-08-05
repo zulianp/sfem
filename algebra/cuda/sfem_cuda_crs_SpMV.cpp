@@ -208,7 +208,7 @@ namespace sfem {
         double alpha{1};
         double beta{1};
         double one{1};
-        BLAS_Tpl<real_t> blas;
+        std::shared_ptr<BLAS<real_t>> blas;
 
         std::shared_ptr<Buffer<count_t>> rowidx;
         std::shared_ptr<Buffer<idx_t>> colidx;
@@ -328,11 +328,11 @@ namespace sfem {
         ret->ndofs = ndofs;
         ret->execution_space_ = EXECUTION_SPACE_DEVICE;
 
-        CUDA_BLAS<real_t>::build_blas(ret->blas);
+        ret->blas = make_cuda_blas<real_t>();
         auto impl = std::make_shared<SymCooSpMVImpl>(ndofs, rowidx, colidx, values, scale_output);
         ret->apply_ = [=](const real_t* const x, real_t* const y) {
             impl->apply(x, y);
-            ret->blas.xypaz(ndofs, diag_values->data(), x, 1, y);
+            ret->blas->xypaz(ndofs, diag_values->data(), x, 1, y);
         };
         return ret;
     }
