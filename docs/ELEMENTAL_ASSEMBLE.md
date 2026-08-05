@@ -26,6 +26,8 @@ u_local[dof][lane]
 H_local[row * NDOFS + col][lane]
 ```
 
+`NDOFS` is the active number of local degrees of freedom for the current element. `MAX_NDOFS` is only a compile-time capacity used by fixed scratch arrays; it must be greater than or equal to `NDOFS`, but it is not used in element indexing formulas.
+
 For example, in 2D:
 
 ```text
@@ -58,12 +60,16 @@ AoS is often more convenient for users after assembly. A common pattern is:
 
 ```cpp
 static constexpr int VECTOR_SIZE = 16;
-static constexpr int MAX_NDOFS = 81; // 3 * 27, enough for HEX27
+static constexpr int MAX_NDOFS = 81; // Scratch capacity, not the active element NDOFS.
 
-const int dim = mesh->spatial_dimension(); // Rxample mesh-manager call
+const int dim = mesh->spatial_dimension(); // Example mesh-manager call
 const int nshape = mesh->n_nodes_per_element(0); // Example mesh-manager call
-const int ndofs = dim * nshape;
+const int ndofs = dim * nshape; // Active NDOFS for this element.
 const int nelems = batch_nelems;
+
+if (ndofs > MAX_NDOFS) {
+    return SFEM_FAILURE;
+}
 
 real_t coords_soa[MAX_NDOFS][VECTOR_SIZE];
 real_t u_soa[MAX_NDOFS][VECTOR_SIZE];
@@ -83,12 +89,14 @@ for (int shape = 0; shape < nshape; ++shape) {
 }
 
 int status = SFEM_FAILURE;
+// `coords`, `u_local`, and `H_local` are the generated API views over
+// coords_soa, u_soa, and hessian_soa. The reference example shows the binding.
 if (dim == 2) {
-    status = neohookean_hessian_2d_batch<VECTOR_SIZE, MAX_NDOFS>(
-            element_type, nelems, coords_soa, lmbda, mu, u_soa, hessian_soa);
+    status = sfem::codegen::neohookean_ogden_hessian_2d_element_soa<real_t, VECTOR_SIZE>(
+            element_type, nelems, coords, lmbda, mu, u_local, H_local);
 } else if (dim == 3) {
-    status = neohookean_hessian_3d_batch<VECTOR_SIZE, MAX_NDOFS>(
-            element_type, nelems, coords_soa, lmbda, mu, u_soa, hessian_soa);
+    status = sfem::codegen::neohookean_ogden_hessian_3d_element_soa<real_t, VECTOR_SIZE>(
+            element_type, nelems, coords, lmbda, mu, u_local, H_local);
 }
 
 if (status != SFEM_SUCCESS) {
@@ -96,7 +104,7 @@ if (status != SFEM_SUCCESS) {
 }
 ```
 
-Choose `MAX_NDOFS` once for the element family you support. The fixed `*_soa` arrays are the only local storage. The batch wrapper binds the generated API view internally; user code fills only the active `ndofs` prefix for the current element.
+Choose `MAX_NDOFS` once for the largest element family you support. The fixed `*_soa` arrays are the only local storage capacity. All loops and dense matrix indexing use the active `ndofs` for the current element.
 
 ## SoA To AoS
 
