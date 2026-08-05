@@ -12,8 +12,47 @@
 #include "sfem_PowerMethod.hpp"
 #include "sfem_openmp_blas.hpp"
 
-// https://en.wikipedia.org/wiki/Conjugate_gradient_method
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+// 3-term Chebyshev iteration (smoother / polynomial preconditioner)
 namespace sfem {
+
+    namespace chebyshev3_host_ {
+
+        // y ← alpha * x
+        template <typename T>
+        static void scaled_copy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for (ptrdiff_t i = 0; i < n; i++) {
+                y[i] = alpha * x[i];
+            }
+        }
+
+        // p ← β p − rhs + Ax;  x ← x − α p
+        template <typename T>
+        static void iteration_update(const ptrdiff_t n,
+                                     const T         alpha,
+                                     const T         beta,
+                                     const T* const  rhs,
+                                     const T* const  Ax,
+                                     T* const        p,
+                                     T* const        x) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for (ptrdiff_t i = 0; i < n; i++) {
+                const T pi = beta * p[i] - rhs[i] + Ax[i];
+                p[i]       = pi;
+                x[i] -= alpha * pi;
+            }
+        }
+
+    }  // namespace chebyshev3_host_
+
     template <typename T>
     class Chebyshev3 : public MatrixFreeLinearSolver<T> {
     public:
@@ -40,6 +79,9 @@ namespace sfem {
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         bool      is_initial_guess_zero{false};
         bool      verbose{true};
+        // If true, apply_op overwrites its output (e.g. BSR SpMV with scale_output==0).
+        // Default false: most ops accumulate (y += Ax); zeros() before each apply_op.
+        bool apply_overwrites_output{false};
 
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
@@ -49,6 +91,7 @@ namespace sfem {
         void set_rtol(const T val) { rtol = val; }
 
         void set_verbose(const bool val) { verbose = val; }
+        void set_apply_overwrites_output(const bool val) { apply_overwrites_output = val; }
 
         ExecutionSpace execution_space() const override { return execution_space_; }
 
@@ -126,9 +169,6 @@ namespace sfem {
 
             eig_max = max_eigen_value(eigenvector, work);
 
-            // destroy(eigenvector);  // Maybe we want to keep this around?
-            // destroy(work);
-
             auto blas_impl = blas;
             p_             = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
             temp_          = Buffer<T>::own(this->rows(), eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
@@ -149,7 +189,6 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            // Iteration 0
             if (max_it <= 0) {
                 iterations_ = 0;
                 return 0;
@@ -162,19 +201,17 @@ namespace sfem {
             const T eig_avg  = (eig_min + eig_max) / 2;
             const T eig_diff = (eig_min - eig_max) / 2;
 
-            // Params
-            T alpha = 1 / eig_avg;
+            T alpha = T(1) / eig_avg;
             T beta  = 0;
             T dea   = 0;
 
-            // Vectors
+            // Iteration 0: p = A x - rhs (or p = -rhs if x==0), then x -= alpha p
             if (is_initial_guess_zero) {
-                blas->copy(n, rhs, p);
-                blas->scal(n, -1, p);
+                scaled_copy(n, T(-1), rhs, p);
             } else {
-                blas->zeros(n, p);
+                ensure_apply_buffer(n, p);
                 apply_op(x, p);
-                blas->axpy(n, -1, rhs, p);
+                blas->axpy(n, T(-1), rhs, p);
             }
 
             blas->axpy(n, -alpha, p, x);
@@ -184,48 +221,21 @@ namespace sfem {
             }
 
             // Iteration 1
-            // Params
             dea   = eig_diff * alpha;
-            beta  = 0.5 * dea * dea;
-            alpha = 1 / (eig_avg - (beta / alpha));
-
-            // Vectors
-            blas->axpby(n, -1, rhs, beta, p);
-
-            if (temp) {
-                blas->zeros(n, temp);
-                apply_op(x, temp);
-                blas->axpy(n, 1, temp, p);
-            } else {
-                // This can only be used if boundary conditions are
-                // already satified or applied with a matrix
-                apply_op(x, p);
-            }
-            blas->axpy(n, -alpha, p, x);
+            beta  = T(0.5) * dea * dea;
+            alpha = T(1) / (eig_avg - (beta / alpha));
+            iteration_step(n, alpha, beta, rhs, x, p, temp);
             iterations_ = 2;
             if (max_it == 2) {
                 return 0;
             }
 
-            // Iteration i>=2
+            // Iteration i >= 2
             for (; iterations_ < max_it; iterations_++) {
                 dea   = eig_diff * alpha;
-                beta  = 0.25 * dea * dea;
-                alpha = 1 / (eig_avg - (beta / alpha));
-
-                blas->axpby(n, -1, rhs, beta, p);
-
-                if (temp) {
-                    blas->zeros(n, temp);
-                    apply_op(x, temp);
-                    blas->axpy(n, 1, temp, p);
-                } else {
-                    // This can only be used if boundary conditions are
-                    // already satified or applied with a matrix
-                    apply_op(x, p);
-                }
-
-                blas->axpy(n, -alpha, p, x);
+                beta  = T(0.25) * dea * dea;
+                alpha = T(1) / (eig_avg - (beta / alpha));
+                iteration_step(n, alpha, beta, rhs, x, p, temp);
             }
 
             return 0;
@@ -235,6 +245,61 @@ namespace sfem {
         void                  set_max_it(const int it) override { max_it = it; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
+
+    private:
+        bool use_host_kernels() const { return execution_space_ == EXECUTION_SPACE_HOST; }
+
+        void ensure_apply_buffer(const ptrdiff_t n, T* const y) const {
+            if (!apply_overwrites_output) {
+                blas->zeros(n, y);
+            }
+        }
+
+        void scaled_copy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) const {
+            if (use_host_kernels()) {
+                chebyshev3_host_::scaled_copy(n, alpha, x, y);
+            } else {
+                // Device / generic BLAS fallback
+                blas->zaxpby(n, alpha, x, T(0), x, y);
+            }
+        }
+
+        void iteration_update(const ptrdiff_t n,
+                              const T         alpha,
+                              const T         beta,
+                              const T* const  rhs,
+                              const T* const  Ax,
+                              T* const        p,
+                              T* const        x) const {
+            if (use_host_kernels()) {
+                chebyshev3_host_::iteration_update(n, alpha, beta, rhs, Ax, p, x);
+            } else {
+                blas->axpby(n, T(-1), rhs, beta, p);
+                blas->axpy(n, T(1), Ax, p);
+                blas->axpy(n, -alpha, p, x);
+            }
+        }
+
+        void iteration_step(const ptrdiff_t n,
+                            const T         alpha,
+                            const T         beta,
+                            const T* const  rhs,
+                            T* const        x,
+                            T* const        p,
+                            T* const        temp) const {
+            if (temp) {
+                // SpMV first (independent of p), then vector update:
+                //   p ← β p − rhs + A x;  x ← x − α p
+                ensure_apply_buffer(n, temp);
+                apply_op(x, temp);
+                iteration_update(n, alpha, beta, rhs, temp, p, x);
+            } else {
+                // Legacy in-place path (apply overwrites p).
+                blas->axpby(n, T(-1), rhs, beta, p);
+                apply_op(x, p);
+                blas->axpy(n, -alpha, p, x);
+            }
+        }
     };
 
     template <typename T>
