@@ -52,10 +52,12 @@ namespace sfem {
         }
 
         // Solver parameters
-        T   tol{1e-10};
+        T   atol{1e-16};
+        T   rtol{1e-10};
         int max_it{10000};
 
-        void set_atol(const T val) { tol = val; }
+        void set_atol(const T val) { atol = val; }
+        void set_rtol(const T val) { rtol = val; }
 
         void default_init() {
             blas = make_openmp_blas<T>();
@@ -67,9 +69,16 @@ namespace sfem {
             return blas->good() && apply_op;
         }
 
-        void monitor(const int iter, const T residual) {
-            if (verbose && (iter == max_it || iter % 100 == 0 || residual < tol)) {
-                std::cout << iter << ": " << residual << "\n";
+        bool converged(const T residual, const T residual0) const {
+            return residual < atol || (residual0 > 0 && residual / residual0 < rtol);
+        }
+
+        void monitor(const int iter, const T residual, const T residual0) {
+            if (!verbose) return;
+            const T rel = (residual0 > 0) ? (residual / residual0) : residual;
+            if (iter == max_it || iter % 100 == 0 || converged(residual, residual0)) {
+                std::cout << iter << ": residual abs: " << residual << ", rel: " << rel << " (rtol = " << rtol
+                          << ", atol = " << atol << ")\n";
             }
         }
 
@@ -107,9 +116,10 @@ namespace sfem {
 
             T rho = blas->dot(n, r0, r0);
 
-            if (sqrt(rho) < tol) {
+            const T r_norm0 = sqrt(rho);
+            if (converged(r_norm0, r_norm0)) {
                 blas->destroy(r0);
-                return 0;
+                return SFEM_SUCCESS;
             }
 
             T* r = blas->allocate(n);
@@ -139,12 +149,13 @@ namespace sfem {
                 blas->zaxpby(n, 1, x, alpha, p, h);
                 blas->zaxpby(n, 1, r, -alpha, v, s);
 
-                const T sts = blas->dot(n, s, s);
+                const T sts     = blas->dot(n, s, s);
+                const T s_norm  = sqrt(sts);
 
-                if (sqrt(sts) < tol) {
-                    monitor(iterations_, sqrt(sts));
+                if (converged(s_norm, r_norm0)) {
+                    monitor(iterations_, s_norm, r_norm0);
                     blas->copy(n, h, x);
-                    info = 0;
+                    info = SFEM_SUCCESS;
                     break;
                 }
 
@@ -164,11 +175,12 @@ namespace sfem {
                 blas->zaxpby(n, 1, h, omega, s, x);
                 blas->zaxpby(n, 1, s, -omega, t, r);
 
-                const T rtr = blas->dot(n, r, r);
+                const T rtr    = blas->dot(n, r, r);
+                const T r_norm = sqrt(rtr);
 
-                monitor(iterations_, sqrt(rtr));
-                if (sqrt(rtr) < tol) {
-                    info = 0;
+                monitor(iterations_, r_norm, r_norm0);
+                if (converged(r_norm, r_norm0)) {
+                    info = SFEM_SUCCESS;
                     break;
                 }
 
@@ -209,9 +221,10 @@ namespace sfem {
 
             T rho = blas->dot(n, r0, r0);
 
-            if (sqrt(rho) < tol) {
+            const T r_norm0 = sqrt(rho);
+            if (converged(r_norm0, r_norm0)) {
                 blas->destroy(r0);
-                return 0;
+                return SFEM_SUCCESS;
             }
 
             T* r = blas->allocate(n);
@@ -244,10 +257,11 @@ namespace sfem {
                 blas->zaxpby(n, 1, x, alpha, y, h);
                 blas->zaxpby(n, 1, r, -alpha, v, s);
 
-                const T sts = blas->dot(n, s, s);
+                const T sts    = blas->dot(n, s, s);
+                const T s_norm = sqrt(sts);
 
-                if (sqrt(sts) < tol) {
-                    monitor(iterations_, sqrt(sts));
+                if (converged(s_norm, r_norm0)) {
+                    monitor(iterations_, s_norm, r_norm0);
                     blas->copy(n, h, x);
                     info = SFEM_SUCCESS;
                     break;
@@ -274,11 +288,12 @@ namespace sfem {
                 blas->zaxpby(n, 1, h, omega, z, x);
                 blas->zaxpby(n, 1, s, -omega, t, r);
 
-                const T rtr = blas->dot(n, r, r);
+                const T rtr    = blas->dot(n, r, r);
+                const T r_norm = sqrt(rtr);
 
-                monitor(iterations_, sqrt(rtr));
-                if (sqrt(rtr) < tol) {
-                    info = 0;
+                monitor(iterations_, r_norm, r_norm0);
+                if (converged(r_norm, r_norm0)) {
+                    info = SFEM_SUCCESS;
                     break;
                 }
 
