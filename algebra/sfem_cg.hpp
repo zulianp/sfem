@@ -13,10 +13,65 @@
 
 #include "sfem_openmp_blas.hpp"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 // https://en.wikipedia.org/wiki/Conjugate_gradient_method
-// Must check:
-// https://www.dcs.warwick.ac.uk/pmbs/pmbs14/PMBS14/Workshop_Schedule_files/8-CUDAHPCG.pdf
 namespace sfem {
+
+    namespace cg_host_ {
+
+        // x ← x + alpha p;  r ← r − alpha Ap;  return (r, r)
+        template <typename T>
+        static T update_x_r_and_rtr(const ptrdiff_t n,
+                                    const T         alpha,
+                                    const T* const  p,
+                                    const T* const  Ap,
+                                    T* const        x,
+                                    T* const        r) {
+            T rtr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+ : rtr)
+#endif
+            for (ptrdiff_t i = 0; i < n; i++) {
+                x[i] += alpha * p[i];
+                const T ri = r[i] - alpha * Ap[i];
+                r[i]       = ri;
+                rtr += ri * ri;
+            }
+            return rtr;
+        }
+
+        // x ← x + alpha p;  r ← r − alpha Ap  (no residual reduction)
+        template <typename T>
+        static void update_x_r(const ptrdiff_t n,
+                               const T         alpha,
+                               const T* const  p,
+                               const T* const  Ap,
+                               T* const        x,
+                               T* const        r) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for (ptrdiff_t i = 0; i < n; i++) {
+                x[i] += alpha * p[i];
+                r[i] -= alpha * Ap[i];
+            }
+        }
+
+        // p ← z + beta p
+        template <typename T>
+        static void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for (ptrdiff_t i = 0; i < n; i++) {
+                p[i] = z[i] + beta * p[i];
+            }
+        }
+
+    }  // namespace cg_host_
 
     template <typename T>
     static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
@@ -40,6 +95,11 @@ namespace sfem {
         ptrdiff_t      n_dofs{SFEM_PTRDIFF_INVALID};
         int            iterations_{0};
         bool           verbose{true};
+        // If true, apply_op / preconditioner overwrite their output.
+        // Default false: most ops accumulate (y += Ax).
+        bool           apply_overwrites_output{false};
+        // Host: fuse x/r/(r,r) and p updates. Set false to use separate BLAS calls (A/B baseline).
+        bool           host_fusion{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
@@ -51,6 +111,10 @@ namespace sfem {
         void set_rtol(const T val) { rtol = val; }
 
         void set_verbose(const bool val) { verbose = val; }
+
+        void set_apply_overwrites_output(const bool val) { apply_overwrites_output = val; }
+
+        void set_host_fusion(const bool val) { host_fusion = val; }
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -111,7 +175,7 @@ namespace sfem {
         void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
 
         void default_init() {
-            blas = make_openmp_blas<T>();
+            blas             = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -157,6 +221,14 @@ namespace sfem {
         T*        work_Ap_{nullptr};
         ptrdiff_t work_n_{-1};
 
+        bool use_host_kernels() const { return host_fusion && execution_space_ == EXECUTION_SPACE_HOST; }
+
+        void ensure_apply_buffer(const ptrdiff_t n, T* const y) const {
+            if (!apply_overwrites_output) {
+                blas->zeros(n, y);
+            }
+        }
+
         void destroy_workspace() {
             if (!blas) {
                 work_r_ = work_z_ = work_p_ = work_Ap_ = nullptr;
@@ -197,6 +269,35 @@ namespace sfem {
             work_n_ = n;
         }
 
+        // x += alpha p; r -= alpha Ap; optionally return (r,r)
+        T update_x_r(const ptrdiff_t n,
+                     const T         alpha,
+                     const T* const  p,
+                     const T* const  Ap,
+                     T* const        x,
+                     T* const        r,
+                     const bool      with_rtr) const {
+            if (use_host_kernels()) {
+                if (with_rtr) {
+                    return cg_host_::update_x_r_and_rtr(n, alpha, p, Ap, x, r);
+                }
+                cg_host_::update_x_r(n, alpha, p, Ap, x, r);
+                return T(0);
+            }
+
+            blas->axpby(n, alpha, p, T(1), x);
+            blas->axpby(n, -alpha, Ap, T(1), r);
+            return with_rtr ? blas->dot(n, r, r) : T(0);
+        }
+
+        void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p) const {
+            if (use_host_kernels()) {
+                cg_host_::update_p(n, beta, z, p);
+            } else {
+                blas->axpby(n, T(1), z, beta, p);
+            }
+        }
+
         int aux_apply_basic(const ptrdiff_t n, const T* const b, T* const x) {
             if (!good()) {
                 assert(0);
@@ -208,9 +309,9 @@ namespace sfem {
             T* p  = work_p_;
             T* Ap = work_Ap_;
 
+            ensure_apply_buffer(n, r);
             apply_op->apply(x, r);
-
-            blas->axpby(n, 1, b, -1, r);
+            blas->axpby(n, T(1), b, T(-1), r);
 
             const T rtr0    = blas->dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
@@ -227,7 +328,7 @@ namespace sfem {
 
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                blas->zeros(n, Ap);
+                ensure_apply_buffer(n, Ap);
                 apply_op->apply(p, Ap);
 
                 const T ptAp  = blas->dot(n, p, Ap);
@@ -235,17 +336,14 @@ namespace sfem {
 
                 assert(ptAp == ptAp);
                 assert(alpha == alpha);
-
-                blas->axpby(n, alpha, p, 1, x);
-                blas->axpby(n, -alpha, Ap, 1, r);
-
                 assert(rtr != 0);
                 assert(rtr == rtr);
 
-                const T rtr_new = blas->dot(n, r, r);
+                // Fuse x/r updates + (r,r) into one host pass
+                const T rtr_new = update_x_r(n, alpha, p, Ap, x, r, true);
                 const T beta    = rtr_new / rtr;
                 rtr             = rtr_new;
-                blas->axpby(n, 1, r, beta, p);
+                update_p(n, beta, r, p);
 
                 T r_norm = sqrt(rtr_new);
                 assert(r_norm == r_norm);
@@ -275,9 +373,9 @@ namespace sfem {
             T* p  = work_p_;
             T* Ap = work_Ap_;
 
-            blas->zeros(n, r);
+            ensure_apply_buffer(n, r);
             apply_op->apply(x, r);
-            blas->axpby(n, 1, b, -1, r);
+            blas->axpby(n, T(1), b, T(-1), r);
 
             const T rtr0    = blas->dot(n, r, r);
             const T r_norm0 = sqrt(rtr0);
@@ -287,10 +385,11 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
+            ensure_apply_buffer(n, z);
             preconditioner_op->apply(r, z);
             blas->copy(n, z, p);
 
-            blas->zeros(n, Ap);
+            ensure_apply_buffer(n, Ap);
             apply_op->apply(p, Ap);
 
             const T rtz0 = blas->dot(n, r, z);
@@ -301,18 +400,15 @@ namespace sfem {
             }
 
             {
-                const T ptAp = blas->dot(n, p, Ap);
-
+                const T ptAp  = blas->dot(n, p, Ap);
                 assert(ptAp != 0);
                 const T alpha = rtz / ptAp;
-
-                blas->axpby(n, alpha, p, 1, x);
-                blas->axpby(n, -alpha, Ap, 1, r);
+                update_x_r(n, alpha, p, Ap, x, r, false);
             }
 
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                blas->zeros(n, z);
+                ensure_apply_buffer(n, z);
                 preconditioner_op->apply(r, z);
 
                 const T rtz_new = blas->dot(n, r, z);
@@ -321,16 +417,15 @@ namespace sfem {
                 const T beta = rtz_new / rtz;
                 rtz          = rtz_new;
 
-                blas->axpby(n, 1, z, beta, p);
+                update_p(n, beta, z, p);
 
-                blas->zeros(n, Ap);
+                ensure_apply_buffer(n, Ap);
                 apply_op->apply(p, Ap);
 
                 const T ptAp  = blas->dot(n, p, Ap);
                 const T alpha = rtz / ptAp;
 
-                blas->axpby(n, alpha, p, 1, x);
-                blas->axpby(n, -alpha, Ap, 1, r);
+                update_x_r(n, alpha, p, Ap, x, r, false);
 
                 auto anorm = sqrt(rtz);
                 auto rnorm = anorm / sqrt(rtz0);
@@ -359,3 +454,4 @@ namespace sfem {
 }  // namespace sfem
 
 #endif  // SFEM_CG_HPP
+
