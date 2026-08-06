@@ -2,14 +2,14 @@
 #define SFEM_PARALLEL_MATRIX_FREE_OPERATOR_HPP
 
 #include "sfem_Function.hpp"
-#include "sfem_Operator.hpp"
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
 
 #include <memory>
 
 namespace sfem {
 
-    class ParallelMatrixFreeOperator final : public Operator<real_t> {
+    class ParallelMatrixFreeOperator final : public ParallelOperator<real_t> {
     public:
         ParallelMatrixFreeOperator(const std::shared_ptr<Function>       &function,
                                    const std::shared_ptr<Buffer<real_t>> &state,
@@ -22,12 +22,16 @@ namespace sfem {
         std::ptrdiff_t cols() const override;
         ExecutionSpace execution_space() const override;
 
+        std::shared_ptr<Communicator> comm() const override;
+        std::ptrdiff_t                row_allocation_size() const override;
+        std::ptrdiff_t                col_allocation_size() const override;
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
 
-    std::shared_ptr<Operator<real_t>> create_parallel_matrix_free_operator(
+    std::shared_ptr<ParallelOperator<real_t>> create_parallel_matrix_free_operator(
             const std::shared_ptr<Function>       &function,
             const std::shared_ptr<Buffer<real_t>> &state,
             ExecutionSpace                         execution_space);

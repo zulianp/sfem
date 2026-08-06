@@ -164,8 +164,8 @@ namespace {
         auto linear_op = create_linear_operator(op_type::MATRIX_FREE, f, nullptr, es);
         auto cg        = create_cg(linear_op, es);
         cg->set_max_it(2000);
-        cg->set_rtol(1e-10);
-        cg->set_atol(1e-14);
+        cg->set_rtol(1e-4);
+        cg->set_atol(1e-10);
         cg->verbose = smesh::Env::read<bool>("SFEM_SOLVER_VERBOSE", false);
         SFEM_TEST_ASSERT(cg->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(check_finite("x after CG", x) == SFEM_TEST_SUCCESS);

@@ -524,7 +524,7 @@ namespace sfem {
         SFEM_BSR_SPMV_PREFETCH_DIST = 2
     };
 
-    SFEM_FORCE_INLINE void bsr_spmv_prefetch_r(const void* const addr) {
+    static SFEM_FORCE_INLINE void bsr_spmv_prefetch_r(const void* const addr) {
 #if defined(__GNUC__) || defined(__clang__)
         __builtin_prefetch(addr, 0, 1);
 #else

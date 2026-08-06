@@ -12,16 +12,16 @@ namespace sfem {
 
     class ParallelMatrixFreeOperator::Impl {
     public:
-        std::shared_ptr<Function>       function;
-        std::shared_ptr<Buffer<real_t>> state;
+        std::shared_ptr<Function>        function;
+        std::shared_ptr<Buffer<real_t>>  state;
         std::shared_ptr<smesh::Exchange> exchange;
-        SharedBuffer<real_t>            input_scratch;
-        SharedBuffer<real_t>            output_scratch;
-        SharedBuffer<real_t>            state_scratch;
-        ptrdiff_t                       owned_dofs{0};
-        ptrdiff_t                       local_dofs{0};
-        int                             block_size{1};
-        ExecutionSpace                  execution_space{EXECUTION_SPACE_INVALID};
+        SharedBuffer<real_t>             input_scratch;
+        SharedBuffer<real_t>             output_scratch;
+        SharedBuffer<real_t>             state_scratch;
+        ptrdiff_t                        owned_dofs{0};
+        ptrdiff_t                        local_dofs{0};
+        int                              block_size{1};
+        ExecutionSpace                   execution_space{EXECUTION_SPACE_INVALID};
     };
 
     ParallelMatrixFreeOperator::ParallelMatrixFreeOperator(const std::shared_ptr<Function>       &function,
@@ -110,7 +110,15 @@ namespace sfem {
 
     ExecutionSpace ParallelMatrixFreeOperator::execution_space() const { return impl_->execution_space; }
 
-    std::shared_ptr<Operator<real_t>> create_parallel_matrix_free_operator(
+    std::shared_ptr<Communicator> ParallelMatrixFreeOperator::comm() const {
+        return impl_->function->space()->mesh_ptr()->comm();
+    }
+
+    std::ptrdiff_t ParallelMatrixFreeOperator::row_allocation_size() const { return impl_->local_dofs; }
+
+    std::ptrdiff_t ParallelMatrixFreeOperator::col_allocation_size() const { return impl_->local_dofs; }
+
+    std::shared_ptr<ParallelOperator<real_t>> create_parallel_matrix_free_operator(
             const std::shared_ptr<Function>       &function,
             const std::shared_ptr<Buffer<real_t>> &state,
             const ExecutionSpace                   execution_space) {
@@ -118,7 +126,8 @@ namespace sfem {
         auto mesh  = space->mesh_ptr();
 
         if (mesh->comm()->size() == 1) {
-            return make_op<real_t>(
+            return make_parallel_op<real_t>(
+                    mesh->comm(),
                     space->n_dofs(),
                     space->n_dofs(),
                     [=](const real_t *const x, real_t *const y) {

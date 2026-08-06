@@ -18,6 +18,8 @@
 
 #include "sfem_aliases.hpp"
 
+#include "smesh_env.hpp"
+
 // MATLAB version
 // https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
 namespace sfem {
@@ -63,6 +65,7 @@ namespace sfem {
      * - `set_max_it`: Sets the maximum number of iterations.
      * - `set_max_inner_it`: Sets the maximum number of inner iterations.
      * - `set_atol`: Sets the absolute tolerance for convergence.
+     * - `set_rtol`: Sets the relative tolerance for convergence.
      * - `set_nlsmooth_steps`: Sets the number of nonlinear smoothing steps.
      * - `set_cycle_type`: Sets the type of multigrid cycle.
      * - `set_project_coarse_space_correction`: Enables or disables coarse space correction projection.
@@ -149,6 +152,7 @@ namespace sfem {
             real_t energy_norm_correction;
             real_t penalty_param;
             real_t omega;
+            real_t relative_residual;
 
             static void header(std::ostream& os) {
                 os << "count_iter,";
@@ -160,6 +164,7 @@ namespace sfem {
                 os << "energy_norm_correction,";
                 os << "penalty_param,";
                 os << "omega,";
+                os << "relative_residual,";
                 os << "rate\n";
             }
 
@@ -173,6 +178,7 @@ namespace sfem {
                 os << stats.energy_norm_correction << ",";
                 os << stats.penalty_param << ",";
                 os << stats.omega << ",";
+                os << stats.relative_residual << ",";
                 return os;
             }
         };
@@ -235,7 +241,8 @@ namespace sfem {
                 blas_->copy(n_dofs, x, x_old->data());
             }
 
-            if (debug && constraints_op_) {
+            T residual_norm_0 = 1;
+            if (constraints_op_) {
                 blas_->zeros(n_dofs, mem->work->data());
 
                 // Solution space to constraints space
@@ -255,16 +262,23 @@ namespace sfem {
                 blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
                 blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
 
-                const T r_pen_norm = blas_->norm2(n_dofs, mem->work->data());
+                residual_norm_0 = blas_->norm2(n_dofs, mem->work->data());
 
                 if (debug) {
-                    printf("||g|| start: %e\n", (double)r_pen_norm);
+                    printf("||g|| start: %e\n", (double)residual_norm_0);
                 }
             }
 
             bool converged = false;
             for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
                 T rnorm_previous = 10000000000;
+
+                if (!smesh::Env::read<bool>("UPDATE_CONSTRAINTS_IN_NONLINEAR_CYCLE", false)) {
+                    if (update_constraints_) {
+                        update_constraints_(mem->solution->data());
+                    }
+                }
+
                 for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
                     count_inner_iter++;
 
@@ -313,19 +327,21 @@ namespace sfem {
                                          mem->work->data());
                     }
 
-                    const T r_pen_norm = blas_->norm2(n_dofs, mem->work->data());
+                    const T residual_norm = blas_->norm2(n_dofs, mem->work->data());
 
                     if (debug) {
-                        printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)r_pen_norm, omega);
+                        printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)residual_norm, omega);
                     }
 
-                    bool stagnation = (std::abs(r_pen_norm / rnorm_previous) > stagnation_threshold);
-                    rnorm_previous  = r_pen_norm;
+                    bool stagnation = (std::abs(residual_norm / rnorm_previous) > stagnation_threshold);
+                    rnorm_previous  = residual_norm;
                     if (stagnation) {
                         printf("Stagnation detected\n");
                     }
 
-                    if ((r_pen_norm < std::max(atol_, omega) && inner_iter != 0) || stagnation) {
+                    if (((residual_norm < std::max(atol_, omega) || residual_norm / residual_norm_0 < rtol_) &&
+                         inner_iter != 0) ||
+                        stagnation) {
                         break;
                     }
                 }
@@ -341,8 +357,8 @@ namespace sfem {
                 const T e_pen = ((ub) ? impl_.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
                                 ((lb) ? impl_.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
 
-                const T norm_pen  = std::sqrt(e_pen);
-                const T norm_rpen = blas_->norm2(n_dofs, mem->work->data());
+                const T norm_pen      = std::sqrt(e_pen);
+                const T norm_residual = blas_->norm2(n_dofs, mem->work->data());
 
                 if (enable_shift) {
                     if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
@@ -384,7 +400,8 @@ namespace sfem {
                         count_smoothing_steps,
                         count_lagr_mult_updates,
                         norm_pen,
-                        norm_rpen,
+                        norm_residual,
+                        norm_residual / residual_norm_0,
                         penetration_tol,
                         prev_penalty_param);
 
@@ -404,12 +421,13 @@ namespace sfem {
                                .count_nl_smooth        = 2 * (count_inner_iter * nlsmooth_steps),
                                .count_smooth           = count_smoothing_steps,
                                .norm_penetration       = norm_pen,
-                               .norm_residual          = norm_rpen,
+                               .norm_residual          = norm_residual,
                                .energy_norm_correction = energy_norm_correction,
                                .penalty_param          = prev_penalty_param,
-                               .omega                  = prev_omega});
+                               .omega                  = prev_omega,
+                               .relative_residual      = norm_residual / residual_norm_0});
 
-                if (norm_pen < atol_ && norm_rpen < atol_) {
+                if (norm_pen < atol_ && (norm_residual < atol_ || norm_residual / residual_norm_0 < rtol_)) {
                     converged = true;
                     break;
                 }
@@ -455,6 +473,7 @@ namespace sfem {
         void set_max_it(const int val) { max_it_ = val; }
         void set_max_inner_it(const int val) { max_inner_it = val; }
         void set_atol(const T val) { atol_ = val; }
+        void set_rtol(const T val) { rtol_ = val; }
         void set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
         void set_cycle_type(const int val) { cycle_type_ = val; }
         void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
@@ -470,12 +489,16 @@ namespace sfem {
         void set_update_constraints(std::function<void(const T* const)> fun) { update_constraints_ = fun; }
 
         std::shared_ptr<BLAS<T>>& blas() { return blas_; }
-        ShiftedPenalty_Tpl<T>& impl() { return impl_; }
+        ShiftedPenalty_Tpl<T>&    impl() { return impl_; }
 
     private:
         SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
             auto blas_impl = blas_;
-            return Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); }, (enum MemorySpace)execution_space());
+            return Buffer<T>::own(
+                    n,
+                    blas_impl->allocate(n),
+                    [blas_impl](void* ptr) { blas_impl->destroy(ptr); },
+                    (enum MemorySpace)execution_space());
         }
 
         inline int finest_level() const { return 0; }
@@ -647,8 +670,10 @@ namespace sfem {
             auto      prolongation = prolongation_[coarser_level(level)];
             auto      mem_coarse   = memory_[coarser_level(level)];
 
-            if (update_constraints_) {
-                update_constraints_(mem->solution->data());
+            if (smesh::Env::read<bool>("UPDATE_CONSTRAINTS_IN_NONLINEAR_CYCLE", false)) {
+                if (update_constraints_) {
+                    update_constraints_(mem->solution->data());
+                }
             }
 
             nonlinear_smooth();
@@ -824,18 +849,20 @@ namespace sfem {
                      const int count_smoothing_steps,
                      const int count_lagr_mult_updates,
                      const T   norm_pen,
-                     const T   norm_rpen,
+                     const T   norm_residual,
+                     const T   relative_residual,
                      const T   penetration_tol,
                      const T   penalty_param) {
-            printf("%d|%d|%d) [lagr++ %d] norm_pen %e, norm_rpen %e, penetration_tol %e, "
-                   "penalty_param "
+            printf("%d|%d|%d) [lagr++ %d] norm_pen %e, ||r|| %e, ||r/r0|| %e, penetration_tol %e, "
+                   "penalty "
                    "%e\n",
                    iter,
                    count_inner_iter,
                    count_smoothing_steps,
                    count_lagr_mult_updates,
                    norm_pen,
-                   norm_rpen,
+                   norm_residual,
+                   relative_residual,
                    penetration_tol,
                    penalty_param);
         }
@@ -879,6 +906,7 @@ namespace sfem {
         T    penalty_param_{10};
         T    penalty_param_increase{10};
         T    atol_{1e-10};
+        T    rtol_{1e-10};
         T    penetration_tol_exp{0.9};
         T    omega_factor{100};
         T    stagnation_threshold{0.999};
@@ -888,7 +916,7 @@ namespace sfem {
         std::vector<struct Stats> stats;
 
         std::shared_ptr<BLAS<T>> blas_;
-        ShiftedPenalty_Tpl<T> impl_;
+        ShiftedPenalty_Tpl<T>    impl_;
     };
 
     template <typename T>

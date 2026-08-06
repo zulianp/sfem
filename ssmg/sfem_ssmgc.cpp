@@ -318,8 +318,8 @@ namespace sfem {
             int coarse_linear_smoothing_steps = smesh::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
             int linear_smoothing_steps        = smesh::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
 
-            int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 40);
-            int    max_it               = smesh::Env::read("SFEM_MAX_IT", 15);
+            int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 1);
+            int    max_it               = smesh::Env::read("SFEM_MAX_IT", 100);
             int    nlsmooth_steps       = smesh::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
             int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 400000);
             real_t omega_factor         = smesh::Env::read("SFEM_OMEGA_FACTOR", 100.);
@@ -328,6 +328,7 @@ namespace sfem {
             static constexpr bool is_double = std::is_same<real_t, double>::value;
 
             real_t atol              = smesh::Env::read("SFEM_ATOL", is_double ? 1e-9 : 5e-7);
+            real_t rtol              = smesh::Env::read("SFEM_RTOL", is_double ? 1e-8 : 5e-6);
             real_t max_penalty_param = smesh::Env::read(
                     "SFEM_MAX_PENALTY_PARAM", (enable_mixed_precision ? (is_double ? 1e5 : 1e4) : (is_double ? 1e6 : 1e4)));
             real_t penalty_param          = smesh::Env::read("SFEM_PENALTY_PARAM", 1e4);
@@ -342,6 +343,7 @@ namespace sfem {
             if (in) {
                 printf("SPMG: Reading Input\n");
                 in->get("atol", atol);
+                in->get("rtol", rtol);
                 in->get("coarse_linear_smoothing_steps", coarse_linear_smoothing_steps);
                 in->get("coarse_op_type", coarse_op_type);
                 in->get("coarse_solver_verbose", coarse_solver_verbose);
@@ -567,6 +569,7 @@ namespace sfem {
             mg->set_max_penalty_param(max_penalty_param);
             mg->set_penalty_param(penalty_param);
             mg->set_atol(atol);
+            mg->set_rtol(rtol);
             mg->collect_energy_norm_correction(collect_energy_norm_correction);
             mg->set_enable_shift(enable_shift);
             mg->set_penalty_param_increase(penalty_param_increase);
