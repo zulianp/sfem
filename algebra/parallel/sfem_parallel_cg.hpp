@@ -14,9 +14,23 @@
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_openmp_cg_impl.hpp"
 
 namespace sfem {
 
+    /// Parallel conjugate gradient for @ref ParallelOperator.
+    ///
+    /// Buffer contract for @ref apply:
+    /// - @p x must provide @c apply_op->col_allocation_size() entries (owned + ghosts + aura).
+    ///   CG updates the owned prefix in place; ghost/aura slots are used as apply scratch
+    ///   (in-place gather). There is no extra solution workspace.
+    /// - @p b must provide at least @c apply_op->rows() entries (owned RHS). Only the owned
+    ///   prefix is read by CG. If you also call @c Function::apply_constraints on @p b with
+    ///   sideset-derived nodesets, allocate @c row_allocation_size() — nodesets may index ghosts.
+    ///
+    /// Math (dots / axpy / copies) runs on owned length @c rows(). Workspace vectors
+    /// (@c r, @c p, @c Ap, optional @c z) are allocated to
+    /// @c max(row_allocation_size(), col_allocation_size()).
     template <typename T>
     class ParallelConjugateGradient final : public MatrixFreeLinearSolver<T> {
     public:
@@ -24,6 +38,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>>         preconditioner_op;
         std::shared_ptr<Communicator>        comm_;
         std::shared_ptr<BLAS<T>>             blas;
+        CG_Tpl<T>                            impl;
 
         std::function<void(T*)> interceptor;
 
@@ -36,7 +51,7 @@ namespace sfem {
         int            iterations_{0};
         bool           verbose{true};
         bool           apply_overwrites_output{false};
-        bool           host_fusion{true};
+        bool           fusion{true};
         ExecutionSpace execution_space_{EXECUTION_SPACE_INVALID};
 
         int iterations() const override { return iterations_; }
@@ -47,7 +62,9 @@ namespace sfem {
         void set_rtol(const T val) { rtol = val; }
         void set_verbose(const bool val) { verbose = val; }
         void set_apply_overwrites_output(const bool val) { apply_overwrites_output = val; }
-        void set_host_fusion(const bool val) { host_fusion = val; }
+        void set_fusion(const bool val) { fusion = val; }
+        /// \deprecated Use set_fusion
+        void set_host_fusion(const bool val) { set_fusion(val); }
 
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -120,10 +137,11 @@ namespace sfem {
 
         void default_init() {
             blas             = make_openmp_blas<T>();
+            OpenMP_CG<T>::build(impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        bool good() const { return blas && blas->good() && apply_op && comm_; }
+        bool good() const { return blas && blas->good() && apply_op && comm_ && (!fusion || impl.good()); }
 
         void monitor(const int iter, const T residual, const T relative_residual, const T alpha) {
             if (!verbose) return;
@@ -135,6 +153,7 @@ namespace sfem {
             }
         }
 
+        /// Solve @c Op x = b. @p x must be @c col_allocation_size(); @p b is owned-length.
         int apply(const ptrdiff_t n, const T* const b, T* const x) {
             SFEM_TRACE_SCOPE("ParallelConjugateGradient::apply");
 
@@ -171,11 +190,16 @@ namespace sfem {
             return comm_->sum(local);
         }
 
-        bool use_host_kernels() const { return host_fusion && execution_space_ == EXECUTION_SPACE_HOST; }
+        bool use_fusion() const { return fusion && impl.good(); }
 
-        void ensure_apply_buffer(const ptrdiff_t n, T* const y) const {
+        ptrdiff_t allocation_size() const {
+            return (work_allocation_ > 0) ? work_allocation_ : n_dofs;
+        }
+
+        // Zero full allocation (owned + ghosts/aura) before apply into y.
+        void ensure_apply_buffer(T* const y) const {
             if (!apply_overwrites_output) {
-                blas->zeros(n, y);
+                blas->zeros(allocation_size(), y);
             }
         }
 
@@ -233,11 +257,11 @@ namespace sfem {
                      T* const        x,
                      T* const        r,
                      const bool      with_rtr) const {
-            if (use_host_kernels()) {
+            if (use_fusion()) {
                 if (with_rtr) {
-                    return reduce(cg_host_::update_x_r_and_rtr(n, alpha, p, Ap, x, r));
+                    return reduce(impl.update_x_r_and_rtr(n, alpha, p, Ap, x, r));
                 }
-                cg_host_::update_x_r(n, alpha, p, Ap, x, r);
+                impl.update_x_r(n, alpha, p, Ap, x, r);
                 return T(0);
             }
 
@@ -247,8 +271,8 @@ namespace sfem {
         }
 
         void update_p(const ptrdiff_t n, const T beta, const T* const z, T* const p) const {
-            if (use_host_kernels()) {
-                cg_host_::update_p(n, beta, z, p);
+            if (use_fusion()) {
+                impl.update_p(n, beta, z, p);
             } else {
                 blas->axpby(n, T(1), z, beta, p);
             }
@@ -265,7 +289,7 @@ namespace sfem {
             T* p  = work_p_;
             T* Ap = work_Ap_;
 
-            ensure_apply_buffer(n, r);
+            ensure_apply_buffer(r);
             apply_op->apply(x, r);
             blas->axpby(n, T(1), b, T(-1), r);
 
@@ -284,7 +308,7 @@ namespace sfem {
 
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                ensure_apply_buffer(n, Ap);
+                ensure_apply_buffer(Ap);
                 apply_op->apply(p, Ap);
 
                 const T ptAp  = reduce(blas->dot(n, p, Ap));
@@ -328,7 +352,7 @@ namespace sfem {
             T* p  = work_p_;
             T* Ap = work_Ap_;
 
-            ensure_apply_buffer(n, r);
+            ensure_apply_buffer(r);
             apply_op->apply(x, r);
             blas->axpby(n, T(1), b, T(-1), r);
 
@@ -340,11 +364,11 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
-            ensure_apply_buffer(n, z);
+            ensure_apply_buffer(z);
             preconditioner_op->apply(r, z);
             blas->copy(n, z, p);
 
-            ensure_apply_buffer(n, Ap);
+            ensure_apply_buffer(Ap);
             apply_op->apply(p, Ap);
 
             const T rtz0 = reduce(blas->dot(n, r, z));
@@ -363,7 +387,7 @@ namespace sfem {
 
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                ensure_apply_buffer(n, z);
+                ensure_apply_buffer(z);
                 preconditioner_op->apply(r, z);
 
                 const T rtz_new = reduce(blas->dot(n, r, z));
@@ -374,7 +398,7 @@ namespace sfem {
 
                 update_p(n, beta, z, p);
 
-                ensure_apply_buffer(n, Ap);
+                ensure_apply_buffer(Ap);
                 apply_op->apply(p, Ap);
 
                 const T ptAp  = reduce(blas->dot(n, p, Ap));

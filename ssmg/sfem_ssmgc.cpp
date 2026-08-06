@@ -579,6 +579,7 @@ namespace sfem {
 
             if (SFEM_ENABLE_NL_OBSTACLE) {
                 mg->set_update_constraints([that = this](const T *const disp) {
+                    SFEM_TRACE_SCOPE("SSMGC::update_constraints");
                     that->update_contact(disp);
                     that->restrict_contact_constraints();
                 });
