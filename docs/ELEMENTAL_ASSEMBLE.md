@@ -1,5 +1,7 @@
 # Elemental Assembly API
 
+## Hessian
+
 This note explains how to call the generated header-only NeoHookean dense local Hessian API:
 
 ```cpp
@@ -148,3 +150,47 @@ See `drivers/bench/neohookean_assemble.exe.cpp` for a complete example that:
 - calls the generated NeoHookean dense Hessian API,
 - stores the result as global AoS dense element matrices,
 - compares the result against current BSR assembly.
+
+## Gradient and objective
+
+The same gathered `coords` and `u_streams` can be reused for the dense element gradient and objective calls. The gradient uses one SoA stream per active local dof:
+
+```cpp
+real_t gradient_soa[MAX_NDOFS][VECTOR_SIZE];
+
+int status = SFEM_FAILURE;
+if (dim == 2) {
+    status = sfem::codegen::neohookean_ogden_gradient_2d_element_soa<real_t, VECTOR_SIZE>(
+            element_type, nelems, coords, lmbda, mu, u_streams, gradient_soa);
+} else if (dim == 3) {
+    status = sfem::codegen::neohookean_ogden_gradient_3d_element_soa<real_t, VECTOR_SIZE>(
+            element_type, nelems, coords, lmbda, mu, u_streams, gradient_soa);
+}
+
+if (status != SFEM_SUCCESS) {
+    return status;
+}
+```
+
+`gradient_soa[dof][lane]` stores the local residual contribution for `dof = shape * DIM + component`.
+
+The objective is exposed by the generated `energy` element wrappers and writes one value per element lane:
+
+```cpp
+real_t element_energy[VECTOR_SIZE];
+
+int status = SFEM_FAILURE;
+if (dim == 2) {
+    status = sfem::codegen::neohookean_ogden_energy_2d_element_soa<real_t, VECTOR_SIZE>(
+            element_type, nelems, coords, lmbda, mu, u_streams, element_energy);
+} else if (dim == 3) {
+    status = sfem::codegen::neohookean_ogden_energy_3d_element_soa<real_t, VECTOR_SIZE>(
+            element_type, nelems, coords, lmbda, mu, u_streams, element_energy);
+}
+
+if (status != SFEM_SUCCESS) {
+    return status;
+}
+```
+
+`element_energy[lane]` stores the objective contribution for the corresponding element in the batch.
