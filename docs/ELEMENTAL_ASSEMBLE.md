@@ -194,3 +194,24 @@ if (status != SFEM_SUCCESS) {
 ```
 
 `element_energy[lane]` stores the objective contribution for the corresponding element in the batch.
+
+## Glossary
+
+| Term | Meaning |
+| --- | --- |
+| AoS | Array of structures layout; stores all local entries for one element contiguously before the next element. |
+| SoA | Structure of arrays layout; stores one local quantity contiguously across element lanes. |
+| BSR | Block sparse row matrix format used by the existing global assembly path. |
+| `coords` | Pointer view over gathered coordinate SoA streams. |
+| `DIM` | Spatial dimension of the active element, either 2 or 3. |
+| `dof` | Local degree-of-freedom index, computed as `shape * DIM + component`. |
+| `element_energy` | One objective/energy value per element lane in the current batch. |
+| `gradient_soa` | Dense local residual output streams, indexed as `gradient_soa[dof][lane]`. |
+| `hessian_soa` | Dense local matrix output streams, indexed as `hessian_soa[row * NDOFS + col][lane]`. |
+| `lane` | SIMD batch position for one element inside an SoA stream. |
+| `MAX_NDOFS` | Compile-time scratch capacity for fixed local arrays. |
+| `NDOFS` | Active number of local degrees of freedom, equal to `DIM * N_SHAPE`. |
+| `N_SHAPE` | Number of local shape functions or element nodes. |
+| Proteus order | Tensor-product node ordering expected by generated `PROTEUS_*` kernels. |
+| `u_streams` | Pointer view over gathered displacement/current-state SoA streams. |
+| `VECTOR_SIZE` | Compile-time number of element lanes processed by each generated SoA call. |
