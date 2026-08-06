@@ -1629,9 +1629,15 @@ namespace sfem {
             mu     = SFEM_SHEAR_MODULUS;
             lambda = SFEM_FIRST_LAME_PARAMETER;
 
-            auto &ssm              = space->mesh();
-            auto  mesh             = smesh::derefine(space->mesh_ptr(), 1);
-            auto  h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 24 * 24);
+            auto &ssm = space->mesh();
+            // Macro HEX8 corners in standard HEX8 order (not SS lexicographic).
+            auto mesh = smesh::sshex_to_hex8(smesh::derefine(space->mesh_ptr(), 1));
+            if (!mesh) {
+                SFEM_ERROR("GPUEMVectorWarpOp::initialize: sshex_to_hex8(derefine) failed\n");
+                return SFEM_FAILURE;
+            }
+
+            auto h_element_matrix = sfem::create_host_buffer<scalar_t>(mesh->n_elements() * 24 * 24);
 
             int err = sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
                                                                         mesh->n_elements(),
@@ -1645,8 +1651,25 @@ namespace sfem {
                 return err;
             }
 
+            {
+                const scalar_t *const A = h_element_matrix->data();
+                const ptrdiff_t       n = (ptrdiff_t)h_element_matrix->size();
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    if (A[i] != A[i]) {
+                        SFEM_ERROR("GPUEMVectorWarpOp::initialize: NaN in elemental matrix at %ld\n", (long)i);
+                        return SFEM_FAILURE;
+                    }
+                }
+            }
+
+            // Device apply uses real_t; convert explicitly if scalar_t != real_t.
+            auto h_real = sfem::create_host_buffer<real_t>(h_element_matrix->size());
+            for (ptrdiff_t i = 0; i < (ptrdiff_t)h_element_matrix->size(); ++i) {
+                h_real->data()[i] = (real_t)h_element_matrix->data()[i];
+            }
+
             elements       = create_device_elements_AoS(space, space->element_type());
-            element_matrix = smesh::to_device(h_element_matrix);
+            element_matrix = smesh::to_device(h_real);
 
             // Companion matrix-free LE for hessian_diag / block_diag / BSR / etc.
             linear_elasticity = std::make_shared<GPULinearElasticity>(space);
@@ -1748,9 +1771,14 @@ namespace sfem {
             }
 
             if (changed && element_matrix) {
-                auto &ssm              = space->mesh();
-                auto  mesh             = smesh::derefine(space->mesh_ptr(), 1);
-                auto  h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 24 * 24);
+                auto &ssm = space->mesh();
+                auto  mesh = smesh::sshex_to_hex8(smesh::derefine(space->mesh_ptr(), 1));
+                if (!mesh) {
+                    SFEM_ERROR("GPUEMVectorWarpOp::set_value_in_block: sshex_to_hex8(derefine) failed\n");
+                    return;
+                }
+
+                auto h_element_matrix = sfem::create_host_buffer<scalar_t>(mesh->n_elements() * 24 * 24);
 
                 sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
                                                                   mesh->n_elements(),
@@ -1760,7 +1788,12 @@ namespace sfem {
                                                                   mu,
                                                                   lambda,
                                                                   h_element_matrix->data());
-                element_matrix = smesh::to_device(h_element_matrix);
+
+                auto h_real = sfem::create_host_buffer<real_t>(h_element_matrix->size());
+                for (ptrdiff_t i = 0; i < (ptrdiff_t)h_element_matrix->size(); ++i) {
+                    h_real->data()[i] = (real_t)h_element_matrix->data()[i];
+                }
+                element_matrix = smesh::to_device(h_real);
             }
 
             if (linear_elasticity && linear_elasticity->domains) {

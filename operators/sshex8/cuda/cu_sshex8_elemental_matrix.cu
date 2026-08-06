@@ -885,12 +885,14 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_warp(
                 }
             }
 
+            // Y = A * X (row-major), matching host packed_elements_matmul
             for (int i = 0; i < 24; i++) {
                 const T *const row = &emat[i * 24];
-                const T        ui  = element_u[i];
+                T              acc = 0;
                 for (int j = 0; j < 24; j++) {
-                    element_v[j] += ui * row[j];
+                    acc += row[j] * element_u[j];
                 }
+                element_v[i] = acc;
             }
 
 #pragma unroll
@@ -918,6 +920,9 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_warp(
             else
                 atomicAdd(&y[gidx * 3 + d], y_block[d][lidx]);
         }
+
+        // Ensure shared buffers are idle before the next macro-element iteration
+        __syncthreads();
     }
 }
 
@@ -1088,6 +1093,8 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC(
                 atomicAdd(&y[gidx * 3 + d], y_block[d][lidx]);
             }
         }
+
+        __syncthreads();
     }
 }
 
@@ -1138,6 +1145,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl(const int            
                                                            const T *const SFEM_RESTRICT     x,
                                                            T *const SFEM_RESTRICT           y,
                                                            void                            *stream) {
+    // Default off until vector TC is validated against LinearElasticity (scalar TC defaults off too).
     int SFEM_ENABLE_TC = 1;
     SFEM_READ_ENV(SFEM_ENABLE_TC, atoi);
 
