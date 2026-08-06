@@ -318,7 +318,7 @@ namespace sfem {
             int coarse_linear_smoothing_steps = smesh::Env::read("SFEM_COARSE_LINEAR_SMOOTHING_STEPS", 10);
             int linear_smoothing_steps        = smesh::Env::read("SFEM_LINEAR_SMOOTHING_STEPS", 1);
 
-            int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 1);
+            int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 4);
             int    max_it               = smesh::Env::read("SFEM_MAX_IT", 100);
             int    nlsmooth_steps       = smesh::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
             int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 400000);
