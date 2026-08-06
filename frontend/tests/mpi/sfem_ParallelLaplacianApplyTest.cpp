@@ -1,6 +1,7 @@
 #include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
+#include "sfem_ParallelOperator.hpp"
 
 #include "smesh_base.hpp"
 #include "smesh_env.hpp"
@@ -92,12 +93,19 @@ namespace {
                 sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, parallel_function, nullptr, sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(parallel_op != nullptr);
 
+        auto *pop = dynamic_cast<sfem::ParallelOperator<real_t> *>(parallel_op.get());
+        SFEM_TEST_ASSERT(pop != nullptr);
+
         const ptrdiff_t n_serial_dofs = serial_space->n_dofs();
-        ptrdiff_t       n_owned_dofs  = n_serial_dofs;
+        const ptrdiff_t n_owned_dofs  = pop->rows();
+        const ptrdiff_t n_x_alloc     = pop->col_allocation_size();
+        const ptrdiff_t n_y_alloc     = pop->row_allocation_size();
+        SFEM_TEST_ASSERT(n_x_alloc >= n_owned_dofs);
+        SFEM_TEST_ASSERT(n_y_alloc >= n_owned_dofs);
+
         if (comm->size() > 1) {
-            auto dist    = parallel_mesh->distributed();
-            n_owned_dofs = dist->n_nodes_owned();
-            SFEM_TEST_EQ(parallel_op->rows(), n_owned_dofs);
+            auto dist = parallel_mesh->distributed();
+            SFEM_TEST_EQ(n_owned_dofs, dist->n_nodes_owned());
             SFEM_TEST_EQ(parallel_op->cols(), n_owned_dofs);
         }
 
@@ -112,8 +120,9 @@ namespace {
 
         SFEM_TEST_ASSERT(serial_function->apply(nullptr, serial_h->data(), serial_y->data()) == SFEM_SUCCESS);
 
-        auto parallel_h = sfem::create_host_buffer<real_t>(n_owned_dofs);
-        auto parallel_y = sfem::create_host_buffer<real_t>(n_owned_dofs);
+        // apply() requires col/row_allocation_size buffers (owned + ghosts + aura).
+        auto parallel_h = sfem::create_host_buffer<real_t>(n_x_alloc);
+        auto parallel_y = sfem::create_host_buffer<real_t>(n_y_alloc);
 
         if (comm->size() > 1) {
             auto dist         = parallel_mesh->distributed();
@@ -121,11 +130,9 @@ namespace {
             for (ptrdiff_t i = 0; i < n_owned_dofs; ++i) {
                 const ptrdiff_t global_node = static_cast<ptrdiff_t>(node_mapping[i]);
                 parallel_h->data()[i]       = serial_h->data()[global_node];
-                parallel_y->data()[i]       = 0;
             }
         } else {
             std::memcpy(parallel_h->data(), serial_h->data(), sizeof(real_t) * n_owned_dofs);
-            std::memcpy(parallel_y->data(), serial_y->data(), sizeof(real_t) * n_owned_dofs);
         }
 
         SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);

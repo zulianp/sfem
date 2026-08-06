@@ -15,9 +15,6 @@ namespace sfem {
         std::shared_ptr<Function>        function;
         std::shared_ptr<Buffer<real_t>>  state;
         std::shared_ptr<smesh::Exchange> exchange;
-        SharedBuffer<real_t>             input_scratch;
-        SharedBuffer<real_t>             output_scratch;
-        SharedBuffer<real_t>             state_scratch;
         ptrdiff_t                        owned_dofs{0};
         ptrdiff_t                        local_dofs{0};
         int                              block_size{1};
@@ -41,10 +38,14 @@ namespace sfem {
         impl_->local_dofs = dist->n_nodes_local() * impl_->block_size;
         impl_->exchange   = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
 
-        impl_->input_scratch  = create_host_buffer<real_t>(impl_->local_dofs);
-        impl_->output_scratch = create_host_buffer<real_t>(impl_->local_dofs);
         if (state) {
-            impl_->state_scratch = create_host_buffer<real_t>(impl_->local_dofs);
+            if (state->size() != static_cast<size_t>(impl_->local_dofs)) {
+                SFEM_ERROR(
+                        "ParallelMatrixFreeOperator state size %ld != col_allocation_size %ld "
+                        "(owned+ghosts+aura); allocate with col_allocation_size()\n",
+                        (long)state->size(),
+                        (long)impl_->local_dofs);
+            }
             update_state();
         }
     }
@@ -58,21 +59,15 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        real_t *const state_scratch = impl_->state_scratch->data();
-        if (impl_->state->size() == static_cast<size_t>(impl_->local_dofs)) {
-            std::memcpy(state_scratch, impl_->state->data(), sizeof(real_t) * impl_->local_dofs);
-        } else if (impl_->state->size() == static_cast<size_t>(impl_->owned_dofs)) {
-            std::memcpy(state_scratch, impl_->state->data(), sizeof(real_t) * impl_->owned_dofs);
-            std::fill(state_scratch + impl_->owned_dofs, state_scratch + impl_->local_dofs, real_t(0));
-        } else {
-            SFEM_ERROR("ParallelMatrixFreeOperator state has invalid size %ld, expected %ld or %ld\n",
-                       (long)impl_->state->size(),
-                       (long)impl_->owned_dofs,
-                       (long)impl_->local_dofs);
+        if (impl_->state->size() != static_cast<size_t>(impl_->local_dofs)) {
+            SFEM_ERROR(
+                    "ParallelMatrixFreeOperator::update_state: state size %ld != col_allocation_size %ld\n",
+                    (long)impl_->state->size(),
+                    (long)impl_->local_dofs);
             return SFEM_FAILURE;
         }
 
-        return impl_->exchange->gather(state_scratch, impl_->block_size);
+        return impl_->exchange->gather(impl_->state->data(), impl_->block_size);
     }
 
     int ParallelMatrixFreeOperator::apply(const real_t *const x, real_t *const y) {
@@ -83,25 +78,17 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        real_t *const h_local = impl_->input_scratch->data();
-        real_t *const y_local = impl_->output_scratch->data();
-
-        std::memcpy(h_local, x, sizeof(real_t) * impl_->owned_dofs);
-        std::fill(h_local + impl_->owned_dofs, h_local + impl_->local_dofs, real_t(0));
-
-        if (impl_->exchange->gather(h_local, impl_->block_size) != SFEM_SUCCESS) {
+        // Ghost/aura slots are written by gather; owned values are preserved.
+        real_t *const x_mut = const_cast<real_t *>(x);
+        std::fill(x_mut + impl_->owned_dofs, x_mut + impl_->local_dofs, real_t(0));
+        if (impl_->exchange->gather(x_mut, impl_->block_size) != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
 
-        const real_t *const state_local = impl_->state_scratch ? impl_->state_scratch->data() : nullptr;
+        const real_t *const state_local = impl_->state ? impl_->state->data() : nullptr;
 
-        std::fill(y_local, y_local + impl_->local_dofs, real_t(0));
-        if (impl_->function->apply(state_local, h_local, y_local) != SFEM_SUCCESS) {
-            return SFEM_FAILURE;
-        }
-
-        std::memcpy(y, y_local, sizeof(real_t) * impl_->owned_dofs);
-        return SFEM_SUCCESS;
+        std::fill(y, y + impl_->local_dofs, real_t(0));
+        return impl_->function->apply(state_local, x_mut, y);
     }
 
     std::ptrdiff_t ParallelMatrixFreeOperator::rows() const { return impl_->owned_dofs; }
