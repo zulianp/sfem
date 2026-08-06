@@ -46,6 +46,7 @@ set(SFEM_MODULES
     algebra/ell
     algebra/mg
     algebra/openmp
+    algebra/parallel
     mesh 
     mesh/multiblock
     mesh/sshex8
@@ -473,6 +474,14 @@ if(SFEM_ENABLE_TESTING)
             COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelLaplacianApplyTest>)
         set_tests_properties(sfem_ParallelLaplacianApplyTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelLaplacianApplyTest)
+
+        add_executable(sfem_ParallelCGTest frontend/tests/mpi/sfem_ParallelCGTest.cpp)
+        target_link_libraries(sfem_ParallelCGTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelCGTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelCGTest>)
+        set_tests_properties(sfem_ParallelCGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelCGTest)
     endif()
 endif()
 

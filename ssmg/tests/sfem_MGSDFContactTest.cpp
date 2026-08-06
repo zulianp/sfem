@@ -24,24 +24,32 @@
 struct EnvOptions {
     sfem::ExecutionSpace execution_space;
     int                  base_resolution;
+    real_t               disp_y;
     int                  enable_output;
     int                  element_refine_level;
+    geom_t               y_top;
     std::string          operator_name;
     std::string          contact_case;
     int                  use_spmg;
+    int                  enable_top_bc;
     std::string          ssmgc_yaml;
     int                  n_spheres;
+    int                  resolution_ratio;
 
     static EnvOptions read() {
         EnvOptions ret{.execution_space      = sfem::EXECUTION_SPACE_HOST,
                        .base_resolution      = smesh::Env::read("SFEM_BASE_RESOLUTION", int(1)),
+                       .disp_y               = smesh::Env::read("SFEM_DISP_Y", real_t(-0.05)),
                        .enable_output        = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(1)),
                        .element_refine_level = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", int(2)),
+                       .y_top                = smesh::Env::read("SFEM_Y_TOP", geom_t(0.05)),
                        .operator_name        = smesh::Env::read_string("SFEM_OPERATOR", "LinearElasticity"),
                        .contact_case         = smesh::Env::read_string("SFEM_CONTACT_CASE", "sphere"),
                        .use_spmg             = smesh::Env::read("SFEM_USE_SPMG", int(1)),
+                       .enable_top_bc        = smesh::Env::read("SFEM_ENABLE_TOP_BC", int(0)),
                        .ssmgc_yaml           = smesh::Env::read_string("SFEM_SSMGC_YAML", ""),
-                       .n_spheres            = smesh::Env::read("SFEM_N_SPHERES", int(2))};
+                       .n_spheres            = smesh::Env::read("SFEM_N_SPHERES", int(2)),
+                       .resolution_ratio     = smesh::Env::read("SFEM_RESOLUTION_RATIO", int(20))};
 
         const std::string execution_space = smesh::Env::read_string("SFEM_EXECUTION_SPACE", "");
         if (!execution_space.empty()) {
@@ -52,48 +60,39 @@ struct EnvOptions {
     }
 };
 
-#define SFEM_ENABLE_TOP_BC 1
-
-static const real_t disp_y = -0.05;
-
-static const geom_t y_top            = 0.05;
-static const int    resolution_ratio = 20;
-
-static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
-
 std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::shared_ptr<sfem::Function> &f,
                                                                      const EnvOptions                      &opts) {
     auto fs   = f->space();
     auto m    = fs->mesh_ptr();
     auto comm = m->comm();
     auto es   = f->execution_space();
+    const real_t disp_y           = opts.disp_y;
+    const geom_t y_top            = opts.y_top;
+    const int    resolution_ratio = opts.resolution_ratio;
 
-#if SFEM_ENABLE_TOP_BC
+    if (opts.enable_top_bc) {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+            return y > (y_top - 1e-5) && y < (y_top + 1e-5);
+        });
 
-    auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
-        return y > (y_top - 1e-5) && y < (y_top + 1e-5);
-    });
+        sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
-    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
+        auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
+        f->add_constraint(conds);
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
-    f->add_constraint(conds);
+    } else {
+        auto left_right = sfem::Sideset::create_from_selector(
+                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-#else
+        sfem::DirichletConditions::Condition x_bc{.sidesets = left_right, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition y_bc{.sidesets = left_right, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition z_bc{.sidesets = left_right, .value = 0, .component = 2};
 
-    auto left_right = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
-
-    sfem::DirichletConditions::Condition x_bc{.sidesets = left_right, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sidesets = left_right, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sidesets = left_right, .value = 0, .component = 2};
-
-    auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
-    f->add_constraint(conds);
-
-#endif
+        auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
+        f->add_constraint(conds);
+    }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
@@ -136,33 +135,33 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
     auto m    = fs->mesh_ptr();
     auto comm = m->comm();
     auto es   = f->execution_space();
+    const real_t disp_y           = opts.disp_y;
+    const geom_t y_top            = opts.y_top;
+    const int    resolution_ratio = opts.resolution_ratio;
 
-#if SFEM_ENABLE_TOP_BC
+    if (opts.enable_top_bc) {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+            return y > (y_top - 1e-5) && y < (y_top + 1e-5);
+        });
 
-    auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
-        return y > (y_top - 1e-5) && y < (y_top + 1e-5);
-    });
+        sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
-    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
+        auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
+        f->add_constraint(conds);
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
-    f->add_constraint(conds);
+    } else {
+        auto ss = sfem::Sideset::create_from_selector(
+                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-#else
+        sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
 
-    auto ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
-
-    sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
-
-    auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
-    f->add_constraint(conds);
-
-#endif
+        auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
+        f->add_constraint(conds);
+    }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
@@ -214,33 +213,32 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
     auto m    = fs->mesh_ptr();
     auto comm = m->comm();
     auto es   = f->execution_space();
+    const real_t disp_y = opts.disp_y;
+    const geom_t y_top  = opts.y_top;
 
-#if SFEM_ENABLE_TOP_BC
+    if (opts.enable_top_bc) {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+            return y > (y_top - 1e-5) && y < (y_top + 1e-5);
+        });
 
-    auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
-        return y > (y_top - 1e-5) && y < (y_top + 1e-5);
-    });
+        sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
-    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
+        auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
+        f->add_constraint(conds);
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
-    f->add_constraint(conds);
+    } else {
+        auto ss = sfem::Sideset::create_from_selector(
+                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-#else
+        sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
 
-    auto ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
-
-    sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
-
-    auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
-    f->add_constraint(conds);
-
-#endif
+        auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
+        f->add_constraint(conds);
+    }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
@@ -295,6 +293,8 @@ int test_contact() {
     }
 
     const sfem::ExecutionSpace es = opts.execution_space;
+    const geom_t               y_top            = opts.y_top;
+    const int                  resolution_ratio = opts.resolution_ratio;
 
     auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                              opts.base_resolution * resolution_ratio,

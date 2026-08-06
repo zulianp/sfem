@@ -39,6 +39,7 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_bcrs_sym_SpMV.hpp"
 #include "sfem_cg.hpp"
+#include "sfem_parallel_cg.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 #include "smesh_glob.hpp"
@@ -151,6 +152,25 @@ namespace sfem {
             cg = sfem::h_cg<T>();
         }
 
+        cg->set_n_dofs(op->rows());
+        cg->set_op(op);
+        return cg;
+    }
+
+    template <typename T>
+    static std::shared_ptr<ParallelConjugateGradient<T>> create_parallel_cg(
+            const std::shared_ptr<ParallelOperator<T>> &op) {
+        if (!op) {
+            SFEM_ERROR("create_parallel_cg: null operator\n");
+            return nullptr;
+        }
+
+        if (op->execution_space() != EXECUTION_SPACE_HOST) {
+            SFEM_ERROR("create_parallel_cg: only EXECUTION_SPACE_HOST is supported currently\n");
+            return nullptr;
+        }
+
+        auto cg = h_parallel_cg<T>();
         cg->set_n_dofs(op->rows());
         cg->set_op(op);
         return cg;
