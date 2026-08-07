@@ -53,36 +53,36 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    class SelfContactPenalty final : public Op {
-    public:
-        SelfContactPenalty();
-        ~SelfContactPenalty();
+    // class SelfContactPenalty final : public Op {
+    // public:
+    //     SelfContactPenalty();
+    //     ~SelfContactPenalty();
 
-        static std::shared_ptr<SelfContactPenalty> create(const std::shared_ptr<FunctionSpace>& space);
+    //     static std::shared_ptr<SelfContactPenalty> create(const std::shared_ptr<FunctionSpace>& space);
 
-        static std::shared_ptr<SelfContactPenalty> create(const std::shared_ptr<FunctionSpace>& space,
-                                                          const std::shared_ptr<smesh::Mesh>&   surface);
+    //     static std::shared_ptr<SelfContactPenalty> create(const std::shared_ptr<FunctionSpace>& space,
+    //                                                       const std::shared_ptr<smesh::Mesh>&   surface);
 
-        real_t max_step_size();
+    //     real_t max_step_size();
 
-        const char* name() const override;
-        bool        is_linear() const override;
-        int         hessian_crs(const real_t* const  x,
-                                const count_t* const rowptr,
-                                const idx_t* const   colidx,
-                                real_t* const        values) override;
-        int         gradient(const real_t* const x, real_t* const out) override;
-        int         apply(const real_t* const x, const real_t* const h, real_t* const out) override;
-        int         value(const real_t* x, real_t* const out) override;
-        ptrdiff_t   n_dofs_domain() const override;
-        ptrdiff_t   n_dofs_image() const override;
+    //     const char* name() const override;
+    //     bool        is_linear() const override;
+    //     int         hessian_crs(const real_t* const  x,
+    //                             const count_t* const rowptr,
+    //                             const idx_t* const   colidx,
+    //                             real_t* const        values) override;
+    //     int         gradient(const real_t* const x, real_t* const out) override;
+    //     int         apply(const real_t* const x, const real_t* const h, real_t* const out) override;
+    //     int         value(const real_t* x, real_t* const out) override;
+    //     ptrdiff_t   n_dofs_domain() const override;
+    //     ptrdiff_t   n_dofs_image() const override;
 
-        int update(const real_t* const SFEM_RESTRICT x_prev, const real_t* const SFEM_RESTRICT x_curr) override;
+    //     int update(const real_t* const SFEM_RESTRICT x_prev, const real_t* const SFEM_RESTRICT x_curr) override;
 
-    private:
-        class Impl;
-        std::unique_ptr<Impl> impl_;
-    };
+    // private:
+    //     class Impl;
+    //     std::unique_ptr<Impl> impl_;
+    // };
 }  // namespace sfem
 
 #endif  // SFEM_SELF_COLLISIONS_HPP

@@ -21,7 +21,6 @@ First we install the `C` code base
 Go to a directory of your choosing and type
 
 ```bash
-git clone https://bitbucket.com/zulianp/isolver.git && \
 git clone https://bitbucket.com/zulianp/matrix.io && \
 git clone https://github.com/zulianp/sfem.git && \
 cd matrix.io && make && \
@@ -94,7 +93,7 @@ Cite SFEM if you use it for your work:
 
 ```bibtex
 @misc{sfemgit,
-	author = {Zulian, Patrick and Riva, Simone},
+	author = {Zulian, Patrick and Riva, Simone and Yang, Haoyu},
 	title = {{SFEM}: Simple {FEM}},
 	url = {https://bitbucket.org/zulianp/sfem},
 	howpublished = {https://bitbucket.org/zulianp/sfem},
@@ -103,6 +102,8 @@ Cite SFEM if you use it for your work:
 ```
 
 # AI Generated docs
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/zulianp/sfem)
 
 https://deepwiki.com/zulianp/sfem
 

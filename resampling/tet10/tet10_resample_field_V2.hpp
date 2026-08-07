@@ -7,9 +7,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace sfem {
 
 /**
  * @brief Assemble the dual mass vector for the tet10 element.
@@ -165,9 +163,7 @@ hex8_to_subparametric_tet10_resample_field_local_V(const ptrdiff_t              
 
 //////////////////////////////////////////////////////////////////////////
 
-#ifdef __cplusplus
-}
-#endif
+}  // namespace sfem
 
 // TODO (full 2nd order FEM)
 // For the structured grid we can decide to go directy high-order splines instead of tri-linear

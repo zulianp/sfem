@@ -47,7 +47,7 @@ namespace sfem {
 
         std::function<void(const T* const, T* const)> apply_op;
 
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
         MPRGP_Tpl<T> impl;
         std::shared_ptr<PowerMethod<T>> power_method;
 
@@ -76,10 +76,11 @@ namespace sfem {
 
         void ensure_power_method() {
             if (!power_method) {
+                auto blas_impl = blas;
                 power_method = std::make_shared<PowerMethod<T>>();
-                power_method->norm2 = blas.norm2;
-                power_method->scal = blas.scal;
-                power_method->zeros = blas.zeros;
+                power_method->norm2 = [blas_impl](const std::ptrdiff_t n, const T* const x) { return blas_impl->norm2(n, x); };
+                power_method->scal = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) { blas_impl->scal(n, alpha, x); };
+                power_method->zeros = [blas_impl](const std::size_t n, T* const x) { blas_impl->zeros(n, x); };
             }
         }
 
@@ -89,7 +90,7 @@ namespace sfem {
             impl.project(n_dofs, lb, ub, x);
 
             if (debug) {
-                T norm_project = this->blas.norm2(n_dofs, x);
+                T norm_project = this->blas->norm2(n_dofs, x);
                 printf("norm_project: %g\n", (double)norm_project);
             }
         }
@@ -132,7 +133,7 @@ namespace sfem {
             impl.free_gradient(n_dofs, lb, ub, x, g, gf);
 
             if (debug) {
-                T norm_fg = this->blas.norm2(n_dofs, gf);
+                T norm_fg = this->blas->norm2(n_dofs, gf);
                 printf("norm_fg: %g\n", (double)norm_fg);
             }
         }
@@ -152,60 +153,60 @@ namespace sfem {
         bool good() const {
             assert(apply_op);
             assert(lower_bound_ || upper_bound_);
-            return blas.good() && impl.good() && apply_op && (lower_bound_ || upper_bound_);
+            return blas->good() && impl.good() && apply_op && (lower_bound_ || upper_bound_);
         }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             OpenMP_MPRGP<T>::build_mprgp(impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         void cg_step(const T alpha_cg, const T dot_pAp, const T* const Ap, T* const p, T* const g,
                      T* const gf, T* const x) {
-            this->blas.axpby(n_dofs, -alpha_cg, p, 1, x);
+            this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
 
-            this->blas.axpby(n_dofs, -alpha_cg, Ap, 1, g);
+            this->blas->axpby(n_dofs, -alpha_cg, Ap, 1, g);
 
             this->free_gradient(x, g, gf);
 
-            const T beta = this->blas.dot(n_dofs, Ap, gf) / dot_pAp;
+            const T beta = this->blas->dot(n_dofs, Ap, gf) / dot_pAp;
 
-            this->blas.axpby(n_dofs, 1, gf, -beta, p);
+            this->blas->axpby(n_dofs, 1, gf, -beta, p);
         }
 
         void expansion_step(const T alpha_feas, const T alpha_bar, const T alpha_cg,
                             const T dot_pAp, const T* const b, T* const p, const T* const Ap,
                             T* const g, T* const gf, T* const x) {
-            this->blas.axpby(n_dofs, -alpha_feas, p, 1, x);
+            this->blas->axpby(n_dofs, -alpha_feas, p, 1, x);
 
-            this->blas.axpby(n_dofs, -alpha_feas, Ap, 1, g);
+            this->blas->axpby(n_dofs, -alpha_feas, Ap, 1, g);
 
             switch (expansion_type_) {
                 case EXPANSION_TYPE_PROJECTED_CG: {
-                    this->blas.axpby(n_dofs, -alpha_cg, p, 1, x);
+                    this->blas->axpby(n_dofs, -alpha_cg, p, 1, x);
 
                     if (alpha_cg <= alpha_feas) {
-                        this->blas.axpby(n_dofs, -alpha_cg, Ap, 1, g);
+                        this->blas->axpby(n_dofs, -alpha_cg, Ap, 1, g);
                         this->free_gradient(x, g, gf);
-                        T beta = this->blas.dot(n_dofs, Ap, gf) / dot_pAp;
-                        this->blas.axpby(n_dofs, 1, gf, -beta, p);
+                        T beta = this->blas->dot(n_dofs, Ap, gf) / dot_pAp;
+                        this->blas->axpby(n_dofs, 1, gf, -beta, p);
                     } else {
                         this->project(x);
                         this->gradient(x, b, g);
                         this->free_gradient(x, g, gf);
-                        this->blas.copy(n_dofs, gf, p);
+                        this->blas->copy(n_dofs, gf, p);
                     }
                     break;
                 }
                 default: {
                     // EXPANSION_TYPE_ORGINAL
                     this->free_gradient(x, g, gf);
-                    this->blas.axpby(n_dofs, -alpha_bar, gf, 1, x);
+                    this->blas->axpby(n_dofs, -alpha_bar, gf, 1, x);
                     this->project(x);
                     this->gradient(x, b, g);
                     this->free_gradient(x, g, gf);
-                    this->blas.copy(n_dofs, gf, p);
+                    this->blas->copy(n_dofs, gf, p);
                     break;
                 }
             }
@@ -219,22 +220,22 @@ namespace sfem {
 
             this->chopped_gradient(x, g, gc);
 
-            this->blas.zeros(n_dofs, Agc);
+            this->blas->zeros(n_dofs, Agc);
             apply_op(gc, Agc);
-            T alpha_cg = this->blas.dot(n_dofs, g, gc) / this->blas.dot(n_dofs, gc, Agc);
+            T alpha_cg = this->blas->dot(n_dofs, g, gc) / this->blas->dot(n_dofs, gc, Agc);
 
-            this->blas.axpby(n_dofs, -alpha_cg, gc, 1, x);
+            this->blas->axpby(n_dofs, -alpha_cg, gc, 1, x);
 
-            this->blas.axpby(n_dofs, -alpha_cg, Agc, 1, g);
+            this->blas->axpby(n_dofs, -alpha_cg, Agc, 1, g);
             this->free_gradient(x, g, gf);
 
-            this->blas.copy(n_dofs, gf, p);
+            this->blas->copy(n_dofs, gf, p);
         }
 
         void gradient(const T* const x, const T* const b, T* const g) {
-            this->blas.zeros(n_dofs, g);
+            this->blas->zeros(n_dofs, g);
             this->apply_op(x, g);
-            this->blas.axpby(n_dofs, -1, b, 1, g);
+            this->blas->axpby(n_dofs, -1, b, 1, g);
         }
 
         void monitor(const int iter, const T residual, const T rel_residual) {
@@ -261,16 +262,16 @@ namespace sfem {
             T alpha_feas = -1;  // maximal feasbile step
             T alpha_cg = -1;
 
-            T* g = this->blas.allocate(n_dofs);  // Gradient
-            T* p = this->blas.allocate(n_dofs);
-            T* Ap_or_Ag = this->blas.allocate(n_dofs);
-            T* gf_or_gc = this->blas.allocate(n_dofs);  // Free Gradient or Chopped Gradient
+            T* g = this->blas->allocate(n_dofs);  // Gradient
+            T* p = this->blas->allocate(n_dofs);
+            T* Ap_or_Ag = this->blas->allocate(n_dofs);
+            T* gf_or_gc = this->blas->allocate(n_dofs);  // Free Gradient or Chopped Gradient
 
             T alpha_bar = 1;
             if (expansion_type_ == EXPANSION_TYPE_ORGINAL) {
                 if (max_eig_ == 0) {
                     this->ensure_power_method();
-                    this->blas.values(n_dofs, 1, p);
+                    this->blas->values(n_dofs, 1, p);
                     max_eig_ = power_method->max_eigen_value(
                             apply_op, 10000, this->eigen_solver_tol, n_dofs, p, g);
 
@@ -284,12 +285,12 @@ namespace sfem {
             this->project(x);  // Make iterate feasible
             this->gradient(x, b, g);
 
-            T norm_g = this->blas.norm2(n_dofs, g);
+            T norm_g = this->blas->norm2(n_dofs, g);
             this->monitor(0, norm_g, 1);
             T norm_gp0 = norm_g;
 
             this->free_gradient(x, g, gf_or_gc);
-            this->blas.copy(n_dofs, gf_or_gc, p);
+            this->blas->copy(n_dofs, gf_or_gc, p);
 
             int count_cg_steps = 0;
             int count_expansion_steps = 0;
@@ -302,16 +303,16 @@ namespace sfem {
 
                 if (norm_gc <= this->gamma * norm_gf) {
                     alpha_feas = this->max_alpha(x, p);
-                    this->blas.zeros(n_dofs, Ap_or_Ag);
+                    this->blas->zeros(n_dofs, Ap_or_Ag);
                     this->apply_op(p, Ap_or_Ag);
-                    const T dot_pAp = this->blas.dot(n_dofs, p, Ap_or_Ag);
+                    const T dot_pAp = this->blas->dot(n_dofs, p, Ap_or_Ag);
 
                     if (dot_pAp < 0) {
                         fprintf(stderr, "[Warning][MPRGP] Detected negative curvature\n");
                         return SFEM_FAILURE;
                     }
 
-                    alpha_cg = this->blas.dot(n_dofs, g, p) / dot_pAp;
+                    alpha_cg = this->blas->dot(n_dofs, g, p) / dot_pAp;
 
                     if (alpha_cg <= alpha_feas) {
                         this->cg_step(alpha_cg, dot_pAp, Ap_or_Ag, p, g, gf_or_gc, x);
@@ -356,10 +357,10 @@ namespace sfem {
                 printf("#proportioning_steps\t%d\n", count_proportioning_steps);
             }
 
-            this->blas.destroy(g);
-            this->blas.destroy(p);
-            this->blas.destroy(Ap_or_Ag);
-            this->blas.destroy(gf_or_gc);
+            this->blas->destroy(g);
+            this->blas->destroy(p);
+            this->blas->destroy(Ap_or_Ag);
+            this->blas->destroy(gf_or_gc);
             return converged ? SFEM_SUCCESS : SFEM_FAILURE;
         }
     };

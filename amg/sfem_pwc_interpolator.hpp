@@ -19,10 +19,10 @@ namespace sfem {
         ptrdiff_t fine_dim{SFEM_PTRDIFF_INVALID};
         ptrdiff_t coarse_dim{SFEM_PTRDIFF_INVALID};
         bool transposed{false};
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -33,7 +33,7 @@ namespace sfem {
 
         // Internally allocates a workspace with same memory requirement as `a`
         // (this could be passed in as arg...)
-        std::shared_ptr<CooSymSpMV<R, T>> coarsen(const std::shared_ptr<CooSymSpMV<R, T>>& a);
+        std::shared_ptr<CooSym<R, T>> coarsen(const std::shared_ptr<CooSym<R, T>>& a);
 
         void pwc_interpolate(const T* const v_coarse, T* const v) {
             R* partition = partition_->data();

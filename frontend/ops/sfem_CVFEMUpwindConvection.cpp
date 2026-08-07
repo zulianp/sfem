@@ -1,11 +1,8 @@
 #include "sfem_CVFEMUpwindConvection.hpp"
-#include <mpi.h>
 #include "cvfem_operators.hpp"
 #include "smesh_mesh.hpp"
 
 #include "smesh_glob.hpp"
-
-#include "matrixio_array.h"
 
 namespace sfem {
 
@@ -25,32 +22,26 @@ namespace sfem {
         SFEM_READ_ENV(SFEM_VELZ, );
 
         if (!SFEM_VELX || !SFEM_VELY || (!SFEM_VELZ && space->mesh_ptr()->spatial_dimension() == 3)) {
-            // fprintf(stderr,
-            //         "No input velocity in env: SFEM_VELX=%s\n,SFEM_VELY=%s\n,SFEM_VELZ=%s\n",
-            //         SFEM_VELX,
-            //         SFEM_VELY,
-            //         SFEM_VELZ);
             ret->element_type = (smesh::ElemType)space->element_type();
             return ret;
         }
 
-        ptrdiff_t nlocal, nglobal;
+        auto read_velocity = [](const char *const path) -> std::shared_ptr<Buffer<real_t>> {
+            return path ? Buffer<real_t>::from_file(smesh::Path(path)) : nullptr;
+        };
 
-        real_t *vel0, *vel1, *vel2;
-        if (array_create_from_file(
-                    space->mesh_ptr()->comm()->get(), SFEM_VELX, SFEM_MPI_REAL_T, (void **)&vel0, &nlocal, &nglobal) ||
-            array_create_from_file(
-                    space->mesh_ptr()->comm()->get(), SFEM_VELY, SFEM_MPI_REAL_T, (void **)&vel1, &nlocal, &nglobal) ||
-            array_create_from_file(
-                    space->mesh_ptr()->comm()->get(), SFEM_VELZ, SFEM_MPI_REAL_T, (void **)&vel2, &nlocal, &nglobal)) {
+        auto vel0 = read_velocity(SFEM_VELX);
+        auto vel1 = read_velocity(SFEM_VELY);
+        auto vel2 = read_velocity(SFEM_VELZ);
+        if (!vel0 || !vel1 || !vel2) {
             fprintf(stderr, "Unable to read input velocity\n");
             assert(0);
             return nullptr;
         }
 
-        ret->vel[0] = sfem::manage_host_buffer<real_t>(nlocal, vel0);
-        ret->vel[1] = sfem::manage_host_buffer<real_t>(nlocal, vel1);
-        ret->vel[2] = sfem::manage_host_buffer<real_t>(nlocal, vel2);
+        ret->vel[0] = vel0;
+        ret->vel[1] = vel1;
+        ret->vel[2] = vel2;
 
         return ret;
     }

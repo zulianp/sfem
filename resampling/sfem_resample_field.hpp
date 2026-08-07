@@ -6,13 +6,12 @@
 #include "hyteg.hpp"
 
 #include "bit_array.hpp"
+#include "mesh_utils.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace sfem {
 
 // typedef enum {
 //     smesh::TET4,
@@ -801,8 +800,6 @@ apply_fun_to_mesh(const ptrdiff_t                    nnodes,    // Mesh
                   const function_XYZ_t               fun,       // Function
                   real_t* const SFEM_RESTRICT        weighted_field);  //   Output (weighted field)
 
-#ifdef __cplusplus
-}
-#endif
+}  // namespace sfem
 
 #endif  // SFEM_RESAMPLE_FIELD_H

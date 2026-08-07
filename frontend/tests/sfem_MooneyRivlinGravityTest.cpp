@@ -11,7 +11,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_bsr_SpMV.hpp"
+#include "sfem_BSR.hpp"
 #include "sfem_test.hpp"
 #include "smesh_sideset.hpp"
 
@@ -650,7 +650,6 @@ void export_hemisphere_obstacle_mesh(const smesh::Path& output_dir,
 }
 
 int test_mooney_rivlin_gravity() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     int SFEM_BASE_RESOLUTION = 4;
@@ -660,14 +659,14 @@ int test_mooney_rivlin_gravity() {
     const char*                 mesh_path = getenv("SFEM_MESH");
     if (mesh_path && mesh_path[0] != '\0') {
         printf("Loading mesh from: %s\n", mesh_path);
-        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(mesh_path));
+        mesh = sfem::Mesh::create_from_file(sfem::Communicator::world(), smesh::Path(mesh_path));
     } else {
         // Default cube mesh with configurable initial gap
         real_t SFEM_INIT_GAP = 0.05;  // Default gap above contact plane
         SFEM_READ_ENV(SFEM_INIT_GAP, atof);
 
         printf("Creating default cube mesh with SFEM_INIT_GAP=%.4f\n", SFEM_INIT_GAP);
-        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                             SFEM_BASE_RESOLUTION,
                                             SFEM_BASE_RESOLUTION,
                                             SFEM_BASE_RESOLUTION,  // Grid
@@ -762,7 +761,7 @@ int test_mooney_rivlin_gravity() {
 
         if (g_prony.size() != tau_prony.size()) {
             printf("Error: SFEM_PRONY_G and SFEM_PRONY_TAU must have the same number of terms!\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
+            exit(EXIT_FAILURE);
         }
 
         printf("Prony series from environment: %zu terms\n", g_prony.size());

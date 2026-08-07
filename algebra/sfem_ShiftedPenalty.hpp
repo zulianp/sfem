@@ -39,18 +39,18 @@ namespace sfem {
         int       iterations() const override { return iterations_; }
 
         ExecutionSpace                        execution_space_{EXECUTION_SPACE_INVALID};
-        SharedBuffer<T>            upper_bound_;
-        SharedBuffer<T>            lower_bound_;
+        SharedBuffer<T>                       upper_bound_;
+        SharedBuffer<T>                       lower_bound_;
         std::shared_ptr<Operator<T>>          constraints_op_;
         std::shared_ptr<Operator<T>>          constraints_op_transpose_;
         std::shared_ptr<SparseBlockVector<T>> constraints_op_x_op_;
         std::shared_ptr<Operator<T>>          apply_op;
 
-        BLAS_Tpl<T>           blas;
+        std::shared_ptr<BLAS<T>> blas;
         ShiftedPenalty_Tpl<T> impl;
 
         std::shared_ptr<MatrixFreeLinearSolver<T>> linear_solver_;
-        SharedBuffer<T> lagr_lb, lagr_ub;
+        SharedBuffer<T>                            lagr_lb, lagr_ub;
 
         ExecutionSpace        execution_space() const override { return execution_space_; }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
@@ -91,17 +91,18 @@ namespace sfem {
         bool good() const {
             assert(apply_op);
             assert(lower_bound_ || upper_bound_);
-            return blas.good() && apply_op && (lower_bound_ || upper_bound_);
+            return blas->good() && apply_op && (lower_bound_ || upper_bound_);
         }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             OpenMP_ShiftedPenalty<T>::build(impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         SharedBuffer<T> make_buffer(const ptrdiff_t n) const {
-            return Buffer<T>::own(n, blas.allocate(n), blas.destroy, (enum MemorySpace)execution_space());
+            auto blas_impl = blas;
+            return Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); }, (enum MemorySpace)execution_space());
         }
         int apply(const T* const b, T* const x) override {
             assert(good());
@@ -146,11 +147,11 @@ namespace sfem {
                     if (constraints_op_) {
                         if (debug) printf("Residual\n");
                         // Use r_pen as temp buffer
-                        blas.zeros(n_constrained_dofs, r_pen->data());
+                        blas->zeros(n_constrained_dofs, r_pen->data());
                         constraints_op_->apply(x, r_pen->data());
 
                         // Use c as temp buffer
-                        blas.zeros(n_constrained_dofs, c->data());
+                        blas->zeros(n_constrained_dofs, c->data());
                         impl.calc_r_pen(n_constrained_dofs,
                                         r_pen->data(),
                                         penalty_param_,
@@ -161,28 +162,28 @@ namespace sfem {
                                         c->data());
 
                         if (debug) {
-                            const T norm_pen = blas.norm2(n_constrained_dofs, c->data());
+                            const T norm_pen = blas->norm2(n_constrained_dofs, c->data());
                             printf("norm_pen (pre): %g\n", (double)norm_pen);
                         }
 
-                        blas.zeros(n_dofs, r_pen->data());
+                        blas->zeros(n_dofs, r_pen->data());
                         apply_op->apply(x, r_pen->data());
-                        blas.axpby(n_dofs, 1, b, -1, r_pen->data());
+                        blas->axpby(n_dofs, 1, b, -1, r_pen->data());
 
                         if (debug) printf("Convergence\n");
                         constraints_op_transpose_->apply(c->data(), r_pen->data());
 
                         if (debug) {
-                            const T norm_pen = blas.norm2(n_dofs, r_pen->data());
+                            const T norm_pen = blas->norm2(n_dofs, r_pen->data());
                             printf("norm_pen: %g\n", (double)norm_pen);
                         }
 
                     } else {
-                        blas.zeros(n_dofs, r_pen->data());
+                        blas->zeros(n_dofs, r_pen->data());
 
                         // Compute material residual
                         apply_op->apply(x, r_pen->data());
-                        blas.axpby(n_dofs, 1, b, -1, r_pen->data());
+                        blas->axpby(n_dofs, 1, b, -1, r_pen->data());
 
                         // Compute penalty residual
                         impl.calc_r_pen(n_dofs,
@@ -195,7 +196,7 @@ namespace sfem {
                                         r_pen->data());
                     }
 
-                    const T r_pen_norm = blas.norm2(n_dofs, r_pen->data());
+                    const T r_pen_norm = blas->norm2(n_dofs, r_pen->data());
 
                     if (r_pen_norm < std::max(atol, omega) && inner_iter != 0) {
                         break;
@@ -203,22 +204,22 @@ namespace sfem {
 
                     if (enable_steepest_descent_) {
                         // alpha = <r, r>/<A r, r>
-                        blas.zeros(n_dofs, c->data());
+                        blas->zeros(n_dofs, c->data());
                         apply_op->apply(r_pen->data(), c->data());
 
                         const T alpha =
-                                blas.dot(n_dofs, r_pen->data(), r_pen->data()) / blas.dot(n_dofs, r_pen->data(), c->data());
+                                blas->dot(n_dofs, r_pen->data(), r_pen->data()) / blas->dot(n_dofs, r_pen->data(), c->data());
 
-                        blas.axpby(n_dofs, alpha, r_pen->data(), 1, x);
+                        blas->axpby(n_dofs, alpha, r_pen->data(), 1, x);
                     } else {
                         if (constraints_op_) {
                             if (debug) printf("Jacobian\n");
 
                             // Use c as a temp buffer
-                            blas.zeros(n_constrained_dofs, c->data());
+                            blas->zeros(n_constrained_dofs, c->data());
                             constraints_op_->apply(x, c->data());
 
-                            blas.zeros(n_constrained_dofs, J_pen->data());
+                            blas->zeros(n_constrained_dofs, J_pen->data());
                             impl.calc_J_pen(n_constrained_dofs,
                                             c->data(),
                                             penalty_param_,
@@ -228,10 +229,14 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            linear_solver_->set_op_and_diag_shift(apply_op, constraints_op_x_op_, J_pen);
+                            linear_solver_->set_op_and_diag_shift(
+                                    apply_op +
+                                            sfem::create_sparse_block_vector_mult(apply_op->rows(), constraints_op_x_op_, J_pen),
+                                    constraints_op_x_op_,
+                                    J_pen);
 
                         } else {
-                            blas.zeros(n_dofs, J_pen->data());
+                            blas->zeros(n_dofs, J_pen->data());
 
                             impl.calc_J_pen(n_dofs,
                                             x,
@@ -242,10 +247,10 @@ namespace sfem {
                                             lagr_ub ? lagr_ub->data() : nullptr,
                                             J_pen->data());
 
-                            linear_solver_->set_op_and_diag_shift(apply_op, J_pen);
+                            linear_solver_->set_op_and_diag_shift(apply_op + sfem::diag_op(J_pen, execution_space()), J_pen);
                         }
 
-                        blas.zeros(n_dofs, c->data());
+                        blas->zeros(n_dofs, c->data());
                         linear_solver_->apply(r_pen->data(), c->data());
 
                         count_linear_solver_iter += linear_solver_->iterations();
@@ -260,9 +265,9 @@ namespace sfem {
                                                   lagr_lb ? lagr_lb->data() : nullptr,
                                                   lagr_ub ? lagr_ub->data() : nullptr);
 
-                            blas.axpy(n_dofs, alpha, c->data(), x);
+                            blas->axpy(n_dofs, alpha, c->data(), x);
                         } else {
-                            blas.axpy(n_dofs, damping_, c->data(), x);
+                            blas->axpy(n_dofs, damping_, c->data(), x);
                         }
                     }
                 }
@@ -270,7 +275,7 @@ namespace sfem {
                 auto Tx = x;
 
                 if (constraints_op_) {
-                    blas.zeros(n_constrained_dofs, c->data());
+                    blas->zeros(n_constrained_dofs, c->data());
                     constraints_op_->apply(x, c->data());
                     Tx = c->data();
                 }
@@ -279,10 +284,11 @@ namespace sfem {
                                 ((lb) ? impl.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
 
                 const T norm_pen  = std::sqrt(e_pen);
-                const T norm_rpen = blas.norm2(n_dofs, r_pen->data());
+                const T norm_rpen = blas->norm2(n_dofs, r_pen->data());
 
                 if (norm_pen < penetration_tol) {
-                    // FIXME check if the lagrange mult update makes sense (the distance should probably be the one before the correction)
+                    // FIXME check if the lagrange mult update makes sense (the distance should probably be the one before the
+                    // correction)
                     if (ub) impl.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
                     if (lb) impl.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
 
@@ -292,11 +298,11 @@ namespace sfem {
                     count_lagr_mult_updates++;
 
                     if (debug && ub) {
-                        printf("lagr_ub: %e\n", blas.norm2(n_constrained_dofs, lagr_ub->data()));
+                        printf("lagr_ub: %e\n", blas->norm2(n_constrained_dofs, lagr_ub->data()));
                     }
 
                     if (debug && lb) {
-                        printf("lagr_lb: %e\n", blas.norm2(n_constrained_dofs, lagr_lb->data()));
+                        printf("lagr_lb: %e\n", blas->norm2(n_constrained_dofs, lagr_lb->data()));
                     }
 
                 } else {
@@ -337,8 +343,8 @@ namespace sfem {
             auto temp = make_buffer(n_dofs);
             apply_op->apply(x, temp->data());
 
-            const T xtAx = blas.dot(n_dofs, x, temp->data());
-            const T xtb  = blas.dot(n_dofs, x, b);
+            const T xtAx = blas->dot(n_dofs, x, temp->data());
+            const T xtb  = blas->dot(n_dofs, x, b);
 
             T alpha  = 2;
             T energy = 0;

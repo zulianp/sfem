@@ -6,8 +6,8 @@
 
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_crs_SpMV.hpp"
-#include "spmv.hpp"
+#include "sfem_CRS.hpp"
+
 
 #include "matrixio_array.h"
 
@@ -27,14 +27,13 @@ namespace smesh {
 #endif
 
 int test_amg_poisson() {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     int SFEM_MESH_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_MESH_RESOLUTION * 1,
                                           SFEM_MESH_RESOLUTION * 1,
                                           SFEM_MESH_RESOLUTION * 1,
@@ -94,14 +93,13 @@ int test_amg_poisson() {
 }
 
 int test_amg_sqp() {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
 
     int SFEM_MESH_RESOLUTION = 4;
     SFEM_READ_ENV(SFEM_MESH_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_MESH_RESOLUTION * 1,
                                           SFEM_MESH_RESOLUTION * 1,
                                           SFEM_MESH_RESOLUTION * 1,

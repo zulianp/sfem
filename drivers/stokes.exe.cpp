@@ -10,9 +10,6 @@
 #include <sys/types.h>
 // #include <unistd.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
 
 
@@ -117,16 +114,8 @@ static void node_eval_f3D(const ptrdiff_t nnodes,
 
 //////////////////////////////////////////////
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_stokes(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -139,7 +128,7 @@ int main(int argc, char *argv[]) {
     const char *output_folder = argv[2];
     smesh::create_directory(output_folder);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -147,7 +136,7 @@ int main(int argc, char *argv[]) {
 
     const char *folder = argv[1];
 
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto mesh = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
 
     // Optional params
     real_t SFEM_MU = 1;
@@ -162,7 +151,7 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_AOS, atoi);
     SFEM_READ_ENV(SFEM_DIRICHLET_NODES, );
 
-    if (rank == 0) {
+    if (!comm->rank()) {
         printf(
             "----------------------------------------\n"
             "Options:\n"
@@ -178,7 +167,7 @@ int main(int argc, char *argv[]) {
             SFEM_DIRICHLET_NODES);
     }
 
-    double tack = MPI_Wtime();
+    double tack = smesh::time_seconds();
     printf("stokes.c: read\t\t%g seconds\n", tack - tick);
 
     ptrdiff_t nnz = 0;
@@ -188,7 +177,7 @@ int main(int argc, char *argv[]) {
         mesh->element_type(0), mesh->n_elements(), mesh->n_nodes(), mesh->elements(0)->data(), &rowptr, &colidx);
     nnz = rowptr[mesh->n_nodes()];
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("stokes.c: build crs graph\t\t%g seconds\n", tock - tack);
     tack = tock;
 
@@ -270,14 +259,12 @@ int main(int argc, char *argv[]) {
         smesh::crs_graph_block_to_scalar(mesh->n_nodes(), n_vars, rowptr, colidx, b_rowptr, b_colidx);
 
         if (SFEM_DIRICHLET_NODES) {
-            idx_t *dirichlet_nodes = 0;
-            ptrdiff_t _nope_, nn;
-            array_create_from_file(comm,
-                                   SFEM_DIRICHLET_NODES,
-                                   SFEM_MPI_IDX_T,
-                                   (void **)&dirichlet_nodes,
-                                   &_nope_,
-                                   &nn);
+            auto dirichlet_buf = sfem::Buffer<idx_t>::from_file(smesh::Path(SFEM_DIRICHLET_NODES));
+            if (!dirichlet_buf) {
+                SFEM_ERROR("Failed to read dirichlet nodes from %s\n", SFEM_DIRICHLET_NODES);
+            }
+            idx_t    *dirichlet_nodes = dirichlet_buf->data();
+            ptrdiff_t nn              = dirichlet_buf->size();
 
             for (int d = 0; d < sdim; d++) {
                 constraint_nodes_to_value_vec(nn, dirichlet_nodes, n_vars, d, 0, rhs);
@@ -304,29 +291,20 @@ int main(int argc, char *argv[]) {
         }
 
         {
-            crs_t crs_out;
-            crs_out.rowptr = (char *)b_rowptr;
-            crs_out.colidx = (char *)b_colidx;
-            crs_out.values = (char *)values;
-            crs_out.grows = mesh->n_nodes() * n_vars;
-            crs_out.lrows = mesh->n_nodes() * n_vars;
-            crs_out.lnnz = b_rowptr[mesh->n_nodes() * n_vars];
-            crs_out.gnnz = b_rowptr[mesh->n_nodes() * n_vars];
-            crs_out.start = 0;
-            crs_out.rowoffset = 0;
-            crs_out.rowptr_type = SFEM_MPI_COUNT_T;
-            crs_out.colidx_type = SFEM_MPI_IDX_T;
-            crs_out.values_type = SFEM_MPI_REAL_T;
-
-            crs_write_folder(comm, output_folder, &crs_out);
+            const ptrdiff_t scalar_rows = mesh->n_nodes() * n_vars;
+            const count_t   scalar_nnz  = b_rowptr[scalar_rows];
+            auto rowptr_buf = sfem::Buffer<count_t>::wrap(scalar_rows + 1, b_rowptr);
+            auto colidx_buf = sfem::Buffer<idx_t>::wrap(scalar_nnz, b_colidx);
+            auto values_buf = sfem::Buffer<real_t>::wrap(scalar_nnz, values);
+            auto crs        = sfem::h_crs_spmv<count_t, idx_t, real_t>(
+                    scalar_rows, scalar_rows, rowptr_buf, colidx_buf, values_buf, (real_t)1);
+            crs->to_file(smesh::Path(output_folder));
         }
 
         {
             char path[1024 * 10];
-            // Write rhs vectors
             snprintf(path, sizeof(path), "%s/rhs.raw", output_folder);
-            array_write(
-                comm, path, SFEM_MPI_REAL_T, rhs, mesh->n_nodes() * n_vars, mesh->n_nodes() * n_vars);
+            sfem::Buffer<real_t>::wrap(mesh->n_nodes() * n_vars, rhs)->to_file(smesh::Path(path));
         }
 
         free(b_rowptr);
@@ -387,7 +365,7 @@ int main(int argc, char *argv[]) {
                                          rhs);
         }
 
-        tock = MPI_Wtime();
+        tock = smesh::time_seconds();
         printf("stokes.c: assembly\t\t%g seconds\n", tock - tack);
         tack = tock;
 
@@ -396,14 +374,12 @@ int main(int argc, char *argv[]) {
         ///////////////////////////////////////////////////////////////////////////////
 
         if (SFEM_DIRICHLET_NODES) {
-            idx_t *dirichlet_nodes = 0;
-            ptrdiff_t _nope_, nn;
-            array_create_from_file(comm,
-                                   SFEM_DIRICHLET_NODES,
-                                   SFEM_MPI_IDX_T,
-                                   (void **)&dirichlet_nodes,
-                                   &_nope_,
-                                   &nn);
+            auto dirichlet_buf = sfem::Buffer<idx_t>::from_file(smesh::Path(SFEM_DIRICHLET_NODES));
+            if (!dirichlet_buf) {
+                SFEM_ERROR("Failed to read dirichlet nodes from %s\n", SFEM_DIRICHLET_NODES);
+            }
+            idx_t    *dirichlet_nodes = dirichlet_buf->data();
+            ptrdiff_t nn              = dirichlet_buf->size();
 
             for (int d = 0; d < sdim; d++) {
                 constraint_nodes_to_value(nn, dirichlet_nodes, 0, rhs[d]);
@@ -436,7 +412,7 @@ int main(int argc, char *argv[]) {
             assert(0);
         }
 
-        tock = MPI_Wtime();
+        tock = smesh::time_seconds();
         printf("stokes.c: boundary\t\t%g seconds\n", tock - tack);
         tack = tock;
 
@@ -445,44 +421,31 @@ int main(int argc, char *argv[]) {
         ///////////////////////////////////////////////////////////////////////////////
 
         {
-            // Write block CRS matrix
-            block_crs_t crs_out;
-            crs_out.rowptr = (char *)rowptr;
-            crs_out.colidx = (char *)colidx;
-
-            crs_out.block_size = n_vars * n_vars;
-            crs_out.values = (char **)values;
-            crs_out.grows = mesh->n_nodes();
-            crs_out.lrows = mesh->n_nodes();
-            crs_out.lnnz = nnz;
-            crs_out.gnnz = nnz;
-            crs_out.start = 0;
-            crs_out.rowoffset = 0;
-            crs_out.rowptr_type = SFEM_MPI_COUNT_T;
-            crs_out.colidx_type = SFEM_MPI_IDX_T;
-            crs_out.values_type = SFEM_MPI_REAL_T;
-
             char path_rowptr[1024 * 10];
             snprintf(path_rowptr, sizeof(path_rowptr), "%s/rowptr.raw", output_folder);
 
             char path_colidx[1024 * 10];
             snprintf(path_colidx, sizeof(path_colidx), "%s/colidx.raw", output_folder);
 
-            char format_values[1024 * 10];
-            snprintf(format_values, sizeof(format_values), "%s/values.%%d.raw", output_folder);
-            block_crs_write(comm, path_rowptr, path_colidx, format_values, &crs_out);
+            sfem::Buffer<count_t>::wrap(mesh->n_nodes() + 1, rowptr)->to_file(smesh::Path(path_rowptr));
+            sfem::Buffer<idx_t>::wrap(nnz, colidx)->to_file(smesh::Path(path_colidx));
+
+            char path[1024 * 10];
+            for (int d = 0; d < n_vars * n_vars; d++) {
+                snprintf(path, sizeof(path), "%s/values.%d.raw", output_folder, d);
+                sfem::Buffer<real_t>::wrap(nnz, values[d])->to_file(smesh::Path(path));
+            }
         }
 
         {
             char path[1024 * 10];
-            // Write rhs vectors
             for (int d = 0; d < n_vars; d++) {
                 snprintf(path, sizeof(path), "%s/rhs.%d.raw", output_folder, d);
-                array_write(comm, path, SFEM_MPI_REAL_T, rhs[d], mesh->n_nodes(), mesh->n_nodes());
+                sfem::Buffer<real_t>::wrap(mesh->n_nodes(), rhs[d])->to_file(smesh::Path(path));
             }
         }
 
-        tock = MPI_Wtime();
+        tock = smesh::time_seconds();
         printf("stokes.c: write\t\t%g seconds\n", tock - tack);
         tack = tock;
 
@@ -518,12 +481,17 @@ int main(int argc, char *argv[]) {
 
 
 
-    tock = MPI_Wtime();
-    if (!rank) {
+    tock = smesh::time_seconds();
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld #nz %ld\n", (long)nelements, (long)nnodes, (long)nnz);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_stokes(ctx->communicator(), argc, argv);
 }

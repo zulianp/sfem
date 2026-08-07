@@ -33,17 +33,17 @@ namespace sfem {
      * - Multiple matrix formats (CRS, BSR, diagonal)
      * - Level-of-refinement (LOR) and derefinement
      * - Performance optimization with precomputed Jacobians
-         * - Multi-domain operations via MultiDomainOp
-         * - Semi-structured Proteus hex (same paths as former @c ss:LinearElasticity): @c apply /
-         *   @c gradient / @c hessian_bsr / @c hessian_diag / @c hessian_block_diag_sym when
-         *   @c has_semi_structured_mesh() and @c is_semistructured_type(element_type).
-         */
+     * - Multi-domain operations via MultiDomainOp
+     * - Semi-structured Proteus hex (same paths as former @c ss:LinearElasticity): @c apply /
+     *   @c gradient / @c hessian_bsr / @c hessian_diag / @c hessian_block_diag_sym when
+     *   @c has_semi_structured_mesh() and @c is_semistructured_type(element_type).
+     */
     class LinearElasticity final : public Op {
     public:
         const char *name() const override { return "LinearElasticity"; }
         inline bool is_linear() const override { return true; }
-        ptrdiff_t  n_dofs_domain() const override;
-        ptrdiff_t  n_dofs_image() const override;
+        ptrdiff_t   n_dofs_domain() const override;
+        ptrdiff_t   n_dofs_image() const override;
 
         /**
          * @brief Create a LinearElasticity operator
@@ -122,9 +122,16 @@ namespace sfem {
         int hessian_diag(const real_t *const, real_t *const out) override;
 
         // Vector operations
-        int                 gradient(const real_t *const x, real_t *const out) override;
-        int                 apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override;
-        int                 value(const real_t *x, real_t *const out) override;
+        int gradient(const real_t *const x, real_t *const out) override;
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override;
+        int value(const real_t *x, real_t *const out) override;
+
+        int value_steps(const real_t       *x,
+                        const real_t       *h,
+                        const int           nsteps,
+                        const real_t *const steps,
+                        real_t *const       out) override;
+
         int                 report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;
 
@@ -133,6 +140,11 @@ namespace sfem {
 
         /// @c "ASSUME_AFFINE" is kept for API compatibility (stored; apply path is adjugate iff Jacobian cache exists).
         void set_option(const std::string &name, bool val) override;
+
+#ifdef SFEM_ENABLE_RYAML
+        std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                             const ryml::ConstNodeRef             &node) override;
+#endif  // SFEM_ENABLE_RYAML
 
     private:
         class Impl;

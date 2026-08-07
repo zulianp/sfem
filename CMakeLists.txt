@@ -12,6 +12,7 @@ project(
 
 # Std CMake imports
 include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
 # Our CMake imports
 include(cmake/SFEMCompilerFeatures.cmake)
@@ -34,15 +35,18 @@ endif()
 
 find_package(MatrixIO REQUIRED)
 
-if(SFEM_ENABLE_ISOLVER)
-    find_package(ISolver REQUIRED)
-endif()
-
 set(SFEM_MODULES
     algebra base matrix 
+    algebra/coo
+    algebra/bsr
+    algebra/bsr_soa
     algebra/crs
+    algebra/dia
+    algebra/crs_x_bsr
     algebra/ell
+    algebra/mg
     algebra/openmp
+    algebra/parallel
     mesh 
     mesh/multiblock
     mesh/sshex8
@@ -55,6 +59,7 @@ set(SFEM_MODULES
     operators/cvfem_tet4
     operators/cvfem_tri3
     operators/edgeshell2
+    operators/edgeshell3
     operators/generic
     operators/hex8
     operators/hierarchical
@@ -122,7 +127,17 @@ list(APPEND SFEM_MODULES
 
 list(APPEND SFEM_MODULES 
     frontend
+    frontend/constraints
     frontend/ops
+    frontend/ops/generated
+    frontend/ops/generated/laplace
+    frontend/ops/generated/laplace/op
+    frontend/ops/generated/linear_elasticity
+    frontend/ops/generated/linear_elasticity/op
+    frontend/ops/generated/neohookean_ogden
+    frontend/ops/generated/neohookean_ogden/op
+    frontend/ops/generated/two_phase_flow
+    frontend/ops/generated/two_phase_flow/op
     frontend/mesh
 )
 
@@ -130,12 +145,12 @@ if(SFEM_ENABLE_METIS)
     list(APPEND SFEM_MODULES graphs)
 endif()
 
-if(SFEM_ENABLE_SCCD)
+if(SFEM_ENABLE_SCCD AND SFEM_ENABLE_SSDF)
     list(APPEND SFEM_MODULES frontend/collisions)
 endif()
 
 if(SFEM_ENABLE_SSDF)
-    list(APPEND SFEM_MODULES frontend/distances)
+    list(APPEND SFEM_MODULES frontend/distances frontend/contact)
 endif()
 
 if(SFEM_ENABLE_CUDA)
@@ -160,7 +175,7 @@ if(SFEM_ENABLE_CUDA)
     )
 
     if(SFEM_ENABLE_AMG)
-        list(APPEND SFEM_MODULES amg/cuda)
+        list(APPEND SFEM_MODULES amg/cuda amg/vector_amg)
     endif()
 endif()
 
@@ -182,6 +197,16 @@ foreach(MODULE ${SFEM_MODULES})
         list(APPEND SFEM_KERNEL_HEADERS "${SFEM_MODULE_KERNEL_HEADERS}")
     endif()
 endforeach(MODULE)
+
+file(GLOB_RECURSE SFEM_GENERATED_SOURCES CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cpp")
+file(GLOB_RECURSE SFEM_GENERATED_HEADERS CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.hpp")
+list(APPEND SFEM_SOURCES ${SFEM_GENERATED_SOURCES})
+list(APPEND SFEM_HEADERS ${SFEM_GENERATED_HEADERS})
+
+list(REMOVE_DUPLICATES SFEM_SOURCES)
+list(REMOVE_DUPLICATES SFEM_HEADERS)
 
 if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_SOURCES "${SFEM_KERNEL_SOURCES}")
@@ -216,14 +241,7 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
 
 
-option(SFEM_TET4_CUDA "Use CUDA for TET4" OFF)
-message(STATUS "SFEM_TET4_CUDA: ${SFEM_TET4_CUDA}")
 
-option(SFEM_TET10_CUDA "Use CUDA for TET10" OFF)
-message(STATUS "SFEM_TET10_CUDA: ${SFEM_TET10_CUDA}")
-
-option(SFEM_TET10_WENO "Use WENO for TET10" ON)
-message(STATUS "SFEM_TET10_WENO: ${SFEM_TET10_WENO}")
 
 add_library(sfem ${SFEM_SOURCES} ${SFEM_HEADERS})
 
@@ -281,24 +299,15 @@ if(SFEM_ENABLE_CODEGEN)
     # add_subdirectory(operators/generated)
 endif() 
 
-# option(SFEM_CUDA_ARCH "Use CUDA architecture" OFF)
-
-
 if(SFEM_ENABLE_CUDA)
-# set_target_properties(sfem PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-# https://gt3rs.medium.com/compile-with-nvcc-3566fbdfdbf
-      set(CMAKE_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
-      set_property(TARGET sfem PROPERTY CMAKE_CUDA_ARCHITECTURES ${SFEM_CUDA_ARCH})
-      # get_property(${TEST_CUDA_ARCH} TARGET sfem PROPERTY CMAKE_CUDA_ARCHITECTURES)
-
-      message(STATUS "SFEM_CUDA_ARCH: ${SFEM_CUDA_ARCH}")
+    message(STATUS "CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
 endif()
 
 ######################################################
 ######################################################
 # Executables
 
-list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech) 
+list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech verification)
 
 foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
     file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
@@ -309,15 +318,14 @@ endforeach()
 
 set(DRIVERS "${C_DRIVERS};${CPP_DRIVERS}")
 
-list(APPEND SFEM_EXCLUDED_EXEC "ssolve")
-
 if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
     # FIXME these executables need to be fixed when compiling with real_t=float32
-    list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
+    list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;taylor_hood_navier_stokes)
 endif()
 
-if(NOT ${SFEM_ENABLE_ISOLVER})
-     list (APPEND SFEM_EXCLUDED_EXEC heat_equation;heat_equation;linear_elasticity_assemble;neohookean_assemble;taylor_hood_navier_stokes)
+if(NOT SFEM_ENABLE_MPI)
+    # These drivers depend on distributed/MPI-only headers (e.g. smesh_distributed_aura.hpp)
+    list(APPEND SFEM_EXCLUDED_EXEC "partition")
 endif()
 
 if(SFEM_ENABLE_RESAMPLING)
@@ -335,13 +343,10 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
     list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
 else()
-    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;cuda_do_spmv;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
+    list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
 endif()
 
-if(NOT SFEM_ENABLE_CUSPARSE)
-    # FIXME
-    list(APPEND SFEM_EXCLUDED_EXEC "cuda_do_spmv")
-endif()
+
 
 foreach(DRIVER ${DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
@@ -360,18 +365,57 @@ foreach(DRIVER ${DRIVERS})
     endif()
 endforeach()
 
+if(SFEM_ENABLE_CUDA)
+    add_executable(bench_packed_laplacian_cuda
+        bench/cuda/bench_packed_laplacian.cpp
+        bench/cuda/bench_packed_laplacian.cu)
+    target_link_libraries(bench_packed_laplacian_cuda PRIVATE sfem)
+    # if(SFEM_ENABLE_OPENMP)
+    #     if(OPENMP_DIR)
+    #         target_compile_options(bench_packed_laplacian_cuda PRIVATE
+    #             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
+    #     elseif(OpenMP_CXX_FLAGS)
+    #         separate_arguments(SFEM_OPENMP_CXX_OPTIONS NATIVE_COMMAND "${OpenMP_CXX_FLAGS}")
+    #         foreach(SFEM_OPENMP_CXX_OPTION ${SFEM_OPENMP_CXX_OPTIONS})
+    #             target_compile_options(bench_packed_laplacian_cuda PRIVATE
+    #                 $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${SFEM_OPENMP_CXX_OPTION}>)
+    #         endforeach()
+    #     endif()
+    # endif()
+    list(APPEND SFEM_TARGETS bench_packed_laplacian_cuda)
+endif()
+
+# if(TARGET bench_hyperelasticity)
+#     target_sources(
+#         bench_hyperelasticity
+#         PRIVATE
+#             python/codegen/framework/prova/generated_neohookean_ogden_hex8_operator.cpp)
+#     target_include_directories(
+#         bench_hyperelasticity
+#         PRIVATE python/codegen/framework/prova)
+#     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+#         target_compile_options(bench_hyperelasticity PRIVATE -O3)
+#     endif()
+# endif()
+
 if(SFEM_ENABLE_TESTING)
     enable_testing()
 
     list(APPEND SFEM_UNIT_TESTS
+        algebra/crs/tests
+        algebra/bsr/tests
+        algebra/crs_x_bsr/tests
         operators/ssquad4/tests
         operators/sshex8/tests
         operators/stencil/tests
         mesh/tests
         frontend/tests
         ssmg/tests
-        amg/tests
     )
+
+    if(SFEM_ENABLE_AMG)
+        list(APPEND SFEM_UNIT_TESTS amg/tests)
+    endif()
 
     if(SFEM_ENABLE_CUDA)
         list(APPEND SFEM_UNIT_TESTS
@@ -379,7 +423,7 @@ if(SFEM_ENABLE_TESTING)
         )
     endif()
 
-    if(SFEM_ENABLE_SCCD)
+    if(SFEM_ENABLE_SCCD AND SFEM_ENABLE_SSDF)
         list(APPEND SFEM_UNIT_TESTS
             frontend/collisions/tests
         )
@@ -403,11 +447,42 @@ if(SFEM_ENABLE_TESTING)
 
     foreach(TEST_DRIVER ${TEST_DRIVERS})
         get_filename_component(TEST_DRIVER_NAME ${TEST_DRIVER} NAME_WE)
+        if(TEST_DRIVER_NAME STREQUAL "sfem_MaMALTest" AND NOT SFEM_ENABLE_SSDF)
+            continue()
+        endif()
+        if(TEST_DRIVER_NAME STREQUAL "sfem_TwoBodyContactTest" AND NOT SFEM_ENABLE_SCCD)
+            continue()
+        endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
         target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
         add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
         list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
+
+    if(TARGET sfem_MaMALTest)
+        target_include_directories(sfem_MaMALTest PRIVATE external/ssdf/serial ${CMAKE_CURRENT_BINARY_DIR}/external/ssdf)
+        if(TARGET ssdf)
+            target_link_libraries(sfem_MaMALTest PRIVATE ssdf)
+        endif()
+    endif()
+
+    if(SFEM_ENABLE_MPI)
+        add_executable(sfem_ParallelLaplacianApplyTest frontend/tests/mpi/sfem_ParallelLaplacianApplyTest.cpp)
+        target_link_libraries(sfem_ParallelLaplacianApplyTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelLaplacianApplyTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelLaplacianApplyTest>)
+        set_tests_properties(sfem_ParallelLaplacianApplyTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelLaplacianApplyTest)
+
+        add_executable(sfem_ParallelCGTest frontend/tests/mpi/sfem_ParallelCGTest.cpp)
+        target_link_libraries(sfem_ParallelCGTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelCGTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelCGTest>)
+        set_tests_properties(sfem_ParallelCGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelCGTest)
+    endif()
 endif()
 
 # if(SFEM_ENABLE_BENCHMARK)
@@ -503,17 +578,10 @@ endif()
 
 ######################################################
 
-if(TARGET cuda_do_spmv)
-    add_custom_command(TARGET cuda_do_spmv  POST_BUILD
+if(TARGET bench_spmv)
+    add_custom_command(TARGET bench_spmv POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy
-                           $<TARGET_FILE:cuda_do_spmv>
-                           cuspmv
-                       COMMENT "Copying 'cuda_do_spmv' executable to 'cuspmv'")
+                           $<TARGET_FILE:bench_spmv>
+                           spmv
+                       COMMENT "Copying 'bench_spmv' executable to 'spmv'")
 endif()
-
-
-add_custom_command(TARGET do_spmv  POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy
-                       $<TARGET_FILE:do_spmv>
-                       spmv
-                   COMMENT "Copying 'do_spmv' executable to 'spmv'")

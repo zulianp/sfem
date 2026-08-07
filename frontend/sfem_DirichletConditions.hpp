@@ -16,6 +16,10 @@
 #include "sfem_mask.hpp"
 #include "smesh_mesh.hpp"
 
+#ifdef SFEM_ENABLE_RYAML
+#include <ryml.hpp>
+#endif
+
 namespace sfem {
 
     class DirichletConditions final : public Constraint {
@@ -39,6 +43,11 @@ namespace sfem {
                                                                      const std::string                    &path);
         static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                                      std::string                           yaml);
+
+#ifdef SFEM_ENABLE_RYAML
+        static std::shared_ptr<DirichletConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                     const ryml::NodeRef                  &node);
+#endif
 
         static std::shared_ptr<DirichletConditions> create(const std::shared_ptr<FunctionSpace> &space,
                                                            const std::vector<struct Condition>  &conditions);

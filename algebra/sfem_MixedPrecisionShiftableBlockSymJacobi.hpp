@@ -14,7 +14,7 @@ namespace sfem {
     class MixedPrecisionShiftableBlockSymJacobi final : public ShiftableOperator<HP> {
     public:
         ExecutionSpace                  execution_space_{EXECUTION_SPACE_INVALID};
-        BLAS_Tpl<LP>                    blas;
+        std::shared_ptr<BLAS<LP>> blas;
         ShiftableBlockSymJacobi_Tpl<HP, LP> impl;
 
         SharedBuffer<HP>     diag;
@@ -25,7 +25,7 @@ namespace sfem {
         bool                            is_symmetric{true};
 
         void default_init() {
-            OpenMP_BLAS<LP>::build_blas(blas);
+            blas = make_openmp_blas<LP>();
             ShiftableBlockSymJacobi_OpenMP<HP, LP>::build(block_size, impl);
             execution_space_ = EXECUTION_SPACE_HOST;
         }
@@ -42,8 +42,9 @@ namespace sfem {
             diag                     = d;
             inv_diag                 = create_buffer<LP>(n_blocks * block_size * block_size, execution_space());
             impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
+            impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
-            blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
         }
 
         int shift(const SharedBuffer<HP>& d) override {
@@ -56,7 +57,7 @@ namespace sfem {
             impl.add_sym_diag_to_diag(n_blocks, d->data(), inv_diag->data());
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
-            blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
             return SFEM_SUCCESS;
         }
 
@@ -74,7 +75,7 @@ namespace sfem {
 
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
-            blas.scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
             return SFEM_SUCCESS;
         }
 

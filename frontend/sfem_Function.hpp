@@ -14,8 +14,6 @@
 
 #include "sfem_mask.hpp"
 
-// #include "isolver_function.h"
-
 #include "sfem_Operator.hpp"
 #include "sfem_aliases.hpp"
 
@@ -53,7 +51,7 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 
-    class Function final /* : public isolver::Function */ {
+    class Function final {
     public:
         Function(const std::shared_ptr<FunctionSpace> &space);
         ~Function();
@@ -81,6 +79,8 @@ namespace sfem {
         int hessian_crs(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values);
 
         int hessian_bsr(const real_t *const x, const count_t *const rowptr, const idx_t *const colidx, real_t *const values);
+
+        int hessian_dia(const real_t *const x, const int *const diag_offsets, const ptrdiff_t ndiag, real_t *const values);
 
         int hessian_bcrs_sym(const real_t *const  x,
                              const count_t *const rowptr,
@@ -121,6 +121,16 @@ namespace sfem {
         ExecutionSpace          execution_space() const;
 
         std::shared_ptr<Operator<real_t>> linear_op_variant(const std::vector<std::pair<std::string, int>> &opts);
+
+        double flops() const;
+        double flops_value() const;
+        double flops_gradient() const;
+        double flops_apply() const;
+
+        size_t memory_traffic_bytes() const;
+        size_t memory_traffic_bytes_value() const;
+        size_t memory_traffic_bytes_gradient() const;
+        size_t memory_traffic_bytes_apply() const;
 
         void describe(std::ostream &os) const;
 

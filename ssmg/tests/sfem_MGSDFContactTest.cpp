@@ -1,13 +1,13 @@
 #include <memory>
+#include <string>
 
 #include "sfem_test.hpp"
 
 #include "sfem_Function.hpp"
 
+#include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_crs_SpMV.hpp"
-#include "spmv.hpp"
 
 #include "matrixio_array.h"
 
@@ -21,55 +21,85 @@
 
 #include "sfem_ssmgc.hpp"
 
-#define SFEM_ENABLE_TOP_BC 1
+struct EnvOptions {
+    sfem::ExecutionSpace execution_space;
+    int                  base_resolution;
+    real_t               disp_y;
+    int                  enable_output;
+    int                  element_refine_level;
+    geom_t               y_top;
+    std::string          operator_name;
+    std::string          contact_case;
+    int                  use_spmg;
+    int                  enable_top_bc;
+    std::string          ssmgc_yaml;
+    int                  n_spheres;
+    int                  resolution_ratio;
 
-static const real_t disp_y = -0.05;
+    static EnvOptions read() {
+        EnvOptions ret{.execution_space      = sfem::EXECUTION_SPACE_HOST,
+                       .base_resolution      = smesh::Env::read("SFEM_BASE_RESOLUTION", int(1)),
+                       .disp_y               = smesh::Env::read("SFEM_DISP_Y", real_t(-0.05)),
+                       .enable_output        = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(1)),
+                       .element_refine_level = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", int(2)),
+                       .y_top                = smesh::Env::read("SFEM_Y_TOP", geom_t(0.05)),
+                       .operator_name        = smesh::Env::read_string("SFEM_OPERATOR", "LinearElasticity"),
+                       .contact_case         = smesh::Env::read_string("SFEM_CONTACT_CASE", "sphere"),
+                       .use_spmg             = smesh::Env::read("SFEM_USE_SPMG", int(1)),
+                       .enable_top_bc        = smesh::Env::read("SFEM_ENABLE_TOP_BC", int(0)),
+                       .ssmgc_yaml           = smesh::Env::read_string("SFEM_SSMGC_YAML", ""),
+                       .n_spheres            = smesh::Env::read("SFEM_N_SPHERES", int(2)),
+                       .resolution_ratio     = smesh::Env::read("SFEM_RESOLUTION_RATIO", int(20))};
 
-static const geom_t y_top            = 0.05;
-static const int    resolution_ratio = 20;
+        const std::string execution_space = smesh::Env::read_string("SFEM_EXECUTION_SPACE", "");
+        if (!execution_space.empty()) {
+            ret.execution_space = sfem::execution_space_from_string(execution_space.c_str());
+        }
 
-static const sfem::ExecutionSpace es_to_be_ported = sfem::EXECUTION_SPACE_HOST;
+        return ret;
+    }
+};
 
 std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::shared_ptr<sfem::Function> &f,
-                                                                     const int                              base_resolution) {
+                                                                     const EnvOptions                      &opts) {
     auto fs   = f->space();
     auto m    = fs->mesh_ptr();
     auto comm = m->comm();
     auto es   = f->execution_space();
+    const real_t disp_y           = opts.disp_y;
+    const geom_t y_top            = opts.y_top;
+    const int    resolution_ratio = opts.resolution_ratio;
 
-#if SFEM_ENABLE_TOP_BC
+    if (opts.enable_top_bc) {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+            return y > (y_top - 1e-5) && y < (y_top + 1e-5);
+        });
 
-    auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
-        return y > (y_top - 1e-5) && y < (y_top + 1e-5);
-    });
+        sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
-    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
+        auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
+        f->add_constraint(conds);
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
-    f->add_constraint(conds);
+    } else {
+        auto left_right = sfem::Sideset::create_from_selector(
+                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-#else
+        sfem::DirichletConditions::Condition x_bc{.sidesets = left_right, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition y_bc{.sidesets = left_right, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition z_bc{.sidesets = left_right, .value = 0, .component = 2};
 
-    auto left_right = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
-
-    sfem::DirichletConditions::Condition x_bc{.sidesets = left_right, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sidesets = left_right, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sidesets = left_right, .value = 0, .component = 2};
-
-    auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
-    f->add_constraint(conds);
-
-#endif
+        auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
+        f->add_constraint(conds);
+    }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
     assert(bottom_ss[0]->size() > 0);
 
-    const int n   = base_resolution * smesh::semistructured_level(fs->mesh());
+    const int n   = opts.base_resolution * smesh::semistructured_level(fs->mesh());
     auto      sdf = smesh::create_sdf(comm,
                                  n * resolution_ratio * 2,
                                  n * 1 * 2,
@@ -93,52 +123,50 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_sphere_contact(const std::
                                      return dd;
                                  });
 
-    int SFEM_ENABLE_OUTPUT = 1;
-    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
+    if (opts.enable_output) sdf->to_file(smesh::Path("test_contact/sdf"));
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, bottom_ss, es);
     return contact_conds;
 }
 
 std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std::shared_ptr<sfem::Function> &f,
-                                                                       const int                              base_resolution) {
+                                                                       const EnvOptions                      &opts) {
     auto fs   = f->space();
     auto m    = fs->mesh_ptr();
     auto comm = m->comm();
     auto es   = f->execution_space();
+    const real_t disp_y           = opts.disp_y;
+    const geom_t y_top            = opts.y_top;
+    const int    resolution_ratio = opts.resolution_ratio;
 
-#if SFEM_ENABLE_TOP_BC
+    if (opts.enable_top_bc) {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+            return y > (y_top - 1e-5) && y < (y_top + 1e-5);
+        });
 
-    auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
-        return y > (y_top - 1e-5) && y < (y_top + 1e-5);
-    });
+        sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
-    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
+        auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
+        f->add_constraint(conds);
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
-    f->add_constraint(conds);
+    } else {
+        auto ss = sfem::Sideset::create_from_selector(
+                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-#else
+        sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
 
-    auto ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
-
-    sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
-
-    auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
-    f->add_constraint(conds);
-
-#endif
+        auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
+        f->add_constraint(conds);
+    }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n   = base_resolution * smesh::semistructured_level(fs->mesh());
+    const int n   = opts.base_resolution * smesh::semistructured_level(fs->mesh());
     auto      sdf = smesh::create_sdf(comm,
                                  n * resolution_ratio * 2,
                                  n * 1 * 2,
@@ -173,55 +201,51 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_highfreq_contact(const std
                                      return obstacle - y;
                                  });
 
-    int SFEM_ENABLE_OUTPUT = 1;
-    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
+    if (opts.enable_output) sdf->to_file(smesh::Path("test_contact/sdf"));
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
 }
 
 std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const std::shared_ptr<sfem::Function> &f,
-                                                                          const int base_resolution) {
+                                                                          const EnvOptions                      &opts) {
     auto fs   = f->space();
     auto m    = fs->mesh_ptr();
     auto comm = m->comm();
     auto es   = f->execution_space();
+    const real_t disp_y = opts.disp_y;
+    const geom_t y_top  = opts.y_top;
 
-#if SFEM_ENABLE_TOP_BC
+    if (opts.enable_top_bc) {
+        auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
+            return y > (y_top - 1e-5) && y < (y_top + 1e-5);
+        });
 
-    auto top_ss = sfem::Sideset::create_from_selector(m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool {
-        return y > (y_top - 1e-5) && y < (y_top + 1e-5);
-    });
+        sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
 
-    sfem::DirichletConditions::Condition xtop{.sidesets = top_ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition ytop{.sidesets = top_ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition ztop{.sidesets = top_ss, .value = 0, .component = 2};
+        auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
+        f->add_constraint(conds);
 
-    auto conds = sfem::create_dirichlet_conditions(fs, {xtop, ytop, ztop}, es);
-    f->add_constraint(conds);
+    } else {
+        auto ss = sfem::Sideset::create_from_selector(
+                m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
 
-#else
+        sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
+        sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
 
-    auto ss = sfem::Sideset::create_from_selector(
-            m, [=](const geom_t x, const geom_t y, const geom_t z) -> bool { return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8; });
-
-    sfem::DirichletConditions::Condition x_bc{.sidesets = ss, .value = 0, .component = 0};
-    sfem::DirichletConditions::Condition y_bc{.sidesets = ss, .value = disp_y, .component = 1};
-    sfem::DirichletConditions::Condition z_bc{.sidesets = ss, .value = 0, .component = 2};
-
-    auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
-    f->add_constraint(conds);
-
-#endif
+        auto conds = sfem::create_dirichlet_conditions(fs, {x_bc, y_bc, z_bc}, es);
+        f->add_constraint(conds);
+    }
 
     auto bottom_ss = sfem::Sideset::create_from_selector(
             m, [=](const geom_t /*x*/, const geom_t y, const geom_t z) -> bool { return y > -1e-5 && y < 1e-5; });
 
-    const int n              = base_resolution * smesh::semistructured_level(fs->mesh());
-    int       SFEM_N_SPHERES = 2;
-    SFEM_READ_ENV(SFEM_N_SPHERES, atoi);
-    auto sdf = smesh::create_sdf(comm,
+    const int n         = opts.base_resolution * smesh::semistructured_level(fs->mesh());
+    const int n_spheres = opts.n_spheres;
+    auto      sdf       = smesh::create_sdf(comm,
                                  n * 5 * 2,
                                  n * 1 * 2,
                                  n * 5 * 2,
@@ -231,16 +255,16 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                  1.1,
                                  y_top * 0.5,
                                  1.1,
-                                 [SFEM_N_SPHERES](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                                 [n_spheres](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
                                      geom_t       dd = 1000000;
-                                     const geom_t hx = 1. / (SFEM_N_SPHERES + 1);
-                                     const geom_t hz = 1. / (SFEM_N_SPHERES + 1);
-                                     const geom_t hy = 1. / (SFEM_N_SPHERES + 1);
+                                     const geom_t hx = 1. / (n_spheres + 1);
+                                     const geom_t hz = 1. / (n_spheres + 1);
+                                     const geom_t hy = 1. / (n_spheres + 1);
 
-                                     for (int i = 0; i < SFEM_N_SPHERES; i++) {
-                                         for (int j = 0; j < SFEM_N_SPHERES; j++) {
+                                     for (int i = 0; i < n_spheres; i++) {
+                                         for (int j = 0; j < n_spheres; j++) {
                                              geom_t cx = hx + i * hx, cy = -0.1, cz = hz + j * hz;
-                                             geom_t radius = 1. / (8 + SFEM_N_SPHERES);
+                                             geom_t radius = 1. / (8 + n_spheres);
 
                                              const geom_t dx = cx - x;
                                              const geom_t dy = cy - y;
@@ -254,42 +278,28 @@ std::shared_ptr<sfem::ContactConditions> build_cuboid_multisphere_contact(const 
                                      return dd;
                                  });
 
-    int SFEM_ENABLE_OUTPUT = 1;
-    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-    if (SFEM_ENABLE_OUTPUT) sdf->to_file(smesh::Path("test_contact/sdf"));
+    if (opts.enable_output) sdf->to_file(smesh::Path("test_contact/sdf"));
 
     auto contact_conds = sfem::ContactConditions::create(fs, sdf, {bottom_ss}, es);
     return contact_conds;
 }
 
 int test_contact() {
-    MPI_Comm comm = MPI_COMM_WORLD;
+    auto             comm = sfem::Communicator::world();
+    const EnvOptions opts = EnvOptions::read();
 
-    int comm_size;
-    MPI_Comm_size(comm, &comm_size);
-
-    if (comm_size > 1) {
+    if (comm->size() > 1) {
         SFEM_ERROR("test_contact() can only be run in serial!\n");
     }
 
-    sfem::ExecutionSpace es = sfem::EXECUTION_SPACE_HOST;
+    const sfem::ExecutionSpace es = opts.execution_space;
+    const geom_t               y_top            = opts.y_top;
+    const int                  resolution_ratio = opts.resolution_ratio;
 
-    const char *SFEM_EXECUTION_SPACE{nullptr};
-    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
-    if (SFEM_EXECUTION_SPACE) {
-        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
-    }
-
-    int SFEM_BASE_RESOLUTION = 1;
-    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
-
-    int SFEM_ENABLE_OUTPUT = 1;
-    SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
-
-    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
-                                             SFEM_BASE_RESOLUTION * resolution_ratio,
-                                             SFEM_BASE_RESOLUTION * 1,
-                                             SFEM_BASE_RESOLUTION * resolution_ratio,
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
+                                             opts.base_resolution * resolution_ratio,
+                                             opts.base_resolution * 1,
+                                             opts.base_resolution * resolution_ratio,
                                              0,
                                              0,
                                              0,
@@ -297,11 +307,9 @@ int test_contact() {
                                              y_top,
                                              1);
 
-    int SFEM_ELEMENT_REFINE_LEVEL = 2;
-    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
-    SFEM_TEST_ASSERT(SFEM_ELEMENT_REFINE_LEVEL > 1);
+    SFEM_TEST_ASSERT(opts.element_refine_level > 1);
 
-    mesh                 = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, mesh, true, false);
+    mesh                 = smesh::to_semistructured(opts.element_refine_level, mesh, true, false);
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
 
@@ -316,26 +324,23 @@ int test_contact() {
 #endif
 
     auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, "LinearElasticity", es);
+    auto op = sfem::create_op(fs, opts.operator_name, es);
     op->initialize();
 
     f->add_operator(op);
 
-    if (SFEM_ENABLE_OUTPUT) smesh::create_directory("test_contact");
-
-    const char *SFEM_CONTACT_CASE = "sphere";
-    SFEM_READ_ENV(SFEM_CONTACT_CASE, );
+    if (opts.enable_output) smesh::create_directory("test_contact");
 
     std::shared_ptr<sfem::ContactConditions> contact_conds;
 
-    if (strcmp(SFEM_CONTACT_CASE, "hifreq") == 0) {
-        contact_conds = build_cuboid_highfreq_contact(f, SFEM_BASE_RESOLUTION);
-    } else if (strcmp(SFEM_CONTACT_CASE, "sphere") == 0) {
-        contact_conds = build_cuboid_sphere_contact(f, SFEM_BASE_RESOLUTION);
-    } else if (strcmp(SFEM_CONTACT_CASE, "multisphere") == 0) {
-        contact_conds = build_cuboid_multisphere_contact(f, SFEM_BASE_RESOLUTION);
+    if (opts.contact_case == "hifreq") {
+        contact_conds = build_cuboid_highfreq_contact(f, opts);
+    } else if (opts.contact_case == "sphere") {
+        contact_conds = build_cuboid_sphere_contact(f, opts);
+    } else if (opts.contact_case == "multisphere") {
+        contact_conds = build_cuboid_multisphere_contact(f, opts);
     } else {
-        SFEM_ERROR("SFEM_CONTACT_CASE=%s not valid!\n", SFEM_CONTACT_CASE);
+        SFEM_ERROR("SFEM_CONTACT_CASE=%s not valid!\n", opts.contact_case.c_str());
     }
 
     const ptrdiff_t ndofs = fs->n_dofs();
@@ -349,16 +354,11 @@ int test_contact() {
 
     f->apply_constraints(x->data());
 
-    int SFEM_USE_SPMG = 1;
-    SFEM_READ_ENV(SFEM_USE_SPMG, atoi);
-
-    if (SFEM_USE_SPMG) {
+    if (opts.use_spmg) {
         std::shared_ptr<sfem::Input> in;
-        const char                  *SFEM_SSMGC_YAML{nullptr};
-        SFEM_READ_ENV(SFEM_SSMGC_YAML, );
 
-        if (SFEM_SSMGC_YAML) {
-            in = sfem::YAMLNoIndent::create_from_file(SFEM_SSMGC_YAML);
+        if (!opts.ssmgc_yaml.empty()) {
+            in = sfem::YAMLNoIndent::create_from_file(opts.ssmgc_yaml.c_str());
         }
 
         auto solver = sfem::create_ssmgc(f, contact_conds, in);
@@ -368,7 +368,7 @@ int test_contact() {
         solver->apply(rhs->data(), x->data());
     }
 
-    if (SFEM_ENABLE_OUTPUT) {
+    if (opts.enable_output) {
         smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path("test_contact/mesh"));
 
         auto out = f->output();

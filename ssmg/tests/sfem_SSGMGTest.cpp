@@ -4,10 +4,10 @@
 
 #include "sfem_Function.hpp"
 
+#include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_crs_SpMV.hpp"
-#include "spmv.hpp"
+
 
 #include "matrixio_array.h"
 
@@ -53,7 +53,6 @@ int test_linear_problem(const std::shared_ptr<sfem::Function> &f, const smesh::P
 }
 
 int test_ssgmg_poisson_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -65,8 +64,8 @@ int test_ssgmg_poisson_cube() {
 
     const char *SFEM_OPERATOR = "Laplacian";
     // const char *SFEM_OPERATOR       = "em:Laplacian";
-    const char *SFEM_FINE_OP_TYPE   = MATRIX_FREE;
-    const char *SFEM_COARSE_OP_TYPE = MATRIX_FREE;
+    const char *SFEM_FINE_OP_TYPE   = sfem::op_type::MATRIX_FREE;
+    const char *SFEM_COARSE_OP_TYPE = sfem::op_type::MATRIX_FREE;
 
     int SFEM_ELEMENT_REFINE_LEVEL = 4;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
@@ -75,7 +74,7 @@ int test_ssgmg_poisson_cube() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
-    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
@@ -112,7 +111,6 @@ int test_ssgmg_poisson_cube() {
 }
 
 int test_ssgmg_linear_elasticity_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     const char *SFEM_EXECUTION_SPACE{nullptr};
@@ -123,8 +121,8 @@ int test_ssgmg_linear_elasticity_cube() {
     }
 
     const char *SFEM_OPERATOR       = "LinearElasticity";
-    const char *SFEM_FINE_OP_TYPE   = MATRIX_FREE;
-    const char *SFEM_COARSE_OP_TYPE = MATRIX_FREE;
+    const char *SFEM_FINE_OP_TYPE   = sfem::op_type::MATRIX_FREE;
+    const char *SFEM_COARSE_OP_TYPE = sfem::op_type::MATRIX_FREE;
 
     SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
     SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
@@ -136,7 +134,7 @@ int test_ssgmg_linear_elasticity_cube() {
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     geom_t Lx = 1;
-    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto   m  = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,

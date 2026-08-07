@@ -15,6 +15,7 @@
 #include <cstring>
 
 #include "sfem_API.hpp"
+#include "sfem_context.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
 
@@ -144,11 +145,10 @@ struct TestResult {
 TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double temperature) {
     printf("\n=== %s Viscoelastic Test ===\n", get_mode_name(mode));
     
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto es = sfem::EXECUTION_SPACE_HOST;
     
     auto mesh = sfem::Mesh::create_hex8_cube(
-        sfem::Communicator::wrap(comm),
+        sfem::Communicator::world(),
         1, 1, 1,
         0.0, 0.0, 0.0,
         1.0, 1.0, 1.0
@@ -286,7 +286,7 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
 }
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
+    auto context__ = sfem::initialize(argc, argv);
     
     printf("================================================================\n");
     printf("  MooneyRivlinVisco Excel Validation Test (with WLF TTS)\n");
@@ -503,6 +503,5 @@ for idx, mode in enumerate(modes):
     
     printf("\nTo generate plot, run:\n  python3 plot_visco_validation.py\n");
     
-    MPI_Finalize();
     return 0;
 }

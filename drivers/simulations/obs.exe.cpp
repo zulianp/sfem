@@ -4,10 +4,9 @@
 
 #include "sfem_Function.hpp"
 
+#include "sfem_CRS.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
-#include "sfem_crs_SpMV.hpp"
-#include "spmv.hpp"
 
 #include "matrixio_array.h"
 
@@ -85,7 +84,8 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
         f->add_constraint(dirichlet_conditions);
     }
 
-    auto sdf              = smesh::Grid<geom_t>::create_from_file(comm, sdf_path);
+    auto sdf = smesh::Grid<geom_t>::create_from_file(comm, sdf_path);
+    sdf->scale(smesh::Env::read("SFEM_SDF_SCALE", real_t(1.0)));
     auto contact_boundary = smesh::Sideset::create_from_file(comm, contact_boundary_path);
     auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
 

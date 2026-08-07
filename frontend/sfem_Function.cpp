@@ -2,13 +2,17 @@
 
 #include <stddef.h>
 
-#include "matrixio_array.h"
 #include "utils.h"
 
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
+#include "sfem_openmp_blas.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_blas.hpp"
+#endif
 
 #include "boundary_condition.hpp"
 #include "boundary_condition_io.hpp"
@@ -106,7 +110,6 @@ namespace sfem {
     int Output::write(const char *name, const real_t *const x) {
         SFEM_TRACE_SCOPE("Output::write");
 
-        MPI_Comm comm = impl_->space->mesh_ptr()->comm()->get();
         smesh::create_directory(impl_->output_dir.c_str());
 
         const int block_size = impl_->space->block_size();
@@ -148,7 +151,6 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Output::write_time_step");
 
         auto      space      = impl_->space;
-        auto      mesh       = space->mesh_ptr();
         const int block_size = space->block_size();
 
         smesh::create_directory(impl_->output_dir.c_str());
@@ -176,8 +178,7 @@ namespace sfem {
                          impl_->export_counter++,
                          smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
-                //  TODO
-                if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, buff->data(), n_blocks, n_blocks)) {
+                if (buff->to_file(smesh::Path(path))) {
                     return SFEM_FAILURE;
                 }
             }
@@ -191,7 +192,8 @@ namespace sfem {
                      impl_->export_counter++,
                      smesh::str(smesh::TypeToEnum<real_t>::value()).c_str());
 
-            if (array_write(mesh->comm()->get(), path, SFEM_MPI_REAL_T, x, space->n_dofs(), space->n_dofs())) {
+            auto out = Buffer<real_t>::wrap(space->n_dofs(), const_cast<real_t *>(x));
+            if (out->to_file(smesh::Path(path))) {
                 return SFEM_FAILURE;
             }
         }
@@ -255,14 +257,87 @@ namespace sfem {
     int Function::constraints_mask(mask_t *mask) {
         SFEM_TRACE_SCOPE("Function::constraints_mask");
 
+        int err = SFEM_SUCCESS;
         for (auto &c : impl_->constraints) {
-            c->mask(mask);
+            err += c->mask(mask);
         }
 
-        return SFEM_FAILURE;
+        return err == SFEM_SUCCESS ? SFEM_SUCCESS : SFEM_FAILURE;
     }
 
     std::shared_ptr<CRSGraph> Function::crs_graph() const { return impl_->space->dof_to_dof_graph(); }
+
+    double Function::flops() const {
+        double ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->flops();
+        }
+
+        return ret;
+    }
+
+    double Function::flops_value() const {
+        double ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->flops_value();
+        }
+
+        return ret;
+    }
+
+    double Function::flops_gradient() const {
+        double ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->flops_gradient();
+        }
+
+        return ret;
+    }
+
+    double Function::flops_apply() const {
+        double ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->flops_apply();
+        }
+
+        return ret;
+    }
+
+    size_t Function::memory_traffic_bytes() const {
+        size_t ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->memory_traffic_bytes();
+        }
+
+        return ret;
+    }
+
+    size_t Function::memory_traffic_bytes_value() const {
+        size_t ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->memory_traffic_bytes_value();
+        }
+
+        return ret;
+    }
+
+    size_t Function::memory_traffic_bytes_gradient() const {
+        size_t ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->memory_traffic_bytes_gradient();
+        }
+
+        return ret;
+    }
+
+    size_t Function::memory_traffic_bytes_apply() const {
+        size_t ret = 0;
+        for (const auto &op : impl_->ops) {
+            ret += op->memory_traffic_bytes_apply();
+        }
+
+        return ret;
+    }
 
     int Function::hessian_crs(const real_t *const  x,
                               const count_t *const rowptr,
@@ -302,6 +377,22 @@ namespace sfem {
         if (impl_->handle_constraints) {
             for (auto &c : impl_->constraints) {
                 c->hessian_bsr(x, rowptr, colidx, values);
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int Function::hessian_dia(const real_t *const x,
+                              const int *const    diag_offsets,
+                              const ptrdiff_t     ndiag,
+                              real_t *const       values) {
+        SFEM_TRACE_SCOPE("Function::hessian_dia");
+
+        for (auto &op : impl_->ops) {
+            if (op->hessian_dia(x, diag_offsets, ndiag, values) != SFEM_SUCCESS) {
+                std::cerr << "Failed hessian_dia in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
             }
         }
 
@@ -587,6 +678,8 @@ namespace sfem {
     }
 
     std::shared_ptr<Buffer<idx_t *>> mesh_connectivity_from_file(const std::shared_ptr<Communicator> &comm, const char *folder) {
+        (void)comm;
+
         char pattern[1024 * 10];
         snprintf(pattern, sizeof(pattern), "%s/i*.raw", folder);
 
@@ -598,7 +691,6 @@ namespace sfem {
         idx_t **data = (idx_t **)malloc(n_files * sizeof(idx_t *));
 
         ptrdiff_t local_size = SFEM_PTRDIFF_INVALID;
-        ptrdiff_t size       = SFEM_PTRDIFF_INVALID;
 
         printf("n_files (%d):\n", n_files);
         int err = 0;
@@ -609,7 +701,7 @@ namespace sfem {
             snprintf(path, sizeof(path), "%s/i%d.raw", folder, np);
 
             idx_t *idx = 0;
-            err |= array_create_from_file(comm->get(), path, SFEM_MPI_IDX_T, (void **)&idx, &local_size, &size);
+            err |= (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(path), &idx, &local_size) != SMESH_SUCCESS);
 
             data[np] = idx;
         }

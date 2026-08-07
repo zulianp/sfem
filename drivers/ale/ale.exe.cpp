@@ -30,7 +30,6 @@ static SFEM_INLINE void fvm_quad4_surface_vectors(const geom_t x0,
                                                   const geom_t y1,
                                                   const geom_t y2,
                                                   const geom_t y3,
-                                                  // Output (len 2)
                                                   scalar_t *const SFEM_RESTRICT sf0,
                                                   scalar_t *const SFEM_RESTRICT sf1,
                                                   scalar_t *const SFEM_RESTRICT sf2,
@@ -64,10 +63,7 @@ static SFEM_INLINE void fvm_quad4_surface_vectors(const geom_t x0,
     }
 }
 
-static SFEM_INLINE scalar_t fvm_quad4_convection_flux()
-{
-    return 0;
-}
+static SFEM_INLINE scalar_t fvm_quad4_convection_flux() { return 0; }
 
 static SFEM_INLINE scalar_t fvm_quad4_face_interp(const scalar_t volume,
                                                   const scalar_t val,
@@ -76,16 +72,8 @@ static SFEM_INLINE scalar_t fvm_quad4_face_interp(const scalar_t volume,
     return (volume * val + volume_neigh * val_neigh) / (volume + volume_neigh);
 }
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_ale(const std::shared_ptr<sfem::Communicator> &comm, int /*argc*/, char * /*argv*/[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -93,13 +81,10 @@ int main(int argc, char *argv[]) {
     std::string output_folder = "ale_fvm_out";
     smesh::create_directory(output_folder.c_str());
 
-
-    // 1) Initialize fields, grids and other paramerers
-
     ptrdiff_t nx   = 2;
     int       L    = 4;
     int       H    = 1;
-    auto      mesh = sfem::Mesh::create_quad4_square(sfem::Communicator::wrap(comm), L * nx, H * nx, 0, 0, L, H);
+    auto      mesh = sfem::Mesh::create_quad4_square(comm, L * nx, H * nx, 0, 0, L, H);
 
     auto sideset_inlet = sfem::Sideset::create_from_selector(
             mesh, [L](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
@@ -115,28 +100,19 @@ int main(int argc, char *argv[]) {
 
     mesh->write(smesh::Path((output_folder + "/mesh")));
     auto fs = sfem::FunctionSpace::create(mesh, 1);
+    (void)fs;
 
     element_idx_t *table_{nullptr};
     create_element_adj_table(mesh->n_elements(), mesh->n_nodes(), mesh->element_type(0), mesh->elements(0)->data(), &table_);
 
     const int ns    = elem_num_sides(mesh->element_type(0));
     auto      table = sfem::manage_host_buffer<element_idx_t>(mesh->n_elements() * ns, table_);
+    (void)table;
 
+    return 0;
+}
 
-    // Timestepping loop
-    	// 2) Put F_f = F^n_f (first guess)
-
-
-	    // Loop untill F^*_f is converged
-	    	// 3) The momentum equation without pressure term (Eq. 9) is solved including BCs with fixed F^*
-
-
-	    	// 4) Find F_{0f} from auxiliary velocities
-
-
-	    	// 5) Mass flux at cell face Eq. 16
-
-
-
-    return MPI_Finalize();
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_ale(ctx->communicator(), argc, argv);
 }
