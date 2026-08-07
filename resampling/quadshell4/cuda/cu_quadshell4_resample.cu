@@ -5,11 +5,59 @@
 
 #include "sfem_cuda_base.hpp"
 
-static const scalar_t infty = 10000;
+static const scalar_t infty             = 10000;
+static const real_t   SFEM_SDF_GRAD_EPS = 1e-12;
 
 // #define SFEM_RESAMPLE_GAP_DUAL
 
 static SFEM_INLINE __device__ real_t cu_put_inside(const real_t v) { return MIN(MAX(1e-7, v), 1 - 1e-7); }
+
+SFEM_INLINE __device__ static real_t cu_quadshell4_measure_and_normal(
+        // X-coordinates
+        const real_t px0,
+        const real_t px1,
+        const real_t px2,
+        const real_t px3,
+        // Y-coordinates
+        const real_t py0,
+        const real_t py1,
+        const real_t py2,
+        const real_t py3,
+        // Z-coordinates
+        const real_t pz0,
+        const real_t pz1,
+        const real_t pz2,
+        const real_t pz3,
+        // Quadrature point
+        const real_t qx,
+        const real_t qy,
+        // Output unit face normal (mesh winding)
+        real_t* const SFEM_RESTRICT nx,
+        real_t* const SFEM_RESTRICT ny,
+        real_t* const SFEM_RESTRICT nz) {
+    const scalar_t x0 = qx - 1;
+    const scalar_t x1 = -x0;
+    // r_xi = (x2, x6, x8), r_eta = (x5, x7, x9)
+    const scalar_t x2 = px0 * x0 - px1 * qx + px2 * qx + px3 * x1;
+    const scalar_t x3 = qy - 1;
+    const scalar_t x4 = -x3;
+    const scalar_t x5 = px0 * x3 + px1 * x4 + px2 * qy - px3 * qy;
+    const scalar_t x6 = py0 * x0 - py1 * qx + py2 * qx + py3 * x1;
+    const scalar_t x7 = py0 * x3 + py1 * x4 + py2 * qy - py3 * qy;
+    const scalar_t x8 = pz0 * x0 - pz1 * qx + pz2 * qx + pz3 * x1;
+    const scalar_t x9 = pz0 * x3 + pz1 * x4 + pz2 * qy - pz3 * qy;
+
+    const real_t cx      = x6 * x9 - x8 * x7;
+    const real_t cy      = x8 * x5 - x2 * x9;
+    const real_t cz      = x2 * x7 - x6 * x5;
+    const real_t measure = sqrt(POW2(cx) + POW2(cy) + POW2(cz));
+
+    assert(measure > 0);
+    *nx = cx / measure;
+    *ny = cy / measure;
+    *nz = cz / measure;
+    return measure;
+}
 
 SFEM_INLINE __device__ static real_t cu_quadshell4_measure(
         // X-coordinates
@@ -30,17 +78,8 @@ SFEM_INLINE __device__ static real_t cu_quadshell4_measure(
         // Quadrature point
         const real_t qx,
         const real_t qy) {
-    const scalar_t x0 = qx - 1;
-    const scalar_t x1 = -x0;
-    const scalar_t x2 = px0 * x0 - px1 * qx + px2 * qx + px3 * x1;
-    const scalar_t x3 = qy - 1;
-    const scalar_t x4 = -x3;
-    const scalar_t x5 = px0 * x3 + px1 * x4 + px2 * qy - px3 * qy;
-    const scalar_t x6 = py0 * x0 - py1 * qx + py2 * qx + py3 * x1;
-    const scalar_t x7 = py0 * x3 + py1 * x4 + py2 * qy - py3 * qy;
-    const scalar_t x8 = pz0 * x0 - pz1 * qx + pz2 * qx + pz3 * x1;
-    const scalar_t x9 = pz0 * x3 + pz1 * x4 + pz2 * qy - pz3 * qy;
-    return sqrt((POW2(x2) + POW2(x6) + POW2(x8)) * (POW2(x5) + POW2(x7) + POW2(x9)) - POW2(x2 * x5 + x6 * x7 + x8 * x9));
+    real_t nx, ny, nz;
+    return cu_quadshell4_measure_and_normal(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, qx, qy, &nx, &ny, &nz);
 }
 
 SFEM_INLINE __device__ static void cu_quadshell4_transform(
@@ -226,10 +265,24 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
 
         for (int q_ix = 0; q_ix < n_qp; q_ix++) {
             for (int q_iy = 0; q_iy < n_qp; q_iy++) {
-                const real_t measure = cu_quadshell4_measure(
-                        x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3], z[0], z[1], z[2], z[3], qx[q_ix], qx[q_iy]);
-
-                assert(measure > 0);
+                real_t       face_nx, face_ny, face_nz;
+                const real_t measure = cu_quadshell4_measure_and_normal(x[0],
+                                                                        x[1],
+                                                                        x[2],
+                                                                        x[3],
+                                                                        y[0],
+                                                                        y[1],
+                                                                        y[2],
+                                                                        y[3],
+                                                                        z[0],
+                                                                        z[1],
+                                                                        z[2],
+                                                                        z[3],
+                                                                        qx[q_ix],
+                                                                        qx[q_iy],
+                                                                        &face_nx,
+                                                                        &face_ny,
+                                                                        &face_nz);
 
                 real_t g_qx, g_qy, g_qz;
                 cu_quadshell4_transform(x[0],
@@ -290,10 +343,9 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
                         element_gap[edof_i] += infty * quad4_f[edof_i] * dV;
-                    }
-
-                    for (int edof_i = 0; edof_i < 4; edof_i++) {
-                        element_xnormal[edof_i] += 1 * quad4_f[edof_i] * dV;
+                        element_xnormal[edof_i] += face_nx * quad4_f[edof_i] * dV;
+                        element_ynormal[edof_i] += face_ny * quad4_f[edof_i] * dV;
+                        element_znormal[edof_i] += face_nz * quad4_f[edof_i] * dV;
                     }
 
                     continue;
@@ -344,17 +396,23 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
                         eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
                     }
 
-                    {
-                        // Normalize
-                        const real_t denom = MAX(
-                                1e-20,
-                                sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal));
+                    // Physical gradient (anisotropic voxel spacing)
+                    eval_xnormal /= dx;
+                    eval_ynormal /= dy;
+                    eval_znormal /= dz;
 
-                        assert(denom != 0);
+                    const real_t denom =
+                            sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
 
+                    if (denom >= SFEM_SDF_GRAD_EPS) {
                         eval_xnormal /= denom;
                         eval_ynormal /= denom;
                         eval_znormal /= denom;
+                    } else {
+                        // Flat SDF cell: fall back to geometric face normal
+                        eval_xnormal = face_nx;
+                        eval_ynormal = face_ny;
+                        eval_znormal = face_nz;
                     }
 
 #pragma unroll(4)
@@ -759,11 +817,24 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
 
         for (int q_ix = 0; q_ix < n_qp; q_ix++) {
             for (int q_iy = 0; q_iy < n_qp; q_iy++) {
-                const real_t measure = cu_quadshell4_measure(
-                        x[0], x[1], x[2], x[3], y[0], y[1], y[2], y[3], z[0], z[1], z[2], z[3], qx[q_ix], qx[q_iy]);
-
-                assert(measure != 0);
-                assert(measure > 0);
+                real_t       face_nx, face_ny, face_nz;
+                const real_t measure = cu_quadshell4_measure_and_normal(x[0],
+                                                                        x[1],
+                                                                        x[2],
+                                                                        x[3],
+                                                                        y[0],
+                                                                        y[1],
+                                                                        y[2],
+                                                                        y[3],
+                                                                        z[0],
+                                                                        z[1],
+                                                                        z[2],
+                                                                        z[3],
+                                                                        qx[q_ix],
+                                                                        qx[q_iy],
+                                                                        &face_nx,
+                                                                        &face_ny,
+                                                                        &face_nz);
 
                 real_t g_qx, g_qy, g_qz;
                 cu_quadshell4_transform(x[0],
@@ -824,7 +895,9 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
                 // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
-                        element_xnormal[edof_i] += 1. * quad4_f[edof_i] * dV;
+                        element_xnormal[edof_i] += face_nx * quad4_f[edof_i] * dV;
+                        element_ynormal[edof_i] += face_ny * quad4_f[edof_i] * dV;
+                        element_znormal[edof_i] += face_nz * quad4_f[edof_i] * dV;
                     }
 
                     continue;
@@ -859,17 +932,23 @@ __global__ void cu_quadshell4_resample_gap_normals_local_kernel(
                         eval_znormal += hex8_grad_z[edof_j] * coeffs[edof_j];
                     }
 
-                    {
-                        // Normalize
-                        const real_t denom = MAX(
-                                1e-20,
-                                sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal));
+                    // Physical gradient (anisotropic voxel spacing)
+                    eval_xnormal /= dx;
+                    eval_ynormal /= dy;
+                    eval_znormal /= dz;
 
-                        assert(denom != 0);
+                    const real_t denom =
+                            sqrt(eval_xnormal * eval_xnormal + eval_ynormal * eval_ynormal + eval_znormal * eval_znormal);
 
+                    if (denom >= SFEM_SDF_GRAD_EPS) {
                         eval_xnormal /= denom;
                         eval_ynormal /= denom;
                         eval_znormal /= denom;
+                    } else {
+                        // Flat SDF cell: fall back to geometric face normal
+                        eval_xnormal = face_nx;
+                        eval_ynormal = face_ny;
+                        eval_znormal = face_nz;
                     }
 
 #pragma unroll(4)
