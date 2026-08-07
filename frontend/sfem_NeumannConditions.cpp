@@ -4,7 +4,6 @@
 
 #include <stddef.h>
 
-#include "matrixio_array.h"
 #include "utils.h"
 
 #include "sfem_defs.hpp"
@@ -17,6 +16,7 @@
 
 #include <sys/stat.h>
 #include <cstddef>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -150,8 +150,9 @@ namespace sfem {
                         int k   = 0;
                         for (auto &p : paths) {
                             idx_t    *ii{nullptr};
-                            ptrdiff_t lsize{0}, gsize{0};
-                            if (array_create_from_file(comm->get(), pch, SFEM_MPI_IDX_T, (void **)&ii, &lsize, &gsize)) {
+                            ptrdiff_t lsize{0};
+                            if (smesh::array_read_convert_from_extension<idx_t>(smesh::Path(pch), &ii, &lsize) !=
+                                SMESH_SUCCESS) {
                                 SFEM_ERROR("Failed to read file %s\n", pch);
                                 break;
                             }
@@ -210,12 +211,11 @@ namespace sfem {
                 if (strncmp(pch, path_key, path_key_len) == 0) {
                     conds[i].value = 0;
 
-                    real_t   *values{nullptr};
-                    ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(
-                                comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    auto values = Buffer<real_t>::from_file(smesh::Path(pch + path_key_len));
+                    if (!values) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
+                    const ptrdiff_t lsize = values ? (ptrdiff_t)values->size() : 0;
 
                     if (conds[i].surface->extent(1) != lsize) {
                         if (!rank) {
@@ -354,6 +354,13 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int NeumannConditions::hessian_bsr(const real_t *const /*x*/,
+                                       const count_t *const /*rowptr*/,
+                                       const idx_t *const /*colidx*/,
+                                       real_t *const /*values*/) {
+        return SFEM_SUCCESS;
+    }
+
     int NeumannConditions::gradient(const real_t *const /*x*/, real_t *const out) {
         SFEM_TRACE_SCOPE("NeumannConditions::gradient");
 
@@ -402,7 +409,63 @@ namespace sfem {
     }
 
     int NeumannConditions::value(const real_t *x, real_t *const out) {
-        // TODO
+        SFEM_TRACE_SCOPE("NeumannConditions::value");
+
+        auto space = impl_->space;
+        auto temp  = create_host_buffer<real_t>(space->n_dofs());
+        if (!temp) {
+            return SFEM_FAILURE;
+        }
+
+        int err = gradient(x, temp->data());
+        if (err != SFEM_SUCCESS) {
+            return err;
+        }
+
+        const ptrdiff_t     ndofs = space->n_dofs();
+        const real_t *const g     = temp->data();
+        real_t              acc   = 0;
+
+#pragma omp parallel for reduction(+ : acc)
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            acc += g[i] * x[i];
+        }
+
+        *out += acc;
+        return SFEM_SUCCESS;
+    }
+
+    int NeumannConditions::value_steps(const real_t *const       x,
+                                       const real_t *const       h,
+                                       const int                 nsteps,
+                                       const real_t *const       steps,
+                                       real_t *const             out) {
+        SFEM_TRACE_SCOPE("NeumannConditions::value_steps");
+
+        auto space = impl_->space;
+        auto temp  = create_host_buffer<real_t>(space->n_dofs());
+        if (!temp) {
+            return SFEM_FAILURE;
+        }
+
+        int err = gradient(x, temp->data());
+        if (err != SFEM_SUCCESS) {
+            return err;
+        }
+
+        const ptrdiff_t     ndofs = space->n_dofs();
+        const real_t *const g     = temp->data();
+
+        for (int s = 0; s < nsteps; ++s) {
+            const real_t step = steps[s];
+            real_t       acc  = 0;
+#pragma omp parallel for reduction(+ : acc)
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                acc += g[i] * (x[i] + step * h[i]);
+            }
+            out[s] += acc;
+        }
+
         return SFEM_SUCCESS;
     }
 
@@ -480,12 +543,10 @@ namespace sfem {
         return no_op();
     }
 
+#ifndef SFEM_ENABLE_CUDA
     std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc) {
-#ifdef SFEM_ENABLE_CUDA
-        return std::make_shared<GPUNeumannConditions>(nc);
-#else
         return nc;
-#endif
     }
+#endif
 
 }  // namespace sfem

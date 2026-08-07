@@ -21,10 +21,6 @@ else()
     set(SFEM_CPU_ARCH "${SFEM_CPU_ARCH}")
 endif()
 
-if(NOT SFEM_CUDA_ARCH)
-    set(SFEM_CUDA_ARCH 60 CACHE STRING "Choose the CUDA device capabilities." FORCE)
-endif()
-
 option(SFEM_CUDA_MEMORY "Use CUDA memory model" OFF) ## default OFF is the host memory model
 
 # set a list 
@@ -105,9 +101,17 @@ set(CMAKE_CXX_FLAGS_PROF
     )
 
 
-# set(CMAKE_CUDA_FLAGS "--compiler-options \"-fPIC\" -arch=sm_90 -Xptxas=-O3,-v -use_fast_math")
+# CUDA architectures are selected through CMake's standard
+# CMAKE_CUDA_ARCHITECTURES variable.
 
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -use_fast_math -Xcompiler=-O3,-march=native,-mtune=native,-fPIC -arch=sm_${SFEM_CUDA_ARCH} -Xptxas=-O3,-v,-warn-spills  ")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    set(CMAKE_CUDA_HOST_COMPILER_FLAGS "-O3,-fPIC")
+else()
+    set(CMAKE_CUDA_HOST_COMPILER_FLAGS "-O3,-march=native,-mtune=native,-fPIC")
+endif()
+
+string(REPLACE "-Xcompiler=-O3,-march=native,-mtune=native,-fPIC" "" CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -use_fast_math -Xcompiler=${CMAKE_CUDA_HOST_COMPILER_FLAGS} -Xptxas=-O3,-v,-warn-spills  ")
 
 if(SFEM_ENABLE_CUDA_LINEINFO)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -lineinfo")

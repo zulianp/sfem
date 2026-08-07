@@ -122,6 +122,19 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 e
                                          const real_t *const SFEM_RESTRICT     u,
                                          real_t *const SFEM_RESTRICT           values);
 
+/// Affine apply with SoA adjugate streams (HEX8): adj[d][e], det[e].
+int linear_elasticity_apply_adjugate_soa(const smesh::ElemType                          element_type,
+                                         const ptrdiff_t                                nelements,
+                                         const ptrdiff_t                                nnodes,
+                                         idx_t **const SFEM_RESTRICT                    elements,
+                                         geom_t **const SFEM_RESTRICT                   points,
+                                         const jacobian_t *const SFEM_RESTRICT *const   jacobian_adjugate,
+                                         const geom_t *const SFEM_RESTRICT              jacobian_determinant,
+                                         const real_t                                   mu,
+                                         const real_t                                   lambda,
+                                         const real_t *const SFEM_RESTRICT              u,
+                                         real_t *const SFEM_RESTRICT                    values);
+
 /// Element types that support linear_elasticity_apply_adjugate_aos (HEX8 and Proteus semistructured hex).
 int linear_elasticity_is_opt(smesh::ElemType element_type);
 
@@ -167,6 +180,20 @@ int linear_elasticity_bcrs_sym(const smesh::ElemType              element_type,
                                const ptrdiff_t                    block_stride,
                                real_t **const SFEM_RESTRICT       diag_values,
                                real_t **const SFEM_RESTRICT       off_diag_values);
+
+int linear_elasticity_objective_steps_aos(const smesh::ElemType             element_type,
+                                          const ptrdiff_t                   nelements,
+                                          const ptrdiff_t                   stride,
+                                          const ptrdiff_t                   nnodes,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      mu,
+                                          const real_t                      lambda,
+                                          const real_t *const SFEM_RESTRICT u,
+                                          const real_t *const SFEM_RESTRICT inc,
+                                          const int                         nsteps,
+                                          const real_t *const               steps,
+                                          real_t *const SFEM_RESTRICT       out);
 
 #ifdef __cplusplus
 }

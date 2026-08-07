@@ -456,6 +456,69 @@ static SFEM_INLINE void hex8_ref_shape_grad(const int                     i,
     }
 }
 
+static SFEM_INLINE void hex8_ref_shape_grad_x(const scalar_t                qx,
+                                              const scalar_t                qy,
+                                              const scalar_t                qz,
+                                              scalar_t *const SFEM_RESTRICT out) {
+    SFEM_UNUSED(qx);
+    const scalar_t x0 = 1 - qy;
+    const scalar_t x1 = 1 - qz;
+    const scalar_t x2 = x0 * x1;
+    const scalar_t x3 = qy * x1;
+    const scalar_t x4 = qz * x0;
+    const scalar_t x5 = qy * qz;
+    out[0]            = -x2;
+    out[1]            = x2;
+    out[2]            = x3;
+    out[3]            = -x3;
+    out[4]            = -x4;
+    out[5]            = x4;
+    out[6]            = x5;
+    out[7]            = -x5;
+}
+
+static SFEM_INLINE void hex8_ref_shape_grad_y(const scalar_t                qx,
+                                              const scalar_t                qy,
+                                              const scalar_t                qz,
+                                              scalar_t *const SFEM_RESTRICT out) {
+    SFEM_UNUSED(qy);
+    const scalar_t x0 = 1 - qx;
+    const scalar_t x1 = 1 - qz;
+    const scalar_t x2 = x0 * x1;
+    const scalar_t x3 = qx * x1;
+    const scalar_t x4 = qz * x0;
+    const scalar_t x5 = qx * qz;
+    out[0]            = -x2;
+    out[1]            = -x3;
+    out[2]            = x3;
+    out[3]            = x2;
+    out[4]            = -x4;
+    out[5]            = -x5;
+    out[6]            = x5;
+    out[7]            = x4;
+}
+
+static SFEM_INLINE void hex8_ref_shape_grad_z(const scalar_t                qx,
+                                              const scalar_t                qy,
+                                              const scalar_t                qz,
+                                              scalar_t *const SFEM_RESTRICT out) {
+    SFEM_UNUSED(qz);
+    const scalar_t x0 = 1 - qx;
+    const scalar_t x1 = 1 - qy;
+    const scalar_t x2 = x0 * x1;
+    const scalar_t x3 = qx * x1;
+    const scalar_t x4 = qx * qy;
+    const scalar_t x5 = qy * x0;
+    out[0]            = -x2;
+    out[1]            = -x3;
+    out[2]            = -x4;
+    out[3]            = -x5;
+    out[4]            = x2;
+    out[5]            = x3;
+    out[6]            = x4;
+    out[7]            = x5;
+}
+
 static const scalar_t hex8_g_0[8][3] = {{-1.0 / 4.0, -1.0 / 4.0, -1.0 / 4.0},
                                         {1.0 / 4.0, -1.0 / 4.0, -1.0 / 4.0},
                                         {1.0 / 4.0, 1.0 / 4.0, -1.0 / 4.0},

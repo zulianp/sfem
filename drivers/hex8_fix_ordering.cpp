@@ -1,20 +1,11 @@
 #include "sfem_API.hpp"
 
-#include "matrixio_array.h"
 #include "sfem_defs.hpp"
 
 #include "tet4_inline_cpu.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_hex8_fix_ordering(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -25,8 +16,8 @@ int main(int argc, char *argv[]) {
     }
 
     const char *output_folder = argv[2];
-    const char *folder = argv[1];
-    auto m = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    const char *folder        = argv[1];
+    auto        m             = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
 
     int nxe = elem_num_nodes((smesh::ElemType)m->element_type(0));
     const auto elements = m->elements(0)->data();
@@ -144,7 +135,13 @@ int main(int argc, char *argv[]) {
 
     printf("n_reorders= %ld\n", n_reorders);
 
-    if(n_reorders)
+    if (n_reorders) {
         m->write(smesh::Path(output_folder));
-    return MPI_Finalize();
+    }
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_hex8_fix_ordering(ctx->communicator(), argc, argv);
 }

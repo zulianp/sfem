@@ -39,13 +39,12 @@ int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &outpu
 }
 
 int test_derefine_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     int L                    = 8;
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_BASE_RESOLUTION * 2,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
@@ -60,8 +59,7 @@ int test_derefine_cube() {
 }
 
 int test_derefine_mesh() {
-    MPI_Comm comm = MPI_COMM_WORLD;
-    auto     m    = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path("impeller"));
+    auto     m    = sfem::Mesh::create_from_file(sfem::Communicator::world(), smesh::Path("impeller"));
     return test_derefine(m, smesh::Path("test_derefine_mesh"));
 }
 
@@ -164,12 +162,11 @@ int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &ou
 }
 
 int test_prolongation_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_BASE_RESOLUTION * 2,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
@@ -184,12 +181,11 @@ int test_prolongation_cube() {
 }
 
 int test_restrict_cube() {
-    MPI_Comm comm = MPI_COMM_WORLD;
 
     int SFEM_BASE_RESOLUTION = 1;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,
                                           SFEM_BASE_RESOLUTION * 1,

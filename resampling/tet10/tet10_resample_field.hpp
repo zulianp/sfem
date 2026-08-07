@@ -4,13 +4,12 @@
 #include <mpi.h>
 #include <stddef.h>
 
+#include "mesh_utils.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_mesh.hpp"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace sfem {
 
 /**
  * sub-parametric assumes that the mesh geometry is 1st order (i.e., tet4 with no warped
@@ -84,6 +83,10 @@ real_t hex_aa_8_eval_weno4_3D_Unit(                 //
         const ptrdiff_t*                  stride,   //
         const real_t* const SFEM_RESTRICT data);
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int hex8_to_tet10_resample_field_local_CUDA_wrapper(  //
         const int mpi_size,                           // MPI size
         const int mpi_rank,                           // MPI rank
@@ -150,6 +153,10 @@ int hex8_to_tet10_resample_field_local_CUDA_Managed(
         const real_t* const SFEM_RESTRICT data,    // SDF
         // Output //
         real_t* const SFEM_RESTRICT g_host);
+
+#ifdef __cplusplus
+}
+#endif
 
 /**
  * @brief Resample a field from a structured grid to a quadratic (10-node) tetrahedral mesh using subparametric mapping.
@@ -403,9 +410,7 @@ tet10_measure_real_t(const real_t* const SFEM_RESTRICT x,   //
                      const real_t                      qy,  //
                      const real_t                      qz);                      //
 
-#ifdef __cplusplus
-}
-#endif
+}  // namespace sfem
 
 // TODO (full 2nd order FEM)
 // For the structured grid we can decide to go directy high-order splines instead of tri-linear

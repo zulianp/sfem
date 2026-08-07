@@ -48,8 +48,8 @@ namespace sfem {
         auto fs_coarse = fs->derefine();
         auto f_coarse = f->derefine(fs_coarse, true);
 
-        const char *SFEM_FINE_OP_TYPE = MATRIX_FREE;
-        const char *SFEM_COARSE_OP_TYPE = fs->block_size() == 1 ? COO_SYM : BSR_SYM;
+        const char *SFEM_FINE_OP_TYPE = op_type::MATRIX_FREE;
+        const char *SFEM_COARSE_OP_TYPE = fs->block_size() == 1 ? op_type::COO_SYM : op_type::BSR_SYM;
 
         SFEM_READ_ENV(SFEM_FINE_OP_TYPE, );
         SFEM_READ_ENV(SFEM_COARSE_OP_TYPE, );
@@ -111,7 +111,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
             // FIXME this should not be here!
-            CUDA_BLAS<real_t>::build_blas(mg->blas());
+            mg->blas() = make_cuda_blas<real_t>();
 
             if (spmg) {
                 CUDA_ShiftedPenalty<real_t>::build(spmg->impl());

@@ -1,26 +1,31 @@
 #include "sfem_OpFactory.hpp"
 
-#include "sfem_LinearElasticity.hpp"
-#include "sfem_Laplacian.hpp"
-#include "sfem_Mass.hpp"
-#include "sfem_VectorLaplacian.hpp"
-#include "sfem_LumpedMass.hpp"
-#include "sfem_SemiStructuredEMLaplacian.hpp"
-#include "sfem_SpectralElementLaplacian.hpp"
+#include <map>
+#include "sfem_BoundaryMass.hpp"
+#include "sfem_BDF2InertiaPotential.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
-#include "sfem_NeoHookeanOgden.hpp"
+#include "generated/sfem_generated_ops_registration.hpp"
+#include "generated/neumann/op/sfem_GeneratedNeumann.hpp"
+#include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral.hpp"
+#include "sfem_Gradient.hpp"
 #include "sfem_Hyperelasticity.hpp"
-#include "sfem_PlugInOp.hpp"
-#include "sfem_BoundaryMass.hpp"
-#include "sfem_PackedLaplacian.hpp"
-#include "sfem_NeoHookeanOgdenPacked.hpp"
-#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+#include "sfem_KelvinVoigtNewmark.hpp"
+#include "sfem_Laplacian.hpp"
+#include "sfem_LinearElasticity.hpp"
+#include "sfem_LumpedMass.hpp"
+#include "sfem_Mass.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_Gradient.hpp"
-#include "sfem_KelvinVoigtNewmark.hpp"
-#include <map>
+#include "sfem_NeoHookeanOgden.hpp"
+#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+#include "sfem_NeoHookeanOgdenPacked.hpp"
+#include "sfem_PackedLaplacian.hpp"
+#include "sfem_PlugInOp.hpp"
+#include "sfem_SemiStructuredEMLaplacian.hpp"
+#include "sfem_SemiStructuredEMLinearElasticity.hpp"
+#include "sfem_SpectralElementLaplacian.hpp"
+#include "sfem_VectorLaplacian.hpp"
 
 namespace sfem {
 
@@ -40,6 +45,8 @@ namespace sfem {
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
             instance_.private_register_op("ss:KelvinVoigtNewmark", KelvinVoigtNewmark::create);
+            instance_.private_register_op("BDF2InertiaPotential", BDF2InertiaPotential::create);
+            instance_.private_register_op("ss:BDF2InertiaPotential", BDF2InertiaPotential::create);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("ss:LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
@@ -48,6 +55,7 @@ namespace sfem {
             instance_.private_register_op("ss:Laplacian", Laplacian::create);
             instance_.private_register_op("ss:LumpedMass", LumpedMass::create);
             instance_.private_register_op("ss:em:Laplacian", SemiStructuredEMLaplacian::create);
+            instance_.private_register_op("ss:em:LinearElasticity", SemiStructuredEMLinearElasticity::create);
             instance_.private_register_op("ss:SpectralElementLaplacian", SpectralElementLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
@@ -55,7 +63,8 @@ namespace sfem {
             instance_.private_register_op("LumpedMass", LumpedMass::create);
             instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("NeoHookeanOgdenPacked", NeoHookeanOgdenPacked::create);
-            // instance_.private_register_op("NeoHookeanOgdenActiveStrain", NeoHookeanOgdenActiveStrainPacked::create);
+            instance_.private_register_op("GeneratedNeumann", GeneratedNeumann::create);
+            instance_.private_register_op("GeneratedNeumannGeneral", GeneratedNeumannGeneral::create);
             instance_.private_register_op("NeoHookeanOgdenActiveStrainPacked", NeoHookeanOgdenActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlin", MooneyRivlinActiveStrainPacked::create);
             instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
@@ -64,6 +73,7 @@ namespace sfem {
             instance_.private_register_op("ss:NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
             instance_.private_register_op("Gradient", Gradient::create);
+            register_generated_ops();
             instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
         }
 
@@ -129,4 +139,14 @@ namespace sfem {
 
     std::string d_op_str(const std::string &name) { return "gpu:" + name; }
 
-} // namespace sfem 
+#ifdef SFEM_ENABLE_RYAML
+    static std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                   const ryml::ConstNodeRef             &node,
+                                                   const ExecutionSpace                  es) {
+        std::string name;
+        node["type"] >> name;
+
+        return create_op(space, name.c_str(), es);
+    }
+#endif  // SFEM_ENABLE_RYAML
+}  // namespace sfem

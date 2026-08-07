@@ -2,7 +2,6 @@
 #define CU_HEX8_LAPLACIAN_INLINE_HPP
 
 #include "sfem_cuda_base.hpp"
-#include "sfem_defs.hpp"
 
 #include "cu_lagrange_hex_laplacian_inline.hpp"
 #include "cu_spectral_hex_laplacian_inline.hpp"

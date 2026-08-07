@@ -9,10 +9,17 @@
 
 #pragma once
 
+#include "sfem_ForwardDeclarations.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_glob.hpp"
+
+#include <cstddef>
+
+#ifdef SFEM_ENABLE_RYAML
+#include <ryml.hpp>
+#endif  // SFEM_ENABLE_RYAML
 
 namespace sfem {
 
@@ -163,6 +170,22 @@ namespace sfem {
         }
 
         /**
+         * @brief Assemble the Hessian matrix in DIA format
+         * @param x Current solution vector
+         * @param diag_offsets Diagonal offsets in node-block rows
+         * @param ndiag Number of diagonal offsets
+         * @param values Matrix values array (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int hessian_dia(const real_t *const /*x*/,
+                                const int *const /*diag_offsets*/,
+                                const ptrdiff_t /*ndiag*/,
+                                real_t *const /*values*/) {
+            SFEM_ERROR("DIA assembly not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /**
          * @brief Assemble the diagonal of the Hessian matrix
          * @param x Current solution vector
          * @param values Diagonal values (output)
@@ -276,8 +299,28 @@ namespace sfem {
 
         virtual void override_element_types(const std::vector<smesh::ElemType> &element_types) {}
 
+        virtual double flops() const { return flops_apply(); }
+        virtual double flops_value() const { return 0; }
+        virtual double flops_gradient() const { return 0; }
+        virtual double flops_apply() const { return 0; }
+
+        virtual size_t memory_traffic_bytes() const { return memory_traffic_bytes_apply(); }
+        virtual size_t memory_traffic_bytes_value() const { return 0; }
+        virtual size_t memory_traffic_bytes_gradient() const { return 0; }
+        virtual size_t memory_traffic_bytes_apply() const { return 0; }
+
         virtual ptrdiff_t n_dofs_domain() const = 0;
         virtual ptrdiff_t n_dofs_image() const  = 0;
+
+#ifdef SFEM_ENABLE_RYAML
+        virtual std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                     const ryml::ConstNodeRef             &node) {
+            SMESH_UNUSED(space);
+            SMESH_UNUSED(node);
+            SFEM_ERROR("create_from_yaml not implemented for this operator");
+            return nullptr;
+        }
+#endif  // SFEM_ENABLE_RYAML
     };
 
     /**
@@ -304,6 +347,12 @@ namespace sfem {
         bool                is_no_op() const override { return true; }
         ptrdiff_t           n_dofs_domain() const override { return -1; };
         ptrdiff_t           n_dofs_image() const override { return -1; };
+
+#ifdef SFEM_ENABLE_RYAML
+        inline std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &, const ryml::ConstNodeRef &) override {
+            return std::make_shared<NoOp>();
+        }
+#endif  // SFEM_ENABLE_RYAML
     };
 
     /**

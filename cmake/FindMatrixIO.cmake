@@ -4,7 +4,10 @@ if(NOT MatrixIO_DIR)
 
 find_path(
     MatrixIO_DIR  matrixio_array.h
-    HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../matrix.io
+    HINTS 
+    ${MATRIXIO_DIR}
+    $ENV{MATRIXIO_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../matrix.io
     )
 
 endif()

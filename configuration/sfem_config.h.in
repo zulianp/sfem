@@ -27,7 +27,7 @@
 #cmakedefine01 SFEM_PRINT_THROUGHPUT
 
 #ifdef SFEM_ENABLE_CUDA
-#define SFEM_CUDA_ARCH @SFEM_CUDA_ARCH@
+#define SFEM_CUDA_ARCH @CUDA_ARCHITECTURES@
 #endif
 
 #define CUDA_UNIFIED_MEMORY 0
@@ -109,9 +109,9 @@ typedef smesh::local_idx_t local_idx_t;
 
 // -----------------------------
 // Other types
-#define SFEM_TET4_CUDA @SFEM_TET4_CUDA@
-#define SFEM_TET10_CUDA @SFEM_TET10_CUDA@
-#define SFEM_TET10_WENO @SFEM_TET10_WENO@
+#cmakedefine01 SFEM_TET4_CUDA
+#cmakedefine01 SFEM_TET10_CUDA
+#cmakedefine01 SFEM_TET10_WENO
 
 #define SFEM_CUDA_MEMORY_MODEL @SFEM_CUDA_MEMORY_MODEL@
 

@@ -565,28 +565,29 @@ static SFEM_INLINE void hex8_laplacian_apply_fff_taylor(const scalar_t *const SF
     }
 }
 
-static SFEM_INLINE void hex8_laplacian_apply_fff_integral_soa(const scalar_t                fff0,
-                                                              const scalar_t                fff1,
-                                                              const scalar_t                fff2,
-                                                              const scalar_t                fff3,
-                                                              const scalar_t                fff4,
-                                                              const scalar_t                fff5,
-                                                              const scalar_t                u0,
-                                                              const scalar_t                u1,
-                                                              const scalar_t                u2,
-                                                              const scalar_t                u3,
-                                                              const scalar_t                u4,
-                                                              const scalar_t                u5,
-                                                              const scalar_t                u6,
-                                                              const scalar_t                u7,
-                                                              scalar_t *const SFEM_RESTRICT out0,
-                                                              scalar_t *const SFEM_RESTRICT out1,
-                                                              scalar_t *const SFEM_RESTRICT out2,
-                                                              scalar_t *const SFEM_RESTRICT out3,
-                                                              scalar_t *const SFEM_RESTRICT out4,
-                                                              scalar_t *const SFEM_RESTRICT out5,
-                                                              scalar_t *const SFEM_RESTRICT out6,
-                                                              scalar_t *const SFEM_RESTRICT out7) {
+template <typename scalar_t>
+static SFEM_INLINE void hex8_laplacian_apply_fff_integral_soa_tpl(const scalar_t                fff0,
+                                                                  const scalar_t                fff1,
+                                                                  const scalar_t                fff2,
+                                                                  const scalar_t                fff3,
+                                                                  const scalar_t                fff4,
+                                                                  const scalar_t                fff5,
+                                                                  const scalar_t                u0,
+                                                                  const scalar_t                u1,
+                                                                  const scalar_t                u2,
+                                                                  const scalar_t                u3,
+                                                                  const scalar_t                u4,
+                                                                  const scalar_t                u5,
+                                                                  const scalar_t                u6,
+                                                                  const scalar_t                u7,
+                                                                  scalar_t *const SFEM_RESTRICT out0,
+                                                                  scalar_t *const SFEM_RESTRICT out1,
+                                                                  scalar_t *const SFEM_RESTRICT out2,
+                                                                  scalar_t *const SFEM_RESTRICT out3,
+                                                                  scalar_t *const SFEM_RESTRICT out4,
+                                                                  scalar_t *const SFEM_RESTRICT out5,
+                                                                  scalar_t *const SFEM_RESTRICT out6,
+                                                                  scalar_t *const SFEM_RESTRICT out7) {
     const scalar_t x0  = (scalar_t)(1.0 / 6.0) * fff4;
     const scalar_t x1  = u7 * x0;
     const scalar_t x2  = (scalar_t)(1.0 / 9.0) * fff3;
@@ -695,6 +696,32 @@ static SFEM_INLINE void hex8_laplacian_apply_fff_integral_soa(const scalar_t    
     out5[0] = -x25 - x44 - x47 + x50 + x53 - x65 - x67 + x69 + x71 - x87 - x93 + x94 + x95 - x96 - x97 - x98;
     out6[0] = -x41 - x42 - x45 + x48 + x51 - x66 - x68 + x70 + x72 - x86 - x92 - x94 - x95 + x96 + x97 - x99;
     out7[0] = x1 - x11 - x15 + x64 + x7 + x73 + x79 + x81 - x83 - x85 + x88 + x89 - x90 - x91 + x98 + x99;
+}
+
+static SFEM_INLINE void hex8_laplacian_apply_fff_integral_soa(const scalar_t                fff0,
+                                                              const scalar_t                fff1,
+                                                              const scalar_t                fff2,
+                                                              const scalar_t                fff3,
+                                                              const scalar_t                fff4,
+                                                              const scalar_t                fff5,
+                                                              const scalar_t                u0,
+                                                              const scalar_t                u1,
+                                                              const scalar_t                u2,
+                                                              const scalar_t                u3,
+                                                              const scalar_t                u4,
+                                                              const scalar_t                u5,
+                                                              const scalar_t                u6,
+                                                              const scalar_t                u7,
+                                                              scalar_t *const SFEM_RESTRICT out0,
+                                                              scalar_t *const SFEM_RESTRICT out1,
+                                                              scalar_t *const SFEM_RESTRICT out2,
+                                                              scalar_t *const SFEM_RESTRICT out3,
+                                                              scalar_t *const SFEM_RESTRICT out4,
+                                                              scalar_t *const SFEM_RESTRICT out5,
+                                                              scalar_t *const SFEM_RESTRICT out6,
+                                                              scalar_t *const SFEM_RESTRICT out7) {
+    hex8_laplacian_apply_fff_integral_soa_tpl<scalar_t>(
+            fff0, fff1, fff2, fff3, fff4, fff5, u0, u1, u2, u3, u4, u5, u6, u7, out0, out1, out2, out3, out4, out5, out6, out7);
 }
 
 #endif

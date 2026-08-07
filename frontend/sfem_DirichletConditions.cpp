@@ -5,7 +5,6 @@
 #include <stddef.h>
 
 #include "boundary_condition.hpp"
-#include "matrixio_array.h"
 #include "operators/boundary_conditions/dirichlet.hpp"
 #include "sfem_Function.hpp"
 #include "smesh_prolongation.hpp"
@@ -130,6 +129,10 @@ namespace sfem {
 
         std::map<std::shared_ptr<Sideset>, std::shared_ptr<Buffer<idx_t>>> sideset_to_nodeset;
         for (size_t i = 0; i < conds.size(); i++) {
+            if (conds[i].nodeset->size() == 0) {
+                continue;
+            }
+
             ptrdiff_t coarse_num_nodes = 0;
             idx_t    *coarse_nodeset   = nullptr;
 
@@ -281,14 +284,11 @@ namespace sfem {
                 cdc.component = 0;
 
                 if (SFEM_DIRICHLET_NODESET) {
-                    idx_t    *this_set{nullptr};
-                    ptrdiff_t lsize{0}, gsize{0};
-                    if (array_create_from_file(comm->get(), pch, SFEM_MPI_IDX_T, (void **)&this_set, &lsize, &gsize)) {
+                    cdc.nodeset = Buffer<idx_t>::from_file(smesh::Path(pch));
+                    if (!cdc.nodeset) {
                         SFEM_ERROR("Failed to read file %s\n", pch);
                         break;
                     }
-
-                    cdc.nodeset = manage_host_buffer<idx_t>(lsize, this_set);
                 } else {
                     cdc.sidesets.push_back(Sideset::create_from_file(comm, smesh::Path(pch)));
                     auto mesh_for_sidesets = space->mesh_ptr();
@@ -326,12 +326,11 @@ namespace sfem {
                 if (strncmp(pch, path_key, path_key_len) == 0) {
                     conds[i].value = 0;
 
-                    real_t   *values{nullptr};
-                    ptrdiff_t lsize, gsize;
-                    if (array_create_from_file(
-                                comm->get(), pch + path_key_len, SFEM_MPI_REAL_T, (void **)&values, &lsize, &gsize)) {
+                    auto values = Buffer<real_t>::from_file(smesh::Path(pch + path_key_len));
+                    if (!values) {
                         SFEM_ERROR("Failed to read file %s\n", pch + path_key_len);
                     }
+                    const ptrdiff_t lsize = values ? (ptrdiff_t)values->size() : 0;
 
                     if (conds[i].nodeset->size() != lsize) {
                         if (!rank) {
@@ -355,20 +354,14 @@ namespace sfem {
 
         return dc;
     }
-
+#ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<DirichletConditions> DirichletConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
-                                                                               std::string                           yaml) {
+                                                                               const ryml::NodeRef                  &node) {
         SFEM_TRACE_SCOPE("DirichletConditions::create_from_yaml");
 
-#ifdef SFEM_ENABLE_RYAML
         auto dc = std::make_unique<DirichletConditions>(space);
 
-        ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
-        auto       conds = tree["dirichlet_conditions"];
-
-        MPI_Comm comm = space->mesh_ptr()->comm()->get();
-
-        for (auto c : conds.children()) {
+        for (auto c : node.children()) {
             std::shared_ptr<Sideset>       sideset;
             std::shared_ptr<Buffer<idx_t>> nodeset;
 
@@ -410,13 +403,10 @@ namespace sfem {
                 if (is_file) {
                     std::string path;
                     c["path"] >> path;
-                    idx_t    *arr{nullptr};
-                    ptrdiff_t lsize, gsize;
-                    if (!array_create_from_file(comm, path.c_str(), SFEM_MPI_IDX_T, (void **)&arr, &lsize, &gsize)) {
+                    nodeset = Buffer<idx_t>::from_file(smesh::Path(path));
+                    if (!nodeset) {
                         SFEM_ERROR("Unable to read file %s!\n", path.c_str());
                     }
-
-                    nodeset = manage_host_buffer<idx_t>(lsize, arr);
                 } else {
                     ptrdiff_t size  = c["nodes"].num_children();
                     nodeset         = create_host_buffer<idx_t>(size);
@@ -464,6 +454,19 @@ namespace sfem {
         }
 
         return dc;
+    }
+#endif
+
+    std::shared_ptr<DirichletConditions> DirichletConditions::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                               std::string                           yaml) {
+        SFEM_TRACE_SCOPE("DirichletConditions::create_from_yaml");
+
+#ifdef SFEM_ENABLE_RYAML
+
+        ryml::Tree tree  = ryml::parse_in_place(ryml::to_substr(yaml));
+        auto       conds = tree["dirichlet_conditions"];
+        return create_from_yaml(space, conds);
+
 #else
         SFEM_ERROR("This functionaly requires -DSFEM_ENABLE_RYAML=ON\n");
         return nullptr;
@@ -489,6 +492,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::apply");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             if (c.values) {
                 constraint_nodes_to_values_vec(
                         c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.values->data(), x);
@@ -556,6 +560,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::gradient");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             if (c.values) {
                 constraint_gradient_nodes_to_values_vec(
                         c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, c.values->data(), x, g);
@@ -573,6 +578,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::apply_value");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             constraint_nodes_to_value_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, value, x);
         }
@@ -584,6 +590,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::copy_constrained_dofs");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             constraint_nodes_copy_vec(c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, src, dest);
         }
 
@@ -597,6 +604,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::hessian_crs");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
             crs_constraint_nodes_to_identity_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, 1, rowptr, colidx, values);
         }
@@ -611,6 +619,8 @@ namespace sfem {
         SFEM_TRACE_SCOPE("DirichletConditions::hessian_bsr");
 
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
+
             bsr_constraint_nodes_to_identity_vec(
                     c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, 1, rowptr, colidx, values);
         }
@@ -623,6 +633,8 @@ namespace sfem {
 
         const int block_size = impl_->space->block_size();
         for (auto &c : impl_->conditions) {
+            if (c.nodeset->size() == 0) continue;
+
             auto nodeset = c.nodeset->data();
             for (ptrdiff_t node = 0; node < c.nodeset->size(); node++) {
                 const ptrdiff_t idx = nodeset[node] * block_size + c.component;
@@ -633,12 +645,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+#ifndef SFEM_ENABLE_CUDA
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
-#ifdef SFEM_ENABLE_CUDA
-        return std::make_shared<GPUDirichletConditions>(dc);
-#else
         return dc;
-#endif
     }
+#endif
 
 }  // namespace sfem

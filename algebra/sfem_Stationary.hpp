@@ -5,17 +5,16 @@
 #include <functional>
 #include <memory>
 
-#include "sfem_aliases.hpp"
 #include "sfem_LpSmoother.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_openmp_blas.hpp"
 
 namespace sfem {
 
     template <typename T>
-    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T> &diagonal_scaling, const ExecutionSpace es);
+    static std::shared_ptr<Operator<T>> diag_op(const SharedBuffer<T>& diagonal_scaling, const ExecutionSpace es);
 
-    
     template <typename T>
     class StationaryIteration final : public MatrixFreeLinearSolver<T> {
     public:
@@ -27,7 +26,7 @@ namespace sfem {
         std::shared_ptr<Operator<T>> preconditioner;
         bool                         verbose{false};
         bool                         use_arg_as_first_residual{false};
-        BLAS_Tpl<T>                  blas;
+        std::shared_ptr<BLAS<T>> blas;
 
         int iterations_{0};
 
@@ -37,12 +36,13 @@ namespace sfem {
 
         void ensure_workspace() {
             if (!workspace || workspace->size() != n_dofs) {
-                workspace = Buffer<T>::own(n_dofs, blas.allocate(n_dofs), this->blas.destroy);
+                auto blas_impl = blas;
+                workspace = Buffer<T>::own(n_dofs, blas_impl->allocate(n_dofs), [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
             }
         }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
@@ -51,27 +51,27 @@ namespace sfem {
             SFEM_TRACE_SCOPE("StationaryIteration::apply");
 
             iterations_ = 0;
-            if(use_arg_as_first_residual) {
+            if (use_arg_as_first_residual) {
                 iterations_ = 1;
                 preconditioner->apply(b, x);
             }
 
-            if(iterations_ >= max_it) return SFEM_SUCCESS;
+            if (iterations_ >= max_it) return SFEM_SUCCESS;
 
             ensure_workspace();
 
             T* r = workspace->data();
             for (; iterations_ < max_it; iterations_++) {
-                blas.zeros(workspace->size(), r);
+                blas->zeros(workspace->size(), r);
                 op->apply(x, r);
-                blas.axpby(n_dofs, 1.0, b, -1.0, r);
+                blas->axpby(n_dofs, 1.0, b, -1.0, r);
                 if (verbose) {
-                    T norm_residual = this->blas.norm2(workspace->size(), r);
+                    T norm_residual = this->blas->norm2(workspace->size(), r);
                     printf("%d : %f\n", iterations_, (double)norm_residual);
                 }
                 preconditioner->apply(r, x);
 
-                if(interceptor) {
+                if (interceptor) {
                     interceptor(x);
                 }
             }
@@ -92,7 +92,7 @@ namespace sfem {
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
-            this->op       = op + sfem::diag_op(diag, execution_space());
+            this->op       = op;  // + sfem::diag_op(diag, execution_space());
             auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
             if (shiftable) {
                 return shiftable->shift(diag);
@@ -104,10 +104,10 @@ namespace sfem {
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>&          op,
                                   const std::shared_ptr<SparseBlockVector<T>>& sbv,
-                                  const SharedBuffer<T>&            diag) override {
+                                  const SharedBuffer<T>&                       diag) override {
             assert(sbv->n_blocks() == diag->size());
-            
-            this->op = op + sfem::create_sparse_block_vector_mult(op->rows(), sbv, diag);
+
+            this->op = op;  // + sfem::create_sparse_block_vector_mult(op->rows(), sbv, diag);
 
             auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
             if (shiftable) {

@@ -117,29 +117,21 @@ void        translate3(const ptrdiff_t             nnodes,
     }
 }
 
-int main(int argc, char* argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
+int solve_hex8_extrude_mesh(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
     if (argc != 5) {
-        if (!rank) {
+        if (!comm->rank()) {
             fprintf(stderr, "usage: %s <quad4_mesh> <height> <nlayers> <output_hex8_mesh>\n", argv[0]);
         }
 
         return EXIT_FAILURE;
     }
 
-    const char*     input_folder  = argv[1];
+    const char     *input_folder  = argv[1];
     const geom_t    height        = atof(argv[2]);
     const ptrdiff_t nlayers       = atol(argv[3]);
-    const char*     output_folder = argv[4];
+    const char     *output_folder = argv[4];
 
-    auto quad_mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(input_folder));
+    auto quad_mesh = sfem::Mesh::create_from_file(comm, smesh::Path(input_folder));
 
     auto hex8_elements = sfem::create_host_buffer<idx_t>(8, quad_mesh->n_elements() * nlayers);
     auto hex8_points   = sfem::create_host_buffer<geom_t>(3, quad_mesh->n_nodes() * (nlayers + 1));
@@ -177,5 +169,10 @@ int main(int argc, char* argv[]) {
     path_output_format = std::string(output_folder) + "/x%d." + std::string(smesh::TypeToString<geom_t>::value());
     hex8_points->to_files(smesh::Path(path_output_format));
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_hex8_extrude_mesh(ctx->communicator(), argc, argv);
 }

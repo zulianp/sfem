@@ -20,10 +20,10 @@ namespace sfem {
         std::function<void(const T* const, T* const)> apply_op;
         std::function<void(const T* const, T* const)> left_preconditioner_op;
         std::function<void(const T* const, T* const)> right_preconditioner_op;
-        BLAS_Tpl<T> blas;
+        std::shared_ptr<BLAS<T>> blas;
 
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
-        int iterations_{0};
+        int       iterations_{0};
 
         bool verbose{true};
 
@@ -52,24 +52,33 @@ namespace sfem {
         }
 
         // Solver parameters
-        T tol{1e-10};
+        T   atol{1e-16};
+        T   rtol{1e-10};
         int max_it{10000};
 
-        void set_atol(const T val) { tol = val; }
+        void set_atol(const T val) { atol = val; }
+        void set_rtol(const T val) { rtol = val; }
 
         void default_init() {
-            OpenMP_BLAS<T>::build_blas(blas);
+            blas = make_openmp_blas<T>();
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
         bool good() const {
             assert(apply_op);
-            return blas.good() && apply_op;
+            return blas->good() && apply_op;
         }
 
-        void monitor(const int iter, const T residual) {
-            if (verbose && (iter == max_it || iter % 100 == 0 || residual < tol)) {
-                std::cout << iter << ": " << residual << "\n";
+        bool converged(const T residual, const T residual0) const {
+            return residual < atol || (residual0 > 0 && residual / residual0 < rtol);
+        }
+
+        void monitor(const int iter, const T residual, const T residual0) {
+            if (!verbose) return;
+            const T rel = (residual0 > 0) ? (residual / residual0) : residual;
+            if (iter == max_it || iter % 100 == 0 || converged(residual, residual0)) {
+                std::cout << iter << ": residual abs: " << residual << ", rel: " << rel << " (rtol = " << rtol
+                          << ", atol = " << atol << ")\n";
             }
         }
 
@@ -84,8 +93,7 @@ namespace sfem {
         int apply(const T* const b, T* const x) override {
             assert(n_dofs >= 0);
             if (this->n_dofs < 0) {
-                std::cerr
-                        << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
+                std::cerr << "Error uninitiaized n_dofs. Set set_n_dofs to set the number of dofs\n";
                 return 1;
             }
 
@@ -100,95 +108,103 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            T* r0 = blas.allocate(n);
+            T* r0 = blas->allocate(n);
 
             // Residual
             apply_op(x, r0);
-            blas.axpby(n, 1, b, -1, r0);
+            blas->axpby(n, 1, b, -1, r0);
 
-            T rho = blas.dot(n, r0, r0);
+            T rho = blas->dot(n, r0, r0);
 
-            if (sqrt(rho) < tol) {
-                blas.destroy(r0);
-                return 0;
+            const T r_norm0 = sqrt(rho);
+            if (converged(r_norm0, r_norm0)) {
+                blas->destroy(r0);
+                return SFEM_SUCCESS;
             }
 
-            T* r = blas.allocate(n);
-            T* p = blas.allocate(n);
-            T* v = blas.allocate(n);
-            T* h = blas.allocate(n);
-            T* s = blas.allocate(n);
-            T* t = blas.allocate(n);
+            T* r = blas->allocate(n);
+            T* p = blas->allocate(n);
+            T* v = blas->allocate(n);
+            T* h = blas->allocate(n);
+            T* s = blas->allocate(n);
+            T* t = blas->allocate(n);
 
-            blas.copy(n, r0, r);
-            blas.copy(n, r0, p);
+            blas->copy(n, r0, r);
+            blas->copy(n, r0, p);
 
             int info = SFEM_FAILURE;
             for (iterations_ = 0; iterations_ < max_it; iterations_++) {
-                blas.zeros(n, v);
+                blas->zeros(n, v);
                 apply_op(p, v);
 
-                const T ptv = blas.dot(n, r0, v);
+                const T ptv = blas->dot(n, r0, v);
 
-                if(ptv == 0) {
+                if (ptv == 0) {
                     info = SFEM_FAILURE;
                     break;
                 }
 
                 const T alpha = rho / ptv;
 
-                blas.zaxpby(n, 1, x, alpha, p, h);
-                blas.zaxpby(n, 1, r, -alpha, v, s);
+                blas->zaxpby(n, 1, x, alpha, p, h);
+                blas->zaxpby(n, 1, r, -alpha, v, s);
 
-                const T sts = blas.dot(n, s, s);
+                const T sts     = blas->dot(n, s, s);
+                const T s_norm  = sqrt(sts);
 
-                if (sqrt(sts) < tol) {
-                    monitor(iterations_, sqrt(sts));
-                    blas.copy(n, h, x);
-                    info = 0;
+                if (converged(s_norm, r_norm0)) {
+                    monitor(iterations_, s_norm, r_norm0);
+                    blas->copy(n, h, x);
+                    info = SFEM_SUCCESS;
                     break;
                 }
 
-                blas.zeros(n, t);
+                blas->zeros(n, t);
                 apply_op(s, t);
 
-                const T tts = blas.dot(n, t, s);
-                const T ttt = blas.dot(n, t, t);
+                const T tts = blas->dot(n, t, s);
+                const T ttt = blas->dot(n, t, t);
 
-                if(ttt == 0) {
+                if (ttt == 0) {
                     info = SFEM_FAILURE;
                     break;
                 }
 
                 const T omega = tts / ttt;
 
-                blas.zaxpby(n, 1, h, omega, s, x);
-                blas.zaxpby(n, 1, s, -omega, t, r);
+                blas->zaxpby(n, 1, h, omega, s, x);
+                blas->zaxpby(n, 1, s, -omega, t, r);
 
-                const T rtr = blas.dot(n, r, r);
+                const T rtr    = blas->dot(n, r, r);
+                const T r_norm = sqrt(rtr);
 
-                monitor(iterations_, sqrt(rtr));
-                if (sqrt(rtr) < tol) {
-                    info = 0;
+                monitor(iterations_, r_norm, r_norm0);
+                if (converged(r_norm, r_norm0)) {
+                    info = SFEM_SUCCESS;
                     break;
                 }
 
-                const T rho_new = blas.dot(n, r0, r);
-                const T beta = (rho_new / rho) * (alpha / omega);
-                rho = rho_new;
+                if (std::isnan(omega)) {
+                    info = SFEM_FAILURE;
+                    break;
+                }
 
-                blas.axpby(n, 1, r, beta, p);
-                blas.axpby(n, -omega * beta, v, 1, p);
+                const T rho_new = blas->dot(n, r0, r);
+                const T beta    = (rho_new / rho) * (alpha / omega);
+                rho             = rho_new;
+
+                blas->axpby(n, 1, r, beta, p);
+                blas->axpby(n, -omega * beta, v, 1, p);
             }
 
             // clean-up
-            blas.destroy(r0);
-            blas.destroy(r);
-            blas.destroy(p);
-            blas.destroy(v);
-            blas.destroy(h);
-            blas.destroy(s);
-            blas.destroy(t);
+            blas->destroy(r0);
+            blas->destroy(r);
+            blas->destroy(p);
+            blas->destroy(v);
+            blas->destroy(h);
+            blas->destroy(s);
+            blas->destroy(t);
             return info;
         }
 
@@ -197,104 +213,106 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
 
-            T* r0 = blas.allocate(n);
+            T* r0 = blas->allocate(n);
 
             // Residual
             apply_op(x, r0);
-            blas.axpby(n, 1, b, -1, r0);
+            blas->axpby(n, 1, b, -1, r0);
 
-            T rho = blas.dot(n, r0, r0);
+            T rho = blas->dot(n, r0, r0);
 
-            if (sqrt(rho) < tol) {
-                blas.destroy(r0);
-                return 0;
+            const T r_norm0 = sqrt(rho);
+            if (converged(r_norm0, r_norm0)) {
+                blas->destroy(r0);
+                return SFEM_SUCCESS;
             }
 
-            T* r = blas.allocate(n);
-            T* p = blas.allocate(n);
-            T* v = blas.allocate(n);
-            T* h = blas.allocate(n);
-            T* s = blas.allocate(n);
-            T* t = blas.allocate(n);
+            T* r = blas->allocate(n);
+            T* p = blas->allocate(n);
+            T* v = blas->allocate(n);
+            T* h = blas->allocate(n);
+            T* s = blas->allocate(n);
+            T* t = blas->allocate(n);
 
-            blas.copy(n, r0, r);
-            blas.copy(n, r0, p);
+            blas->copy(n, r0, r);
+            blas->copy(n, r0, p);
 
             int info = SFEM_FAILURE;
-            for (int iterations_ = 0; iterations_ < max_it; iterations_++) {
+            for (iterations_ = 0; iterations_ < max_it; iterations_++) {
                 auto y = t;  // reuse t as a temp for y
-                blas.zeros(n, y);
+                blas->zeros(n, y);
                 right_preconditioner_op(p, y);
 
-                blas.zeros(n, y);
+                blas->zeros(n, v);
                 apply_op(y, v);
 
-                const T ptv = blas.dot(n, r0, v);
-                if(ptv == 0) {
+                const T ptv = blas->dot(n, r0, v);
+                if (ptv == 0) {
                     info = SFEM_FAILURE;
-                    break;    
+                    break;
                 }
 
                 const T alpha = rho / ptv;
 
-                blas.zaxpby(n, 1, x, alpha, y, h);
-                blas.zaxpby(n, 1, r, -alpha, v, s);
+                blas->zaxpby(n, 1, x, alpha, y, h);
+                blas->zaxpby(n, 1, r, -alpha, v, s);
 
-                const T sts = blas.dot(n, s, s);
+                const T sts    = blas->dot(n, s, s);
+                const T s_norm = sqrt(sts);
 
-                if (sqrt(sts) < tol) {
-                    monitor(iterations_, sqrt(sts));
-                    blas.copy(n, h, x);
+                if (converged(s_norm, r_norm0)) {
+                    monitor(iterations_, s_norm, r_norm0);
+                    blas->copy(n, h, x);
                     info = SFEM_SUCCESS;
                     break;
                 }
 
                 auto z = x;  // reuse x as a temp for z
 
-                blas.zeros(n, z);
+                blas->zeros(n, z);
                 right_preconditioner_op(s, z);
 
-                blas.zeros(n, t);
+                blas->zeros(n, t);
                 apply_op(z, t);
 
-                const T tts = blas.dot(n, t, s);
-                const T ttt = blas.dot(n, t, t);
+                const T tts = blas->dot(n, t, s);
+                const T ttt = blas->dot(n, t, t);
 
-                if(ttt == 0) {
+                if (ttt == 0) {
                     info = SFEM_FAILURE;
-                    break;    
-                }
-
-
-                const T omega = tts / ttt;
-
-                blas.zaxpby(n, 1, h, omega, z, x);
-                blas.zaxpby(n, 1, s, -omega, t, r);
-
-                const T rtr = blas.dot(n, r, r);
-
-                monitor(iterations_, sqrt(rtr));
-                if (sqrt(rtr) < tol) {
-                    info = 0;
                     break;
                 }
 
-                const T rho_new = blas.dot(n, r0, r);
-                const T beta = (rho_new / rho) * (alpha / omega);
-                rho = rho_new;
+                const T omega = tts / ttt;
 
-                blas.axpby(n, 1, r, beta, p);
-                blas.axpby(n, -omega * beta, v, 1, p);
+                blas->zaxpby(n, 1, h, omega, z, x);
+                blas->zaxpby(n, 1, s, -omega, t, r);
+
+                const T rtr    = blas->dot(n, r, r);
+                const T r_norm = sqrt(rtr);
+
+                monitor(iterations_, r_norm, r_norm0);
+                if (converged(r_norm, r_norm0)) {
+                    info = SFEM_SUCCESS;
+                    break;
+                }
+
+                const T rho_new = blas->dot(n, r0, r);
+                const T beta    = (rho_new / rho) * (alpha / omega);
+                rho             = rho_new;
+
+                blas->axpby(n, 1, r, beta, p);
+                blas->axpby(n, -omega * beta, v, 1, p);
             }
 
             // clean-up
-            blas.destroy(r0);
-            blas.destroy(r);
-            blas.destroy(p);
-            blas.destroy(v);
-            blas.destroy(h);
-            blas.destroy(s);
-            blas.destroy(t);
+            blas->destroy(r0);
+            blas->destroy(r);
+            blas->destroy(p);
+            blas->destroy(v);
+            blas->destroy(h);
+            blas->destroy(s);
+            blas->destroy(t);
             return info;
         }
     };

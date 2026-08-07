@@ -7,8 +7,8 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Laplacian.hpp"
 #include "sfem_LinearElasticity.hpp"
-#include "smesh_semistructured.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_semistructured.hpp"
 
 #include "smesh_glob.hpp"
 
@@ -98,7 +98,7 @@ namespace sfem {
 
         auto &ssm = space->mesh();
 
-        double tick = MPI_Wtime();
+        double tick = smesh::time_seconds();
 
         int err = spectral_hex_laplacian_apply(smesh::semistructured_level(ssm),
                                                ssm.n_elements(),
@@ -108,7 +108,7 @@ namespace sfem {
                                                h,
                                                out);
 
-        double tock = MPI_Wtime();
+        double tock = smesh::time_seconds();
         total_time += (tock - tick);
         calls++;
         return err;

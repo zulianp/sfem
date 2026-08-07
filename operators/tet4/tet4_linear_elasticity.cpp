@@ -4,23 +4,23 @@
 
 #include <mpi.h>
 
-
 #include "sortreduce.hpp"
 
+#include "hex8_linear_elasticity_inline_cpu.hpp"
 #include "sfem_vec.hpp"
 #include "tet4_linear_elasticity_inline_cpu.hpp"
 
-int tet4_linear_elasticity_value(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elements,
+int tet4_linear_elasticity_value(const ptrdiff_t              nelements,
+                                 const ptrdiff_t              nnodes,
+                                 idx_t **const SFEM_RESTRICT  elements,
                                  geom_t **const SFEM_RESTRICT points,
-                                 const real_t mu,
-                                 const real_t lambda,
-                                 const ptrdiff_t u_stride,
-                                 const real_t *const ux,
-                                 const real_t *const uy,
-                                 const real_t *const uz,
-                                 real_t *const SFEM_RESTRICT value) {
+                                 const real_t                 mu,
+                                 const real_t                 lambda,
+                                 const ptrdiff_t              u_stride,
+                                 const real_t *const          ux,
+                                 const real_t *const          uy,
+                                 const real_t *const          uz,
+                                 real_t *const SFEM_RESTRICT  value) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -30,7 +30,7 @@ int tet4_linear_elasticity_value(const ptrdiff_t nelements,
     real_t acc = 0;
 #pragma omp parallel for reduction(+ : acc)
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[4];
+        idx_t    ev[4];
         scalar_t element_ux[4];
         scalar_t element_uy[4];
         scalar_t element_uz[4];
@@ -41,7 +41,7 @@ int tet4_linear_elasticity_value(const ptrdiff_t nelements,
         }
 
         for (int enode = 0; enode < 4; ++enode) {
-            idx_t dof = ev[enode] * u_stride;
+            idx_t dof         = ev[enode] * u_stride;
             element_ux[enode] = ux[dof];
             element_uy[enode] = uy[dof];
             element_uz[enode] = uz[dof];
@@ -79,20 +79,20 @@ int tet4_linear_elasticity_value(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elements,
+int tet4_linear_elasticity_apply(const ptrdiff_t              nelements,
+                                 const ptrdiff_t              nnodes,
+                                 idx_t **const SFEM_RESTRICT  elements,
                                  geom_t **const SFEM_RESTRICT points,
-                                 const real_t mu,
-                                 const real_t lambda,
-                                 const ptrdiff_t u_stride,
-                                 const real_t *const ux,
-                                 const real_t *const uy,
-                                 const real_t *const uz,
-                                 const ptrdiff_t out_stride,
-                                 real_t *const outx,
-                                 real_t *const outy,
-                                 real_t *const outz) {
+                                 const real_t                 mu,
+                                 const real_t                 lambda,
+                                 const ptrdiff_t              u_stride,
+                                 const real_t *const          ux,
+                                 const real_t *const          uy,
+                                 const real_t *const          uz,
+                                 const ptrdiff_t              out_stride,
+                                 real_t *const                outx,
+                                 real_t *const                outy,
+                                 real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -101,7 +101,7 @@ int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[4];
+        idx_t    ev[4];
         scalar_t element_ux[4];
         scalar_t element_uy[4];
         scalar_t element_uz[4];
@@ -169,16 +169,16 @@ int tet4_linear_elasticity_apply(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-int tet4_linear_elasticity_diag(const ptrdiff_t nelements,
-                                const ptrdiff_t nnodes,
-                                idx_t **const SFEM_RESTRICT elements,
+int tet4_linear_elasticity_diag(const ptrdiff_t              nelements,
+                                const ptrdiff_t              nnodes,
+                                idx_t **const SFEM_RESTRICT  elements,
                                 geom_t **const SFEM_RESTRICT points,
-                                const real_t mu,
-                                const real_t lambda,
-                                const ptrdiff_t out_stride,
-                                real_t *const outx,
-                                real_t *const outy,
-                                real_t *const outz) {
+                                const real_t                 mu,
+                                const real_t                 lambda,
+                                const ptrdiff_t              out_stride,
+                                real_t *const                outx,
+                                real_t *const                outy,
+                                real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -245,15 +245,15 @@ int tet4_linear_elasticity_diag(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-int tet4_linear_elasticity_crs(const ptrdiff_t nelements,
-                               const ptrdiff_t nnodes,
-                               idx_t **const SFEM_RESTRICT elements,
-                               geom_t **const SFEM_RESTRICT points,
-                               const real_t mu,
-                               const real_t lambda,
+int tet4_linear_elasticity_crs(const ptrdiff_t                    nelements,
+                               const ptrdiff_t                    nnodes,
+                               idx_t **const SFEM_RESTRICT        elements,
+                               geom_t **const SFEM_RESTRICT       points,
+                               const real_t                       mu,
+                               const real_t                       lambda,
                                const count_t *const SFEM_RESTRICT rowptr,
-                               const idx_t *const SFEM_RESTRICT colidx,
-                               real_t *const SFEM_RESTRICT values) {
+                               const idx_t *const SFEM_RESTRICT   colidx,
+                               real_t *const SFEM_RESTRICT        values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -262,7 +262,7 @@ int tet4_linear_elasticity_crs(const ptrdiff_t nelements,
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[4];
+        idx_t         ev[4];
         accumulator_t element_matrix[(4 * 3) * (4 * 3)];
 
 #pragma unroll(4)
@@ -301,15 +301,15 @@ int tet4_linear_elasticity_crs(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-int tet4_linear_elasticity_bsr(const ptrdiff_t nelements,
-                               const ptrdiff_t nnodes,
-                               idx_t **const SFEM_RESTRICT elements,
-                               geom_t **const SFEM_RESTRICT points,
-                               const real_t mu,
-                               const real_t lambda,
+int tet4_linear_elasticity_bsr(const ptrdiff_t                    nelements,
+                               const ptrdiff_t                    nnodes,
+                               idx_t **const SFEM_RESTRICT        elements,
+                               geom_t **const SFEM_RESTRICT       points,
+                               const real_t                       mu,
+                               const real_t                       lambda,
                                const count_t *const SFEM_RESTRICT rowptr,
-                               const idx_t *const SFEM_RESTRICT colidx,
-                               real_t *const SFEM_RESTRICT values) {
+                               const idx_t *const SFEM_RESTRICT   colidx,
+                               real_t *const SFEM_RESTRICT        values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
@@ -318,7 +318,7 @@ int tet4_linear_elasticity_bsr(const ptrdiff_t nelements,
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
-        idx_t ev[4];
+        idx_t         ev[4];
         accumulator_t element_matrix[(4 * 3) * (4 * 3)];
 
 #pragma unroll(4)
@@ -352,6 +352,87 @@ int tet4_linear_elasticity_bsr(const ptrdiff_t nelements,
                 (mu, lambda, jacobian_adjugate, jacobian_determinant, element_matrix);
 
         tet4_local_to_global_bsr3(ev, element_matrix, rowptr, colidx, values);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int tet4_linear_elasticity_block_diag_sym(const ptrdiff_t                                        nelements,
+                                          const ptrdiff_t                                        nnodes,
+                                          const idx_t *const SFEM_RESTRICT *const SFEM_RESTRICT  elements,
+                                          const geom_t *const SFEM_RESTRICT *const SFEM_RESTRICT points,
+                                          const real_t                                           mu,
+                                          const real_t                                           lambda,
+                                          const ptrdiff_t                                        out_stride,
+                                          real_t *const SFEM_RESTRICT                            out0,
+                                          real_t *const SFEM_RESTRICT                            out1,
+                                          real_t *const SFEM_RESTRICT                            out2,
+                                          real_t *const SFEM_RESTRICT                            out3,
+                                          real_t *const SFEM_RESTRICT                            out4,
+                                          real_t *const SFEM_RESTRICT                            out5) {
+    SFEM_UNUSED(nnodes);
+
+    const geom_t *const x = points[0];
+    const geom_t *const y = points[1];
+    const geom_t *const z = points[2];
+
+#pragma omp parallel for
+    for (ptrdiff_t i = 0; i < nelements; ++i) {
+        idx_t ev[4];
+
+        for (int v = 0; v < 4; ++v) {
+            ev[v] = elements[v][i];
+        }
+
+        scalar_t jacobian_adjugate[9];
+        scalar_t jacobian_determinant = 0;
+        tet4_adjugate_and_det_s(x[ev[0]],
+                                x[ev[1]],
+                                x[ev[2]],
+                                x[ev[3]],
+                                // Y-coordinates
+                                y[ev[0]],
+                                y[ev[1]],
+                                y[ev[2]],
+                                y[ev[3]],
+                                // Z-coordinates
+                                z[ev[0]],
+                                z[ev[1]],
+                                z[ev[2]],
+                                z[ev[3]],
+                                // Output
+                                jacobian_adjugate,
+                                &jacobian_determinant);
+
+        static const scalar_t grads[4][3] = {
+                {-1, -1, -1},
+                {1, 0, 0},
+                {0, 1, 0},
+                {0, 0, 1},
+        };
+
+        // Assemble the diagonal part of the matrix
+        for (int edof_i = 0; edof_i < 4; edof_i++) {
+            accumulator_t element_matrix[6] = {0, 0, 0, 0, 0, 0};
+            linear_elasticity_matrix_sym(
+                    mu, lambda, jacobian_adjugate, jacobian_determinant, grads[edof_i], grads[edof_i], 1.0, element_matrix);
+
+            const ptrdiff_t v = ev[edof_i];
+
+            // local to global
+#pragma omp atomic update
+            out0[v * out_stride] += element_matrix[0];
+#pragma omp atomic update
+            out1[v * out_stride] += element_matrix[1];
+#pragma omp atomic update
+            out2[v * out_stride] += element_matrix[2];
+#pragma omp atomic update
+            out3[v * out_stride] += element_matrix[3];
+#pragma omp atomic update
+            out4[v * out_stride] += element_matrix[4];
+#pragma omp atomic update
+            out5[v * out_stride] += element_matrix[5];
+        }
     }
 
     return SFEM_SUCCESS;

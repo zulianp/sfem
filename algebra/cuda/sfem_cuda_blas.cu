@@ -206,7 +206,7 @@ public:
 };
 
 template <typename T>
-using BLAS = BLASImpl<T>;
+using CUDA_BLAS_Impl = BLASImpl<T>;
 
 #else
 
@@ -276,21 +276,21 @@ __global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T 
 }
 
 template <typename T>
-class BLAS {
+class CUDA_BLAS_Impl {
 public:
-    static float dot(const ptrdiff_t n, const T *const l, const T *const r) {
+    static T dot(const ptrdiff_t n, const T *const l, const T *const r) {
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
 
-        double *d_result = 0;
-        cudaMalloc((void **)&d_result, sizeof(double));
-        cudaMemset((void *)d_result, 0, sizeof(double));
+        T *d_result = 0;
+        cudaMalloc((void **)&d_result, sizeof(T));
+        cudaMemset((void *)d_result, 0, sizeof(T));
 
         tdot<<<n_blocks, kernel_block_size>>>(n, l, r, d_result);
         SFEM_DEBUG_SYNCHRONIZE();
 
-        double ret = 0;
-        cudaMemcpy(&ret, d_result, sizeof(double), cudaMemcpyDeviceToHost);
+        T ret = 0;
+        cudaMemcpy(&ret, d_result, sizeof(T), cudaMemcpyDeviceToHost);
         cudaFree(d_result);
         return ret;
     }
@@ -416,14 +416,14 @@ extern void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const des
     cudaMemcpy(dest, src, n * sizeof(real_t), cudaMemcpyDeviceToDevice);
 }
 
-extern real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r) { return BLAS<real_t>::dot(n, l, r); }
+extern real_t d_dot(const ptrdiff_t n, const real_t *const l, const real_t *const r) { return CUDA_BLAS_Impl<real_t>::dot(n, l, r); }
 
 extern void d_axpby(const ptrdiff_t n, const real_t alpha, const real_t *const x, const real_t beta, real_t *const y) {
-    BLAS<real_t>::axpby(n, alpha, x, beta, y);
+    CUDA_BLAS_Impl<real_t>::axpby(n, alpha, x, beta, y);
 }
 
 extern void d_axpy(const ptrdiff_t n, const real_t alpha, const real_t *const x, real_t *const y) {
-    BLAS<real_t>::axpy(n, alpha, x, y);
+    CUDA_BLAS_Impl<real_t>::axpy(n, alpha, x, y);
 }
 
 extern void d_zaxpby(const ptrdiff_t     n,
@@ -432,14 +432,14 @@ extern void d_zaxpby(const ptrdiff_t     n,
                      const real_t        beta,
                      const real_t *const y,
                      real_t *const       z) {
-    BLAS<real_t>::zaxpby(n, alpha, x, beta, y, z);
+    CUDA_BLAS_Impl<real_t>::zaxpby(n, alpha, x, beta, y, z);
 }
 
-extern void d_scal(const ptrdiff_t n, const real_t alpha, real_t *const x) { BLAS<real_t>::scal(n, alpha, x); }
+extern void d_scal(const ptrdiff_t n, const real_t alpha, real_t *const x) { CUDA_BLAS_Impl<real_t>::scal(n, alpha, x); }
 
 extern real_t d_nrm2(const ptrdiff_t n, const real_t *const x) {
     real_t ret = 0;
-    BLAS<real_t>::nrm2(n, x, &ret);
+    CUDA_BLAS_Impl<real_t>::nrm2(n, x, &ret);
     return ret;
 }
 
@@ -494,48 +494,85 @@ extern void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const
 namespace sfem {
 
     template <typename T>
-    void CUDA_BLAS<T>::build_blas(struct BLAS_Tpl<T> &tpl) {
-        tpl.allocate = [](const std::ptrdiff_t n) -> T * {
-            T *ptr = nullptr;
-            cudaMalloc((void **)&ptr, n * sizeof(T));
+    T *CUDA_BLAS<T>::allocate(const std::size_t n) {
+        T *ptr = nullptr;
+        cudaMalloc((void **)&ptr, n * sizeof(T));
 
-            if (!ptr) {
-                size_t free, total;
-                cudaMemGetInfo(&free, &total);
-                SFEM_ERROR(
-                        "cudaMalloc failed to allocate %g [GB]\n"
-                        "%g [GB] free, %g [GB] total\n",
-                        n * sizeof(T) * 1e-9,
-                        free * 1e-9,
-                        total * 1e-9);
-            }
+        if (!ptr) {
+            size_t free, total;
+            cudaMemGetInfo(&free, &total);
+            SFEM_ERROR(
+                    "cudaMalloc failed to allocate %g [GB]\n"
+                    "%g [GB] free, %g [GB] total\n",
+                    n * sizeof(T) * 1e-9,
+                    free * 1e-9,
+                    total * 1e-9);
+        }
 
-            cudaMemset(ptr, 0, n * sizeof(T));
-            return ptr;
-        };
+        cudaMemset(ptr, 0, n * sizeof(T));
+        return ptr;
+    }
 
-        tpl.copy = [](const ptrdiff_t n, const T *const src, T *const dest) {
-            CHECK_CUDA(cudaMemcpy(dest, src, n * sizeof(T), cudaMemcpyDeviceToDevice));
-        };
+    template <typename T>
+    void CUDA_BLAS<T>::destroy(void *a) {
+        d_destroy(a);
+    }
 
-        tpl.zeros = [](const std::size_t size, T *const x) { CHECK_CUDA(cudaMemset(x, 0, size * sizeof(T))); };
+    template <typename T>
+    void CUDA_BLAS<T>::zeros(const std::size_t size, T *const x) {
+        CHECK_CUDA(cudaMemset(x, 0, size * sizeof(T)));
+    }
 
-        tpl.norm2 = [](const ptrdiff_t n, const T *const x) -> T {
-            T ret = 0;
-            BLASImpl<T>::nrm2(n, x, &ret);
-            return ret;
-        };
+    template <typename T>
+    void CUDA_BLAS<T>::values(const std::size_t size, const T value, T *const x) {
+        tvalues<T>(size, value, x);
+    }
 
-        tpl.xypaz      = txypaz<T>;
-        tpl.reciprocal = reciprocal<T>;
+    template <typename T>
+    void CUDA_BLAS<T>::copy(const ptrdiff_t n, const T *const src, T *const dest) {
+        CHECK_CUDA(cudaMemcpy(dest, src, n * sizeof(T), cudaMemcpyDeviceToDevice));
+    }
 
-        tpl.destroy = &d_destroy;
-        tpl.values  = &tvalues<T>;
-        tpl.dot     = &BLASImpl<T>::dot;
-        tpl.axpby   = &BLASImpl<T>::axpby;
-        tpl.axpy    = &BLASImpl<T>::axpy;
-        tpl.scal    = &BLASImpl<T>::scal;
-        tpl.zaxpby  = &BLASImpl<T>::zaxpby;
+    template <typename T>
+    T CUDA_BLAS<T>::dot(const ptrdiff_t n, const T *const l, const T *const r) {
+        return CUDA_BLAS_Impl<T>::dot(n, l, r);
+    }
+
+    template <typename T>
+    void CUDA_BLAS<T>::axpy(const ptrdiff_t n, const T alpha, const T *const x, T *const y) {
+        CUDA_BLAS_Impl<T>::axpy(n, alpha, x, y);
+    }
+
+    template <typename T>
+    void CUDA_BLAS<T>::axpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, T *const y) {
+        CUDA_BLAS_Impl<T>::axpby(n, alpha, x, beta, y);
+    }
+
+    template <typename T>
+    void CUDA_BLAS<T>::scal(const std::ptrdiff_t n, const T alpha, T *const x) {
+        CUDA_BLAS_Impl<T>::scal(n, alpha, x);
+    }
+
+    template <typename T>
+    void CUDA_BLAS<T>::reciprocal(const std::ptrdiff_t n, const T alpha, T *const x) {
+        ::reciprocal<T>(n, alpha, x);
+    }
+
+    template <typename T>
+    T CUDA_BLAS<T>::norm2(const ptrdiff_t n, const T *const x) {
+        T ret = 0;
+        CUDA_BLAS_Impl<T>::nrm2(n, x, &ret);
+        return ret;
+    }
+
+    template <typename T>
+    void CUDA_BLAS<T>::zaxpby(const ptrdiff_t n, const T alpha, const T *const x, const T beta, const T *const y, T *const z) {
+        CUDA_BLAS_Impl<T>::zaxpby(n, alpha, x, beta, y, z);
+    }
+
+    template <typename T>
+    void CUDA_BLAS<T>::xypaz(const ptrdiff_t n, const T *const x, const T *const y, const T alpha, T *const z) {
+        txypaz<T>(n, x, y, alpha, z);
     }
 
     template struct CUDA_BLAS<double>;

@@ -21,6 +21,8 @@
 
 #define SFEM_RESAMPLE_GAP_DUAL
 
+namespace sfem {
+
 /**
  * @brief Compute tetrahedral dual basis functions and their weighted sum for a point in physical space
  *
@@ -832,3 +834,5 @@ tet4_resample_field_local_refine_adjoint_hyteg(const ptrdiff_t                  
     RETURN_FROM_FUNCTION(ret);
 }  // END OF FUNCTION tet4_resample_field_local_refine_adjoint_hyteg
 //////////////////////////////////////////////////////////
+
+}  // namespace sfem

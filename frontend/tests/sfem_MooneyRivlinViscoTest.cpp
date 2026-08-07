@@ -9,7 +9,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_bsr_SpMV.hpp"
+#include "sfem_BSR.hpp"
 #include "sfem_test.hpp"
 #include "smesh_sideset.hpp"
 
@@ -50,7 +50,6 @@ std::shared_ptr<sfem::Output> create_output(const std::shared_ptr<sfem::Function
 }
 
 int test_mooney_rivlin_visco_relaxation() {
-    MPI_Comm comm = MPI_COMM_WORLD;
     auto     es   = sfem::EXECUTION_SPACE_HOST;
 
     int SFEM_BASE_RESOLUTION = 4;
@@ -60,9 +59,9 @@ int test_mooney_rivlin_visco_relaxation() {
     const char                 *mesh_path = getenv("SFEM_MESH");
     if (mesh_path && mesh_path[0] != '\0') {
         printf("Loading mesh from: %s\n", mesh_path);
-        mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(mesh_path));
+        mesh = sfem::Mesh::create_from_file(sfem::Communicator::world(), smesh::Path(mesh_path));
     } else {
-        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::wrap(comm),
+        mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
                                             SFEM_BASE_RESOLUTION,
                                             SFEM_BASE_RESOLUTION,
                                             SFEM_BASE_RESOLUTION,  // Grid
@@ -157,7 +156,7 @@ int test_mooney_rivlin_visco_relaxation() {
 
         if (g_prony.size() != tau_prony.size()) {
             printf("Error: SFEM_PRONY_G and SFEM_PRONY_TAU must have the same number of terms!\n");
-            MPI_Abort(MPI_COMM_WORLD, 1);
+            exit(EXIT_FAILURE);
         }
 
         printf("Prony series from environment: %zu terms\n", g_prony.size());

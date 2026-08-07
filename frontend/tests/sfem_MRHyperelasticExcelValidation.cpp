@@ -119,11 +119,11 @@ struct TestResult {
 TestResult run_hyperelastic_test(TestMode mode, const RefData& ref) {
     printf("\n=== %s Hyperelastic Test ===\n", get_mode_name(mode));
     
-    MPI_Comm comm = MPI_COMM_WORLD;
+    auto comm = sfem::Communicator::world();
     auto es = sfem::EXECUTION_SPACE_HOST;
     
     auto mesh = sfem::Mesh::create_hex8_cube(
-        sfem::Communicator::wrap(comm),
+        comm,
         1, 1, 1,
         0.0, 0.0, 0.0,
         1.0, 1.0, 1.0
@@ -214,7 +214,7 @@ TestResult run_hyperelastic_test(TestMode mode, const RefData& ref) {
 }
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
+    auto ctx = sfem::initialize(argc, argv);
     
     printf("================================================================\n");
     printf("  Mooney-Rivlin Hyperelastic Validation Test\n");
@@ -359,6 +359,5 @@ plt.close(fig)
     
     printf("\nTo generate plot, run:\n  python3 plot_hyperelastic_excel_validation.py\n");
     
-    MPI_Finalize();
     return 0;
 }

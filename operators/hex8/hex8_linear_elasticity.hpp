@@ -54,6 +54,23 @@ int affine_hex8_linear_elasticity_apply_adjugate(const ptrdiff_t                
                                                  real_t *const                         outy,
                                                  real_t *const                         outz);
 
+/// Affine apply with SoA adjugate streams: adj[d][e], det[e]. Uses sum-factorization.
+int affine_hex8_linear_elasticity_apply_adjugate_soa(const ptrdiff_t                              nelements,
+                                                     const ptrdiff_t                              nnodes,
+                                                     idx_t **const SFEM_RESTRICT                  elements,
+                                                     const jacobian_t *const SFEM_RESTRICT *const adjugate,
+                                                     const geom_t *const SFEM_RESTRICT            jacobian_determinant,
+                                                     const real_t                                 mu,
+                                                     const real_t                                 lambda,
+                                                     const ptrdiff_t                              u_stride,
+                                                     const real_t *const                          ux,
+                                                     const real_t *const                          uy,
+                                                     const real_t *const                          uz,
+                                                     const ptrdiff_t                              out_stride,
+                                                     real_t *const                                outx,
+                                                     real_t *const                                outy,
+                                                     real_t *const                                outz);
+
 int affine_hex8_linear_elasticity_bsr(const ptrdiff_t                    nelements,
                                       const ptrdiff_t                    nnodes,
                                       idx_t **const SFEM_RESTRICT        elements,
@@ -134,6 +151,25 @@ int hex8_linear_elasticity_l2_project_cauchy_stress(const ptrdiff_t             
                                                     real_t *const                s11,
                                                     real_t *const                s12,
                                                     real_t *const                s22);
+
+int hex8_linear_elasticity_objective_steps(const ptrdiff_t                   nelements,
+                                           const ptrdiff_t                   stride,
+                                           const ptrdiff_t                   nnodes,
+                                           idx_t **const SFEM_RESTRICT       elements,
+                                           geom_t **const SFEM_RESTRICT      points,
+                                           const real_t                      mu,
+                                           const real_t                      lambda,
+                                           const ptrdiff_t                   u_stride,
+                                           const real_t *const SFEM_RESTRICT ux,
+                                           const real_t *const SFEM_RESTRICT uy,
+                                           const real_t *const SFEM_RESTRICT uz,
+                                           const ptrdiff_t                   inc_stride,
+                                           const real_t *const SFEM_RESTRICT incx,
+                                           const real_t *const SFEM_RESTRICT incy,
+                                           const real_t *const SFEM_RESTRICT incz,
+                                           const int                         nsteps,
+                                           const real_t *const               steps,
+                                           real_t *const SFEM_RESTRICT       out);
 
 #ifdef __cplusplus
 }

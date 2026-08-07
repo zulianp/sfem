@@ -3,11 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
-
 
 #include "sfem_base.hpp"
 
@@ -161,16 +157,8 @@ void shear(const ptrdiff_t nelements,
     }
 }
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_cshear(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -180,33 +168,32 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
-    const char *path_u[3] = {argv[2], argv[3], argv[4]};
+    const char *folder        = argv[1];
+    const char *path_u[3]     = {argv[2], argv[3], argv[4]};
     const char *output_prefix = argv[5];
 
     printf("%s %s %s %s %s %s\n", argv[0], folder, path_u[0], path_u[1], path_u[2], output_prefix);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
-
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
-    const ptrdiff_t n_nodes = mesh->n_nodes();
+    const ptrdiff_t n_nodes    = mesh->n_nodes();
 
-    real_t *u[3];
-
-    ptrdiff_t u_n_local, u_n_global;
-
-    for (int d = 0; d < 3; ++d) {
-        array_create_from_file(comm, path_u[d], SFEM_MPI_REAL_T, (void **)&u[d], &u_n_local, &u_n_global);
+    auto u0 = sfem::Buffer<real_t>::from_file(smesh::Path(path_u[0]));
+    auto u1 = sfem::Buffer<real_t>::from_file(smesh::Path(path_u[1]));
+    auto u2 = sfem::Buffer<real_t>::from_file(smesh::Path(path_u[2]));
+    if (!u0 || !u1 || !u2) {
+        SFEM_ERROR("Failed to read displacement files\n");
     }
-    
-    real_t *shear_6[6];
+
+    real_t *u[3] = {u0->data(), u1->data(), u2->data()};
+
+    std::shared_ptr<sfem::Buffer<real_t>> shear_bufs[6];
+    real_t                               *shear_6[6];
     for (int d = 0; d < 6; ++d) {
-        shear_6[d] = (real_t *)malloc(n_elements * sizeof(real_t));
+        shear_bufs[d] = sfem::create_host_buffer<real_t>(n_elements);
+        shear_6[d]    = shear_bufs[d]->data();
     }
 
     shear(n_elements,
@@ -226,17 +213,21 @@ int main(int argc, char *argv[]) {
     char path[2048];
     for (int d = 0; d < 6; ++d) {
         snprintf(path, sizeof(path), "%s.%d.raw", output_prefix, d);
-        array_write(comm, path, SFEM_MPI_REAL_T, shear_6[d], n_elements, n_elements);
-        free(shear_6[d]);
+        shear_bufs[d]->to_file(smesh::Path(path));
     }
 
-    double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_cshear(ctx->communicator(), argc, argv);
 }

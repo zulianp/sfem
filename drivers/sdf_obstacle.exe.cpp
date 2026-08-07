@@ -21,21 +21,11 @@
 #include "boundary_condition_io.hpp"
 #include "dirichlet.hpp"
 
-#include "matrixio_array.h"
-
 #include "sfem_SSMultigrid.hpp"
 #include "sfem_ssmgc.hpp"
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -105,10 +95,10 @@ int main(int argc, char *argv[]) {
 
     smesh::create_directory(output_path);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     smesh::Path folder{argv[1]};
-    auto        m          = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto        m          = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     const int   block_size = 3;
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
@@ -207,7 +197,7 @@ int main(int argc, char *argv[]) {
 
     // auto upper_bound_increment = sfem::create_buffer<real_t>(contact_conds->n_constrained_dofs(), es);
 
-    double solve_tick = MPI_Wtime();
+    double solve_tick = smesh::time_seconds();
 
     // auto blas = sfem::blas<real_t>(es);
 
@@ -243,7 +233,7 @@ int main(int argc, char *argv[]) {
     //     }
     // }
 
-    double solve_tock = MPI_Wtime();
+    double solve_tock = smesh::time_seconds();
 
     auto h_x   = smesh::to_host(x);
     auto h_rhs = smesh::to_host(rhs);
@@ -263,12 +253,12 @@ int main(int argc, char *argv[]) {
     output->write("rhs", h_rhs->data());
     output->write("gap", upper_bound_viz->data());
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     ptrdiff_t nelements = m->n_elements();
     ptrdiff_t nnodes    = fs->mesh().n_nodes();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("%s (%s):\n", argv[0], type_to_string(fs->element_type()));
         printf("----------------------------------------\n");
@@ -277,5 +267,10 @@ int main(int argc, char *argv[]) {
         printf("----------------------------------------\n");
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_sdf_obstacle(ctx->communicator(), argc, argv);
 }

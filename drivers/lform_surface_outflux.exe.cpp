@@ -3,11 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "array_dtof.h"
-#include "matrixio_array.h"
-#include "matrixio_crs.h"
 #include "utils.h"
-
 
 #include "sfem_base.hpp"
 
@@ -404,21 +400,13 @@ void surface_outflux(const smesh::ElemType element_type,
         }
         default: {
             assert(0);
-            MPI_Abort(MPI_COMM_WORLD, SFEM_FAILURE);
+            SFEM_ERROR("Unsupported element type");
         }
     }
 }
 
-int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
-
-    MPI_Comm comm = MPI_COMM_WORLD;
-
-    int rank, size;
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (size != 1) {
+int solve_lform_surface_outflux(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    if (comm->size() != 1) {
         fprintf(stderr, "Parallel execution not supported!\n");
         return EXIT_FAILURE;
     }
@@ -428,9 +416,9 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const char *folder = argv[1];
+    const char *folder             = argv[1];
     const char *path_vector_field[3] = {argv[2], argv[3], argv[4]};
-    const char *path_output = argv[5];
+    const char *path_output        = argv[5];
 
     printf("%s %s %s %s %s %s\n",
            argv[0],
@@ -440,37 +428,30 @@ int main(int argc, char *argv[]) {
            path_vector_field[2],
            path_output);
 
-    double tick = MPI_Wtime();
+    const double tick = smesh::time_seconds();
 
-    ///////////////////////////////////////////////////////////////////////////////
-    // Read data
-    ///////////////////////////////////////////////////////////////////////////////
-
-    auto mesh = sfem::Mesh::create_from_file(sfem::Communicator::wrap(comm), smesh::Path(folder));
+    auto            mesh       = sfem::Mesh::create_from_file(comm, smesh::Path(folder));
     const ptrdiff_t n_elements = mesh->n_elements();
-    const ptrdiff_t n_nodes = mesh->n_nodes();
+    const ptrdiff_t n_nodes    = mesh->n_nodes();
 
-    real_t *vector_field[3];
-    ptrdiff_t vector_field_size_local, vector_field_size_global;
-
-    for (int d = 0; d < mesh->spatial_dimension(); ++d) {
-        array_create_from_file(comm,
-                               path_vector_field[d],
-                               SFEM_MPI_REAL_T,
-                               (void **)&vector_field[d],
-                               &vector_field_size_local,
-                               &vector_field_size_global);
+    auto v0 = sfem::Buffer<real_t>::from_file(smesh::Path(path_vector_field[0]));
+    auto v1 = sfem::Buffer<real_t>::from_file(smesh::Path(path_vector_field[1]));
+    auto v2 = sfem::Buffer<real_t>::from_file(smesh::Path(path_vector_field[2]));
+    if (!v0 || !v1 || !v2) {
+        SFEM_ERROR("Failed to read vector field files\n");
     }
+
+    real_t *vector_field[3] = {v0->data(), v1->data(), v2->data()};
 
     geom_t *normals_xyz[3];
     for (int d = 0; d < mesh->spatial_dimension(); ++d) {
-        normals_xyz[d] = (geom_t *)malloc(n_elements * sizeof(geom_t));
+        normals_xyz[d] = (geom_t *)malloc((size_t)n_elements * sizeof(geom_t));
     }
 
     normals(n_elements, n_nodes, mesh->elements(0)->data(), mesh->points()->data(), normals_xyz);
 
-    real_t *outflux = (real_t *)malloc(n_nodes * sizeof(real_t));
-    memset(outflux, 0, n_nodes * sizeof(real_t));
+    auto outflux_buf = sfem::create_host_buffer<real_t>(n_nodes);
+    real_t *outflux  = outflux_buf->data();
 
     surface_outflux(mesh->element_type(0),
                     n_elements,
@@ -487,27 +468,29 @@ int main(int argc, char *argv[]) {
     SFEM_READ_ENV(SFEM_EXPORT_NORMALS, atoi);
 
     if (SFEM_EXPORT_NORMALS) {
-        array_write(comm, "normalx.raw", SFEM_MPI_GEOM_T, normals_xyz[0], n_elements, n_elements);
-        array_write(comm, "normaly.raw", SFEM_MPI_GEOM_T, normals_xyz[1], n_elements, n_elements);
-        array_write(comm, "normalz.raw", SFEM_MPI_GEOM_T, normals_xyz[2], n_elements, n_elements);
+        sfem::Buffer<geom_t>::wrap(n_elements, normals_xyz[0])->to_file(smesh::Path("normalx.raw"));
+        sfem::Buffer<geom_t>::wrap(n_elements, normals_xyz[1])->to_file(smesh::Path("normaly.raw"));
+        sfem::Buffer<geom_t>::wrap(n_elements, normals_xyz[2])->to_file(smesh::Path("normalz.raw"));
     }
 
-    array_write(comm, path_output, SFEM_MPI_REAL_T, outflux, n_nodes, n_nodes);
-
-    free(outflux);
+    outflux_buf->to_file(smesh::Path(path_output));
 
     for (int d = 0; d < mesh->spatial_dimension(); ++d) {
         free(normals_xyz[d]);
-        free(vector_field[d]);
     }
 
-    double tock = MPI_Wtime();
+    const double tock = smesh::time_seconds();
 
-    if (!rank) {
+    if (!comm->rank()) {
         printf("----------------------------------------\n");
         printf("#elements %ld #nodes %ld\n", (long)n_elements, (long)n_nodes);
         printf("TTS:\t\t\t%g seconds\n", tock - tick);
     }
 
-    return MPI_Finalize();
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    auto ctx = sfem::initialize(argc, argv);
+    return solve_lform_surface_outflux(ctx->communicator(), argc, argv);
 }

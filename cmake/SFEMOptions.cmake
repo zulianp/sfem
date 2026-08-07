@@ -14,7 +14,6 @@ option(SFEM_ENABLE_EXPLICIT_VECTORIZATION "Enable explicit vectorization kernels
 option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" ON)
 option(SFEM_ENABLE_GLIBCXX_DEBUG "uses flags -D_GLIBCXX_DEBUG when compiling in debug mode" OFF)
 option(SFEM_ENABLE_HXTSORT "Enable HXTSort library for unsigned indices" OFF)
-option(SFEM_ENABLE_ISOLVER "Enable Isolver interface" OFF)
 option(SFEM_ENABLE_LAPACK "Enable Lapck support" OFF)
 option(SFEM_ENABLE_MEM_DIAGNOSTICS "Enable mem diagonstics" ON)
 option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
@@ -25,7 +24,15 @@ option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" ON)
 option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
 option(SFEM_ENABLE_SCCD "Enable SCCD library" OFF)
+option(SFEM_SCCD_BUILD_SHARED_LIBS "Build bundled SCCD as a shared library" OFF)
 option(SFEM_ENABLE_SSDF "Enable SSDF library" OFF)
+set(_SFEM_ENABLE_CUBIQL_DEFAULT ${SFEM_ENABLE_SSDF})
+option(SFEM_ENABLE_CUBIQL "Enable cuBQL acceleration in SSDF" ${_SFEM_ENABLE_CUBIQL_DEFAULT})
+unset(_SFEM_ENABLE_CUBIQL_DEFAULT)
+if(SFEM_ENABLE_SSDF AND NOT SFEM_ENABLE_CUBIQL)
+    message(STATUS "SFEM_ENABLE_CUBIQL enabled because SFEM_ENABLE_SSDF is ON")
+    set(SFEM_ENABLE_CUBIQL ON CACHE BOOL "Enable cuBQL acceleration in SSDF" FORCE)
+endif()
 option(SFEM_ENABLE_SRESAMPLE "Enable resampling library" OFF) # TODO
 
 if(WIN32)        
@@ -113,4 +120,11 @@ if(SFEM_ENABLE_AVX2)
 endif()
 
 
+option(SFEM_TET4_CUDA "Use CUDA for TET4" OFF)
+message(STATUS "SFEM_TET4_CUDA: ${SFEM_TET4_CUDA}")
 
+option(SFEM_TET10_CUDA "Use CUDA for TET10" OFF)
+message(STATUS "SFEM_TET10_CUDA: ${SFEM_TET10_CUDA}")
+
+option(SFEM_TET10_WENO "Use WENO for TET10" ON)
+message(STATUS "SFEM_TET10_WENO: ${SFEM_TET10_WENO}")
