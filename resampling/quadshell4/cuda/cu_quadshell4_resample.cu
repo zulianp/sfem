@@ -345,11 +345,9 @@ __global__ void cu_quadshell4_resample_gap_local_kernel(
                 const ptrdiff_t j = floor(grid_y);
                 const ptrdiff_t k = floor(grid_z);
 
-                // If outside grid: +infty SDF sample → after wg -= stored gap is -infty (far/separated).
-                // Used by sample()/viz. Solver upper bounds use gap_value_local (opposite inject sign).
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
-                        element_gap[edof_i] += infty * quad4_f[edof_i] * dV;
+                        element_gap[edof_i] += -infty * quad4_f[edof_i] * dV;
                         element_xnormal[edof_i] += face_nx * quad4_f[edof_i] * dV;
                         element_ynormal[edof_i] += face_ny * quad4_f[edof_i] * dV;
                         element_znormal[edof_i] += face_nz * quad4_f[edof_i] * dV;

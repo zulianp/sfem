@@ -15,7 +15,7 @@
 #define POW2(a) ((a) * (a))
 #endif
 
-static const scalar_t infty = 10000;
+static const scalar_t infty             = 10000;
 static const real_t   SFEM_SDF_GRAD_EPS = 1e-12;
 
 // #define SFEM_RESAMPLE_GAP_DUAL
@@ -74,9 +74,9 @@ SFEM_INLINE static real_t quadshell4_measure_and_normal(
     const scalar_t x8 = pz0 * x0 - pz1 * qx + pz2 * qx + pz3 * x1;
     const scalar_t x9 = pz0 * x3 + pz1 * x4 + pz2 * qy - pz3 * qy;
 
-    const real_t cx = x6 * x9 - x8 * x7;
-    const real_t cy = x8 * x5 - x2 * x9;
-    const real_t cz = x2 * x7 - x6 * x5;
+    const real_t cx      = x6 * x9 - x8 * x7;
+    const real_t cy      = x8 * x5 - x2 * x9;
+    const real_t cz      = x2 * x7 - x6 * x5;
     const real_t measure = sqrt(POW2(cx) + POW2(cy) + POW2(cz));
 
     if (measure > SFEM_SDF_GRAD_EPS) {
@@ -112,8 +112,7 @@ SFEM_INLINE static real_t quadshell4_measure(
         const real_t qx,
         const real_t qy) {
     real_t nx, ny, nz;
-    return quadshell4_measure_and_normal(
-            px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, qx, qy, &nx, &ny, &nz);
+    return quadshell4_measure_and_normal(px0, px1, px2, px3, py0, py1, py2, py3, pz0, pz1, pz2, pz3, qx, qy, &nx, &ny, &nz);
 }
 
 SFEM_INLINE static void quadshell4_transform(
@@ -302,24 +301,24 @@ int quadshell4_resample_gap_local(
 
         for (int q_ix = 0; q_ix < n_qp; q_ix++) {
             for (int q_iy = 0; q_iy < n_qp; q_iy++) {
-                real_t face_nx, face_ny, face_nz;
+                real_t       face_nx, face_ny, face_nz;
                 const real_t measure = quadshell4_measure_and_normal(x[0],
-                                                                    x[1],
-                                                                    x[2],
-                                                                    x[3],
-                                                                    y[0],
-                                                                    y[1],
-                                                                    y[2],
-                                                                    y[3],
-                                                                    z[0],
-                                                                    z[1],
-                                                                    z[2],
-                                                                    z[3],
-                                                                    qx[q_ix],
-                                                                    qx[q_iy],
-                                                                    &face_nx,
-                                                                    &face_ny,
-                                                                    &face_nz);
+                                                                     x[1],
+                                                                     x[2],
+                                                                     x[3],
+                                                                     y[0],
+                                                                     y[1],
+                                                                     y[2],
+                                                                     y[3],
+                                                                     z[0],
+                                                                     z[1],
+                                                                     z[2],
+                                                                     z[3],
+                                                                     qx[q_ix],
+                                                                     qx[q_iy],
+                                                                     &face_nx,
+                                                                     &face_ny,
+                                                                     &face_nz);
 
                 real_t g_qx, g_qy, g_qz;
                 quadshell4_transform(x[0],
@@ -376,11 +375,10 @@ int quadshell4_resample_gap_local(
                 const ptrdiff_t j = floor(grid_y);
                 const ptrdiff_t k = floor(grid_z);
 
-                // If outside grid: +infty SDF sample → after wg -= stored gap is -infty (far/separated).
-                // Used by sample()/viz. Solver upper bounds use gap_value_local (opposite inject sign).
+                // If outside
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
-                        element_gap[edof_i] += infty * quad4_f[edof_i] * dV;
+                        element_gap[edof_i] += -infty * quad4_f[edof_i] * dV;
                         element_xnormal[edof_i] += face_nx * quad4_f[edof_i] * dV;
                         element_ynormal[edof_i] += face_ny * quad4_f[edof_i] * dV;
                         element_znormal[edof_i] += face_nz * quad4_f[edof_i] * dV;
@@ -571,8 +569,6 @@ int quadshell4_resample_weight_local(
     return SFEM_SUCCESS;
 }
 
-
-
 int quadshell4_resample_gap_value_local(
         // Mesh
         const ptrdiff_t              nelements,
@@ -612,7 +608,6 @@ int quadshell4_resample_gap_value_local(
         real_t quad4_f[4];
         real_t element_gap[4];
 
-
         for (int v = 0; v < 4; ++v) {
             ev[v] = elems[v][e];
         }
@@ -624,7 +619,7 @@ int quadshell4_resample_gap_value_local(
         }
 
         memset(element_gap, 0, 4 * sizeof(real_t));
-        
+
         for (int q_ix = 0; q_ix < n_qp; q_ix++) {
             for (int q_iy = 0; q_iy < n_qp; q_iy++) {
                 const real_t measure = quadshell4_measure(
@@ -743,8 +738,6 @@ int quadshell4_resample_gap_value_local(
     return SFEM_SUCCESS;
 }
 
-
-
 int quadshell4_resample_gap_normals_local(
         // Mesh
         const ptrdiff_t              nelements,
@@ -806,24 +799,24 @@ int quadshell4_resample_gap_normals_local(
 
         for (int q_ix = 0; q_ix < n_qp; q_ix++) {
             for (int q_iy = 0; q_iy < n_qp; q_iy++) {
-                real_t face_nx, face_ny, face_nz;
+                real_t       face_nx, face_ny, face_nz;
                 const real_t measure = quadshell4_measure_and_normal(x[0],
-                                                                    x[1],
-                                                                    x[2],
-                                                                    x[3],
-                                                                    y[0],
-                                                                    y[1],
-                                                                    y[2],
-                                                                    y[3],
-                                                                    z[0],
-                                                                    z[1],
-                                                                    z[2],
-                                                                    z[3],
-                                                                    qx[q_ix],
-                                                                    qx[q_iy],
-                                                                    &face_nx,
-                                                                    &face_ny,
-                                                                    &face_nz);
+                                                                     x[1],
+                                                                     x[2],
+                                                                     x[3],
+                                                                     y[0],
+                                                                     y[1],
+                                                                     y[2],
+                                                                     y[3],
+                                                                     z[0],
+                                                                     z[1],
+                                                                     z[2],
+                                                                     z[3],
+                                                                     qx[q_ix],
+                                                                     qx[q_iy],
+                                                                     &face_nx,
+                                                                     &face_ny,
+                                                                     &face_nz);
 
                 real_t g_qx, g_qy, g_qz;
                 quadshell4_transform(x[0],
@@ -964,4 +957,3 @@ int quadshell4_resample_gap_normals_local(
 
     return SFEM_SUCCESS;
 }
-
