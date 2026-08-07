@@ -372,3 +372,4 @@ int sdf_view_ensure_margin(MPI_Comm                             comm,
 
     return SFEM_SUCCESS;
 }
+

@@ -35,7 +35,7 @@ SFEM_INLINE static int hex_aa_8_contains(
         const real_t x,
         const real_t y,
         const real_t z) {
-    int outside = (x < xmin) | (x > xmax) | (y < ymin) | (y > ymax) | (z < zmin) | (x > zmax);
+    int outside = (x < xmin) | (x > xmax) | (y < ymin) | (y > ymax) | (z < zmin) | (z > zmax);
     return !outside;
 }
 
@@ -79,10 +79,16 @@ SFEM_INLINE static real_t quadshell4_measure_and_normal(
     const real_t cz = x2 * x7 - x6 * x5;
     const real_t measure = sqrt(POW2(cx) + POW2(cy) + POW2(cz));
 
-    assert(measure > 0);
-    *nx = cx / measure;
-    *ny = cy / measure;
-    *nz = cz / measure;
+    if (measure > SFEM_SDF_GRAD_EPS) {
+        *nx = cx / measure;
+        *ny = cy / measure;
+        *nz = cz / measure;
+    } else {
+        // Degenerate / collapsed quad at this QP
+        *nx = 1;
+        *ny = 0;
+        *nz = 0;
+    }
     return measure;
 }
 
@@ -370,7 +376,8 @@ int quadshell4_resample_gap_local(
                 const ptrdiff_t j = floor(grid_y);
                 const ptrdiff_t k = floor(grid_z);
 
-                // If outside
+                // If outside grid: +infty SDF sample → after wg -= stored gap is -infty (far/separated).
+                // Used by sample()/viz. Solver upper bounds use gap_value_local (opposite inject sign).
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
                         element_gap[edof_i] += infty * quad4_f[edof_i] * dV;
@@ -680,7 +687,10 @@ int quadshell4_resample_gap_value_local(
                 const ptrdiff_t j = floor(grid_y);
                 const ptrdiff_t k = floor(grid_z);
 
-                // If outside
+                // If outside grid: inject -infty before wg -= so stored gap becomes +infty.
+                // sample_value() feeds ShiftedPenalty upper bounds (n·u ≤ ub); +infty keeps the
+                // constraint inactive. (gap_local uses +infty here instead → stored -infty for
+                // signed-distance / viz semantics.)
                 if (i < 0 || j < 0 || k < 0 || (i + 1 >= n[0]) || (j + 1 >= n[1]) || (k + 1 >= n[2])) {
                     for (int edof_i = 0; edof_i < 4; edof_i++) {
                         element_gap[edof_i] += -infty * quad4_f[edof_i] * dV;
