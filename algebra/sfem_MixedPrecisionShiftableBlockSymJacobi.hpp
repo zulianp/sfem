@@ -19,6 +19,7 @@ namespace sfem {
 
         SharedBuffer<HP>     diag;
         SharedBuffer<LP>     inv_diag;
+        SharedBuffer<HP>     scaling_prev;  // last sparse scaling (size = n_contact)
         SharedBuffer<mask_t> constraints_mask;
         HP                               relaxation_parameter{1./3};
         int                             block_size{3};
@@ -45,6 +46,9 @@ namespace sfem {
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
             blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+
+            // Force full sparse refresh on next shift (inv_diag is material-only).
+            scaling_prev = nullptr;
         }
 
         int shift(const SharedBuffer<HP>& d) override {
@@ -58,6 +62,7 @@ namespace sfem {
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());
             blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            scaling_prev = nullptr;
             return SFEM_SUCCESS;
         }
 
@@ -65,9 +70,28 @@ namespace sfem {
             SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::shift");
 
             const ptrdiff_t n_blocks = inv_diag->size() / 9;
+            const ptrdiff_t n_sparse = block_diag->idx()->size();
+
+            if (impl.sparse_update_inv_diag) {
+                if (!scaling_prev || scaling_prev->size() != (size_t)n_sparse) {
+                    // Zero-initialized ⇒ first update rebuilds every newly nonzero scaling.
+                    scaling_prev = create_buffer<HP>(n_sparse, execution_space());
+                }
+
+                impl.sparse_update_inv_diag(n_sparse,
+                                            block_diag->idx()->data(),
+                                            diag->data(),
+                                            block_diag->data()->data(),
+                                            scaling->data(),
+                                            scaling_prev->data(),
+                                            constraints_mask->data(),
+                                            (LP)relaxation_parameter,
+                                            inv_diag->data());
+                return SFEM_SUCCESS;
+            }
 
             impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
-            impl.add_sparse_sym_diag_to_diag(block_diag->idx()->size(),
+            impl.add_sparse_sym_diag_to_diag(n_sparse,
                                              block_diag->idx()->data(),
                                              block_diag->data()->data(),
                                              scaling->data(),
