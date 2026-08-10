@@ -60,10 +60,9 @@ namespace sfem {
         }
 
         if (impl_->state->size() != static_cast<size_t>(impl_->local_dofs)) {
-            SFEM_ERROR(
-                    "ParallelMatrixFreeOperator::update_state: state size %ld != col_allocation_size %ld\n",
-                    (long)impl_->state->size(),
-                    (long)impl_->local_dofs);
+            SFEM_ERROR("ParallelMatrixFreeOperator::update_state: state size %ld != col_allocation_size %ld\n",
+                       (long)impl_->state->size(),
+                       (long)impl_->local_dofs);
             return SFEM_FAILURE;
         }
 
@@ -87,7 +86,7 @@ namespace sfem {
 
         const real_t *const state_local = impl_->state ? impl_->state->data() : nullptr;
 
-        std::fill(y, y + impl_->local_dofs, real_t(0));
+        std::fill(y, y + impl_->local_dofs, real_t(0));  // TODO: should not be necessary, since apply semantics is based on Add
         return impl_->function->apply(state_local, x_mut, y);
     }
 
@@ -105,10 +104,9 @@ namespace sfem {
 
     std::ptrdiff_t ParallelMatrixFreeOperator::col_allocation_size() const { return impl_->local_dofs; }
 
-    std::shared_ptr<ParallelOperator<real_t>> create_parallel_matrix_free_operator(
-            const std::shared_ptr<Function>       &function,
-            const std::shared_ptr<Buffer<real_t>> &state,
-            const ExecutionSpace                   execution_space) {
+    std::shared_ptr<ParallelOperator<real_t>> create_parallel_matrix_free_operator(const std::shared_ptr<Function> &function,
+                                                                                   const std::shared_ptr<Buffer<real_t>> &state,
+                                                                                   const ExecutionSpace execution_space) {
         auto space = function->space();
         auto mesh  = space->mesh_ptr();
 
@@ -117,9 +115,7 @@ namespace sfem {
                     mesh->comm(),
                     space->n_dofs(),
                     space->n_dofs(),
-                    [=](const real_t *const x, real_t *const y) {
-                        function->apply(state ? state->data() : nullptr, x, y);
-                    },
+                    [=](const real_t *const x, real_t *const y) { function->apply(state ? state->data() : nullptr, x, y); },
                     execution_space);
         }
 

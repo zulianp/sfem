@@ -5,7 +5,7 @@
  * Multi-block meshes use MultiDomainOp (see initialize). Semi-structured HEX8
  * macro elements are assembled via assemble_lumped_mass() in operators/mass.cpp
  * (same entry point as standard elements). Register both @c LumpedMass and
- * @c ss:LumpedMass with LumpedMass::create in the factory.
+ * @c LumpedMass with LumpedMass::create in the factory.
  */
 
 #pragma once

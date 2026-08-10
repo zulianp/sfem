@@ -69,7 +69,7 @@ namespace sfem {
         }
     }
 
-    const char *SemiStructuredEMLaplacian::name() const { return "ss:em:Laplacian"; }
+    const char *SemiStructuredEMLaplacian::name() const { return "em:Laplacian"; }
 
     int SemiStructuredEMLaplacian::initialize(const std::vector<std::string> &block_names) {
         auto &ssm      = space->mesh();
@@ -87,7 +87,7 @@ namespace sfem {
                                                const count_t *const rowptr,
                                                const idx_t *const   colidx,
                                                real_t *const        values) {
-        SFEM_ERROR("[Error] ss:em:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:Laplacian::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
@@ -100,7 +100,7 @@ namespace sfem {
     }
 
     int SemiStructuredEMLaplacian::gradient(const real_t *const x, real_t *const out) {
-        SFEM_ERROR("[Error] ss:em:Laplacian::gradient NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:Laplacian::gradient NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
@@ -123,7 +123,7 @@ namespace sfem {
     }
 
     int SemiStructuredEMLaplacian::value(const real_t *x, real_t *const out) {
-        SFEM_ERROR("[Error] ss:em:Laplacian::value NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:Laplacian::value NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 

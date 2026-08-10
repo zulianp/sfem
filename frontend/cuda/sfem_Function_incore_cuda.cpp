@@ -463,7 +463,7 @@ namespace sfem {
             return ret;
         }
 
-        static int populate_gpu_le_domains_sharing_jacobians(const MultiDomainOp                 &fine_domains,
+        static int populate_gpu_le_domains_sharing_jacobians(const MultiDomainOp                  &fine_domains,
                                                              const std::shared_ptr<MultiDomainOp> &coarse_domains) {
             for (auto &n2d : coarse_domains->domains()) {
                 auto fine_it = fine_domains.domains().find(n2d.first);
@@ -472,8 +472,7 @@ namespace sfem {
                 }
 
                 auto domain_op = share_gpu_le_op_data(fine_it->second, n2d.second);
-                if (!domain_op || !domain_op->elements || !domain_op->jacobian_adjugate ||
-                    !domain_op->jacobian_determinant) {
+                if (!domain_op || !domain_op->elements || !domain_op->jacobian_adjugate || !domain_op->jacobian_determinant) {
                     return SFEM_FAILURE;
                 }
 
@@ -555,7 +554,7 @@ namespace sfem {
             return std::make_unique<GPULaplacian>(space);
         }
 
-        const char *name() const override { return is_semistructured_type(element_type) ? "ss:gpu::Laplacian" : "gpu:Laplacian"; }
+        const char *name() const override { return "gpu:Laplacian"; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -806,7 +805,7 @@ namespace sfem {
         }
 
         const char *name() const override {
-            return is_semistructured_type(element_type) ? "ss:gpu:LinearElasticity" : "gpu:LinearElasticity";
+            return "gpu:LinearElasticity";
         }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
@@ -1092,7 +1091,7 @@ namespace sfem {
         }
 
         const char *name() const override {
-            return is_semistructured_type(element_type) ? "ss:gpu:KelvinVoigtNewmark" : "gpu:KelvinVoigtNewmark";
+            return "gpu:KelvinVoigtNewmark";
         }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
@@ -1438,7 +1437,7 @@ namespace sfem {
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
-        const char *name() const override { return "ss::gpu::EMOp"; }
+        const char *name() const override { return "gpu:em:Laplacian"; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -1549,10 +1548,130 @@ namespace sfem {
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
-        const char *name() const override { return "ss::gpu::EMWarpOp"; }
+        const char *name() const override { return "gpu:EMWarpOp"; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
+    };
+
+    class GPUEMMultiVectorWarpOp : public Op {
+    public:
+        std::shared_ptr<FunctionSpace>  space;
+        enum smesh::PrimitiveType       real_type{smesh::SMESH_DEFAULT};
+        std::shared_ptr<Buffer<idx_t>>  elements;
+        std::shared_ptr<Buffer<real_t>> element_matrix;
+        bool                            cartesian_ordering{true};
+
+        GPUEMMultiVectorWarpOp(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space) {
+            SFEM_TRACE_SCOPE("GPUEMMultiVectorWarpOp::create");
+            if (space->block_size() < 1) {
+                SFEM_ERROR("GPUEMMultiVectorWarpOp requires block_size >= 1\n");
+                return nullptr;
+            }
+            auto ret = std::make_unique<GPUEMMultiVectorWarpOp>(space);
+            return ret;
+        }
+
+        std::shared_ptr<Op> lor_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_ERROR("IMPLEMENT ME!\n");
+            return nullptr;
+        }
+
+        std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override {
+            SFEM_ERROR("IMPLEMENT ME!\n");
+            return nullptr;
+        }
+
+        int initialize(const std::vector<std::string> &block_names = {}) override {
+            auto mesh             = space->mesh_ptr();
+            auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
+
+            int err = 0;
+            if (space->has_semi_structured_mesh()) {
+                auto &ssm = space->mesh();
+                if (cartesian_ordering) {
+                    err = sshex8_laplacian_element_matrix_cartesian(smesh::semistructured_level(ssm),
+                                                                    mesh->n_elements(),
+                                                                    mesh->n_nodes(),
+                                                                    mesh->elements(0)->data(),
+                                                                    mesh->points()->data(),
+                                                                    h_element_matrix->data());
+                } else {
+                    err = sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
+                                                          mesh->n_elements(),
+                                                          mesh->n_nodes(),
+                                                          mesh->elements(0)->data(),
+                                                          mesh->points()->data(),
+                                                          h_element_matrix->data());
+                }
+            } else {
+                SFEM_ERROR("Only works with SSMesh!\n");
+                return SFEM_FAILURE;
+            }
+
+            elements       = create_device_elements_AoS(space, space->element_type());
+            element_matrix = smesh::to_device(h_element_matrix);
+            return err;
+        }
+
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
+            SFEM_TRACE_SCOPE("GPUEMMultiVectorWarpOp::apply");
+
+            if (!space->has_semi_structured_mesh()) {
+                SFEM_ERROR("Only works with SSMesh!\n");
+                return SFEM_FAILURE;
+            }
+
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            return cu_affine_sshex8_elemental_matrix_apply_AoS_multivector(level,
+                                                                           ssm.n_elements(),
+                                                                           elements->data(),
+                                                                           real_type,
+                                                                           space->block_size(),
+                                                                           (void *)element_matrix->data(),
+                                                                           h,
+                                                                           out,
+                                                                           SFEM_DEFAULT_STREAM);
+        }
+
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override {
+            SFEM_ERROR("[Error] GPUEMMultiVectorWarpOp::hessian_crs NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int hessian_diag(const real_t *const, real_t *const out) override {
+            SFEM_ERROR("[Error] GPUEMMultiVectorWarpOp::gradient NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int gradient(const real_t *const x, real_t *const out) override { return apply(nullptr, x, out); }
+
+        int value(const real_t *x, real_t *const out) override {
+            SFEM_ERROR("[Error] GPUEMMultiVectorWarpOp::value NOT IMPLEMENTED!\n");
+            return SFEM_FAILURE;
+        }
+
+        int            report(const real_t *const) override { return SFEM_SUCCESS; }
+        ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
+
+        const char *name() const override { return "gpu:EMMultiVectorWarpOp"; }
+        inline bool is_linear() const override { return true; }
+        ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
+        ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
+
+        std::shared_ptr<Op> clone() const override {
+            auto ret            = std::make_shared<GPUEMMultiVectorWarpOp>(space);
+            ret->real_type      = real_type;
+            ret->elements       = elements;
+            ret->element_matrix = element_matrix;
+            return ret;
+        }
     };
 
     class GPUEMVectorWarpOp : public Op {
@@ -1594,8 +1713,7 @@ namespace sfem {
                 return nullptr;
             }
 
-            if (derefined_space->has_semi_structured_mesh() &&
-                is_semistructured_type(derefined_space->element_type())) {
+            if (derefined_space->has_semi_structured_mesh() && is_semistructured_type(derefined_space->element_type())) {
                 auto ret            = std::make_shared<GPUEMVectorWarpOp>(derefined_space);
                 ret->real_type      = real_type;
                 ret->mu             = mu;
@@ -1693,13 +1811,13 @@ namespace sfem {
             auto     &ssm   = space->mesh();
             const int level = smesh::semistructured_level(ssm);
             return cu_affine_sshex8_elemental_matrix_apply_AoS_vector(level,
-                                                                     ssm.n_elements(),
-                                                                     elements->data(),
-                                                                     real_type,
-                                                                     (void *)element_matrix->data(),
-                                                                     h,
-                                                                     out,
-                                                                     SFEM_DEFAULT_STREAM);
+                                                                      ssm.n_elements(),
+                                                                      elements->data(),
+                                                                      real_type,
+                                                                      (void *)element_matrix->data(),
+                                                                      h,
+                                                                      out,
+                                                                      SFEM_DEFAULT_STREAM);
         }
 
         int hessian_crs(const real_t *const  x,
@@ -1738,7 +1856,7 @@ namespace sfem {
         int            report(const real_t *const) override { return SFEM_SUCCESS; }
         ExecutionSpace execution_space() const override { return EXECUTION_SPACE_DEVICE; }
 
-        const char *name() const override { return "ss::gpu::EMVectorWarpOp"; }
+        const char *name() const override { return "gpu:em:LinearElasticity"; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override { return space->n_dofs(); }
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
@@ -1754,9 +1872,7 @@ namespace sfem {
             return ret;
         }
 
-        void set_value_in_block(const std::string &block_name,
-                                const std::string &var_name,
-                                const real_t       value) override {
+        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override {
             if (!block_name.empty() && space->mesh().n_blocks() == 1 && block_name != space->mesh().block(0)->name()) {
                 return;
             }
@@ -1771,7 +1887,7 @@ namespace sfem {
             }
 
             if (changed && element_matrix) {
-                auto &ssm = space->mesh();
+                auto &ssm  = space->mesh();
                 auto  mesh = smesh::sshex_to_hex8(smesh::derefine(space->mesh_ptr(), 1));
                 if (!mesh) {
                     SFEM_ERROR("GPUEMVectorWarpOp::set_value_in_block: sshex_to_hex8(derefine) failed\n");
@@ -1811,14 +1927,13 @@ namespace sfem {
     void register_device_ops() {
         Factory::register_op("gpu:LinearElasticity", &GPULinearElasticity::create);
         Factory::register_op("gpu:Laplacian", &GPULaplacian::create);
-        Factory::register_op("ss:gpu:Laplacian", &GPULaplacian::create);
-        Factory::register_op("ss:gpu:LinearElasticity", &GPULinearElasticity::create);
-        Factory::register_op("ss:gpu:EMOp", &GPUEMOp::create);
-        Factory::register_op("ss:gpu:EMWarpOp", &GPUEMWarpOp::create);
-        Factory::register_op("ss:gpu:EMVectorWarpOp", &GPUEMVectorWarpOp::create);
+        Factory::register_op("gpu:em:Laplacian", &GPUEMOp::create);
+        Factory::register_op("gpu:em:LinearElasticity", &GPUEMVectorWarpOp::create);
         Factory::register_op("gpu:EMOp", &GPUEMOp::create);
+        Factory::register_op("gpu:EMWarpOp", &GPUEMWarpOp::create);
+        Factory::register_op("gpu:EMMultiVectorWarpOp", &GPUEMMultiVectorWarpOp::create);
+        Factory::register_op("gpu:EMVectorWarpOp", &GPUEMVectorWarpOp::create);
         Factory::register_op("gpu:KelvinVoigtNewmark", &GPUKelvinVoigtNewmark::create);
-        Factory::register_op("ss:gpu:KelvinVoigtNewmark", &GPUKelvinVoigtNewmark::create);
     }
 
 }  // namespace sfem
