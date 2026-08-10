@@ -586,32 +586,28 @@ namespace sfem {
         auto cs  = impl_->contact_surface;
         int  err = 0;
 
+        for (auto &obs : impl_->obstacles) {
 #ifdef SFEM_ENABLE_CUDA
-        if (is_ptr_device(g)) {
-            SFEM_ERROR("IMPLEMENT ME!\n");
-        } else
-#endif
-        {
-            for (auto &obs : impl_->obstacles) {
-#ifdef SFEM_ENABLE_CUDA
-                if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-                    err += obs->sample_value(cs->element_type(),
-                                             cs->elements_device()->extent(1),
-                                             cs->node_mapping_device()->size(),
-                                             cs->elements_device()->data(),
-                                             cs->points_device()->data(),
-                                             g);
-                    continue;
-                }
-#endif
-                // FIXME always sample gap and normals together
+            if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+                assert(is_ptr_device(g));
+                assert(cs->points_device());
+                assert(is_ptr_device(cs->points_device()->data()));
                 err += obs->sample_value(cs->element_type(),
-                                         cs->elements()->extent(1),
-                                         cs->node_mapping()->size(),
-                                         cs->elements()->data(),
-                                         cs->points()->data(),
+                                         cs->elements_device()->extent(1),
+                                         cs->node_mapping_device()->size(),
+                                         cs->elements_device()->data(),
+                                         cs->points_device()->data(),
                                          g);
+                continue;
             }
+#endif
+            // FIXME always sample gap and normals together
+            err += obs->sample_value(cs->element_type(),
+                                     cs->elements()->extent(1),
+                                     cs->node_mapping()->size(),
+                                     cs->elements()->data(),
+                                     cs->points()->data(),
+                                     g);
         }
 
         return err;
@@ -626,10 +622,12 @@ namespace sfem {
     }
 
     int ContactConditions::signed_distance(const real_t *const disp, real_t *const g) {
-        if (is_ptr_device(disp)) {
-            SFEM_ERROR("IMPLEMENT ME!\n");
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
+            assert(is_ptr_device(disp));
+            assert(is_ptr_device(g));
         }
-
+#endif
         impl_->contact_surface->displace_points(disp);
         return signed_distance(g);
     }

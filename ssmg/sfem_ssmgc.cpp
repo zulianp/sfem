@@ -170,28 +170,8 @@ namespace sfem {
 
         int update_contact(const T *const disp) {
             SFEM_TRACE_SCOPE("SPMG::update_contact");
-            auto                      f  = levels[0]->function;
-            const enum ExecutionSpace es = f->execution_space();
-
-#ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == es) {
-                // FIXME avoid copies from/to device
-
-                auto wdisp = Buffer<const T>::wrap(f->space()->n_dofs(), disp, MEMORY_SPACE_DEVICE);
-                auto hdisp = smesh::to_host(wdisp);
-
-                contact_conds->update(hdisp->data());
-
-                auto hg = sfem::create_host_buffer<T>(upper_bound->size());
-                contact_conds->update_signed_distance(hdisp->data(), hg->data());
-                buffer_host_to_device(hg->size() * sizeof(T), (void *)hg->data(), (void *)upper_bound->data());
-            } else
-#endif
-            {
-                contact_conds->update(disp);
-                contact_conds->update_signed_distance(disp, upper_bound->data());
-            }
-
+            contact_conds->update(disp);
+            contact_conds->update_signed_distance(disp, upper_bound->data());
             return SFEM_SUCCESS;
         }
 
@@ -200,19 +180,15 @@ namespace sfem {
             contact_conds->init();
             linear_constraints_op           = contact_conds->linear_constraints_op();
             linear_constraints_op_transpose = contact_conds->linear_constraints_op_transpose();
-            upper_bound = sfem::create_buffer<T>(contact_conds->n_constrained_dofs(), sfem::MEMORY_SPACE_HOST);
 
+            const ExecutionSpace es = levels[0]->function->execution_space();
+            upper_bound =
+                    sfem::create_buffer<T>(contact_conds->n_constrained_dofs(), es);
             contact_conds->signed_distance(upper_bound->data());
-            const ExecutionSpace es             = levels[0]->function->execution_space();
-            const int            block_size     = levels[0]->function->space()->block_size();
-            const int            sym_block_size = (block_size == 3 ? 6 : 3);
-            const int            nlevels        = levels.size();
 
-#ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == es) {
-                upper_bound = smesh::to_device(upper_bound);
-            }
-#endif
+            const int block_size     = levels[0]->function->space()->block_size();
+            const int sym_block_size = (block_size == 3 ? 6 : 3);
+            const int nlevels        = levels.size();
 
             std::vector<std::shared_ptr<Buffer<idx_t *>>> host_sides;
             {
