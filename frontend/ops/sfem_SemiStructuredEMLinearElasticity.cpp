@@ -90,7 +90,7 @@ namespace sfem {
         return ret;
     }
 
-    const char *SemiStructuredEMLinearElasticity::name() const { return "ss:em:LinearElasticity"; }
+    const char *SemiStructuredEMLinearElasticity::name() const { return "em:LinearElasticity"; }
 
     int SemiStructuredEMLinearElasticity::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("SemiStructuredEMLinearElasticity::initialize");
@@ -125,7 +125,7 @@ namespace sfem {
                                                       const count_t *const,
                                                       const idx_t *const,
                                                       real_t *const) {
-        SFEM_ERROR("[Error] ss:em:LinearElasticity::hessian_crs NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:LinearElasticity::hessian_crs NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
@@ -147,7 +147,7 @@ namespace sfem {
     }
 
     int SemiStructuredEMLinearElasticity::gradient(const real_t *const x, real_t *const out) {
-        SFEM_ERROR("[Error] ss:em:LinearElasticity::gradient NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:LinearElasticity::gradient NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
@@ -178,7 +178,7 @@ namespace sfem {
     }
 
     int SemiStructuredEMLinearElasticity::value(const real_t *x, real_t *const out) {
-        SFEM_ERROR("[Error] ss:em:LinearElasticity::value NOT IMPLEMENTED!\n");
+        SFEM_ERROR("[Error] em:LinearElasticity::value NOT IMPLEMENTED!\n");
         return SFEM_FAILURE;
     }
 
