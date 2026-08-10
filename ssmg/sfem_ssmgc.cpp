@@ -321,7 +321,7 @@ namespace sfem {
             int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 4);
             int    max_it               = smesh::Env::read("SFEM_MAX_IT", 100);
             int    nlsmooth_steps       = smesh::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
-            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 400000);
+            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 40000);
             real_t omega_factor         = smesh::Env::read("SFEM_OMEGA_FACTOR", 100.);
             real_t stagnation_threshold = smesh::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
 
