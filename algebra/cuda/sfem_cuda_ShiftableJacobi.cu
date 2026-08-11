@@ -245,20 +245,14 @@ namespace sfem {
                                                     const HP* const    SFEM_RESTRICT material_diag,
                                                     const HP* const    SFEM_RESTRICT sparse_dd,
                                                     const HP* const    SFEM_RESTRICT scaling,
-                                                    HP* const          SFEM_RESTRICT scaling_prev,
                                                     const mask_t* const SFEM_RESTRICT constraints_mask,
                                                     const LP           omega,
                                                     LP* const          SFEM_RESTRICT inv_diag) {
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_sparse; i += blockDim.x * gridDim.x) {
-                const HP si = scaling[i];
-                if (si == scaling_prev[i]) {
-                    continue;
-                }
-                scaling_prev[i] = si;
-
-                const ptrdiff_t b   = idx[i];
-                const auto* const di = &material_diag[b * 6];
-                const auto* const dd = &sparse_dd[i * 6];
+                const HP          si  = scaling[i];
+                const ptrdiff_t   b   = idx[i];
+                const auto* const di  = &material_diag[b * 6];
+                const auto* const dd  = &sparse_dd[i * 6];
                 auto* const       ivi = &inv_diag[b * 9];
 
                 LP mat_0 = (LP)(di[0] + si * dd[0]);
@@ -315,7 +309,6 @@ namespace sfem {
                                                                   const HP* const    material_diag,
                                                                   const HP* const    sparse_dd,
                                                                   const HP* const    scaling,
-                                                                  HP* const          scaling_prev,
                                                                   const mask_t* const constraints_mask,
                                                                   const LP           omega,
                                                                   LP* const          inv_diag) {
@@ -326,7 +319,7 @@ namespace sfem {
             int       kernel_block_size = 128;
             ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_sparse + kernel_block_size - 1) / kernel_block_size);
             sbv3_sparse_update_inv_diag<<<kernel_n_blocks, kernel_block_size>>>(
-                    n_sparse, idx, material_diag, sparse_dd, scaling, scaling_prev, constraints_mask, omega, inv_diag);
+                    n_sparse, idx, material_diag, sparse_dd, scaling, constraints_mask, omega, inv_diag);
 
             SFEM_DEBUG_SYNCHRONIZE();
         }

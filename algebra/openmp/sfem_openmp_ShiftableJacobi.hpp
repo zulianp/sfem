@@ -25,14 +25,12 @@ namespace sfem {
 
         std::function<void(const ptrdiff_t, LP* const)>                                 inplace_invert;
 
-        // Rebuild inv_diag only where scaling differs from scaling_prev (then update scaling_prev).
-        // Each changed block is rebuilt from material diag + scale*dd, masked, inverted, *omega.
+        // Rebuild inv_diag for every sparse contact index from material diag + scale*dd.
         std::function<void(const ptrdiff_t,
                            const idx_t* const,
                            const HP* const,
                            const HP* const,
                            const HP* const,
-                           HP* const,
                            const mask_t* const,
                            const LP,
                            LP* const)>
@@ -241,18 +239,12 @@ namespace sfem {
                                                                     const HP* const    material_diag,
                                                                     const HP* const    sparse_dd,
                                                                     const HP* const    scaling,
-                                                                    HP* const          scaling_prev,
                                                                     const mask_t* const constraints_mask,
                                                                     const LP           omega,
                                                                     LP* const          inv_diag) {
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_sparse; i++) {
-                const HP si = scaling[i];
-                if (si == scaling_prev[i]) {
-                    continue;
-                }
-                scaling_prev[i] = si;
-
+                const HP        si  = scaling[i];
                 const ptrdiff_t b   = idx[i];
                 const auto* const di = &material_diag[b * 6];
                 const auto* const dd = &sparse_dd[i * 6];
