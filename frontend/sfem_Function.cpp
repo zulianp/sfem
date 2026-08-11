@@ -461,35 +461,74 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Function::gradient(const real_t *const x, real_t *const out) {
+    int Function::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
         SFEM_TRACE_SCOPE("Function::gradient");
 
         for (auto &op : impl_->ops) {
-            if (op->gradient(x, out) != SFEM_SUCCESS) {
+            if (op->gradient(x, out, scope) != SFEM_SUCCESS) {
                 std::cerr << "Failed gradient in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
         }
 
-        if (impl_->handle_constraints) {
+        if (scope == ElementScope::ALL && impl_->handle_constraints) {
             constraints_gradient(x, out);
         }
 
         return SFEM_SUCCESS;
     }
 
-    int Function::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+    int Function::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) {
         SFEM_TRACE_SCOPE("Function::apply");
 
         for (auto &op : impl_->ops) {
-            if (op->apply(x, h, out) != SFEM_SUCCESS) {
+            if (op->apply(x, h, out, scope) != SFEM_SUCCESS) {
                 std::cerr << "Failed apply in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
         }
 
-        if (impl_->handle_constraints) {
+        if (scope == ElementScope::ALL && impl_->handle_constraints) {
             copy_constrained_dofs(h, out);
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int Function::gradient(const real_t *const x, real_t *const out, const ElementRange range) {
+        SFEM_TRACE_SCOPE("Function::gradient(range)");
+
+        for (auto &op : impl_->ops) {
+            if (op->gradient(x, out, range) != SFEM_SUCCESS) {
+                std::cerr << "Failed gradient in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int Function::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementRange range) {
+        SFEM_TRACE_SCOPE("Function::apply(range)");
+
+        for (auto &op : impl_->ops) {
+            if (op->apply(x, h, out, range) != SFEM_SUCCESS) {
+                std::cerr << "Failed apply in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int Function::value(const real_t *x, real_t *const out, const ElementRange range) {
+        SFEM_TRACE_SCOPE("Function::value(range)");
+
+        for (auto &op : impl_->ops) {
+            if (op->value(x, out, range) != SFEM_SUCCESS) {
+                std::cerr << "Failed value in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
         }
 
         return SFEM_SUCCESS;
@@ -526,18 +565,20 @@ namespace sfem {
                 this->execution_space());
     }
 
-    int Function::value(const real_t *x, real_t *const out) {
+    int Function::value(const real_t *x, real_t *const out, const ElementScope scope) {
         SFEM_TRACE_SCOPE("Function::value");
 
         for (auto &op : impl_->ops) {
-            if (op->value(x, out) != SFEM_SUCCESS) {
+            if (op->value(x, out, scope) != SFEM_SUCCESS) {
                 std::cerr << "Failed value in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
         }
 
-        for (auto &c : impl_->constraints) {
-            c->value(x, out);
+        if (scope == ElementScope::ALL) {
+            for (auto &c : impl_->constraints) {
+                c->value(x, out);
+            }
         }
 
         return SFEM_SUCCESS;
