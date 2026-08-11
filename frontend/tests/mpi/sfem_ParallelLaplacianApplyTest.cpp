@@ -8,11 +8,22 @@
 #include "smesh_mesh.hpp"
 #include "smesh_mesh_reorder.hpp"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_cuda_blas.hpp"
+#include "smesh_device_buffer.hpp"
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace {
 
@@ -35,10 +46,8 @@ namespace {
         }
     }
 
-    int test_parallel_laplacian_apply() {
+    int test_parallel_laplacian_apply_es(const sfem::ExecutionSpace es) {
         auto comm = sfem::Communicator::world();
-
-        // SFEM_TEST_ASSERT(comm->size() > 1);
 
         const smesh::Path mesh_path("/private/tmp/sfem_parallel_laplacian_apply_mesh");
 
@@ -80,7 +89,7 @@ namespace {
         auto parallel_function = sfem::Function::create(parallel_space);
 
         auto serial_laplacian   = sfem::create_op(serial_space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
-        auto parallel_laplacian = sfem::create_op(parallel_space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+        auto parallel_laplacian = sfem::create_op(parallel_space, "Laplacian", es);
         SFEM_TEST_ASSERT(serial_laplacian != nullptr);
         SFEM_TEST_ASSERT(parallel_laplacian != nullptr);
         SFEM_TEST_ASSERT(serial_laplacian->initialize() == SFEM_SUCCESS);
@@ -89,8 +98,7 @@ namespace {
         serial_function->add_operator(serial_laplacian);
         parallel_function->add_operator(parallel_laplacian);
 
-        auto parallel_op =
-                sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, parallel_function, nullptr, sfem::EXECUTION_SPACE_HOST);
+        auto parallel_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, parallel_function, nullptr, es);
         SFEM_TEST_ASSERT(parallel_op != nullptr);
 
         auto *pop = dynamic_cast<sfem::ParallelOperator<real_t> *>(parallel_op.get());
@@ -120,22 +128,46 @@ namespace {
 
         SFEM_TEST_ASSERT(serial_function->apply(nullptr, serial_h->data(), serial_y->data()) == SFEM_SUCCESS);
 
-        // apply() requires col/row_allocation_size buffers (owned + ghosts + aura).
-        auto parallel_h = sfem::create_host_buffer<real_t>(n_x_alloc);
-        auto parallel_y = sfem::create_host_buffer<real_t>(n_y_alloc);
+        auto parallel_h_host = sfem::create_host_buffer<real_t>(n_x_alloc);
+        auto parallel_y_host = sfem::create_host_buffer<real_t>(n_y_alloc);
+        std::fill(parallel_h_host->data(), parallel_h_host->data() + n_x_alloc, real_t(0));
+        std::fill(parallel_y_host->data(), parallel_y_host->data() + n_y_alloc, real_t(0));
 
         if (comm->size() > 1) {
             auto dist         = parallel_mesh->distributed();
             auto node_mapping = dist->node_mapping()->data();
             for (ptrdiff_t i = 0; i < n_owned_dofs; ++i) {
                 const ptrdiff_t global_node = static_cast<ptrdiff_t>(node_mapping[i]);
-                parallel_h->data()[i]       = serial_h->data()[global_node];
+                parallel_h_host->data()[i]  = serial_h->data()[global_node];
             }
         } else {
-            std::memcpy(parallel_h->data(), serial_h->data(), sizeof(real_t) * n_owned_dofs);
+            std::memcpy(parallel_h_host->data(), serial_h->data(), sizeof(real_t) * n_owned_dofs);
+        }
+
+        std::shared_ptr<sfem::Buffer<real_t>> parallel_h;
+        std::shared_ptr<sfem::Buffer<real_t>> parallel_y;
+
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+#ifdef SFEM_ENABLE_CUDA
+            parallel_h = smesh::create_device_buffer<real_t>(n_x_alloc);
+            parallel_y = smesh::create_device_buffer<real_t>(n_y_alloc);
+            buffer_host_to_device((size_t)n_x_alloc * sizeof(real_t), parallel_h_host->data(), parallel_h->data());
+            buffer_host_to_device((size_t)n_y_alloc * sizeof(real_t), parallel_y_host->data(), parallel_y->data());
+#else
+            SFEM_TEST_ASSERT(false && "device test requires CUDA");
+#endif
+        } else {
+            parallel_h = parallel_h_host;
+            parallel_y = parallel_y_host;
         }
 
         SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
+
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+#ifdef SFEM_ENABLE_CUDA
+            buffer_device_to_host((size_t)n_y_alloc * sizeof(real_t), parallel_y->data(), parallel_y_host->data());
+#endif
+        }
 
         const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-10) : real_t(1e-5);
 
@@ -144,12 +176,31 @@ namespace {
             auto node_mapping = dist->node_mapping()->data();
             for (ptrdiff_t i = 0; i < n_owned_dofs; ++i) {
                 const ptrdiff_t global_node = static_cast<ptrdiff_t>(node_mapping[i]);
-                SFEM_TEST_APPROXEQ(parallel_y->data()[i], serial_y->data()[global_node], tol);
+                SFEM_TEST_APPROXEQ(parallel_y_host->data()[i], serial_y->data()[global_node], tol);
+            }
+        } else {
+            for (ptrdiff_t i = 0; i < n_owned_dofs; ++i) {
+                SFEM_TEST_APPROXEQ(parallel_y_host->data()[i], serial_y->data()[i], tol);
             }
         }
 
-        const int bench_reps  = smesh::Env::read<int>("SFEM_PARALLEL_LAPLACIAN_BENCH_REPS", 20);
-        const int warmup_reps = smesh::Env::read<int>("SFEM_PARALLEL_LAPLACIAN_WARMUP_REPS", 2);
+        const int bench_reps  = smesh::Env::read<int>("SFEM_PARALLEL_LAPLACIAN_BENCH_REPS", 40);
+        const int warmup_reps = smesh::Env::read<int>("SFEM_PARALLEL_LAPLACIAN_WARMUP_REPS", 3);
+
+        auto time_parallel_apply = [&](const char *legacy_env) -> double {
+            setenv("SFEM_PARALLEL_MF_LEGACY", legacy_env, 1);
+            comm->barrier();
+            for (int r = 0; r < warmup_reps; ++r) {
+                SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
+            }
+            comm->barrier();
+            const double tick = smesh::time_seconds();
+            for (int r = 0; r < bench_reps; ++r) {
+                SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
+            }
+            comm->barrier();
+            return smesh::time_seconds() - tick;
+        };
 
         double serial_elapsed = 0;
         if (comm->rank() == 0) {
@@ -166,40 +217,83 @@ namespace {
             serial_elapsed = smesh::time_seconds() - tick;
         }
 
-        comm->barrier();
-        for (int r = 0; r < warmup_reps; ++r) {
+        // Correctness already checked on default (new) path above; also verify legacy matches serial.
+        {
+            setenv("SFEM_PARALLEL_MF_LEGACY", "1", 1);
             SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
+            if (es == sfem::EXECUTION_SPACE_DEVICE) {
+#ifdef SFEM_ENABLE_CUDA
+                buffer_device_to_host((size_t)n_y_alloc * sizeof(real_t), parallel_y->data(), parallel_y_host->data());
+#endif
+            }
+            if (comm->size() > 1) {
+                auto dist         = parallel_mesh->distributed();
+                auto node_mapping = dist->node_mapping()->data();
+                for (ptrdiff_t i = 0; i < n_owned_dofs; ++i) {
+                    const ptrdiff_t global_node = static_cast<ptrdiff_t>(node_mapping[i]);
+                    SFEM_TEST_APPROXEQ(parallel_y_host->data()[i], serial_y->data()[global_node], tol);
+                }
+            }
+            setenv("SFEM_PARALLEL_MF_LEGACY", "0", 1);
         }
 
-        comm->barrier();
-        const double parallel_tick = smesh::time_seconds();
-        for (int r = 0; r < bench_reps; ++r) {
-            SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
-        }
-        comm->barrier();
-        const double parallel_elapsed = smesh::time_seconds() - parallel_tick;
+        const double legacy_elapsed = time_parallel_apply("1");
+        const double overlap_elapsed = time_parallel_apply("0");
 
         if (comm->rank() == 0) {
             const ptrdiff_t n_global_dofs = (comm->size() > 1) ? parallel_mesh->distributed()->n_nodes_global() : n_serial_dofs;
             const double    serial_rate   = static_cast<double>(n_serial_dofs) * static_cast<double>(bench_reps) / serial_elapsed;
-            const double parallel_rate = static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / parallel_elapsed;
-            std::printf("Laplacian apply(%ld) DOF rates: serial %.6e dof/s, parallel %.6e dof/s, speedup %.3f, reps %d\n",
-                        n_global_dofs,
-                        serial_rate,
-                        parallel_rate,
-                        parallel_rate / serial_rate,
-                        bench_reps);
+            const double    legacy_rate =
+                    static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / legacy_elapsed;
+            const double overlap_rate =
+                    static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / overlap_elapsed;
+#ifdef _OPENMP
+            const int omp_max = omp_get_max_threads();
+#else
+            const int omp_max = 1;
+#endif
+            std::printf(
+                    "Laplacian apply(%ld) [%s] ranks=%d omp_max_threads=%d reps=%d\n"
+                    "  serial:  %.6e dof/s  (%.6f s)\n"
+                    "  legacy:  %.6e dof/s  (%.6f s)  speedup_vs_serial %.3f\n"
+                    "  overlap: %.6e dof/s  (%.6f s)  speedup_vs_serial %.3f  vs_legacy %.3fx\n",
+                    (long)n_global_dofs,
+                    es == sfem::EXECUTION_SPACE_DEVICE ? "device" : "host",
+                    comm->size(),
+                    omp_max,
+                    bench_reps,
+                    serial_rate,
+                    serial_elapsed,
+                    legacy_rate,
+                    legacy_elapsed,
+                    legacy_rate / serial_rate,
+                    overlap_rate,
+                    overlap_elapsed,
+                    overlap_rate / serial_rate,
+                    legacy_elapsed / overlap_elapsed);
         }
 
+        setenv("SFEM_PARALLEL_MF_LEGACY", "0", 1);
         comm->barrier();
         return SFEM_TEST_SUCCESS;
     }
+
+    int test_parallel_laplacian_apply_host() { return test_parallel_laplacian_apply_es(sfem::EXECUTION_SPACE_HOST); }
+
+    // Device distributed MF apply deferred: needs CUDA-aware Exchange::gather on device
+    // pointers (see ParallelMatrixFreeOperator::apply comments). Do not re-enable until then.
+#if 0 && defined(SFEM_ENABLE_CUDA)
+    int test_parallel_laplacian_apply_device() { return test_parallel_laplacian_apply_es(sfem::EXECUTION_SPACE_DEVICE); }
+#endif
 
 }  // namespace
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
-    SFEM_RUN_TEST(test_parallel_laplacian_apply);
+    SFEM_RUN_TEST(test_parallel_laplacian_apply_host);
+#if 0 && defined(SFEM_ENABLE_CUDA)
+    SFEM_RUN_TEST(test_parallel_laplacian_apply_device);
+#endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

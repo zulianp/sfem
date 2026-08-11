@@ -199,6 +199,10 @@ pysfem should become sfem
 - **Abstraction Layer**: Explicit MPI dependencies must be hidden behind simple abstractions:
   - `Communicator` class for MPI_Comm handling
   - Current abstractions will have adapt their implementation internally
+- **Matrix-free parallel apply**: Support phased assembly via `ElementScope` (`ALL`, `OWNED_NOT_SHARED`, `SHARED_AND_AURA`).
+  - Host: `gather_begin` / reserved-rank OpenMP (`tid0` waits, other threads apply owned chunks) / `SHARED_AND_AURA` when `omp_get_max_threads() > 1`
+  - Device (planned, CUDA-aware MPI): device `x`/`y` in place; async `OWNED_NOT_SHARED` kernel overlapped with device `Exchange::gather` (device pack + MPI on device buffers); then `SHARED_AND_AURA`. No host staging/D2H/H2D of the full field.
+  - `MPI_Init_thread(MPI_THREAD_FUNNELED)` only when OpenMP will use more than one thread
 - **Compile-time Fallbacks**: Backend functions must have compile-time fallbacks:
   - `#ifdef SFEM_ENABLE_MPI` guards for MPI-specific code (including matrix.io functionalities)
   - Serial implementations for non-MPI builds

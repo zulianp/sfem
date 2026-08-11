@@ -1,12 +1,18 @@
 #include "sfem_ParallelMatrixFreeOperator.hpp"
 
+#include "sfem_ElementScope.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_logger.hpp"
+#include "smesh_env.hpp"
 #include "smesh_exchange.hpp"
 #include "smesh_mesh.hpp"
 
 #include <algorithm>
 #include <cstring>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace sfem {
 
@@ -25,6 +31,14 @@ namespace sfem {
                                                            const std::shared_ptr<Buffer<real_t>> &state,
                                                            const ExecutionSpace                   execution_space)
         : impl_(std::make_unique<Impl>()) {
+        if (execution_space != EXECUTION_SPACE_HOST) {
+            SFEM_ERROR(
+                    "ParallelMatrixFreeOperator: EXECUTION_SPACE_DEVICE not implemented yet.\n"
+                    "Need CUDA-aware Exchange::gather on device pointers (device pack/unpack +\n"
+                    "MPI on device buffers), then mirror the host ElementScope overlap path.\n"
+                    "Do not stage via host D2H/H2D; x/y are already device allocation-sized.\n");
+        }
+
         impl_->function        = function;
         impl_->state           = state;
         impl_->execution_space = execution_space;
@@ -72,22 +86,79 @@ namespace sfem {
     int ParallelMatrixFreeOperator::apply(const real_t *const x, real_t *const y) {
         SFEM_TRACE_SCOPE("ParallelMatrixFreeOperator::apply");
 
-        if (impl_->execution_space != EXECUTION_SPACE_HOST) {
-            SFEM_ERROR("ParallelMatrixFreeOperator supports host execution only\n");
-            return SFEM_FAILURE;
-        }
-
-        // Ghost/aura slots are written by gather; owned values are preserved.
-        real_t *const x_mut = const_cast<real_t *>(x);
-        std::fill(x_mut + impl_->owned_dofs, x_mut + impl_->local_dofs, real_t(0));
-        if (impl_->exchange->gather(x_mut, impl_->block_size) != SFEM_SUCCESS) {
-            return SFEM_FAILURE;
-        }
-
+        real_t *const       x_mut       = const_cast<real_t *>(x);
         const real_t *const state_local = impl_->state ? impl_->state->data() : nullptr;
+        auto                mesh        = impl_->function->space()->mesh_ptr();
 
-        std::fill(y, y + impl_->local_dofs, real_t(0));  // TODO: should not be necessary, since apply semantics is based on Add
-        return impl_->function->apply(state_local, x_mut, y);
+        // SFEM_PARALLEL_MF_LEGACY=1: original blocking gather + full ALL apply (no ElementScope overlap).
+        const bool legacy = smesh::Env::read<int>("SFEM_PARALLEL_MF_LEGACY", 0) != 0;
+
+        // -------------------------------------------------------------------------
+        // DEVICE (not implemented): x/y are already on device (allocation-sized).
+        // Intended path once Exchange supports CUDA-aware MPI on device pointers:
+        //   1. d_memset(y, 0, local_dofs); optionally zero ghost/aura slots of x on device
+        //   2. Launch apply(OWNED_NOT_SHARED) async on the same device stream as the Op
+        //   3. exchange->gather(x) / gather_begin+wait with device pack + MPI on device bufs
+        //      (no host staging, no per-call alloc, no full-vector D2H/H2D)
+        //   4. Device sync as needed so ghosts are ready for SHARED_AND_AURA
+        //   5. apply(SHARED_AND_AURA); copy_constrained_dofs on device constraints
+        // Prerequisites: device pack/unpack in Exchange; CUDA-aware MPI build.
+        // -------------------------------------------------------------------------
+
+        std::fill(x_mut + impl_->owned_dofs, x_mut + impl_->local_dofs, real_t(0));
+        std::fill(y, y + impl_->local_dofs, real_t(0));
+
+        if (legacy) {
+            if (impl_->exchange->gather(x_mut, impl_->block_size) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+            return impl_->function->apply(state_local, x_mut, y);
+        }
+
+        if (impl_->exchange->gather_begin(x_mut, impl_->block_size) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+
+#ifdef _OPENMP
+        if (omp_get_max_threads() > 1) {
+            int err = SFEM_SUCCESS;
+#pragma omp parallel reduction(| : err)
+            {
+                const int tid = omp_get_thread_num();
+                const int nt  = omp_get_num_threads();
+                if (tid == 0) {
+                    if (impl_->exchange->gather_wait() != SFEM_SUCCESS) {
+                        err = SFEM_FAILURE;
+                    }
+                } else {
+                    const auto owned     = element_range(*mesh, ElementScope::OWNED_NOT_SHARED);
+                    const int  n_workers = nt - 1;
+                    const auto chunk     = static_chunk(owned.size(), tid - 1, n_workers);
+                    const ElementRange range{owned.begin + chunk.begin, owned.begin + chunk.end};
+                    if (impl_->function->apply(state_local, x_mut, y, range) != SFEM_SUCCESS) {
+                        err = SFEM_FAILURE;
+                    }
+                }
+            }
+            if (err != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+        } else
+#endif
+        {
+            if (impl_->function->apply(state_local, x_mut, y, ElementScope::OWNED_NOT_SHARED) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+            if (impl_->exchange->gather_wait() != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+        }
+
+        if (impl_->function->apply(state_local, x_mut, y, ElementScope::SHARED_AND_AURA) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        // Match Function::apply(ALL): Dirichlet identity on constrained DOFs.
+        return impl_->function->copy_constrained_dofs(x_mut, y);
     }
 
     std::ptrdiff_t ParallelMatrixFreeOperator::rows() const { return impl_->owned_dofs; }
@@ -120,7 +191,9 @@ namespace sfem {
         }
 
         if (execution_space != EXECUTION_SPACE_HOST) {
-            SFEM_ERROR("create_parallel_matrix_free_operator supports distributed host execution only\n");
+            SFEM_ERROR(
+                    "create_parallel_matrix_free_operator: distributed DEVICE apply needs CUDA-aware\n"
+                    "Exchange::gather on device pointers (see ParallelMatrixFreeOperator::apply comments).\n");
             return nullptr;
         }
 

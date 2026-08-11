@@ -664,14 +664,44 @@ namespace sfem {
             });
         }
 
-        int gradient(const real_t *const x, real_t *const out) override {
+        int gradient(const real_t *const x, real_t *const out) override { return gradient(x, out, ElementScope::ALL); }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+            return apply(x, h, out, ElementScope::ALL);
+        }
+
+        int gradient(const real_t *const x, real_t *const out, const ElementScope scope) override {
+            return gradient(x, out, element_range(*space->mesh_ptr(), scope));
+        }
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override {
+            return apply(x, h, out, element_range(*space->mesh_ptr(), scope));
+        }
+
+        int gradient(const real_t *const x, real_t *const out, const ElementRange range) override {
             return iterate([&](const OpDomain &domain) {
                 auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
+                if (range.empty()) {
+                    return SFEM_SUCCESS;
+                }
+                const ptrdiff_t n_block = op_data->nelements();
+                if (range.begin < 0 || range.end > n_block) {
+                    SFEM_ERROR("GPULaplacian: ElementRange out of bounds\n");
+                    return SFEM_FAILURE;
+                }
+                const ptrdiff_t ne  = range.size();
+                const int       nxe = elem_num_nodes(domain.element_type);
+                idx_t          *view[32];
+                idx_t **const   elems = op_data->elements->data();
+                for (int v = 0; v < nxe; ++v) {
+                    view[v] = elems[v] + range.begin;
+                }
+                // Flat SoA FFF: component d at fff[d * n_block + e]; offset by begin, keep stride n_block.
                 return cu_laplacian_apply(domain.element_type,
-                                          op_data->nelements(),
-                                          op_data->elements->data(),
-                                          op_data->nelements(),
-                                          op_data->fff_data(),
+                                          ne,
+                                          view,
+                                          n_block,
+                                          op_data->fff_data() + range.begin,
                                           real_type,
                                           x,
                                           out,
@@ -679,14 +709,29 @@ namespace sfem {
             });
         }
 
-        int apply(const real_t *const x, const real_t *const h, real_t *const out) override {
+        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementRange range) override {
             return iterate([&](const OpDomain &domain) {
                 auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
+                if (range.empty()) {
+                    return SFEM_SUCCESS;
+                }
+                const ptrdiff_t n_block = op_data->nelements();
+                if (range.begin < 0 || range.end > n_block) {
+                    SFEM_ERROR("GPULaplacian: ElementRange out of bounds\n");
+                    return SFEM_FAILURE;
+                }
+                const ptrdiff_t ne  = range.size();
+                const int       nxe = elem_num_nodes(domain.element_type);
+                idx_t          *view[32];
+                idx_t **const   elems = op_data->elements->data();
+                for (int v = 0; v < nxe; ++v) {
+                    view[v] = elems[v] + range.begin;
+                }
                 return cu_laplacian_apply(domain.element_type,
-                                          op_data->nelements(),
-                                          op_data->elements->data(),
-                                          op_data->nelements(),
-                                          op_data->fff_data(),
+                                          ne,
+                                          view,
+                                          n_block,
+                                          op_data->fff_data() + range.begin,
                                           real_type,
                                           h,
                                           out,
