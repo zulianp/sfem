@@ -704,6 +704,7 @@ namespace sfem {
 
                     if (enable_line_search_) {
                         // ATTENTION to code changes and side-effects
+                        SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::line_search");
 
                         //  dot(c, (b - A * x))
                         T numerator = blas_->dot(correction->size(), correction->data(), mem->work->data());
