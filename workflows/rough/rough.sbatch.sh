@@ -4,11 +4,11 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=72
-#SBATCH --time=01:00:00
+#SBATCH --time=00:30:00
 #SBATCH --output=slurm-rough-%j.out
 #SBATCH --error=slurm-rough-%j.err
 #SBATCH --exclusive
-#SBATCH --partition=normal
+#SBATCH --partition=debug
 #SBATCH --uenv-passthrough=use
 
 set -euo pipefail
