@@ -15,7 +15,7 @@ fi
 
 set -x
 
-rm -f output
+rm -rf output
 
 SFEM_EXECUTION_SPACE=device     \
 SFEM_COARSE_OP_TYPE=MF 			\

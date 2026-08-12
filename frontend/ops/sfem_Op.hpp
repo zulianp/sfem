@@ -247,18 +247,14 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        virtual int gradient(const real_t *const x, real_t *const out, const ElementRange /*range*/) {
-            SFEM_ERROR("%s does not support ElementRange apply\n", name());
-            return SFEM_FAILURE;
-        }
-
-        virtual int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementRange /*range*/) {
-            SFEM_ERROR("%s does not support ElementRange apply\n", name());
-            return SFEM_FAILURE;
-        }
-
-        virtual int value(const real_t * /*x*/, real_t *const /*out*/, const ElementRange /*range*/) {
-            SFEM_ERROR("%s does not support ElementRange apply\n", name());
+        /// Apply on a flat element subrange within @p scope (parallel overlap). Default: unsupported.
+        virtual int apply_scope_flat_range(const real_t *const /*x*/,
+                                           const real_t *const /*h*/,
+                                           real_t *const /*out*/,
+                                           const ElementScope /*scope*/,
+                                           const ptrdiff_t /*flat_begin*/,
+                                           const ptrdiff_t /*flat_end*/) {
+            SFEM_ERROR("%s does not support scoped flat-range apply\n", name());
             return SFEM_FAILURE;
         }
 
@@ -391,14 +387,14 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
         int value(const real_t * /*x*/, real_t *const /*out*/, const ElementScope) override { return SFEM_SUCCESS; }
-        int gradient(const real_t *const /*x*/, real_t *const /*out*/, const ElementRange) override { return SFEM_SUCCESS; }
-        int apply(const real_t *const /*x*/,
-                  const real_t *const /*h*/,
-                  real_t *const /*out*/,
-                  const ElementRange) override {
+        int apply_scope_flat_range(const real_t *const /*x*/,
+                                   const real_t *const /*h*/,
+                                   real_t *const /*out*/,
+                                   const ElementScope /*scope*/,
+                                   const ptrdiff_t /*flat_begin*/,
+                                   const ptrdiff_t /*flat_end*/) override {
             return SFEM_SUCCESS;
         }
-        int value(const real_t * /*x*/, real_t *const /*out*/, const ElementRange) override { return SFEM_SUCCESS; }
         std::shared_ptr<Op> clone() const override { return std::make_shared<NoOp>(); }
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override { return std::make_shared<NoOp>(); }
         bool                is_no_op() const override { return true; }

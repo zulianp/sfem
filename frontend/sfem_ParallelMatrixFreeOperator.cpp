@@ -1,6 +1,7 @@
 #include "sfem_ParallelMatrixFreeOperator.hpp"
 
 #include "sfem_ElementScope.hpp"
+#include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_env.hpp"
@@ -51,6 +52,8 @@ namespace sfem {
         impl_->owned_dofs = dist->n_nodes_owned() * impl_->block_size;
         impl_->local_dofs = dist->n_nodes_local() * impl_->block_size;
         impl_->exchange   = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
+
+        assert_mesh_supports_distributed_element_scopes(*mesh);
 
         if (state) {
             if (state->size() != static_cast<size_t>(impl_->local_dofs)) {
@@ -131,11 +134,16 @@ namespace sfem {
                         err = SFEM_FAILURE;
                     }
                 } else {
-                    const auto owned     = element_range(*mesh, ElementScope::OWNED_NOT_SHARED);
                     const int  n_workers = nt - 1;
-                    const auto chunk     = static_chunk(owned.size(), tid - 1, n_workers);
-                    const ElementRange range{owned.begin + chunk.begin, owned.begin + chunk.end};
-                    if (impl_->function->apply(state_local, x_mut, y, range) != SFEM_SUCCESS) {
+                    const auto flat_chunk =
+                            static_chunk(count_block_elements(*mesh, ElementScope::OWNED_NOT_SHARED), tid - 1, n_workers);
+                    if (impl_->function->apply_scope_flat_range(
+                                state_local,
+                                x_mut,
+                                y,
+                                ElementScope::OWNED_NOT_SHARED,
+                                flat_chunk.begin,
+                                flat_chunk.end) != SFEM_SUCCESS) {
                         err = SFEM_FAILURE;
                     }
                 }

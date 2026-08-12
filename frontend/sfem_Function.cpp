@@ -495,38 +495,17 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int Function::gradient(const real_t *const x, real_t *const out, const ElementRange range) {
-        SFEM_TRACE_SCOPE("Function::gradient(range)");
+    int Function::apply_scope_flat_range(const real_t *const x,
+                                         const real_t *const h,
+                                         real_t *const       out,
+                                         const ElementScope  scope,
+                                         const ptrdiff_t     flat_begin,
+                                         const ptrdiff_t     flat_end) {
+        SFEM_TRACE_SCOPE("Function::apply_scope_flat_range");
 
         for (auto &op : impl_->ops) {
-            if (op->gradient(x, out, range) != SFEM_SUCCESS) {
-                std::cerr << "Failed gradient in op: " << op->name() << "\n";
-                return SFEM_FAILURE;
-            }
-        }
-
-        return SFEM_SUCCESS;
-    }
-
-    int Function::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementRange range) {
-        SFEM_TRACE_SCOPE("Function::apply(range)");
-
-        for (auto &op : impl_->ops) {
-            if (op->apply(x, h, out, range) != SFEM_SUCCESS) {
-                std::cerr << "Failed apply in op: " << op->name() << "\n";
-                return SFEM_FAILURE;
-            }
-        }
-
-        return SFEM_SUCCESS;
-    }
-
-    int Function::value(const real_t *x, real_t *const out, const ElementRange range) {
-        SFEM_TRACE_SCOPE("Function::value(range)");
-
-        for (auto &op : impl_->ops) {
-            if (op->value(x, out, range) != SFEM_SUCCESS) {
-                std::cerr << "Failed value in op: " << op->name() << "\n";
+            if (op->apply_scope_flat_range(x, h, out, scope, flat_begin, flat_end) != SFEM_SUCCESS) {
+                std::cerr << "Failed apply_scope_flat_range in op: " << op->name() << "\n";
                 return SFEM_FAILURE;
             }
         }

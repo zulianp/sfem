@@ -25,8 +25,8 @@ namespace sfem {
         int                  block_size{3};
         bool                 is_symmetric{true};
         // SFEM_JACOBI_SPARSE_UPDATE=0 forces full inv_diag rebuild (debug / A-B vs sparse path).
-        bool                 enable_sparse_update_{true};
-        bool                 sparse_update_policy_logged_{false};
+        bool enable_sparse_update_{true};
+        // bool                 sparse_update_policy_logged_{false};
 
         void default_init() {
             blas = make_openmp_blas<LP>();
@@ -34,18 +34,18 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
-        void read_sparse_update_policy() {
-            enable_sparse_update_ = smesh::Env::read<bool>("SFEM_JACOBI_SPARSE_UPDATE", true);
-            if (!sparse_update_policy_logged_) {
-                static bool logged_once = false;
-                if (!logged_once) {
-                    printf("MixedPrecisionShiftableBlockSymJacobi: SFEM_JACOBI_SPARSE_UPDATE=%d\n",
-                           (int)enable_sparse_update_);
-                    logged_once = true;
-                }
-                sparse_update_policy_logged_ = true;
-            }
-        }
+        // void read_sparse_update_policy() {
+        //     enable_sparse_update_ = smesh::Env::read<bool>("SFEM_JACOBI_SPARSE_UPDATE", true);
+        //     if (!sparse_update_policy_logged_) {
+        //         static bool logged_once = false;
+        //         if (!logged_once) {
+        //             printf("MixedPrecisionShiftableBlockSymJacobi: SFEM_JACOBI_SPARSE_UPDATE=%d\n",
+        //                    (int)enable_sparse_update_);
+        //             logged_once = true;
+        //         }
+        //         sparse_update_policy_logged_ = true;
+        //     }
+        // }
 
         void set_diag(const SharedBuffer<HP>& d) {
             SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::set_diag");
@@ -55,7 +55,7 @@ namespace sfem {
             assert(execution_space_ == (enum ExecutionSpace)d->mem_space());
             assert(constraints_mask);
 
-            read_sparse_update_policy();
+            // read_sparse_update_policy();
 
             const ptrdiff_t n_blocks = d->size() / 6;
             diag                     = d;

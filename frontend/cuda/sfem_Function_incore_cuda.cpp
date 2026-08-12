@@ -671,71 +671,82 @@ namespace sfem {
         }
 
         int gradient(const real_t *const x, real_t *const out, const ElementScope scope) override {
-            return gradient(x, out, element_range(*space->mesh_ptr(), scope));
-        }
-
-        int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override {
-            return apply(x, h, out, element_range(*space->mesh_ptr(), scope));
-        }
-
-        int gradient(const real_t *const x, real_t *const out, const ElementRange range) override {
+            auto mesh = space->mesh_ptr();
             return iterate([&](const OpDomain &domain) {
-                auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
-                if (range.empty()) {
-                    return SFEM_SUCCESS;
-                }
-                const ptrdiff_t n_block = op_data->nelements();
-                if (range.begin < 0 || range.end > n_block) {
-                    SFEM_ERROR("GPULaplacian: ElementRange out of bounds\n");
-                    return SFEM_FAILURE;
-                }
-                const ptrdiff_t ne  = range.size();
-                const int       nxe = elem_num_nodes(domain.element_type);
-                idx_t          *view[32];
-                idx_t **const   elems = op_data->elements->data();
-                for (int v = 0; v < nxe; ++v) {
-                    view[v] = elems[v] + range.begin;
-                }
-                // Flat SoA FFF: component d at fff[d * n_block + e]; offset by begin, keep stride n_block.
-                return cu_laplacian_apply(domain.element_type,
-                                          ne,
-                                          view,
-                                          n_block,
-                                          op_data->fff_data() + range.begin,
-                                          real_type,
-                                          x,
-                                          out,
-                                          stream);
+                const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
+                return gpu_laplacian_block_vector(domain, x, out, element_range(*mesh, b, scope));
             });
         }
 
-        int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementRange range) override {
+        int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override {
+            auto mesh = space->mesh_ptr();
             return iterate([&](const OpDomain &domain) {
-                auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
-                if (range.empty()) {
+                const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
+                return gpu_laplacian_block_vector(domain, h, out, element_range(*mesh, b, scope));
+            });
+        }
+
+        int apply_scope_flat_range(const real_t *const /*x*/,
+                                   const real_t *const h,
+                                   real_t *const       out,
+                                   const ElementScope  scope,
+                                   const ptrdiff_t     flat_begin,
+                                   const ptrdiff_t     flat_end) override {
+            if (flat_end <= flat_begin) {
+                return SFEM_SUCCESS;
+            }
+
+            auto mesh = space->mesh_ptr();
+            int  err  = SFEM_SUCCESS;
+            for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
+                if (gpu_laplacian_apply_block(*mesh, slice.block, slice.range, h, out) != SFEM_SUCCESS) {
+                    err = SFEM_FAILURE;
+                }
+            }
+            return err;
+        }
+
+        int gpu_laplacian_block_vector(const OpDomain &domain, const real_t *const in, real_t *const out, const ElementRange range) {
+            auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
+            if (range.empty()) {
+                return SFEM_SUCCESS;
+            }
+            const ptrdiff_t n_block = op_data->nelements();
+            if (range.begin < 0 || range.end > n_block) {
+                SFEM_ERROR("GPULaplacian: block ElementRange out of bounds\n");
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t ne  = range.size();
+            const int       nxe = elem_num_nodes(domain.element_type);
+            idx_t          *view[32];
+            idx_t **const   elems = op_data->elements->data();
+            for (int v = 0; v < nxe; ++v) {
+                view[v] = elems[v] + range.begin;
+            }
+            return cu_laplacian_apply(domain.element_type,
+                                      ne,
+                                      view,
+                                      n_block,
+                                      op_data->fff_data() + range.begin,
+                                      real_type,
+                                      in,
+                                      out,
+                                      stream);
+        }
+
+        int gpu_laplacian_apply_block(smesh::Mesh           &mesh,
+                                      const smesh::block_idx_t block,
+                                      const ElementRange         range,
+                                      const real_t *const        h,
+                                      real_t *const              out) {
+            if (range.empty()) {
+                return SFEM_SUCCESS;
+            }
+            return iterate([&](const OpDomain &domain) {
+                if (block_id_for_domain(mesh, *domain.block) != block) {
                     return SFEM_SUCCESS;
                 }
-                const ptrdiff_t n_block = op_data->nelements();
-                if (range.begin < 0 || range.end > n_block) {
-                    SFEM_ERROR("GPULaplacian: ElementRange out of bounds\n");
-                    return SFEM_FAILURE;
-                }
-                const ptrdiff_t ne  = range.size();
-                const int       nxe = elem_num_nodes(domain.element_type);
-                idx_t          *view[32];
-                idx_t **const   elems = op_data->elements->data();
-                for (int v = 0; v < nxe; ++v) {
-                    view[v] = elems[v] + range.begin;
-                }
-                return cu_laplacian_apply(domain.element_type,
-                                          ne,
-                                          view,
-                                          n_block,
-                                          op_data->fff_data() + range.begin,
-                                          real_type,
-                                          h,
-                                          out,
-                                          stream);
+                return gpu_laplacian_block_vector(domain, h, out, range);
             });
         }
 
