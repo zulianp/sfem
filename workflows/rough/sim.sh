@@ -15,8 +15,8 @@ fi
 
 set -x
 
-# export SFEM_ENABLE_MIXED_PRECISION=0
-# export SFEM_MAX_PENALTY_PARAM=1e6
+rm -f output
+
 SFEM_EXECUTION_SPACE=device     \
 SFEM_COARSE_OP_TYPE=MF 			\
 SFEM_MAX_INNER_IT=3 			\
