@@ -284,7 +284,7 @@ int main(int argc, char** argv) {
         cg->set_rtol(SFEM_RTOL);
         cg->set_atol(SFEM_ATOL);
         cg->verbose = false;
-        cg->set_host_fusion(host_fusion);
+        cg->set_fusion(host_fusion);
         if (precond) {
             cg->set_preconditioner_op(precond);
         }
@@ -420,7 +420,7 @@ int main(int argc, char** argv) {
            double(SFEM_RTOL),
            double(SFEM_ATOL),
            SFEM_SMOOTH_IT);
-    printf("# cg_blas / cg_*_blas: host_fusion=0 (separate BLAS axpby+dot); cg / cg_bjacobi: fused\n");
+    printf("# cg_blas / cg_*_blas: fusion=0 (separate BLAS axpby+dot); cg / cg_bjacobi: fused OpenMP/CUDA strategy\n");
     printf("# Filter with SFEM_SOLVERS=cg,cg_blas,cg_bjacobi,... or all\n");
 
     return EXIT_SUCCESS;

@@ -9,6 +9,7 @@
 #include "sfem_openmp_blas.hpp"
 
 #include "sfem_openmp_ShiftableJacobi.hpp"
+#include "smesh_env.hpp"
 
 namespace sfem {
 
@@ -77,11 +78,26 @@ namespace sfem {
         T                               relaxation_parameter{1./3};
         int                             block_size{3};
         bool                            is_symmetric{true};
+        // SFEM_JACOBI_SPARSE_UPDATE=0 forces full inv_diag rebuild (debug / A-B vs sparse path).
+        bool                            enable_sparse_update_{true};
+        bool                            sparse_update_policy_logged_{false};
 
         void default_init() {
             blas = make_openmp_blas<T>();
             ShiftableBlockSymJacobi_OpenMP<T>::build(block_size, impl);
             execution_space_ = EXECUTION_SPACE_HOST;
+        }
+
+        void read_sparse_update_policy() {
+            enable_sparse_update_ = smesh::Env::read<bool>("SFEM_JACOBI_SPARSE_UPDATE", true);
+            if (!sparse_update_policy_logged_) {
+                static bool logged_once = false;
+                if (!logged_once) {
+                    printf("ShiftableBlockSymJacobi: SFEM_JACOBI_SPARSE_UPDATE=%d\n", (int)enable_sparse_update_);
+                    logged_once = true;
+                }
+                sparse_update_policy_logged_ = true;
+            }
         }
 
         void set_diag(const SharedBuffer<T>& d) {
@@ -91,6 +107,8 @@ namespace sfem {
             assert(is_symmetric);
             assert(execution_space_ == (enum ExecutionSpace)d->mem_space());
             assert(constraints_mask);
+
+            read_sparse_update_policy();
 
             const ptrdiff_t n_blocks = d->size() / 6;
             diag                     = d;
@@ -119,10 +137,24 @@ namespace sfem {
             SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::shift");
 
             const ptrdiff_t n_blocks = inv_diag->size() / 9;
+            const ptrdiff_t n_sparse = block_diag->idx()->size();
 
+            if (enable_sparse_update_ && impl.sparse_update_inv_diag) {
+                impl.sparse_update_inv_diag(n_sparse,
+                                            block_diag->idx()->data(),
+                                            diag->data(),
+                                            block_diag->data()->data(),
+                                            scaling->data(),
+                                            constraints_mask->data(),
+                                            relaxation_parameter,
+                                            inv_diag->data());
+                return SFEM_SUCCESS;
+            }
+
+            // Full rebuild path (pre-28487044 behavior / SFEM_JACOBI_SPARSE_UPDATE=0).
             impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
             impl.add_sparse_sym_diag_to_diag(
-                    block_diag->idx()->size(), block_diag->idx()->data(), block_diag->data()->data(), scaling->data(), inv_diag->data());
+                    n_sparse, block_diag->idx()->data(), block_diag->data()->data(), scaling->data(), inv_diag->data());
 
             impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
             impl.inplace_invert(n_blocks, inv_diag->data());

@@ -1004,6 +1004,238 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_k
     }
 }
 
+// Build 24x24 micro-element matrix into shared emat. __noinline__ so apply-phase
+// register pressure does not inherit matrix_block / quadrature temporaries.
+template <typename T>
+__device__ __noinline__ void cu_sshex8_tp_build_emat_24x24(const int                        lidx,
+                                                           const int                        nthreads,
+                                                           const T                          mu,
+                                                           const T                          lambda,
+                                                           const T *const SFEM_RESTRICT      shared_adjugate,
+                                                           const T                          determinant,
+                                                           T *const SFEM_RESTRICT           emat) {
+    static const int N_DOF        = 24;
+    static const int N_NODE_PAIRS = 8 * 8;
+
+    for (int pair = lidx; pair < N_NODE_PAIRS; pair += nthreads) {
+        const int row_node = pair >> 3;
+        const int col_node = pair & 7;
+
+        T block[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+#pragma unroll
+        for (int q = 0; q < 8; q++) {
+            T test_grad[3];
+            T trial_grad[3];
+
+            cu_sshex8_tp_ref_grad<T>(q, row_node, test_grad);
+            cu_sshex8_tp_ref_grad<T>(q, col_node, trial_grad);
+            cu_linear_elasticity_matrix_block<T>(
+                    mu, lambda, shared_adjugate, determinant, (T)0.125, trial_grad, test_grad, block);
+        }
+
+        T *const row0 = &emat[(row_node * 3 + 0) * N_DOF + col_node * 3];
+        T *const row1 = &emat[(row_node * 3 + 1) * N_DOF + col_node * 3];
+        T *const row2 = &emat[(row_node * 3 + 2) * N_DOF + col_node * 3];
+
+        row0[0] = block[0];
+        row0[1] = block[1];
+        row0[2] = block[2];
+        row1[0] = block[3];
+        row1[1] = block[4];
+        row1[2] = block[5];
+        row2[0] = block[6];
+        row2[1] = block[7];
+        row2[2] = block[8];
+    }
+}
+
+// Optimized TP path (LEVEL8_KERNEL=6): launch_bounds + noinline emat build + padded shared.
+// KERNEL=4 baseline is left unchanged for A/B.
+template <typename T, int LEVEL>
+__global__ __launch_bounds__(128, 4) void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_opt_kernel(
+        const ptrdiff_t                          nelements,
+        idx_t **const SFEM_RESTRICT              elements,
+        const ptrdiff_t                          jacobian_stride,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+        const T                                  mu,
+        const T                                  lambda,
+        const ptrdiff_t                          u_stride,
+        const T *const SFEM_RESTRICT             g_ux,
+        const T *const SFEM_RESTRICT             g_uy,
+        const T *const SFEM_RESTRICT             g_uz,
+        const ptrdiff_t                          out_stride,
+        T *const SFEM_RESTRICT                   g_outx,
+        T *const SFEM_RESTRICT                   g_outy,
+        T *const SFEM_RESTRICT                   g_outz) {
+    static_assert(LEVEL == 8, "TP opt kernel supports LEVEL=8 only");
+
+    static const int BLOCK_SIZE         = LEVEL + 1;
+    static const int BLOCK_SIZE_2       = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3       = BLOCK_SIZE_2 * BLOCK_SIZE;
+    static const int PADDED_BLOCK_SIZE3 = 10 * BLOCK_SIZE * BLOCK_SIZE;
+    static const int N_DOF              = 24;
+    static const int N_MICRO            = LEVEL * LEVEL * LEVEL;
+    static const int N_MATRIX           = N_DOF * N_DOF;
+
+    __shared__ T u_block[3][PADDED_BLOCK_SIZE3];
+    __shared__ T out_block[3][PADDED_BLOCK_SIZE3];
+    __shared__ T shared_adjugate[9];
+    __shared__ T shared_determinant;
+    __shared__ T emat[N_MATRIX];
+
+    const int lidx     = threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z);
+    const int nthreads = blockDim.x * blockDim.y * blockDim.z;
+
+    for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        for (int i = lidx; i < BLOCK_SIZE_3; i += nthreads) {
+            const int z = i / BLOCK_SIZE_2;
+            const int r = i - z * BLOCK_SIZE_2;
+            const int y = r / BLOCK_SIZE;
+            const int x = r - y * BLOCK_SIZE;
+            const int pi = cu_sshex8_level8_padded_lidx(x, y, z);
+
+            const idx_t     node = elements[i][e];
+            const ptrdiff_t in   = node * u_stride;
+
+            u_block[0][pi]   = g_ux[in];
+            u_block[1][pi]   = g_uy[in];
+            u_block[2][pi]   = g_uz[in];
+            out_block[0][pi] = 0;
+            out_block[1][pi] = 0;
+            out_block[2][pi] = 0;
+        }
+
+        if (lidx == 0) {
+            shared_adjugate[0] = g_jacobian_adjugate[0 * jacobian_stride + e];
+            shared_adjugate[1] = g_jacobian_adjugate[1 * jacobian_stride + e];
+            shared_adjugate[2] = g_jacobian_adjugate[2 * jacobian_stride + e];
+            shared_adjugate[3] = g_jacobian_adjugate[3 * jacobian_stride + e];
+            shared_adjugate[4] = g_jacobian_adjugate[4 * jacobian_stride + e];
+            shared_adjugate[5] = g_jacobian_adjugate[5 * jacobian_stride + e];
+            shared_adjugate[6] = g_jacobian_adjugate[6 * jacobian_stride + e];
+            shared_adjugate[7] = g_jacobian_adjugate[7 * jacobian_stride + e];
+            shared_adjugate[8] = g_jacobian_adjugate[8 * jacobian_stride + e];
+            shared_determinant = g_jacobian_determinant[e];
+            cu_hex8_sub_adj_0_in_place<T>((T)(1. / LEVEL), shared_adjugate, &shared_determinant);
+        }
+
+        __syncthreads();
+
+        cu_sshex8_tp_build_emat_24x24<T>(lidx, nthreads, mu, lambda, shared_adjugate, shared_determinant, emat);
+
+        __syncthreads();
+
+        assert(blockDim.x == 4);
+        assert(blockDim.y == 8);
+
+        const int batch_size  = blockDim.y * blockDim.z;
+        const int batch_start = threadIdx.z * blockDim.y;
+        const int n_rounds    = (N_MICRO + batch_size - 1) / batch_size;
+
+        const int in_vertex_0  = threadIdx.x;
+        const int in_vertex_1  = threadIdx.x + 4;
+        const int out_vertex   = threadIdx.y;
+        const int in_x_offset0 = cu_sshex8_hex_vertex_x(in_vertex_0);
+        const int in_y_offset0 = cu_sshex8_hex_vertex_y(in_vertex_0);
+        const int in_z_offset0 = cu_sshex8_hex_vertex_z(in_vertex_0);
+        const int in_x_offset1 = cu_sshex8_hex_vertex_x(in_vertex_1);
+        const int in_y_offset1 = cu_sshex8_hex_vertex_y(in_vertex_1);
+        const int in_z_offset1 = cu_sshex8_hex_vertex_z(in_vertex_1);
+        const int out_x_offset = cu_sshex8_hex_vertex_x(out_vertex);
+        const int out_y_offset = cu_sshex8_hex_vertex_y(out_vertex);
+        const int out_z_offset = cu_sshex8_hex_vertex_z(out_vertex);
+
+        const int col0 = in_vertex_0 * 3;
+        const int col1 = in_vertex_1 * 3;
+
+        for (int r = 0; r < n_rounds; r++) {
+            const int in_micro_e  = threadIdx.y + batch_start + r * batch_size;
+            const int out_micro_e = 2 * threadIdx.x + batch_start + r * batch_size;
+
+            double u00 = 0;
+            double u01 = 0;
+            double u02 = 0;
+            double u10 = 0;
+            double u11 = 0;
+            double u12 = 0;
+
+            if (in_micro_e < N_MICRO) {
+                const int in_xe = in_micro_e % LEVEL;
+                const int in_ye = (in_micro_e / LEVEL) % LEVEL;
+                const int in_ze = in_micro_e / (LEVEL * LEVEL);
+
+                const int idx0 = cu_sshex8_level8_padded_lidx(
+                        in_xe + in_x_offset0, in_ye + in_y_offset0, in_ze + in_z_offset0);
+                const int idx1 = cu_sshex8_level8_padded_lidx(
+                        in_xe + in_x_offset1, in_ye + in_y_offset1, in_ze + in_z_offset1);
+
+                u00 = (double)u_block[0][idx0];
+                u01 = (double)u_block[1][idx0];
+                u02 = (double)u_block[2][idx0];
+                u10 = (double)u_block[0][idx1];
+                u11 = (double)u_block[1][idx1];
+                u12 = (double)u_block[2][idx1];
+            }
+
+#pragma unroll
+            for (int out_comp = 0; out_comp < 3; out_comp++) {
+                double C0 = 0;
+                double C1 = 0;
+
+                const int row = out_vertex * 3 + out_comp;
+
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col0 + 0], u00, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col1 + 0], u10, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col0 + 1], u01, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col1 + 1], u11, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col0 + 2], u02, C0, C1);
+                cu_sshex8_mma_m8n8k4_f64((double)emat[row * N_DOF + col1 + 2], u12, C0, C1);
+
+                if (out_micro_e < N_MICRO) {
+                    const int out_xe = out_micro_e % LEVEL;
+                    const int out_ye = (out_micro_e / LEVEL) % LEVEL;
+                    const int out_ze = out_micro_e / (LEVEL * LEVEL);
+                    const int idx    = cu_sshex8_level8_padded_lidx(
+                            out_xe + out_x_offset, out_ye + out_y_offset, out_ze + out_z_offset);
+
+                    atomicAdd(&out_block[out_comp][idx], (T)C0);
+                }
+
+                if (out_micro_e + 1 < N_MICRO) {
+                    const int out_xe = (out_micro_e + 1) % LEVEL;
+                    const int out_ye = ((out_micro_e + 1) / LEVEL) % LEVEL;
+                    const int out_ze = (out_micro_e + 1) / (LEVEL * LEVEL);
+                    const int idx    = cu_sshex8_level8_padded_lidx(
+                            out_xe + out_x_offset, out_ye + out_y_offset, out_ze + out_z_offset);
+
+                    atomicAdd(&out_block[out_comp][idx], (T)C1);
+                }
+            }
+        }
+
+        __syncthreads();
+
+        for (int i = lidx; i < BLOCK_SIZE_3; i += nthreads) {
+            const int z  = i / BLOCK_SIZE_2;
+            const int r  = i - z * BLOCK_SIZE_2;
+            const int y  = r / BLOCK_SIZE;
+            const int x  = r - y * BLOCK_SIZE;
+            const int pi = cu_sshex8_level8_padded_lidx(x, y, z);
+
+            const idx_t     node    = elements[i][e];
+            const ptrdiff_t out_idx = node * out_stride;
+
+            atomicAdd(&g_outx[out_idx], out_block[0][pi]);
+            atomicAdd(&g_outy[out_idx], out_block[1][pi]);
+            atomicAdd(&g_outz[out_idx], out_block[2][pi]);
+        }
+
+        __syncthreads();
+    }
+}
+
 #define local_mem_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernel
 // #define local_mem_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel
 
@@ -1273,6 +1505,77 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(const ptrdiff_t 
 }
 
 template <typename T, int LEVEL>
+int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
+        const ptrdiff_t                          nelements,
+        idx_t **const SFEM_RESTRICT              elements,
+        const ptrdiff_t                          jacobian_stride,
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+        const T                                  mu,
+        const T                                  lambda,
+        const ptrdiff_t                          u_stride,
+        const T *const SFEM_RESTRICT             ux,
+        const T *const SFEM_RESTRICT             uy,
+        const T *const SFEM_RESTRICT             uz,
+        const ptrdiff_t                          out_stride,
+        T *const SFEM_RESTRICT                   outx,
+        T *const SFEM_RESTRICT                   outy,
+        T *const SFEM_RESTRICT                   outz,
+        void                                    *stream) {
+    SFEM_DEBUG_SYNCHRONIZE();
+
+    if (LEVEL != 8) {
+        SFEM_ERROR("cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl: level %d not supported!\n",
+                   LEVEL);
+        return SFEM_FAILURE;
+    }
+
+    dim3 block_size(4, 8, 4);
+    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
+
+    if (stream) {
+        cudaStream_t s = *static_cast<cudaStream_t *>(stream);
+        cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_opt_kernel<T, LEVEL>
+                <<<n_blocks, block_size, 0, s>>>(nelements,
+                                                 elements,
+                                                 jacobian_stride,
+                                                 jacobian_adjugate,
+                                                 jacobian_determinant,
+                                                 mu,
+                                                 lambda,
+                                                 u_stride,
+                                                 ux,
+                                                 uy,
+                                                 uz,
+                                                 out_stride,
+                                                 outx,
+                                                 outy,
+                                                 outz);
+    } else {
+        cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_opt_kernel<T, LEVEL>
+                <<<n_blocks, block_size, 0>>>(nelements,
+                                              elements,
+                                              jacobian_stride,
+                                              jacobian_adjugate,
+                                              jacobian_determinant,
+                                              mu,
+                                              lambda,
+                                              u_stride,
+                                              ux,
+                                              uy,
+                                              uz,
+                                              out_stride,
+                                              outx,
+                                              outy,
+                                              outz);
+    }
+
+    SFEM_CUDA_CHECK(cudaPeekAtLastError());
+    SFEM_DEBUG_SYNCHRONIZE();
+    return SFEM_SUCCESS;
+}
+
+template <typename T, int LEVEL>
 int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t                          nelements,
                                                                idx_t **const SFEM_RESTRICT              elements,
                                                                const ptrdiff_t                          jacobian_stride,
@@ -1517,8 +1820,11 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
 #define my_kernel_segmented cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl
 #define my_kernel_local_mem_original cu_affine_sshex8_linear_elasticity_apply_local_mem_original_tpl
 #define my_kernel_tensor_product cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl
+#define my_kernel_tensor_product_opt cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl
 #define my_kernel_level8_gather cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl
 
+// SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL: 0=local_mem_seg, 2=warp, 3=local_mem,
+// 4=TP (default), 5=gather, 6=TP opt (launch_bounds+padded shared).
 static int cu_sshex8_linear_elasticity_level8_kernel() {
     static int kernel = -1;
 
@@ -1678,6 +1984,24 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                               (real_t *)outy,
                                                               (real_t *)outz,
                                                               stream);
+                }
+                case 6: {
+                    return my_kernel_tensor_product_opt<real_t, 8>(nelements,
+                                                                   elements,
+                                                                   jacobian_stride,
+                                                                   (cu_jacobian_t *)jacobian_adjugate,
+                                                                   (cu_jacobian_t *)jacobian_determinant,
+                                                                   mu,
+                                                                   lambda,
+                                                                   u_stride,
+                                                                   (real_t *)ux,
+                                                                   (real_t *)uy,
+                                                                   (real_t *)uz,
+                                                                   out_stride,
+                                                                   (real_t *)outx,
+                                                                   (real_t *)outy,
+                                                                   (real_t *)outz,
+                                                                   stream);
                 }
                 default: {
                     return my_kernel_segmented<real_t, 8>(nelements,

@@ -100,10 +100,13 @@ namespace sfem {
         int hessian_block_diag_sym(const real_t *const x, real_t *const values);
 
         int update(const real_t *const x);
-        int gradient(const real_t *const x, real_t *const out);
-        int apply(const real_t *const x, const real_t *const h, real_t *const out);
+        int gradient(const real_t *const x, real_t *const out, const ElementScope scope = ElementScope::ALL);
+        int apply(const real_t *const x,
+                  const real_t *const h,
+                  real_t *const       out,
+                  const ElementScope  scope = ElementScope::ALL);
+        int value(const real_t *x, real_t *const out, const ElementScope scope = ElementScope::ALL);
 
-        int value(const real_t *x, real_t *const out);
         int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out);
 
         int apply_constraints(real_t *const x);
@@ -135,6 +138,16 @@ namespace sfem {
         void describe(std::ostream &os) const;
 
     private:
+        friend class ParallelMatrixFreeOperator;
+
+        /// Flat subrange within @p scope (parallel overlap); block layout resolved inside ops.
+        int apply_scope_flat_range(const real_t *const x,
+                                   const real_t *const h,
+                                   real_t *const       out,
+                                   const ElementScope  scope,
+                                   const ptrdiff_t     flat_begin,
+                                   const ptrdiff_t     flat_end);
+
         class Impl;
         std::unique_ptr<Impl> impl_;
     };

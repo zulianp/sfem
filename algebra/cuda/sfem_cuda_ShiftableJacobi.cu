@@ -239,6 +239,91 @@ namespace sfem {
             SFEM_DEBUG_SYNCHRONIZE();
         }
 
+        template <typename HP, typename LP>
+        __global__ void sbv3_sparse_update_inv_diag(const ptrdiff_t    n_sparse,
+                                                    const idx_t* const SFEM_RESTRICT idx,
+                                                    const HP* const    SFEM_RESTRICT material_diag,
+                                                    const HP* const    SFEM_RESTRICT sparse_dd,
+                                                    const HP* const    SFEM_RESTRICT scaling,
+                                                    const mask_t* const SFEM_RESTRICT constraints_mask,
+                                                    const LP           omega,
+                                                    LP* const          SFEM_RESTRICT inv_diag) {
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_sparse; i += blockDim.x * gridDim.x) {
+                const HP          si  = scaling[i];
+                const ptrdiff_t   b   = idx[i];
+                const auto* const di  = &material_diag[b * 6];
+                const auto* const dd  = &sparse_dd[i * 6];
+                auto* const       ivi = &inv_diag[b * 9];
+
+                LP mat_0 = (LP)(di[0] + si * dd[0]);
+                LP mat_1 = (LP)(di[1] + si * dd[1]);
+                LP mat_2 = (LP)(di[2] + si * dd[2]);
+                LP mat_3 = (LP)(di[1] + si * dd[1]);
+                LP mat_4 = (LP)(di[3] + si * dd[3]);
+                LP mat_5 = (LP)(di[4] + si * dd[4]);
+                LP mat_6 = (LP)(di[2] + si * dd[2]);
+                LP mat_7 = (LP)(di[4] + si * dd[4]);
+                LP mat_8 = (LP)(di[5] + si * dd[5]);
+
+                if (cu_mask_get(b * 3 + 0, constraints_mask)) {
+                    mat_0 = 1;
+                    mat_1 = 0;
+                    mat_2 = 0;
+                }
+                if (cu_mask_get(b * 3 + 1, constraints_mask)) {
+                    mat_3 = 0;
+                    mat_4 = 1;
+                    mat_5 = 0;
+                }
+                if (cu_mask_get(b * 3 + 2, constraints_mask)) {
+                    mat_6 = 0;
+                    mat_7 = 0;
+                    mat_8 = 1;
+                }
+
+                const LP x0 = mat_4 * mat_8;
+                const LP x1 = mat_5 * mat_7;
+                const LP x2 = mat_1 * mat_5;
+                const LP x3 = mat_1 * mat_8;
+                const LP x4 = mat_2 * mat_4;
+                const LP x5 =
+                        (LP)1 / (mat_0 * x0 - mat_0 * x1 + mat_2 * mat_3 * mat_7 - mat_3 * x3 + mat_6 * x2 - mat_6 * x4);
+
+                assert(x5 == x5);
+
+                ivi[0] = omega * x5 * (x0 - x1);
+                ivi[1] = omega * x5 * (mat_2 * mat_7 - x3);
+                ivi[2] = omega * x5 * (x2 - x4);
+                ivi[3] = omega * x5 * (-mat_3 * mat_8 + mat_5 * mat_6);
+                ivi[4] = omega * x5 * (mat_0 * mat_8 - mat_2 * mat_6);
+                ivi[5] = omega * x5 * (-mat_0 * mat_5 + mat_2 * mat_3);
+                ivi[6] = omega * x5 * (mat_3 * mat_7 - mat_4 * mat_6);
+                ivi[7] = omega * x5 * (-mat_0 * mat_7 + mat_1 * mat_6);
+                ivi[8] = omega * x5 * (mat_0 * mat_4 - mat_1 * mat_3);
+            }
+        }
+
+        template <typename HP, typename LP>
+        static void SparseBlockSymOps_CUDA_sparse_update_inv_diag(const ptrdiff_t    n_sparse,
+                                                                  const idx_t* const idx,
+                                                                  const HP* const    material_diag,
+                                                                  const HP* const    sparse_dd,
+                                                                  const HP* const    scaling,
+                                                                  const mask_t* const constraints_mask,
+                                                                  const LP           omega,
+                                                                  LP* const          inv_diag) {
+            if (!n_sparse) return;
+
+            SFEM_DEBUG_SYNCHRONIZE();
+
+            int       kernel_block_size = 128;
+            ptrdiff_t kernel_n_blocks   = std::max(ptrdiff_t(1), (n_sparse + kernel_block_size - 1) / kernel_block_size);
+            sbv3_sparse_update_inv_diag<<<kernel_n_blocks, kernel_block_size>>>(
+                    n_sparse, idx, material_diag, sparse_dd, scaling, constraints_mask, omega, inv_diag);
+
+            SFEM_DEBUG_SYNCHRONIZE();
+        }
+
     }  // namespace private_
 
     template <typename HP, typename LP>
@@ -255,6 +340,7 @@ namespace sfem {
 
         tpl.apply_mask     = &private_::Mask3_CUDA<LP>::apply;
         tpl.inplace_invert = &private_::Invert3_CUDA<LP>::inplace_apply_AoS;
+        tpl.sparse_update_inv_diag = &private_::SparseBlockSymOps_CUDA_sparse_update_inv_diag<HP, LP>;
         return SFEM_SUCCESS;
     }
 

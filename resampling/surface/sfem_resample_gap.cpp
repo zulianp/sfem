@@ -6,7 +6,6 @@
 
 #include "mass.hpp"
 
-
 #include "matrixio_array.h"
 
 #include <math.h>
@@ -19,7 +18,7 @@
 
 int resample_gap_local(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -59,7 +58,7 @@ int resample_gap_local(
 
 int resample_weight_local(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -87,7 +86,7 @@ int resample_weight_local(
 
 int resample_gap(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -113,7 +112,7 @@ int resample_gap(
         return SFEM_FAILURE;
     }
 
-    real_t* w = (real_t *)calloc(nnodes, sizeof(real_t));
+    real_t* w = (real_t*)calloc(nnodes, sizeof(real_t));
     if (resample_weight_local(st, nelements, nnodes, elems, xyz, w) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
@@ -140,7 +139,7 @@ int resample_gap(
 
 int resample_gap_value_local(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -170,7 +169,7 @@ int resample_gap_value_local(
 
 int resample_gap_value(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -192,7 +191,7 @@ int resample_gap_value(
         return SFEM_FAILURE;
     }
 
-    real_t* w = (real_t *)calloc(nnodes, sizeof(real_t));
+    real_t* w = (real_t*)calloc(nnodes, sizeof(real_t));
     if (resample_weight_local(st, nelements, nnodes, elems, xyz, w) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
@@ -209,7 +208,7 @@ int resample_gap_value(
 
 int resample_gap_normals_local(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -242,7 +241,7 @@ int resample_gap_normals_local(
 
 int resample_gap_normals(
         // Mesh
-        const smesh::ElemType          element_type,
+        const smesh::ElemType        element_type,
         const ptrdiff_t              nelements,
         const ptrdiff_t              nnodes,
         idx_t** const SFEM_RESTRICT  elems,
@@ -354,7 +353,7 @@ int sdf_view_ensure_margin(MPI_Comm                             comm,
                   sdf_end + 2 + z_margin);  // 1 for the rightside of the cell 1 for the exclusive range
 
     ptrdiff_t pnlocal_z = (sdf_end - sdf_start);
-    geom_t*   psdf      = (geom_t *)malloc(pnlocal_z * stride[2] * sizeof(geom_t));
+    geom_t*   psdf      = (geom_t*)malloc(pnlocal_z * stride[2] * sizeof(geom_t));
 
     array_range_select(comm,
                        SFEM_MPI_GEOM_T,
@@ -373,3 +372,4 @@ int sdf_view_ensure_margin(MPI_Comm                             comm,
 
     return SFEM_SUCCESS;
 }
+

@@ -9,6 +9,16 @@
 
 namespace sfem {
 
+    /// Matrix-free operator on distributed meshes.
+    ///
+    /// Buffer contract for @ref apply:
+    /// - @p x must provide @ref col_allocation_size() entries (owned + ghosts + aura).
+    ///   Owned DOFs are read; ghost/aura slots are filled by an in-place gather.
+    /// - @p y must provide @ref row_allocation_size() entries. The owned prefix is the
+    ///   result; ghost/aura slots are used as assembly scratch.
+    ///
+    /// Optional nonlinear @p state (constructor) must already have
+    /// @ref col_allocation_size() entries; @ref update_state gathers into it in place.
     class ParallelMatrixFreeOperator final : public ParallelOperator<real_t> {
     public:
         ParallelMatrixFreeOperator(const std::shared_ptr<Function>       &function,

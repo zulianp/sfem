@@ -15,19 +15,19 @@ fi
 
 set -x
 
-# export SFEM_ENABLE_MIXED_PRECISION=0
-# export SFEM_MAX_PENALTY_PARAM=1e6
+rm -rf output
 
+SFEM_EXECUTION_SPACE=device     \
 SFEM_COARSE_OP_TYPE=MF 			\
-SFEM_MAX_INNER_IT=1 			\
+SFEM_MAX_INNER_IT=3 			\
 SFEM_ENABLE_LINE_SEARCH=1		\
-SFEM_MAX_IT=50					\
-SFEM_ATOL=5e-7					\
-SFEM_ELEMENT_REFINE_LEVEL=2	    \
+SFEM_MAX_IT=120					\
+SFEM_ATOL=1e-7					\
+SFEM_ELEMENT_REFINE_LEVEL=4	    \
 SFEM_STAGNATION_THRESHOLD=10	\
 SFEM_PENALTY_PARAM=100			\
 SFEM_NL_SMOOTH_STEPS=27			\
-SFEM_TRACE_FILE=obs.csv 		\
+SMESH_TRACE_FILE=obs.csv 		\
 	$LAUNCH obs rock ./sdf dirichlet.yaml rock/contact_boundary output
 
 rm -f output/out/contact_stress.{1,2}.*
