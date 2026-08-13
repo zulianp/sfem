@@ -39,32 +39,59 @@ namespace sfem {
         return mesh.comm() && mesh.comm()->size() > 1;
     }
 
-    /// Distributed ElementScope requires smesh single-block layout (owned/shared counts are mesh-global).
+    /// True when each block has owned+ghosts matching its local SoA (serial always).
     inline bool mesh_supports_distributed_element_scopes(const smesh::Mesh &mesh) {
         if (!mesh_is_distributed(mesh)) {
             return true;
         }
-        return mesh.n_blocks() == 1 && mesh.n_elements(0) == mesh.distributed()->n_elements_local();
+        if (!mesh.distributed()) {
+            return false;
+        }
+        for (smesh::block_idx_t b = 0; b < static_cast<smesh::block_idx_t>(mesh.n_blocks()); ++b) {
+            const auto block = mesh.block(b);
+            if (!block) {
+                return false;
+            }
+            if (block->n_elements_owned() < block->n_elements_shared()) {
+                return false;
+            }
+            if (block->n_elements() != block->n_elements_owned() + block->n_elements_ghosts()) {
+                return false;
+            }
+        }
+        return true;
     }
 
-    /// Abort if MPI mesh cannot use phased ElementScope (multi-block distributed not implemented in smesh).
+    /// Abort if a distributed mesh is missing per-block owned/shared/aura layout.
     inline void assert_mesh_supports_distributed_element_scopes(const smesh::Mesh &mesh) {
         if (!mesh_is_distributed(mesh)) {
             return;
         }
-        if (mesh.n_blocks() != 1) {
-            SFEM_ERROR(
-                    "ElementScope on distributed meshes requires exactly one block; smesh does not yet provide "
-                    "per-block owned/shared/aura element partitioning.\n");
+        if (!mesh.distributed()) {
+            SFEM_ERROR("ElementScope on distributed mesh: Mesh::distributed() is unset.\n");
         }
-        const ptrdiff_t n_block = mesh.n_elements(0);
-        const ptrdiff_t n_local = mesh.distributed()->n_elements_local();
-        if (n_block != n_local) {
-            SFEM_ERROR(
-                    "ElementScope on distributed mesh: block 0 has %ld elements but distributed layout has %ld local "
-                    "elements; block layout must match smesh distributed element ordering.\n",
-                    (long)n_block,
-                    (long)n_local);
+        for (smesh::block_idx_t b = 0; b < static_cast<smesh::block_idx_t>(mesh.n_blocks()); ++b) {
+            const auto block = mesh.block(b);
+            if (!block) {
+                SFEM_ERROR("ElementScope on distributed mesh: block %d is null.\n", (int)b);
+            }
+            if (block->n_elements_owned() < block->n_elements_shared()) {
+                SFEM_ERROR(
+                        "ElementScope on distributed mesh: block %d n_shared (%ld) > n_owned (%ld).\n",
+                        (int)b,
+                        (long)block->n_elements_shared(),
+                        (long)block->n_elements_owned());
+            }
+            const ptrdiff_t n_block = block->n_elements();
+            const ptrdiff_t n_local = block->n_elements_owned() + block->n_elements_ghosts();
+            if (n_block != n_local) {
+                SFEM_ERROR(
+                        "ElementScope on distributed mesh: block %d has %ld elements but owned+ghosts is %ld; "
+                        "block layout must match smesh per-block element ordering.\n",
+                        (int)b,
+                        (long)n_block,
+                        (long)n_local);
+            }
         }
     }
 
@@ -76,10 +103,18 @@ namespace sfem {
         return off;
     }
 
-    /// Concatenated local element span [begin, end) for @p scope (single-block distributed or serial sum of blocks).
-    inline ElementRange mesh_element_range(const smesh::Mesh &mesh, const ElementScope scope) {
+    /// Block-local [begin, end) for @p scope. Distributed ranges come from that block's
+    /// owned-not-shared / owned / local counts (SoA order: ONS | shared | aura).
+    inline ElementRange element_range(const smesh::Mesh &mesh, const smesh::block_idx_t block_idx, const ElementScope scope) {
+        if (static_cast<size_t>(block_idx) >= mesh.n_blocks()) {
+            SFEM_ERROR("element_range: block index %d out of range (n_blocks=%ld).\n",
+                       (int)block_idx,
+                       (long)mesh.n_blocks());
+        }
+
+        const ptrdiff_t n = mesh.n_elements(block_idx);
+
         if (!mesh_is_distributed(mesh)) {
-            const ptrdiff_t n = mesh.n_elements();
             switch (scope) {
                 case ElementScope::ALL:
                 case ElementScope::OWNED_NOT_SHARED:
@@ -90,12 +125,9 @@ namespace sfem {
             return {0, 0};
         }
 
-        assert_mesh_supports_distributed_element_scopes(mesh);
-
-        const auto        dist    = mesh.distributed();
-        const ptrdiff_t n_ons   = dist->n_elements_owned_not_shared();
-        const ptrdiff_t n_local = dist->n_elements_local();
-
+        const auto      block   = mesh.block(block_idx);
+        const ptrdiff_t n_ons   = block->n_elements_owned_not_shared();
+        const ptrdiff_t n_local = n;
         switch (scope) {
             case ElementScope::ALL:
                 return {0, n_local};
@@ -107,49 +139,9 @@ namespace sfem {
         return {0, 0};
     }
 
-    /// Block-local [begin, end) for @p scope. Serial: per-block ALL/OWNED; distributed: only block 0 (single-block mesh).
-    inline ElementRange element_range(const smesh::Mesh &mesh, const smesh::block_idx_t block_idx, const ElementScope scope) {
-        if (mesh_is_distributed(mesh)) {
-            if (block_idx != 0) {
-                SFEM_ERROR(
-                        "ElementScope on distributed meshes is only defined for block 0 until smesh supports "
-                        "multi-block distributed element layout.\n");
-            }
-            assert_mesh_supports_distributed_element_scopes(mesh);
-            const ElementRange mesh_rng = mesh_element_range(mesh, scope);
-            const ptrdiff_t    n_block  = mesh.n_elements(0);
-            const ptrdiff_t    begin    = std::max(mesh_rng.begin, ptrdiff_t(0));
-            const ptrdiff_t    end      = std::min(mesh_rng.end, n_block);
-            if (begin >= end) {
-                return {0, 0};
-            }
-            return {begin, end};
-        }
-
-        const ptrdiff_t block_off = block_element_offset(mesh, block_idx);
-        const ptrdiff_t block_end = block_off + mesh.n_elements(block_idx);
-        const ElementRange mesh_rng = mesh_element_range(mesh, scope);
-
-        const ptrdiff_t begin = std::max(mesh_rng.begin, block_off);
-        const ptrdiff_t end     = std::min(mesh_rng.end, block_end);
-        if (begin >= end) {
-            return {0, 0};
-        }
-        return {begin - block_off, end - block_off};
-    }
-
     inline std::vector<BlockElementSlice> block_element_slices(const smesh::Mesh &mesh, const ElementScope scope) {
         std::vector<BlockElementSlice> slices;
-        if (mesh_is_distributed(mesh)) {
-            assert_mesh_supports_distributed_element_scopes(mesh);
-            const ElementRange r = element_range(mesh, 0, scope);
-            if (!r.empty()) {
-                slices.push_back({0, r});
-            }
-            return slices;
-        }
-
-        const size_t n_blocks = mesh.n_blocks();
+        const size_t                   n_blocks = mesh.n_blocks();
         slices.reserve(n_blocks);
         for (smesh::block_idx_t b = 0; b < static_cast<smesh::block_idx_t>(n_blocks); ++b) {
             const ElementRange r = element_range(mesh, b, scope);
@@ -166,6 +158,23 @@ namespace sfem {
             n += slice.range.size();
         }
         return n;
+    }
+
+    /// Concatenated flat span [0, count) of per-block slices for @p scope (not SoA indices).
+    inline ElementRange mesh_element_range(const smesh::Mesh &mesh, const ElementScope scope) {
+        if (!mesh_is_distributed(mesh)) {
+            const ptrdiff_t n = mesh.n_elements();
+            switch (scope) {
+                case ElementScope::ALL:
+                case ElementScope::OWNED_NOT_SHARED:
+                    return {0, n};
+                case ElementScope::SHARED_AND_AURA:
+                    return {0, 0};
+            }
+            return {0, 0};
+        }
+
+        return {0, count_block_elements(mesh, scope)};
     }
 
     /// Contiguous static partition of [0, n) across n_workers workers.
