@@ -137,7 +137,7 @@ for i in range(1, n - 1):
 A *= 1 / (h)
 I = np.eye(n) * h
 
-b = np.ones(n) * 2 * h
+b = np.ones(n) * 4 * h
 # b = np.ones(n) * h
 b[0] = 0
 b[n - 1] = 0
@@ -145,10 +145,10 @@ b[n - 1] = 0
 x = np.zeros(n)
 
 # Solve A x = b
-x = np.linalg.solve(A, b)
+# x = np.linalg.solve(A, b)
 ub = np.ones(n) * 0.075
 
-penalty = 1e12 / h
+penalty = 1e4 / h
 
 xc = x.copy()
 
@@ -165,23 +165,24 @@ A_factor = lu_factor(A, check_finite=False)
 delta_old = shift.copy()
 lambda_hat_old = shift.copy()
 
-aug_damping = h 
-njacs = 10
+aug_damping = 2*h 
+njacs = 1
 for i in range(0, 4000):
 
-    if False:
-    # if True:
+    # if False:
+    if True:
     # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
 
         for j in range(njacs):
             penalty_jacobi_step(A, I, xc, b, ub, penalty, shift)
-            # penalty_gs_step(A, I, xc, b, ub, penalty, shift)
-            shift = penalty * np.maximum(0.0, aug_damping * (xc - ub) + shift / penalty)
+            penalty_gs_step(A, I, xc, b, ub, penalty, shift)
+            # shift = penalty * np.maximum(0.0, aug_damping * (xc - ub) + shift / penalty)
 
-        norm_g = np.linalg.norm(penalty_gradient(A, I, xc, b, ub, penalty, shift))
+        
 
     # if (i + 1) % 10 == 0:
-    # shift = penalty * np.maximum(0.0, (xc - ub) + shift / penalty)
+        # shift = penalty * np.maximum(0.0, (xc - ub) + shift / penalty)
+        norm_g = np.linalg.norm(penalty_gradient(A, I, xc, b, ub, penalty, shift))
 
     else: # Crossed secant method
         xc[:] = lu_solve(A_factor, b - I_diag * shift, check_finite=False)

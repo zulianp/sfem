@@ -11,7 +11,9 @@
 #include "smesh_mesh.hpp"
 #include "smesh_spaces.hpp"
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 namespace sfem {
 
@@ -27,35 +29,66 @@ namespace sfem {
             return 0;
         }
 
+        /// Range into this domain's SoA only. Serial ALL/OWNED is the whole block;
+        /// never a mesh-concatenated [0, n_elements()) that overruns later blocks.
+        ElementRange domain_element_range(const smesh::Mesh &mesh, const OpDomain &domain, const ElementScope scope) {
+            if (!mesh_is_distributed(mesh)) {
+                if (scope == ElementScope::SHARED_AND_AURA) {
+                    return {0, 0};
+                }
+                return {0, domain.block->n_elements()};
+            }
+            const smesh::block_idx_t b = block_id_for_domain(mesh, *domain.block);
+            return element_range(mesh, b, scope);
+        }
+
+        ElementRange clamp_to_block(const ElementRange range, const ptrdiff_t n_block) {
+            const ptrdiff_t begin = std::max(range.begin, ptrdiff_t(0));
+            const ptrdiff_t end   = std::min(range.end, n_block);
+            if (begin >= end) {
+                return {0, 0};
+            }
+            return {begin, end};
+        }
+
+        /// SoA view of [begin, begin+ne). begin==0 is the original columns (SS HEX nxe can be huge).
+        idx_t **element_soa_view(idx_t **const elems,
+                                 const int     nxe,
+                                 const ptrdiff_t begin,
+                                 idx_t        *stack_view[32],
+                                 std::vector<idx_t *> &heap_view) {
+            if (begin == 0) {
+                return elems;
+            }
+            if (nxe <= 32) {
+                for (int v = 0; v < nxe; ++v) {
+                    stack_view[v] = elems[v] + begin;
+                }
+                return stack_view;
+            }
+            heap_view.resize((size_t)nxe);
+            for (int v = 0; v < nxe; ++v) {
+                heap_view[v] = elems[v] + begin;
+            }
+            return heap_view.data();
+        }
+
         int laplacian_dispatch_domain_vector(const OpDomain     &domain,
                                              smesh::Mesh        &mesh,
                                              const real_t *const u,
                                              real_t *const       out,
-                                             const ElementRange  range) {
+                                             const ElementRange  range_in) {
+            const ElementRange range = clamp_to_block(range_in, domain.block->n_elements());
             if (range.empty()) {
                 return SFEM_SUCCESS;
             }
 
-            const ptrdiff_t n_block = domain.block->n_elements();
-            if (range.begin < 0 || range.end > n_block || range.begin > range.end) {
-                SFEM_ERROR("Laplacian: ElementRange [%ld, %ld) out of block range [0, %ld)\n",
-                           (long)range.begin,
-                           (long)range.end,
-                           (long)n_block);
-                return SFEM_FAILURE;
-            }
-
-            const ptrdiff_t   ne     = range.size();
-            idx_t **const     elems  = domain.block->elements()->data();
-            const int         nxe    = elem_num_nodes(domain.element_type);
-            idx_t            *view[32];
-            if (nxe > 32) {
-                SFEM_ERROR("Laplacian: element type has too many nodes (%d)\n", nxe);
-                return SFEM_FAILURE;
-            }
-            for (int v = 0; v < nxe; ++v) {
-                view[v] = elems[v] + range.begin;
-            }
+            const ptrdiff_t         ne    = range.size();
+            idx_t **const           elems = domain.block->elements()->data();
+            const int               nxe   = elem_num_nodes(domain.element_type);
+            idx_t                  *stack_view[32];
+            std::vector<idx_t *>    heap_view;
+            idx_t **const           view  = element_soa_view(elems, nxe, range.begin, stack_view, heap_view);
 
             if (domain.user_data) {
                 auto                fff      = std::static_pointer_cast<smesh::FFF>(domain.user_data);
@@ -69,23 +102,17 @@ namespace sfem {
                                          smesh::Mesh        &mesh,
                                          const real_t *const x,
                                          real_t *const       out,
-                                         const ElementRange  range) {
+                                         const ElementRange  range_in) {
+            const ElementRange range = clamp_to_block(range_in, domain.block->n_elements());
             if (range.empty()) {
                 return SFEM_SUCCESS;
             }
-
-            const ptrdiff_t n_block = domain.block->n_elements();
-            if (range.begin < 0 || range.end > n_block) {
-                SFEM_ERROR("Laplacian: value ElementRange out of bounds\n");
-                return SFEM_FAILURE;
-            }
-            const ptrdiff_t ne    = range.size();
-            idx_t **const   elems = domain.block->elements()->data();
-            const int       nxe   = elem_num_nodes(domain.element_type);
-            idx_t          *view[32];
-            for (int v = 0; v < nxe; ++v) {
-                view[v] = elems[v] + range.begin;
-            }
+            const ptrdiff_t         ne    = range.size();
+            idx_t **const           elems = domain.block->elements()->data();
+            const int               nxe   = elem_num_nodes(domain.element_type);
+            idx_t                  *stack_view[32];
+            std::vector<idx_t *>    heap_view;
+            idx_t **const           view  = element_soa_view(elems, nxe, range.begin, stack_view, heap_view);
             return laplacian_assemble_value(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), x, out);
         }
 
@@ -254,24 +281,21 @@ namespace sfem {
     int Laplacian::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
-            return laplacian_dispatch_domain_vector(domain, *mesh, x, out, element_range(*mesh, b, scope));
+            return laplacian_dispatch_domain_vector(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
     int Laplacian::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
-            return laplacian_dispatch_domain_vector(domain, *mesh, h, out, element_range(*mesh, b, scope));
+            return laplacian_dispatch_domain_vector(domain, *mesh, h, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
     int Laplacian::value(const real_t *x, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
-            return laplacian_value_domain_range(domain, *mesh, x, out, element_range(*mesh, b, scope));
+            return laplacian_value_domain_range(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
