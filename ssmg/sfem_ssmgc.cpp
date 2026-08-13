@@ -9,10 +9,13 @@
 
 #include "smesh_device_buffer.hpp"
 
+#include <cstring>
+
 #ifdef SFEM_ENABLE_CUDA
 // #include "cu_ssquad4_interpolate.hpp"
 #include "sfem_Function_incore_cuda.hpp"
 #include "sfem_cuda_ShiftedPenalty_impl.hpp"
+#include "sfem_cuda_blas.hpp"
 #endif
 
 namespace sfem {
@@ -128,14 +131,36 @@ namespace sfem {
             }
         }
 
+        static void zero_sbv_data(const std::shared_ptr<SparseBlockVector<T>> &sbv) {
+            auto data = sbv->data();
+#ifdef SFEM_ENABLE_CUDA
+            if (data->mem_space() == MEMORY_SPACE_DEVICE) {
+                d_memset(data->data(), 0, data->size() * sizeof(T));
+                return;
+            }
+#endif
+            std::memset(data->data(), 0, data->size() * sizeof(T));
+        }
+
         void restrict_contact_constraints() {
             SFEM_TRACE_SCOPE("SPMG::restrict_contact_constraints");
             const int nlevels = levels.size();
             for (int i = 1; i < nlevels; i++) {
                 auto fine   = levels[i - 1];
                 auto coarse = levels[i];
+                // Surface restriction accumulates with += / atomicAdd.
+                zero_sbv_data(coarse->sbv);
                 restrict_sbv[i - 1]->apply(fine->sbv->data()->data(), coarse->sbv->data()->data());
             }
+        }
+
+        void rebuild_contact_constraints() {
+            SFEM_TRACE_SCOPE("SPMG::rebuild_contact_constraints");
+            // Keep penalty SBV normals consistent with live constraint ops after NL obstacle update.
+            auto fine = levels[0];
+            zero_sbv_data(fine->sbv);
+            contact_conds->hessian_block_diag_sym(nullptr, fine->sbv->data()->data());
+            restrict_contact_constraints();
         }
 
         void init_discretization(const std::shared_ptr<Function> f) {
@@ -170,28 +195,8 @@ namespace sfem {
 
         int update_contact(const T *const disp) {
             SFEM_TRACE_SCOPE("SPMG::update_contact");
-            auto                      f  = levels[0]->function;
-            const enum ExecutionSpace es = f->execution_space();
-
-#ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == es) {
-                // FIXME avoid copies from/to device
-
-                auto wdisp = Buffer<const T>::wrap(f->space()->n_dofs(), disp, MEMORY_SPACE_DEVICE);
-                auto hdisp = smesh::to_host(wdisp);
-
-                contact_conds->update(hdisp->data());
-
-                auto hg = sfem::create_host_buffer<T>(upper_bound->size());
-                contact_conds->update_signed_distance(hdisp->data(), hg->data());
-                buffer_host_to_device(hg->size() * sizeof(T), (void *)hg->data(), (void *)upper_bound->data());
-            } else
-#endif
-            {
-                contact_conds->update(disp);
-                contact_conds->update_signed_distance(disp, upper_bound->data());
-            }
-
+            contact_conds->update(disp);
+            contact_conds->update_signed_distance(disp, upper_bound->data());
             return SFEM_SUCCESS;
         }
 
@@ -200,19 +205,15 @@ namespace sfem {
             contact_conds->init();
             linear_constraints_op           = contact_conds->linear_constraints_op();
             linear_constraints_op_transpose = contact_conds->linear_constraints_op_transpose();
-            upper_bound = sfem::create_buffer<T>(contact_conds->n_constrained_dofs(), sfem::MEMORY_SPACE_HOST);
 
+            const ExecutionSpace es = levels[0]->function->execution_space();
+            upper_bound =
+                    sfem::create_buffer<T>(contact_conds->n_constrained_dofs(), es);
             contact_conds->signed_distance(upper_bound->data());
-            const ExecutionSpace es             = levels[0]->function->execution_space();
-            const int            block_size     = levels[0]->function->space()->block_size();
-            const int            sym_block_size = (block_size == 3 ? 6 : 3);
-            const int            nlevels        = levels.size();
 
-#ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == es) {
-                upper_bound = smesh::to_device(upper_bound);
-            }
-#endif
+            const int block_size     = levels[0]->function->space()->block_size();
+            const int sym_block_size = (block_size == 3 ? 6 : 3);
+            const int nlevels        = levels.size();
 
             std::vector<std::shared_ptr<Buffer<idx_t *>>> host_sides;
             {
@@ -308,7 +309,7 @@ namespace sfem {
             bool enable_mixed_precision             = smesh::Env::read("SFEM_ENABLE_MIXED_PRECISION", true);
 
             bool collect_energy_norm_correction = true;
-            bool coarse_solver_verbose          = false;
+            bool coarse_solver_verbose          = smesh::Env::read("SFEM_COARSE_SOLVER_VERBOSE", false);
             bool debug                          = false;
             bool enable_shift                   = true;
             bool enable_line_search             = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", false);
@@ -321,7 +322,7 @@ namespace sfem {
             int    max_inner_it         = smesh::Env::read("SFEM_MAX_INNER_IT", 4);
             int    max_it               = smesh::Env::read("SFEM_MAX_IT", 100);
             int    nlsmooth_steps       = smesh::Env::read("SFEM_NL_SMOOTH_STEPS", 15);
-            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 400000);
+            int    max_coarse_it        = smesh::Env::read("SFEM_MAX_COARSE_IT", 40000);
             real_t omega_factor         = smesh::Env::read("SFEM_OMEGA_FACTOR", 100.);
             real_t stagnation_threshold = smesh::Env::read("SFEM_STAGNATION_THRESHOLD", 0.999);
 
@@ -579,8 +580,9 @@ namespace sfem {
 
             if (SFEM_ENABLE_NL_OBSTACLE) {
                 mg->set_update_constraints([that = this](const T *const disp) {
+                    SFEM_TRACE_SCOPE("SSMGC::update_constraints");
                     that->update_contact(disp);
-                    that->restrict_contact_constraints();
+                    that->rebuild_contact_constraints();
                 });
             }
         }
@@ -625,7 +627,12 @@ namespace sfem {
 
     template <typename T>
     int SSMGC<T>::update(const T *const disp) {
-        return impl_->update_contact(disp);
+        const int err = impl_->update_contact(disp);
+        if (err != SFEM_SUCCESS) {
+            return err;
+        }
+        impl_->rebuild_contact_constraints();
+        return SFEM_SUCCESS;
     }
 
     template <typename T>

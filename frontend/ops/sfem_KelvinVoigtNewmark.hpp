@@ -11,7 +11,7 @@ namespace sfem {
      * Multi-block: @c initialize builds @c MultiDomainOp; material scalars are seeded from env
      * and stored per block ( @c k , @c K , @c eta , @c dt , @c gamma , @c beta , @c rho ).
      * Semi-structured macro HEX is dispatched in @c operators/kelvin_voigt_newmark.cpp .
-     * Register both @c KelvinVoigtNewmark and @c ss:KelvinVoigtNewmark with @c KelvinVoigtNewmark::create .
+     * Register @c KelvinVoigtNewmark with @c KelvinVoigtNewmark::create .
      */
     class KelvinVoigtNewmark final : public Op {
     public:

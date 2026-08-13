@@ -68,7 +68,7 @@ namespace sfem {
         }
     }
 
-    const char *SpectralElementLaplacian::name() const { return "ss:SpectralElementLaplacian"; }
+    const char *SpectralElementLaplacian::name() const { return "SpectralElementLaplacian"; }
 
     int SpectralElementLaplacian::initialize(const std::vector<std::string> &block_names) { return SFEM_SUCCESS; }
 

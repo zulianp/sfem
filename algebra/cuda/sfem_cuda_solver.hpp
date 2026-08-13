@@ -5,7 +5,7 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_blas.hpp"
+#include "sfem_cuda_cg_impl.hpp"
 
 #include <map>
 #include <memory>
@@ -14,8 +14,9 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<ConjugateGradient<T>> d_cg() {
-        auto cg = std::make_shared<ConjugateGradient<T>>();
-        cg->blas = make_cuda_blas<T>();
+        auto cg              = std::make_shared<ConjugateGradient<T>>();
+        cg->blas             = make_cuda_blas<T>();
+        CUDA_CG<T>::build(cg->impl);
         cg->execution_space_ = EXECUTION_SPACE_DEVICE;
         return cg;
     }

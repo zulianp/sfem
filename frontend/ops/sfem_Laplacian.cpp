@@ -30,23 +30,63 @@ namespace sfem {
         int laplacian_dispatch_domain_vector(const OpDomain     &domain,
                                              smesh::Mesh        &mesh,
                                              const real_t *const u,
-                                             real_t *const       out) {
-            if (domain.user_data) {
-                auto fff = std::static_pointer_cast<smesh::FFF>(domain.user_data);
-                return laplacian_apply_opt(domain.element_type,
-                                           domain.block->n_elements(),
-                                           domain.block->elements()->data(),
-                                           fff->fff_AoS()->data(),
-                                           u,
-                                           out);
+                                             real_t *const       out,
+                                             const ElementRange  range) {
+            if (range.empty()) {
+                return SFEM_SUCCESS;
             }
-            return laplacian_apply(domain.element_type,
-                                   domain.block->n_elements(),
-                                   mesh.n_nodes(),
-                                   domain.block->elements()->data(),
-                                   mesh.points()->data(),
-                                   u,
-                                   out);
+
+            const ptrdiff_t n_block = domain.block->n_elements();
+            if (range.begin < 0 || range.end > n_block || range.begin > range.end) {
+                SFEM_ERROR("Laplacian: ElementRange [%ld, %ld) out of block range [0, %ld)\n",
+                           (long)range.begin,
+                           (long)range.end,
+                           (long)n_block);
+                return SFEM_FAILURE;
+            }
+
+            const ptrdiff_t   ne     = range.size();
+            idx_t **const     elems  = domain.block->elements()->data();
+            const int         nxe    = elem_num_nodes(domain.element_type);
+            idx_t            *view[32];
+            if (nxe > 32) {
+                SFEM_ERROR("Laplacian: element type has too many nodes (%d)\n", nxe);
+                return SFEM_FAILURE;
+            }
+            for (int v = 0; v < nxe; ++v) {
+                view[v] = elems[v] + range.begin;
+            }
+
+            if (domain.user_data) {
+                auto                fff      = std::static_pointer_cast<smesh::FFF>(domain.user_data);
+                constexpr ptrdiff_t fff_size = 6;
+                return laplacian_apply_opt(domain.element_type, ne, view, fff->fff_AoS()->data() + range.begin * fff_size, u, out);
+            }
+            return laplacian_apply(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), u, out);
+        }
+
+        int laplacian_value_domain_range(const OpDomain     &domain,
+                                         smesh::Mesh        &mesh,
+                                         const real_t *const x,
+                                         real_t *const       out,
+                                         const ElementRange  range) {
+            if (range.empty()) {
+                return SFEM_SUCCESS;
+            }
+
+            const ptrdiff_t n_block = domain.block->n_elements();
+            if (range.begin < 0 || range.end > n_block) {
+                SFEM_ERROR("Laplacian: value ElementRange out of bounds\n");
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t ne    = range.size();
+            idx_t **const   elems = domain.block->elements()->data();
+            const int       nxe   = elem_num_nodes(domain.element_type);
+            idx_t          *view[32];
+            for (int v = 0; v < nxe; ++v) {
+                view[v] = elems[v] + range.begin;
+            }
+            return laplacian_assemble_value(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), x, out);
         }
 
     }  // namespace
@@ -202,33 +242,67 @@ namespace sfem {
     }
 
     int Laplacian::gradient(const real_t *const x, real_t *const out) {
-        SFEM_TRACE_SCOPE("Laplacian::gradient");
-
-        auto mesh = impl_->space->mesh_ptr();
-        return impl_->iterate([&](const OpDomain &domain) { return laplacian_dispatch_domain_vector(domain, *mesh, x, out); });
+        return gradient(x, out, ElementScope::ALL);
     }
 
-    int Laplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("Laplacian::apply");
-        SFEM_OP_CAPTURE();
-
-        auto mesh = impl_->space->mesh_ptr();
-        return impl_->iterate([&](const OpDomain &domain) { return laplacian_dispatch_domain_vector(domain, *mesh, h, out); });
+    int Laplacian::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        return apply(x, h, out, ElementScope::ALL);
     }
 
-    int Laplacian::value(const real_t *x, real_t *const out) {
-        SFEM_TRACE_SCOPE("Laplacian::value");
+    int Laplacian::value(const real_t *x, real_t *const out) { return value(x, out, ElementScope::ALL); }
 
+    int Laplacian::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
-            return laplacian_assemble_value(domain.element_type,
-                                            domain.block->n_elements(),
-                                            mesh->n_nodes(),
-                                            domain.block->elements()->data(),
-                                            mesh->points()->data(),
-                                            x,
-                                            out);
+            const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
+            return laplacian_dispatch_domain_vector(domain, *mesh, x, out, element_range(*mesh, b, scope));
         });
+    }
+
+    int Laplacian::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) {
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) {
+            const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
+            return laplacian_dispatch_domain_vector(domain, *mesh, h, out, element_range(*mesh, b, scope));
+        });
+    }
+
+    int Laplacian::value(const real_t *x, real_t *const out, const ElementScope scope) {
+        auto mesh = impl_->space->mesh_ptr();
+        return impl_->iterate([&](const OpDomain &domain) {
+            const smesh::block_idx_t b = block_id_for_domain(*mesh, *domain.block);
+            return laplacian_value_domain_range(domain, *mesh, x, out, element_range(*mesh, b, scope));
+        });
+    }
+
+    int Laplacian::apply_scope_flat_range(const real_t *const /*x*/,
+                                          const real_t *const h,
+                                          real_t *const       out,
+                                          const ElementScope  scope,
+                                          const ptrdiff_t     flat_begin,
+                                          const ptrdiff_t     flat_end) {
+        SFEM_TRACE_SCOPE("Laplacian::apply_scope_flat_range");
+        SFEM_OP_CAPTURE();
+
+        if (flat_end <= flat_begin) {
+            return SFEM_SUCCESS;
+        }
+
+        auto mesh = impl_->space->mesh_ptr();
+        int  err  = SFEM_SUCCESS;
+        for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
+            const smesh::block_idx_t block = slice.block;
+            const ElementRange         range = slice.range;
+            if (impl_->iterate([&](const OpDomain &domain) {
+                    if (block_id_for_domain(*mesh, *domain.block) != block) {
+                        return SFEM_SUCCESS;
+                    }
+                    return laplacian_dispatch_domain_vector(domain, *mesh, h, out, range);
+                }) != SFEM_SUCCESS) {
+                err = SFEM_FAILURE;
+            }
+        }
+        return err;
     }
 
     int Laplacian::report(const real_t *const) { return SFEM_SUCCESS; }
