@@ -4,6 +4,7 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
+#include "sfem_Parameters.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "smesh_glob.hpp"
@@ -12,6 +13,7 @@
 #include "smesh_spaces.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -49,6 +51,29 @@ namespace sfem {
                 return {0, 0};
             }
             return {begin, end};
+        }
+
+        static real_t domain_diffusion(const OpDomain &domain) {
+            if (!domain.parameters) {
+                return real_t(1);
+            }
+            return domain.parameters->get_real_value("k", real_t(1));
+        }
+
+        static void laplacian_seed_diffusion(MultiDomainOp &m, const real_t k) {
+            for (auto &kv : m.domains()) {
+                kv.second.parameters->set_value("k", k);
+            }
+        }
+
+        static void laplacian_copy_diffusion(const MultiDomainOp &from, MultiDomainOp &to) {
+            for (const auto &kv : from.domains()) {
+                auto it = to.domains().find(kv.first);
+                if (it == to.domains().end()) {
+                    continue;
+                }
+                it->second.parameters->set_value("k", kv.second.parameters->get_real_value("k", real_t(1)));
+            }
         }
 
         /// SoA view of [begin, begin+ne). begin==0 is the original columns (SS HEX nxe can be huge).
@@ -89,13 +114,38 @@ namespace sfem {
             idx_t                  *stack_view[32];
             std::vector<idx_t *>    heap_view;
             idx_t **const           view  = element_soa_view(elems, nxe, range.begin, stack_view, heap_view);
+            const real_t            k     = domain_diffusion(domain);
 
             if (domain.user_data) {
                 auto                fff      = std::static_pointer_cast<smesh::FFF>(domain.user_data);
                 constexpr ptrdiff_t fff_size = 6;
-                return laplacian_apply_opt(domain.element_type, ne, view, fff->fff_AoS()->data() + range.begin * fff_size, u, out);
+                const jacobian_t   *fff_in   = fff->fff_AoS()->data() + range.begin * fff_size;
+                if (k == real_t(1)) {
+                    return laplacian_apply_opt(domain.element_type, ne, view, fff_in, u, out);
+                }
+
+                const ptrdiff_t nfff   = fff_size * ne;
+                jacobian_t     *scaled = (jacobian_t *)malloc((size_t)nfff * sizeof(jacobian_t));
+                for (ptrdiff_t i = 0; i < nfff; ++i) {
+                    scaled[i] = static_cast<jacobian_t>(k * fff_in[i]);
+                }
+                const int err = laplacian_apply_opt(domain.element_type, ne, view, scaled, u, out);
+                free(scaled);
+                return err;
             }
-            return laplacian_apply(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), u, out);
+
+            if (k == real_t(1)) {
+                return laplacian_apply(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), u, out);
+            }
+
+            const ptrdiff_t n   = mesh.n_nodes();
+            real_t         *tmp = (real_t *)calloc((size_t)n, sizeof(real_t));
+            const int       err = laplacian_apply(domain.element_type, ne, n, view, mesh.points()->data(), u, tmp);
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                out[i] += k * tmp[i];
+            }
+            free(tmp);
+            return err;
         }
 
         int laplacian_value_domain_range(const OpDomain     &domain,
@@ -113,7 +163,16 @@ namespace sfem {
             idx_t                  *stack_view[32];
             std::vector<idx_t *>    heap_view;
             idx_t **const           view  = element_soa_view(elems, nxe, range.begin, stack_view, heap_view);
-            return laplacian_assemble_value(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), x, out);
+            const real_t            k     = domain_diffusion(domain);
+            if (k == real_t(1)) {
+                return laplacian_assemble_value(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), x, out);
+            }
+
+            real_t    acc = 0;
+            const int err =
+                    laplacian_assemble_value(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), x, &acc);
+            *out += k * acc;
+            return err;
         }
 
     }  // namespace
@@ -144,6 +203,7 @@ namespace sfem {
     int Laplacian::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("Laplacian::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+        laplacian_seed_diffusion(*impl_->domains, real_t(1));
 
         auto mesh = impl_->space->mesh_ptr();
 
@@ -178,6 +238,7 @@ namespace sfem {
         }
         auto ret            = std::make_shared<Laplacian>(space);
         ret->impl_->domains = impl_->domains->lor_op(space, {});
+        laplacian_copy_diffusion(*impl_->domains, *ret->impl_->domains);
         return ret;
     }
 
@@ -187,6 +248,7 @@ namespace sfem {
         if (space->has_semi_structured_mesh() && is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<Laplacian>(space);
             ret->initialize({});
+            laplacian_copy_diffusion(*impl_->domains, *ret->impl_->domains);
             return ret;
         }
 
@@ -196,13 +258,13 @@ namespace sfem {
             !is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<Laplacian>(space);
             ret->initialize({});
-            assert(space->n_blocks() == 1);
-            ret->override_element_types({space->element_type()});
+            laplacian_copy_diffusion(*impl_->domains, *ret->impl_->domains);
             return ret;
         }
 
         auto ret            = std::make_shared<Laplacian>(space);
         ret->impl_->domains = impl_->domains->derefine_op(space, {});
+        laplacian_copy_diffusion(*impl_->domains, *ret->impl_->domains);
         return ret;
     }
 
@@ -257,14 +319,31 @@ namespace sfem {
         SFEM_TRACE_SCOPE("Laplacian::hessian_diag");
 
         auto mesh = impl_->space->mesh_ptr();
+        const ptrdiff_t n = mesh->n_nodes();
 
         return impl_->iterate([&](const OpDomain &domain) {
-            return laplacian_diag(domain.element_type,
-                                  domain.block->n_elements(),
-                                  mesh->n_nodes(),
-                                  domain.block->elements()->data(),
-                                  mesh->points()->data(),
-                                  values);
+            const real_t k = domain_diffusion(domain);
+            if (k == real_t(1)) {
+                return laplacian_diag(domain.element_type,
+                                      domain.block->n_elements(),
+                                      n,
+                                      domain.block->elements()->data(),
+                                      mesh->points()->data(),
+                                      values);
+            }
+
+            real_t   *tmp = (real_t *)calloc((size_t)n, sizeof(real_t));
+            const int err = laplacian_diag(domain.element_type,
+                                           domain.block->n_elements(),
+                                           n,
+                                           domain.block->elements()->data(),
+                                           mesh->points()->data(),
+                                           tmp);
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                values[i] += k * tmp[i];
+            }
+            free(tmp);
+            return err;
         });
     }
 
@@ -348,3 +427,4 @@ namespace sfem {
     void Laplacian::set_option(const std::string & /*name*/, bool /*val*/) {}
 
 }  // namespace sfem
+

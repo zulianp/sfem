@@ -22,6 +22,16 @@ namespace sfem {
         auto  es     = f->execution_space();
         auto &ssmesh = f->space()->mesh();
 
+        for (size_t b = 0; b < ssmesh.n_blocks(); ++b) {
+            const auto bid = static_cast<smesh::block_idx_t>(b);
+            if (!smesh::is_hex_ss_family(ssmesh.element_type(bid))) {
+                SFEM_ERROR("create_gmg_data: HEX-family SS only (TET/QUAD B5.5, mixed B5.6); block %zu type %s\n",
+                           b,
+                           smesh::type_to_string(ssmesh.element_type(bid)));
+                return nullptr;
+            }
+        }
+
         std::vector<int> levels = smesh::derefinement_levels(ssmesh);
         std::reverse(levels.begin(), levels.end());
         const int nlevels = levels.size();
@@ -146,7 +156,8 @@ namespace sfem {
         auto coarse_solver = sfem::create_cg<real_t>(ops.back(), es);
         coarse_solver->set_max_it(10000);
         coarse_solver->verbose = false;
-        coarse_solver->set_rtol(1e-6);
+        coarse_solver->set_rtol(1e-10);
+        coarse_solver->set_atol(1e-14);
 
         bool enable_coarse_space_preconditioner = true;
         if (enable_coarse_space_preconditioner) {

@@ -333,8 +333,6 @@ namespace sfem {
             ret->initialize({});
             linear_elasticity_copy_material(*impl_->domains, *ret->impl_->domains);
             ret->set_option("ASSUME_AFFINE", impl_->use_affine_approximation);
-            assert(space->n_blocks() == 1);
-            ret->override_element_types({space->element_type()});
             return ret;
         }
 

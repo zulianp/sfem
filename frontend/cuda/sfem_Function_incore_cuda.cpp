@@ -608,8 +608,6 @@ namespace sfem {
             if (space->has_semi_structured_mesh() && is_semistructured_type(element_type)) {
                 auto ret = std::make_shared<GPULaplacian>(derefined_space);
                 ret->initialize(block_names);
-                assert(derefined_space->n_blocks() == 1);
-                ret->override_element_types({derefined_space->element_type()});
                 return ret;
             }
 
@@ -835,8 +833,6 @@ namespace sfem {
                 auto ret     = std::make_shared<GPULinearElasticity>(derefined_space);
                 ret->domains = std::make_shared<MultiDomainOp>(derefined_space, block_names);
                 gpu_linear_elasticity_copy_material(*domains, *ret->domains);
-                assert(derefined_space->n_blocks() == 1);
-                ret->override_element_types({derefined_space->element_type()});
                 if (populate_gpu_le_domains_sharing_jacobians(*domains, ret->domains) != SFEM_SUCCESS) {
                     return nullptr;
                 }
@@ -1107,8 +1103,6 @@ namespace sfem {
                 auto ret = std::make_shared<GPUKelvinVoigtNewmark>(derefined_space);
                 ret->initialize(block_names);
                 gpu_kv_copy_material(*domains, *ret->domains);
-                assert(derefined_space->n_blocks() == 1);
-                ret->override_element_types({derefined_space->element_type()});
                 ret->real_type = real_type;
                 ret->stream    = stream;
                 ret->dt        = dt;

@@ -18,6 +18,7 @@
 #include "smesh_sideset.hpp"
 
 #include <sys/stat.h>
+#include <algorithm>
 #include <cstddef>
 #include <fstream>
 #include <iostream>
@@ -114,18 +115,15 @@ namespace sfem {
                                                               const bool                            as_zero) const {
         SFEM_TRACE_SCOPE("DirichletConditions::derefine");
 
-        auto space = impl_->space;
-        auto mesh  = space->mesh_ptr();
-        auto et    = (smesh::ElemType)space->element_type();
+        auto coarse = std::make_shared<DirichletConditions>(coarse_space);
+        auto &conds = impl_->conditions;
 
-        // FIXME
-        auto coarse_restriction_mesh = (!coarse_space->has_semi_structured_mesh() && space->has_semi_structured_mesh())
-                                               ? smesh::derefine(mesh, 1)
-                                               : nullptr;
-
-        ptrdiff_t max_coarse_idx = -1;
-        auto      coarse         = std::make_shared<DirichletConditions>(coarse_space);
-        auto     &conds          = impl_->conditions;
+        // Hierarchical SS numbering puts coarse nodes at ids 0 .. n_coarse-1.
+        // Do not scan the fine SoA with the coarse element type: those local slots are not the
+        // coarse subset, so max_node_id can exceed the coarse vector length.
+        const int       coarse_bs      = std::max(coarse_space->block_size(), 1);
+        const ptrdiff_t n_coarse_nodes = coarse_space->n_dofs() / coarse_bs;
+        const idx_t     max_coarse_idx = n_coarse_nodes > 0 ? static_cast<idx_t>(n_coarse_nodes - 1) : static_cast<idx_t>(0);
 
         std::map<std::shared_ptr<Sideset>, std::shared_ptr<Buffer<idx_t>>> sideset_to_nodeset;
         for (size_t i = 0; i < conds.size(); i++) {
@@ -141,48 +139,37 @@ namespace sfem {
             cdc.component = conds[i].component;
             cdc.value     = as_zero ? 0 : conds[i].value;
 
-            // FIXME
-
             if (cdc.sidesets.empty()) {
-                if (max_coarse_idx == -1) {
-                    if (coarse_restriction_mesh) {
-                        max_coarse_idx = smesh::max_node_id(coarse_restriction_mesh->element_type(0),
-                                                            coarse_restriction_mesh->n_elements(),
-                                                            coarse_restriction_mesh->elements(0)->data());
-                    } else {
-                        max_coarse_idx =
-                                smesh::max_node_id(coarse_space->element_type(), mesh->n_elements(), mesh->elements(0)->data());
+                if (n_coarse_nodes <= 0) {
+                    cdc.nodeset = create_host_buffer<idx_t>(0);
+                } else {
+                    smesh::hierarchical_create_coarse_indices<idx_t>(
+                            max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
+                    cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
+
+                    if (!as_zero && conds[i].values) {
+                        cdc.values = create_host_buffer<real_t>(coarse_num_nodes);
+                        smesh::hierarchical_collect_coarse_values<idx_t>(max_coarse_idx,
+                                                                         conds[i].nodeset->size(),
+                                                                         conds[i].nodeset->data(),
+                                                                         conds[i].values->data(),
+                                                                         cdc.values->data());
                     }
-                }
-
-                smesh::hierarchical_create_coarse_indices<idx_t>(
-                        max_coarse_idx, conds[i].nodeset->size(), conds[i].nodeset->data(), &coarse_num_nodes, &coarse_nodeset);
-                cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
-
-                if (!as_zero && conds[i].values) {
-                    cdc.values = create_host_buffer<real_t>(coarse_num_nodes);
-                    smesh::hierarchical_collect_coarse_values<idx_t>(max_coarse_idx,
-                                                                     conds[i].nodeset->size(),
-                                                                     conds[i].nodeset->data(),
-                                                                     conds[i].values->data(),
-                                                                     cdc.values->data());
                 }
 
             } else {
                 assert(as_zero);
                 if (!coarse_space->has_semi_structured_mesh()) {
-                    if (max_coarse_idx == -1) {
-                        max_coarse_idx = smesh::max_node_id(coarse_restriction_mesh->element_type(0),
-                                                            coarse_restriction_mesh->n_elements(),
-                                                            coarse_restriction_mesh->elements(0)->data());
+                    if (n_coarse_nodes <= 0) {
+                        cdc.nodeset = create_host_buffer<idx_t>(0);
+                    } else {
+                        smesh::hierarchical_create_coarse_indices<idx_t>(max_coarse_idx,
+                                                                         conds[i].nodeset->size(),
+                                                                         conds[i].nodeset->data(),
+                                                                         &coarse_num_nodes,
+                                                                         &coarse_nodeset);
+                        cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
                     }
-
-                    smesh::hierarchical_create_coarse_indices<idx_t>(max_coarse_idx,
-                                                                     conds[i].nodeset->size(),
-                                                                     conds[i].nodeset->data(),
-                                                                     &coarse_num_nodes,
-                                                                     &coarse_nodeset);
-                    cdc.nodeset = sfem::manage_host_buffer<idx_t>(coarse_num_nodes, coarse_nodeset);
                 } else {
                     // Use first sideset to find nodeset
                     auto it = sideset_to_nodeset.find(conds[i].sidesets[0]);

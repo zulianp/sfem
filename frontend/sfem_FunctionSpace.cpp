@@ -150,7 +150,7 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
         derefined_mesh = smesh::sshex_to_hex8(derefined_mesh);
     }
 
-    return std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size, derefined_mesh->element_type(0));
+    return std::make_shared<FunctionSpace>(derefined_mesh, impl_->block_size);
 }
 
     FunctionSpace::FunctionSpace() : impl_(std::make_unique<Impl>()) {}
