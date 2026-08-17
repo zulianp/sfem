@@ -54,6 +54,7 @@ namespace sfem {
         // Getters for debugging/external control
         real_t get_gamma() const;
         int get_num_active_terms() const;
+        int get_history_n_qp() const;
         
         // Advanced interface: set precomputed Prony coefficients directly
         // This allows external computation of temperature-shifted tau and filtering
@@ -82,4 +83,3 @@ namespace sfem {
         std::unique_ptr<Impl> impl_;
     };
 }  // namespace sfem
-

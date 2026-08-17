@@ -103,6 +103,7 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const real_t *const SFEM_RESTRICT beta,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const int                         history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     real_t *const SFEM_RESTRICT       new_history,
     // 5. Displacement input
@@ -135,6 +136,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const int                         history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
@@ -171,6 +173,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const int                         history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
@@ -207,6 +210,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const int                         history_n_qp,
     const real_t *const SFEM_RESTRICT history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
@@ -227,4 +231,3 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
 #endif
 
 #endif  // HEX8_MOONEY_RIVLIN_VISCO_FLEXIBLE_H
-

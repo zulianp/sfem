@@ -79,6 +79,15 @@ int test_mooney_rivlin_visco_relaxation() {
 
     // Operator
     auto op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
+    const char *history_mode_env = getenv("SFEM_HISTORY_MODE");
+    const std::string history_mode = history_mode_env ? history_mode_env : "per_qp";
+    const int expected_history_n_qp =
+            history_mode == "per_elem" || history_mode == "per_element" || history_mode == "1" ? 1 : 8;
+    SFEM_TEST_ASSERT(op->get_history_n_qp() == expected_history_n_qp);
+    printf("History mode: %s (%d history point%s per element)\n",
+           history_mode.c_str(),
+           op->get_history_n_qp(),
+           op->get_history_n_qp() == 1 ? "" : "s");
 
     // LumpedMass
     auto mass_op = sfem::create_op(fs, "LumpedMass", es);
