@@ -153,11 +153,23 @@ namespace sfem {
             smoothers.push_back(smoother);
         }
 
-        auto coarse_solver = sfem::create_cg<real_t>(ops.back(), es);
-        coarse_solver->set_max_it(10000);
-        coarse_solver->verbose = false;
-        coarse_solver->set_rtol(1e-10);
-        coarse_solver->set_atol(1e-14);
+        std::shared_ptr<MatrixFreeLinearSolver<real_t>> coarse_solver;
+        auto coarse_pop = std::dynamic_pointer_cast<ParallelOperator<real_t>>(ops.back());
+        if (coarse_pop && coarse_pop->comm() && coarse_pop->comm()->size() > 1) {
+            auto pcg = sfem::create_parallel_cg<real_t>(coarse_pop);
+            pcg->set_max_it(10000);
+            pcg->verbose = false;
+            pcg->set_rtol(1e-10);
+            pcg->set_atol(1e-14);
+            coarse_solver = pcg;
+        } else {
+            auto cg = sfem::create_cg<real_t>(ops.back(), es);
+            cg->set_max_it(10000);
+            cg->verbose = false;
+            cg->set_rtol(1e-10);
+            cg->set_atol(1e-14);
+            coarse_solver = cg;
+        }
 
         bool enable_coarse_space_preconditioner = true;
         if (enable_coarse_space_preconditioner) {

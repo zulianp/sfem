@@ -29,6 +29,7 @@
 #include "sfem_Multigrid.hpp"
 #include "sfem_ParallelMatrixFreeOperator.hpp"
 #include "smesh_env.hpp"
+#include "smesh_exchange.hpp"
 
 #include "sell.hpp"
 #include "sfem_BSR.hpp"
@@ -253,7 +254,7 @@ namespace sfem {
         auto ret            = std::make_shared<StationaryIteration<T>>();
         ret->op             = op;
         ret->preconditioner = preconditioner;
-        ret->n_dofs         = op->cols();
+        ret->configure_sizes_from_op();
 
 #ifdef SFEM_ENABLE_CUDA
         if (es == EXECUTION_SPACE_DEVICE) {
@@ -429,6 +430,31 @@ namespace sfem {
         }
     }
 
+    static std::shared_ptr<Operator<real_t>> wrap_prolongation_coarse_gather(
+            const std::shared_ptr<FunctionSpace>         &from_space,
+            const ExecutionSpace                          es,
+            const std::shared_ptr<Operator<real_t>>      &op) {
+        auto mesh = from_space->mesh_ptr();
+        if (!mesh || !mesh->is_distributed() || !mesh->comm() || mesh->comm()->size() <= 1) {
+            return op;
+        }
+        if (es == EXECUTION_SPACE_DEVICE) {
+            SFEM_ERROR("create_hierarchical_prolongation: distributed DEVICE apply is not implemented\n");
+            return op;
+        }
+
+        auto      ex = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
+        const int bs = from_space->block_size();
+        return make_op<real_t>(
+                op->rows(),
+                op->cols(),
+                [=](const real_t *const from, real_t *const to) {
+                    ex->gather(const_cast<real_t *>(from), bs);
+                    op->apply(from, to);
+                },
+                es);
+    }
+
     static std::shared_ptr<Operator<real_t>> create_hierarchical_prolongation(const std::shared_ptr<FunctionSpace> &from_space,
                                                                               const std::shared_ptr<FunctionSpace> &to_space,
                                                                               const ExecutionSpace                  es) {
@@ -444,82 +470,88 @@ namespace sfem {
         if (EXECUTION_SPACE_DEVICE == es) {
             if (to_ss) {
                 if (from_ss) {
-                    return make_op<real_t>(
-                            to_space->n_dofs(),
-                            from_space->n_dofs(),
-                            [=](const real_t *const from, real_t *const to) {
-                                SFEM_TRACE_SCOPE("cu_sshex8_prolongate");
+                    return wrap_prolongation_coarse_gather(
+                            from_space,
+                            es,
+                            make_op<real_t>(
+                                    to_space->n_dofs(),
+                                    from_space->n_dofs(),
+                                    [=](const real_t *const from, real_t *const to) {
+                                        SFEM_TRACE_SCOPE("cu_sshex8_prolongate");
 
-                                auto     &from_ssm   = from_space->mesh();
-                                auto     &to_ssm     = to_space->mesh();
-                                const int to_level   = smesh::semistructured_level(to_ssm);
-                                const int from_level = smesh::semistructured_level(from_ssm);
+                                        auto     &from_ssm   = from_space->mesh();
+                                        auto     &to_ssm     = to_space->mesh();
+                                        const int to_level   = smesh::semistructured_level(to_ssm);
+                                        const int from_level = smesh::semistructured_level(from_ssm);
 
-                                for (size_t b = 0; b < from_ssm.n_blocks(); ++b) {
-                                    auto            from_b = from_ssm.block(b);
-                                    auto            to_b   = to_ssm.block(b);
-                                    const ptrdiff_t ne     = from_b->n_elements();
-                                    if (ne == 0) {
-                                        continue;
-                                    }
-                                    auto from_els = from_b->device_elements_SoA();
-                                    auto to_els   = to_b->device_elements_SoA();
-                                    if (from_els->mem_space() != smesh::MEMORY_SPACE_DEVICE ||
-                                        to_els->mem_space() != smesh::MEMORY_SPACE_DEVICE) {
-                                        SFEM_ERROR("Elements are not on the device");
-                                    }
-                                    smesh::cu_sshex8_prolongate(ne,
-                                                                from_level,
-                                                                1,
-                                                                from_els->data(),
-                                                                to_level,
-                                                                1,
-                                                                to_els->data(),
-                                                                from_space->block_size(),
-                                                                smesh::SMESH_DEFAULT,
-                                                                1,
-                                                                from,
-                                                                smesh::SMESH_DEFAULT,
-                                                                1,
-                                                                to,
-                                                                SFEM_DEFAULT_STREAM);
-                                }
-                            },
-                            es);
+                                        for (size_t b = 0; b < from_ssm.n_blocks(); ++b) {
+                                            auto            from_b = from_ssm.block(b);
+                                            auto            to_b   = to_ssm.block(b);
+                                            const ptrdiff_t ne     = from_b->n_elements();
+                                            if (ne == 0) {
+                                                continue;
+                                            }
+                                            auto from_els = from_b->device_elements_SoA();
+                                            auto to_els   = to_b->device_elements_SoA();
+                                            if (from_els->mem_space() != smesh::MEMORY_SPACE_DEVICE ||
+                                                to_els->mem_space() != smesh::MEMORY_SPACE_DEVICE) {
+                                                SFEM_ERROR("Elements are not on the device");
+                                            }
+                                            smesh::cu_sshex8_prolongate(ne,
+                                                                        from_level,
+                                                                        1,
+                                                                        from_els->data(),
+                                                                        to_level,
+                                                                        1,
+                                                                        to_els->data(),
+                                                                        from_space->block_size(),
+                                                                        smesh::SMESH_DEFAULT,
+                                                                        1,
+                                                                        from,
+                                                                        smesh::SMESH_DEFAULT,
+                                                                        1,
+                                                                        to,
+                                                                        SFEM_DEFAULT_STREAM);
+                                        }
+                                    },
+                                    es));
                 }
 
-                return make_op<real_t>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_prolongation");
+                return wrap_prolongation_coarse_gather(
+                        from_space,
+                        es,
+                        make_op<real_t>(
+                                to_space->n_dofs(),
+                                from_space->n_dofs(),
+                                [=](const real_t *const from, real_t *const to) {
+                                    SFEM_TRACE_SCOPE("cu_sshex8_hierarchical_prolongation");
 
-                            auto     &ssm   = to_space->mesh();
-                            const int level = smesh::semistructured_level(ssm);
-                            for (size_t b = 0; b < ssm.n_blocks(); ++b) {
-                                auto            to_b = ssm.block(b);
-                                const ptrdiff_t ne   = to_b->n_elements();
-                                if (ne == 0) {
-                                    continue;
-                                }
-                                auto elements = to_b->device_elements_SoA();
-                                if (elements->mem_space() != smesh::MEMORY_SPACE_DEVICE) {
-                                    SFEM_ERROR("Elements are not on the device");
-                                }
-                                smesh::cu_sshex8_hierarchical_prolongation(level,
-                                                                           ne,
-                                                                           elements->data(),
-                                                                           from_space->block_size(),
-                                                                           smesh::SMESH_DEFAULT,
-                                                                           1,
-                                                                           from,
-                                                                           smesh::SMESH_DEFAULT,
-                                                                           1,
-                                                                           to,
-                                                                           SFEM_DEFAULT_STREAM);
-                            }
-                        },
-                        es);
+                                    auto     &ssm   = to_space->mesh();
+                                    const int level = smesh::semistructured_level(ssm);
+                                    for (size_t b = 0; b < ssm.n_blocks(); ++b) {
+                                        auto            to_b = ssm.block(b);
+                                        const ptrdiff_t ne   = to_b->n_elements();
+                                        if (ne == 0) {
+                                            continue;
+                                        }
+                                        auto elements = to_b->device_elements_SoA();
+                                        if (elements->mem_space() != smesh::MEMORY_SPACE_DEVICE) {
+                                            SFEM_ERROR("Elements are not on the device");
+                                        }
+                                        smesh::cu_sshex8_hierarchical_prolongation(level,
+                                                                                   ne,
+                                                                                   elements->data(),
+                                                                                   from_space->block_size(),
+                                                                                   smesh::SMESH_DEFAULT,
+                                                                                   1,
+                                                                                   from,
+                                                                                   smesh::SMESH_DEFAULT,
+                                                                                   1,
+                                                                                   to,
+                                                                                   SFEM_DEFAULT_STREAM);
+                                    }
+                                },
+                                es));
             }
 
             auto elements = to_space->device_elements();
@@ -528,100 +560,153 @@ namespace sfem {
                 to_space->set_device_elements(elements);
             }
 
-            return make_op<real_t>(
-                    to_space->n_dofs(),
-                    from_space->n_dofs(),
-                    [=](const real_t *const from, real_t *const to) {
-                        SFEM_TRACE_SCOPE("smesh::cu_macrotet4_to_tet4_prolongation_element_based");
+            return wrap_prolongation_coarse_gather(
+                    from_space,
+                    es,
+                    make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("smesh::cu_macrotet4_to_tet4_prolongation_element_based");
 
-                        smesh::cu_macrotet4_to_tet4_prolongation_element_based(from_space->mesh().n_elements(),
-                                                                               elements->data(),
-                                                                               from_space->block_size(),
-                                                                               smesh::SMESH_DEFAULT,
-                                                                               1,
-                                                                               from,
-                                                                               smesh::SMESH_DEFAULT,
-                                                                               1,
-                                                                               to,
-                                                                               SFEM_DEFAULT_STREAM);
-                    },
-                    es);
+                                smesh::cu_macrotet4_to_tet4_prolongation_element_based(from_space->mesh().n_elements(),
+                                                                                       elements->data(),
+                                                                                       from_space->block_size(),
+                                                                                       smesh::SMESH_DEFAULT,
+                                                                                       1,
+                                                                                       from,
+                                                                                       smesh::SMESH_DEFAULT,
+                                                                                       1,
+                                                                                       to,
+                                                                                       SFEM_DEFAULT_STREAM);
+                            },
+                            es));
 
         } else
 #endif
         {
             if (to_ss) {
                 if (!from_ss) {
-                    return make_op<real_t>(
-                            to_space->n_dofs(),
-                            from_space->n_dofs(),
-                            [=](const real_t *const from, real_t *const to) {
-                                SFEM_TRACE_SCOPE("sshex8_hierarchical_prolongation");
+                    auto from_mesh = from_space->mesh_ptr();
+                    const bool mpi_hex = from_mesh && from_mesh->is_distributed() && from_mesh->comm() &&
+                                         from_mesh->comm()->size() > 1;
+                    if (mpi_hex) {
+                        return wrap_prolongation_coarse_gather(
+                                from_space,
+                                es,
+                                make_op<real_t>(
+                                        to_space->n_dofs(),
+                                        from_space->n_dofs(),
+                                        [=](const real_t *const from, real_t *const to) {
+                                            SFEM_TRACE_SCOPE("sshex8_prolongate_from_hex8");
 
-                                auto     &ssm   = to_space->mesh();
-                                const int level = smesh::semistructured_level(ssm);
-                                for (size_t b = 0; b < ssm.n_blocks(); ++b) {
-                                    auto            to_b = ssm.block(b);
-                                    const ptrdiff_t ne   = to_b->n_elements();
-                                    if (ne == 0) {
-                                        continue;
-                                    }
-                                    smesh::sshex8_hierarchical_prolongation(
-                                            level, ne, to_b->elements()->data(), from_space->block_size(), from, to);
-                                }
-                            },
-                            EXECUTION_SPACE_HOST);
+                                            auto     &from_m   = from_space->mesh();
+                                            auto     &to_ssm   = to_space->mesh();
+                                            const int to_level = smesh::semistructured_level(to_ssm);
+                                            for (size_t b = 0; b < to_ssm.n_blocks(); ++b) {
+                                                auto            from_b = from_m.block(b);
+                                                auto            to_b   = to_ssm.block(b);
+                                                const ptrdiff_t ne     = to_b->n_elements();
+                                                if (ne == 0) {
+                                                    continue;
+                                                }
+                                                idx_t *from_sshex[8];
+                                                smesh::hex8_elements_as_sshex8_level1(from_b->elements()->data(),
+                                                                                      from_sshex);
+                                                smesh::sshex8_prolongate(ne,
+                                                                         1,
+                                                                         1,
+                                                                         from_sshex,
+                                                                         to_level,
+                                                                         1,
+                                                                         to_b->elements()->data(),
+                                                                         from_space->block_size(),
+                                                                         from,
+                                                                         to);
+                                            }
+                                        },
+                                        EXECUTION_SPACE_HOST));
+                    }
+
+                    return wrap_prolongation_coarse_gather(
+                            from_space,
+                            es,
+                            make_op<real_t>(
+                                    to_space->n_dofs(),
+                                    from_space->n_dofs(),
+                                    [=](const real_t *const from, real_t *const to) {
+                                        SFEM_TRACE_SCOPE("sshex8_hierarchical_prolongation");
+
+                                        auto     &ssm   = to_space->mesh();
+                                        const int level = smesh::semistructured_level(ssm);
+                                        for (size_t b = 0; b < ssm.n_blocks(); ++b) {
+                                            auto            to_b = ssm.block(b);
+                                            const ptrdiff_t ne   = to_b->n_elements();
+                                            if (ne == 0) {
+                                                continue;
+                                            }
+                                            smesh::sshex8_hierarchical_prolongation(
+                                                    level, ne, to_b->elements()->data(), from_space->block_size(), from, to);
+                                        }
+                                    },
+                                    EXECUTION_SPACE_HOST));
                 }
 
                 assert(smesh::semistructured_level(from_space->mesh()) > 1);
 
-                return make_op<real_t>(
-                        to_space->n_dofs(),
-                        from_space->n_dofs(),
-                        [=](const real_t *const from, real_t *const to) {
-                            SFEM_TRACE_SCOPE("sshex8_prolongate");
+                return wrap_prolongation_coarse_gather(
+                        from_space,
+                        es,
+                        make_op<real_t>(
+                                to_space->n_dofs(),
+                                from_space->n_dofs(),
+                                [=](const real_t *const from, real_t *const to) {
+                                    SFEM_TRACE_SCOPE("sshex8_prolongate");
 
-                            auto     &from_ssm   = from_space->mesh();
-                            auto     &to_ssm     = to_space->mesh();
-                            const int from_level = smesh::semistructured_level(from_ssm);
-                            const int to_level   = smesh::semistructured_level(to_ssm);
-                            for (size_t b = 0; b < from_ssm.n_blocks(); ++b) {
-                                auto            from_b = from_ssm.block(b);
-                                auto            to_b   = to_ssm.block(b);
-                                const ptrdiff_t ne     = from_b->n_elements();
-                                if (ne == 0) {
-                                    continue;
-                                }
-                                smesh::sshex8_prolongate(ne,
-                                                         from_level,
-                                                         1,
-                                                         from_b->elements()->data(),
-                                                         to_level,
-                                                         1,
-                                                         to_b->elements()->data(),
-                                                         from_space->block_size(),
-                                                         from,
-                                                         to);
-                            }
-                        },
-                        EXECUTION_SPACE_HOST);
+                                    auto     &from_ssm   = from_space->mesh();
+                                    auto     &to_ssm     = to_space->mesh();
+                                    const int from_level = smesh::semistructured_level(from_ssm);
+                                    const int to_level   = smesh::semistructured_level(to_ssm);
+                                    for (size_t b = 0; b < from_ssm.n_blocks(); ++b) {
+                                        auto            from_b = from_ssm.block(b);
+                                        auto            to_b   = to_ssm.block(b);
+                                        const ptrdiff_t ne     = from_b->n_elements();
+                                        if (ne == 0) {
+                                            continue;
+                                        }
+                                        smesh::sshex8_prolongate(ne,
+                                                                 from_level,
+                                                                 1,
+                                                                 from_b->elements()->data(),
+                                                                 to_level,
+                                                                 1,
+                                                                 to_b->elements()->data(),
+                                                                 from_space->block_size(),
+                                                                 from,
+                                                                 to);
+                                    }
+                                },
+                                EXECUTION_SPACE_HOST));
             }
 
-            return make_op<real_t>(
-                    to_space->n_dofs(),
-                    from_space->n_dofs(),
-                    [=](const real_t *const from, real_t *const to) {
-                        SFEM_TRACE_SCOPE("hierarchical_prolongation");
+            return wrap_prolongation_coarse_gather(
+                    from_space,
+                    es,
+                    make_op<real_t>(
+                            to_space->n_dofs(),
+                            from_space->n_dofs(),
+                            [=](const real_t *const from, real_t *const to) {
+                                SFEM_TRACE_SCOPE("hierarchical_prolongation");
 
-                        smesh::hierarchical_prolongation(from_space->element_type(),
-                                                         to_space->element_type(),
-                                                         to_space->mesh().n_elements(),
-                                                         to_space->mesh().elements(0)->data(),
-                                                         from_space->block_size(),
-                                                         from,
-                                                         to);
-                    },
-                    EXECUTION_SPACE_HOST);
+                                smesh::hierarchical_prolongation(from_space->element_type(),
+                                                                 to_space->element_type(),
+                                                                 to_space->mesh().n_elements(),
+                                                                 to_space->mesh().elements(0)->data(),
+                                                                 from_space->block_size(),
+                                                                 from,
+                                                                 to);
+                            },
+                            EXECUTION_SPACE_HOST));
         }
     }
 
