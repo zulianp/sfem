@@ -482,6 +482,14 @@ if(SFEM_ENABLE_TESTING)
             COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelCGTest>)
         set_tests_properties(sfem_ParallelCGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelCGTest)
+
+        add_executable(sfem_ParallelFunctionSpaceTest frontend/tests/mpi/sfem_ParallelFunctionSpaceTest.cpp)
+        target_link_libraries(sfem_ParallelFunctionSpaceTest PRIVATE sfem)
+        add_test(
+            NAME sfem_ParallelFunctionSpaceTest
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelFunctionSpaceTest>)
+        set_tests_properties(sfem_ParallelFunctionSpaceTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        list(APPEND SFEM_TARGETS sfem_ParallelFunctionSpaceTest)
     endif()
 endif()
 
