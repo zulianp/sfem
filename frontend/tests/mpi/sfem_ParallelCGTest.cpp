@@ -6,7 +6,6 @@
 #include "smesh_base.hpp"
 #include "smesh_env.hpp"
 #include "smesh_mesh.hpp"
-#include "smesh_mesh_reorder.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -16,7 +15,7 @@
 
 namespace {
 
-    // Cube extents passed to Mesh::create_hex8_cube (must match mesh write below).
+    // Cube extents passed to Mesh::create_hex8_cube.
     constexpr geom_t k_x_min = -1;
     constexpr geom_t k_x_max = 1;
 
@@ -54,28 +53,21 @@ namespace {
     int test_parallel_cg() {
         auto comm = sfem::Communicator::world();
 
-        const smesh::Path mesh_path("/private/tmp/sfem_parallel_cg_mesh");
-        bool              verbose = smesh::Env::read("SFEM_VERBOSE", false);
+        bool verbose = smesh::Env::read("SFEM_VERBOSE", false);
 
-        if (comm->rank() == 0) {
-            // Axis-aligned cube: exact solution of -Δu=0 with u(±1)=±1 is u(x)=x.
-            ptrdiff_t factor = smesh::Env::read("SFEM_MESH_FACTOR", 2);
-            auto      mesh   = sfem::Mesh::create_hex8_cube(
-                    sfem::Communicator::self(), factor * 48, factor * 40, factor * 32, k_x_min, -0.5, 0.25, k_x_max, 1.5, 2.0);
-            auto reordering = smesh::SFC::create_from_env();
-            reordering->reorder(*mesh);
-            SFEM_TEST_ASSERT(mesh->write(mesh_path) == SFEM_SUCCESS);
-        }
-
-        comm->barrier();
-
-        auto parallel_mesh = sfem::Mesh::create_from_file(comm, mesh_path);
+        // Axis-aligned cube: exact solution of -Δu=0 with u(±1)=±1 is u(x)=x.
+        ptrdiff_t factor        = smesh::Env::read("SFEM_MESH_FACTOR", 2);
+        auto      parallel_mesh = sfem::Mesh::create_hex8_cube(
+                comm, factor * 48, factor * 40, factor * 32, k_x_min, -0.5, 0.25, k_x_max, 1.5, 2.0);
         SFEM_TEST_ASSERT(parallel_mesh != nullptr);
 
         if (comm->size() > 1) {
+            SFEM_TEST_ASSERT(parallel_mesh->is_distributed());
             auto dist = parallel_mesh->distributed();
             SFEM_TEST_ASSERT(dist->n_nodes_global() > 0);
             SFEM_TEST_ASSERT(comm->sum(dist->n_nodes_aura()) > 0);
+        } else {
+            SFEM_TEST_ASSERT(!parallel_mesh->is_distributed());
         }
 
         std::shared_ptr<sfem::Function> parallel_function;
@@ -153,3 +145,4 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

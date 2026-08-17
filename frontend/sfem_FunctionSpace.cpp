@@ -5,24 +5,10 @@
 #include <memory>
 
 #include "sfem_aliases.hpp"
-// 
-// #include "smesh_semistructured.hpp"
-// 
+#include "smesh_mesh.hpp"
 #include "smesh_packed_mesh.hpp"
 
 namespace sfem {
-
-    template <typename idx_t>
-    ptrdiff_t max_node_id(const enum smesh::ElemType type, const ptrdiff_t nelements, idx_t **const SMESH_RESTRICT elements) {
-        const int nxe = elem_num_nodes(type);
-        idx_t     ret = 0;
-        for (int i = 0; i < nxe; i++) {
-            for (ptrdiff_t e = 0; e < nelements; e++) {
-                ret = std::max(ret, elements[i][e]);
-            }
-        }
-        return ret;
-    }
 
     class FunctionSpace::Impl {
     public:
@@ -31,8 +17,8 @@ namespace sfem {
         // Multi-block support: dedicated element type for each block
         std::vector<smesh::ElemType> element_types;
 
-        // Number of nodes of function-space (TODO)
         ptrdiff_t nlocal{0};
+        ptrdiff_t nowned{0};
         ptrdiff_t nglobal{0};
 
         // CRS graph
@@ -82,6 +68,25 @@ namespace sfem {
                 for (size_t i = 0; i < n_blocks; ++i) {
                     element_types.push_back(element_type);
                 }
+            }
+        }
+
+        void initialize_dof_counts() {
+            if (!mesh) {
+                nlocal  = 0;
+                nowned  = 0;
+                nglobal = 0;
+                return;
+            }
+
+            const ptrdiff_t bs = block_size;
+            if (mesh->is_distributed()) {
+                auto dist = mesh->distributed();
+                nlocal    = dist->n_nodes_local() * bs;
+                nowned    = dist->n_nodes_owned() * bs;
+                nglobal   = dist->n_nodes_global() * bs;
+            } else {
+                nlocal = nowned = nglobal = mesh->n_nodes() * bs;
             }
         }
 
@@ -151,14 +156,12 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
     FunctionSpace::FunctionSpace() : impl_(std::make_unique<Impl>()) {}
 
     std::shared_ptr<FunctionSpace> FunctionSpace::create(const std::shared_ptr<FunctionSpace::PackedMesh> &mesh, const int block_size) {
-        auto ret                         = std::make_shared<FunctionSpace>();
-        ret->impl_->mesh                 = mesh->mesh();
-        ret->impl_->block_size           = block_size;
-        ret->impl_->packed_mesh          = mesh;
-        ret->impl_->nlocal               = mesh->mesh()->n_nodes() * block_size;
-        ret->impl_->nglobal              = ret->impl_->nlocal;
-
-        ret->impl_->element_types.push_back(mesh->mesh()->element_type(0));
+        auto ret               = std::make_shared<FunctionSpace>();
+        ret->impl_->mesh       = mesh->mesh();
+        ret->impl_->block_size = block_size;
+        ret->impl_->packed_mesh = mesh;
+        ret->impl_->initialize_element_types();
+        ret->impl_->initialize_dof_counts();
         return ret;
     }
 
@@ -170,24 +173,11 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
 
         if (element_type == smesh::INVALID) {
             impl_->initialize_element_types();
-
         } else {
             impl_->override_element_types(element_type);
         }
 
-        if (element_type == smesh::INVALID) {
-            impl_->nlocal  = mesh->n_nodes() * block_size;
-            impl_->nglobal = mesh->n_nodes() * block_size;
-        } else {
-            assert(mesh->n_blocks() == 1);
-            // FIXME in parallel it will not work
-            impl_->nlocal =
-                    (max_node_id<idx_t>(impl_->get_element_type_for_block(0), mesh->n_elements(), mesh->elements(0)->data()) + 1) *
-                    block_size;
-            impl_->nglobal = impl_->nlocal;
-        }
-
-        // Initialize element types for multi-block support
+        impl_->initialize_dof_counts();
     }
     FunctionSpace::~FunctionSpace() = default;
 
@@ -202,6 +192,10 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
     int FunctionSpace::block_size() const { return impl_->block_size; }
 
     ptrdiff_t FunctionSpace::n_dofs() const { return impl_->nlocal; }
+
+    ptrdiff_t FunctionSpace::n_owned_dofs() const { return impl_->nowned; }
+
+    ptrdiff_t FunctionSpace::n_dofs_global() const { return impl_->nglobal; }
 
     SharedBuffer<geom_t *> FunctionSpace::points() { return impl_->mesh->points(); }
 
@@ -242,3 +236,4 @@ std::shared_ptr<FunctionSpace> FunctionSpace::derefine(const int to_level) {
 
     std::shared_ptr<FunctionSpace::PackedMesh> FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
 }  // namespace sfem
+
