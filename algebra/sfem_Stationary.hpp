@@ -1,12 +1,14 @@
 #ifndef SFEM_STATIONARY_HPP
 #define SFEM_STATIONARY_HPP
 
+#include <algorithm>
 #include <cstddef>
 #include <functional>
 #include <memory>
 
 #include "sfem_LpSmoother.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_openmp_blas.hpp"
 
@@ -20,6 +22,7 @@ namespace sfem {
     public:
         ExecutionSpace               execution_space_{EXECUTION_SPACE_INVALID};
         ptrdiff_t                    n_dofs{SFEM_PTRDIFF_INVALID};
+        ptrdiff_t                    n_alloc{SFEM_PTRDIFF_INVALID};
         int                          max_it{3};
         SharedBuffer<T>              workspace;
         std::shared_ptr<Operator<T>> op;
@@ -34,10 +37,20 @@ namespace sfem {
 
         int iterations() const override { return iterations_; }
 
+        void configure_sizes_from_op() {
+            n_dofs  = op ? op->rows() : SFEM_PTRDIFF_INVALID;
+            n_alloc = n_dofs;
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(op);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                n_alloc = std::max(pop->row_allocation_size(), pop->col_allocation_size());
+            }
+        }
+
         void ensure_workspace() {
-            if (!workspace || workspace->size() != n_dofs) {
+            const ptrdiff_t n = (n_alloc > 0) ? n_alloc : n_dofs;
+            if (!workspace || workspace->size() != static_cast<size_t>(n)) {
                 auto blas_impl = blas;
-                workspace = Buffer<T>::own(n_dofs, blas_impl->allocate(n_dofs), [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+                workspace = Buffer<T>::own(n, blas_impl->allocate(n), [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
             }
         }
 
@@ -85,14 +98,15 @@ namespace sfem {
         /* MatrixFreeLinearSolver */
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->op = op;
-            n_dofs   = op->rows();
+            configure_sizes_from_op();
         }
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override { this->preconditioner = op; }
         void set_max_it(const int it) override { max_it = it; }
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
         int set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& op, const SharedBuffer<T>& diag) override {
-            this->op       = op;  // + sfem::diag_op(diag, execution_space());
+            this->op = op;
+            configure_sizes_from_op();
             auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
             if (shiftable) {
                 return shiftable->shift(diag);
@@ -107,7 +121,8 @@ namespace sfem {
                                   const SharedBuffer<T>&                       diag) override {
             assert(sbv->n_blocks() == diag->size());
 
-            this->op = op;  // + sfem::create_sparse_block_vector_mult(op->rows(), sbv, diag);
+            this->op = op;
+            configure_sizes_from_op();
 
             auto shiftable = std::dynamic_pointer_cast<ShiftableOperator<T>>(preconditioner);
             if (shiftable) {
@@ -127,7 +142,7 @@ namespace sfem {
         auto solver            = std::make_shared<StationaryIteration<T>>();
         solver->op             = op;
         solver->preconditioner = preconditioner;
-        solver->n_dofs         = op->cols();
+        solver->configure_sizes_from_op();
         solver->default_init();
         return solver;
     }
