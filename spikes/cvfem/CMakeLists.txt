@@ -63,6 +63,7 @@ foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baselin
             SFEM::sfem
             $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
     target_compile_options(${_cvfem_tgt} PRIVATE ${_cvfem_perf_opts})
+    target_include_directories(${_cvfem_tgt} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES

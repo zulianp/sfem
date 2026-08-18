@@ -1,4 +1,6 @@
 #include "smesh_mesh.hpp"
+#include "smesh_buffer.hpp"
+#include "sfem_BSR.hpp"
 
 #include <mpi.h>
 
@@ -40,6 +42,8 @@ using jacobian_t = smesh::jacobian_t;
 static constexpr int VEC_SIZE = VEC_BYTES / int(sizeof(scalar_t));
 static_assert(VEC_SIZE >= 1, "invalid vector size");
 static constexpr int ALIGN_BYTES = 64;
+
+#include "cvfem_tet4_ns_upwind_kernels.hpp"
 
 template <typename T>
 struct AlignedBuffer {
@@ -87,11 +91,6 @@ struct AlignedBuffer {
   T &operator[](ptrdiff_t i) { return ptr[i]; }
   const T &operator[](ptrdiff_t i) const { return ptr[i]; }
 };
-
-static SFEM_INLINE const jacobian_t *aligned_geom(const jacobian_t *p) {
-  return static_cast<const jacobian_t *>(
-      __builtin_assume_aligned(p, ALIGN_BYTES));
-}
 
 struct MeshData {
   std::shared_ptr<smesh::Mesh> mesh;
@@ -238,20 +237,6 @@ static SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f,
   f[id] += value;
 }
 
-struct Tet4InputPack {
-  scalar_t ux0[VEC_SIZE], ux1[VEC_SIZE], ux2[VEC_SIZE], ux3[VEC_SIZE];
-  scalar_t uy0[VEC_SIZE], uy1[VEC_SIZE], uy2[VEC_SIZE], uy3[VEC_SIZE];
-  scalar_t uz0[VEC_SIZE], uz1[VEC_SIZE], uz2[VEC_SIZE], uz3[VEC_SIZE];
-  scalar_t p0[VEC_SIZE], p1[VEC_SIZE], p2[VEC_SIZE], p3[VEC_SIZE];
-};
-
-struct Tet4ResidualPack {
-  scalar_t rx0[VEC_SIZE], rx1[VEC_SIZE], rx2[VEC_SIZE], rx3[VEC_SIZE];
-  scalar_t ry0[VEC_SIZE], ry1[VEC_SIZE], ry2[VEC_SIZE], ry3[VEC_SIZE];
-  scalar_t rz0[VEC_SIZE], rz1[VEC_SIZE], rz2[VEC_SIZE], rz3[VEC_SIZE];
-  scalar_t rc0[VEC_SIZE], rc1[VEC_SIZE], rc2[VEC_SIZE], rc3[VEC_SIZE];
-};
-
 static SFEM_INLINE void gather_tet4_pack(const MeshData &d,
                                          const ptrdiff_t begin,
                                          const int nlanes,
@@ -272,212 +257,23 @@ static SFEM_INLINE void gather_tet4_pack(const MeshData &d,
     const smesh::idx_t n2 = elems[2][e];
     const smesh::idx_t n3 = elems[3][e];
 
-    pack.ux0[lane] = ux[n0];
-    pack.ux1[lane] = ux[n1];
-    pack.ux2[lane] = ux[n2];
-    pack.ux3[lane] = ux[n3];
-    pack.uy0[lane] = uy[n0];
-    pack.uy1[lane] = uy[n1];
-    pack.uy2[lane] = uy[n2];
-    pack.uy3[lane] = uy[n3];
-    pack.uz0[lane] = uz[n0];
-    pack.uz1[lane] = uz[n1];
-    pack.uz2[lane] = uz[n2];
-    pack.uz3[lane] = uz[n3];
-    pack.p0[lane] = p[n0];
-    pack.p1[lane] = p[n1];
-    pack.p2[lane] = p[n2];
-    pack.p3[lane] = p[n3];
+    pack.ux[0][lane] = ux[n0];
+    pack.ux[1][lane] = ux[n1];
+    pack.ux[2][lane] = ux[n2];
+    pack.ux[3][lane] = ux[n3];
+    pack.uy[0][lane] = uy[n0];
+    pack.uy[1][lane] = uy[n1];
+    pack.uy[2][lane] = uy[n2];
+    pack.uy[3][lane] = uy[n3];
+    pack.uz[0][lane] = uz[n0];
+    pack.uz[1][lane] = uz[n1];
+    pack.uz[2][lane] = uz[n2];
+    pack.uz[3][lane] = uz[n3];
+    pack.p[0][lane] = p[n0];
+    pack.p[1][lane] = p[n1];
+    pack.p[2][lane] = p[n2];
+    pack.p[3][lane] = p[n3];
   }
-}
-
-static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(
-    const scalar_t rho_s, const scalar_t mu_s,
-    const jacobian_t *const SFEM_RESTRICT adj0_ptr,
-    const jacobian_t *const SFEM_RESTRICT adj1_ptr,
-    const jacobian_t *const SFEM_RESTRICT adj2_ptr,
-    const jacobian_t *const SFEM_RESTRICT adj3_ptr,
-    const jacobian_t *const SFEM_RESTRICT adj4_ptr,
-    const jacobian_t *const SFEM_RESTRICT adj5_ptr,
-    const jacobian_t *const SFEM_RESTRICT adj6_ptr,
-    const jacobian_t *const SFEM_RESTRICT adj7_ptr,
-    const jacobian_t *const SFEM_RESTRICT adj8_ptr,
-    const jacobian_t *const SFEM_RESTRICT det_ptr, const Tet4InputPack &in,
-    Tet4ResidualPack &out) {
-  const scalar_t half = 0.5;
-  const scalar_t two = 2.0;
-  const scalar_t rho = rho_s;
-  const scalar_t mu = mu_s;
-  const scalar_t c12 = 1.0 / 12.0;
-  const scalar_t c24 = 1.0 / 24.0;
-
-  alignas(ALIGN_BYTES) scalar_t g00v[VEC_SIZE], g01v[VEC_SIZE], g02v[VEC_SIZE];
-  alignas(ALIGN_BYTES) scalar_t g10v[VEC_SIZE], g11v[VEC_SIZE], g12v[VEC_SIZE];
-  alignas(ALIGN_BYTES) scalar_t g20v[VEC_SIZE], g21v[VEC_SIZE], g22v[VEC_SIZE];
-
-#pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr,      \
-                             adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr   \
-                         : 64)
-  for (int lane = 0; lane < VEC_SIZE; ++lane) {
-    const scalar_t adj0 = scalar_t(adj0_ptr[lane]);
-    const scalar_t adj1 = scalar_t(adj1_ptr[lane]);
-    const scalar_t adj2 = scalar_t(adj2_ptr[lane]);
-    const scalar_t adj3 = scalar_t(adj3_ptr[lane]);
-    const scalar_t adj4 = scalar_t(adj4_ptr[lane]);
-    const scalar_t adj5 = scalar_t(adj5_ptr[lane]);
-    const scalar_t adj6 = scalar_t(adj6_ptr[lane]);
-    const scalar_t adj7 = scalar_t(adj7_ptr[lane]);
-    const scalar_t adj8 = scalar_t(adj8_ptr[lane]);
-    const scalar_t inv_det = 1.0 / scalar_t(det_ptr[lane]);
-    const scalar_t ux0 = in.ux0[lane];
-    const scalar_t dux0 = in.ux1[lane] - ux0;
-    const scalar_t dux1 = in.ux2[lane] - ux0;
-    const scalar_t dux2 = in.ux3[lane] - ux0;
-    const scalar_t uy0 = in.uy0[lane];
-    const scalar_t duy0 = in.uy1[lane] - uy0;
-    const scalar_t duy1 = in.uy2[lane] - uy0;
-    const scalar_t duy2 = in.uy3[lane] - uy0;
-    const scalar_t uz0 = in.uz0[lane];
-    const scalar_t duz0 = in.uz1[lane] - uz0;
-    const scalar_t duz1 = in.uz2[lane] - uz0;
-    const scalar_t duz2 = in.uz3[lane] - uz0;
-    g00v[lane] = (dux0 * adj0 + dux1 * adj3 + dux2 * adj6) * inv_det;
-    g01v[lane] = (dux0 * adj1 + dux1 * adj4 + dux2 * adj7) * inv_det;
-    g02v[lane] = (dux0 * adj2 + dux1 * adj5 + dux2 * adj8) * inv_det;
-    g10v[lane] = (duy0 * adj0 + duy1 * adj3 + duy2 * adj6) * inv_det;
-    g11v[lane] = (duy0 * adj1 + duy1 * adj4 + duy2 * adj7) * inv_det;
-    g12v[lane] = (duy0 * adj2 + duy1 * adj5 + duy2 * adj8) * inv_det;
-    g20v[lane] = (duz0 * adj0 + duz1 * adj3 + duz2 * adj6) * inv_det;
-    g21v[lane] = (duz0 * adj1 + duz1 * adj4 + duz2 * adj7) * inv_det;
-    g22v[lane] = (duz0 * adj2 + duz1 * adj5 + duz2 * adj8) * inv_det;
-    out.rx0[lane] = 0.0;
-    out.rx1[lane] = 0.0;
-    out.rx2[lane] = 0.0;
-    out.rx3[lane] = 0.0;
-    out.ry0[lane] = 0.0;
-    out.ry1[lane] = 0.0;
-    out.ry2[lane] = 0.0;
-    out.ry3[lane] = 0.0;
-    out.rz0[lane] = 0.0;
-    out.rz1[lane] = 0.0;
-    out.rz2[lane] = 0.0;
-    out.rz3[lane] = 0.0;
-    out.rc0[lane] = 0.0;
-    out.rc1[lane] = 0.0;
-    out.rc2[lane] = 0.0;
-    out.rc3[lane] = 0.0;
-  }
-
-#define GEOM_SIMD_PRAGMA                                                       \
-  _Pragma("omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr: 64)")
-
-#define SCS_AREA3(AR0, AR1, AR2)                                               \
-  const scalar_t adj0 = scalar_t(adj0_ptr[lane]);                              \
-  const scalar_t adj1 = scalar_t(adj1_ptr[lane]);                              \
-  const scalar_t adj2 = scalar_t(adj2_ptr[lane]);                              \
-  const scalar_t adj3 = scalar_t(adj3_ptr[lane]);                              \
-  const scalar_t adj4 = scalar_t(adj4_ptr[lane]);                              \
-  const scalar_t adj5 = scalar_t(adj5_ptr[lane]);                              \
-  const scalar_t adj6 = scalar_t(adj6_ptr[lane]);                              \
-  const scalar_t adj7 = scalar_t(adj7_ptr[lane]);                              \
-  const scalar_t adj8 = scalar_t(adj8_ptr[lane]);                              \
-  const scalar_t ax = adj0 * (AR0) + adj3 * (AR1) + adj6 * (AR2);               \
-  const scalar_t ay = adj1 * (AR0) + adj4 * (AR1) + adj7 * (AR2);               \
-  const scalar_t az = adj2 * (AR0) + adj5 * (AR1) + adj8 * (AR2)
-
-#define SCS_AREA_AR2_0(AR0, AR1)                                               \
-  const scalar_t adj0 = scalar_t(adj0_ptr[lane]);                              \
-  const scalar_t adj1 = scalar_t(adj1_ptr[lane]);                              \
-  const scalar_t adj2 = scalar_t(adj2_ptr[lane]);                              \
-  const scalar_t adj3 = scalar_t(adj3_ptr[lane]);                              \
-  const scalar_t adj4 = scalar_t(adj4_ptr[lane]);                              \
-  const scalar_t adj5 = scalar_t(adj5_ptr[lane]);                              \
-  const scalar_t ax = adj0 * (AR0) + adj3 * (AR1);                              \
-  const scalar_t ay = adj1 * (AR0) + adj4 * (AR1);                              \
-  const scalar_t az = adj2 * (AR0) + adj5 * (AR1)
-
-#define SCS_AREA_AR1_0(AR0, AR2)                                               \
-  const scalar_t adj0 = scalar_t(adj0_ptr[lane]);                              \
-  const scalar_t adj1 = scalar_t(adj1_ptr[lane]);                              \
-  const scalar_t adj2 = scalar_t(adj2_ptr[lane]);                              \
-  const scalar_t adj6 = scalar_t(adj6_ptr[lane]);                              \
-  const scalar_t adj7 = scalar_t(adj7_ptr[lane]);                              \
-  const scalar_t adj8 = scalar_t(adj8_ptr[lane]);                              \
-  const scalar_t ax = adj0 * (AR0) + adj6 * (AR2);                              \
-  const scalar_t ay = adj1 * (AR0) + adj7 * (AR2);                              \
-  const scalar_t az = adj2 * (AR0) + adj8 * (AR2)
-
-#define SCS_AREA_AR0_0(AR1, AR2)                                               \
-  const scalar_t adj3 = scalar_t(adj3_ptr[lane]);                              \
-  const scalar_t adj4 = scalar_t(adj4_ptr[lane]);                              \
-  const scalar_t adj5 = scalar_t(adj5_ptr[lane]);                              \
-  const scalar_t adj6 = scalar_t(adj6_ptr[lane]);                              \
-  const scalar_t adj7 = scalar_t(adj7_ptr[lane]);                              \
-  const scalar_t adj8 = scalar_t(adj8_ptr[lane]);                              \
-  const scalar_t ax = adj3 * (AR1) + adj6 * (AR2);                              \
-  const scalar_t ay = adj4 * (AR1) + adj7 * (AR2);                              \
-  const scalar_t az = adj5 * (AR1) + adj8 * (AR2)
-
-#define SCS_FLUX_LANES(I, J, AREA)                                             \
-  do {                                                                         \
-    GEOM_SIMD_PRAGMA for (int lane = 0; lane < VEC_SIZE; ++lane) {             \
-      AREA;                                                                    \
-      const scalar_t uxI = in.ux##I[lane];                                     \
-      const scalar_t uxJ = in.ux##J[lane];                                     \
-      const scalar_t uyI = in.uy##I[lane];                                     \
-      const scalar_t uyJ = in.uy##J[lane];                                     \
-      const scalar_t uzI = in.uz##I[lane];                                     \
-      const scalar_t uzJ = in.uz##J[lane];                                     \
-      const scalar_t adv_x = half * (uxI + uxJ);                               \
-      const scalar_t adv_y = half * (uyI + uyJ);                               \
-      const scalar_t adv_z = half * (uzI + uzJ);                               \
-      const scalar_t mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az);      \
-      const scalar_t mdot_abs = mdot < scalar_t(0) ? -mdot : mdot;             \
-      const scalar_t mdot_pos = half * (mdot + mdot_abs);                      \
-      const scalar_t mdot_neg = half * (mdot - mdot_abs);                      \
-      const scalar_t p_mid = half * (in.p##I[lane] + in.p##J[lane]);           \
-      const scalar_t g00 = g00v[lane];                                         \
-      const scalar_t g01 = g01v[lane];                                         \
-      const scalar_t g02 = g02v[lane];                                         \
-      const scalar_t g10 = g10v[lane];                                         \
-      const scalar_t g11 = g11v[lane];                                         \
-      const scalar_t g12 = g12v[lane];                                         \
-      const scalar_t g20 = g20v[lane];                                         \
-      const scalar_t g21 = g21v[lane];                                         \
-      const scalar_t g22 = g22v[lane];                                         \
-      const scalar_t tau_x =                                                   \
-          mu * ((two * g00) * ax + (g01 + g10) * ay + (g02 + g20) * az);       \
-      const scalar_t tau_y =                                                   \
-          mu * ((g10 + g01) * ax + (two * g11) * ay + (g12 + g21) * az);       \
-      const scalar_t tau_z =                                                   \
-          mu * ((g20 + g02) * ax + (g21 + g12) * ay + (two * g22) * az);       \
-      const scalar_t fx = mdot_pos * uxI + mdot_neg * uxJ + p_mid * ax - tau_x; \
-      const scalar_t fy = mdot_pos * uyI + mdot_neg * uyJ + p_mid * ay - tau_y; \
-      const scalar_t fz = mdot_pos * uzI + mdot_neg * uzJ + p_mid * az - tau_z; \
-      out.rx##I[lane] += fx;                                                   \
-      out.ry##I[lane] += fy;                                                   \
-      out.rz##I[lane] += fz;                                                   \
-      out.rc##I[lane] += mdot;                                                 \
-      out.rx##J[lane] -= fx;                                                   \
-      out.ry##J[lane] -= fy;                                                   \
-      out.rz##J[lane] -= fz;                                                   \
-      out.rc##J[lane] -= mdot;                                                 \
-    }                                                                          \
-  } while (0)
-
-  SCS_FLUX_LANES(0, 1, SCS_AREA3(c12, c24, c24));
-  SCS_FLUX_LANES(0, 2, SCS_AREA3(c24, c12, c24));
-  SCS_FLUX_LANES(0, 3, SCS_AREA3(c24, c24, c12));
-  SCS_FLUX_LANES(1, 2, SCS_AREA_AR2_0(-c24, c24));
-  SCS_FLUX_LANES(1, 3, SCS_AREA_AR1_0(-c24, c24));
-  SCS_FLUX_LANES(2, 3, SCS_AREA_AR0_0(-c24, c24));
-
-#undef SCS_FLUX_LANES
-#undef SCS_AREA3
-#undef SCS_AREA_AR2_0
-#undef SCS_AREA_AR1_0
-#undef SCS_AREA_AR0_0
-#undef GEOM_SIMD_PRAGMA
 }
 
 static SFEM_INLINE void run_microkernel(const MeshData &d, const scalar_t rho,
@@ -485,41 +281,26 @@ static SFEM_INLINE void run_microkernel(const MeshData &d, const scalar_t rho,
                                         const ptrdiff_t begin, const int nlanes,
                                         const Tet4InputPack &in,
                                         Tet4ResidualPack &out) {
-  if (nlanes == VEC_SIZE) {
-    cvfem_tet4_ns_upwind_simd_microkernel(
-        rho, mu, aligned_geom(d.adj[0].data() + begin),
-        aligned_geom(d.adj[1].data() + begin),
-        aligned_geom(d.adj[2].data() + begin),
-        aligned_geom(d.adj[3].data() + begin),
-        aligned_geom(d.adj[4].data() + begin),
-        aligned_geom(d.adj[5].data() + begin),
-        aligned_geom(d.adj[6].data() + begin),
-        aligned_geom(d.adj[7].data() + begin),
-        aligned_geom(d.adj[8].data() + begin),
-        aligned_geom(d.det.data() + begin), in, out);
-    return;
-  }
+  cvfem_run_residual_kernel(rho, mu, d.adj[0].data() + begin,
+                            d.adj[1].data() + begin, d.adj[2].data() + begin,
+                            d.adj[3].data() + begin, d.adj[4].data() + begin,
+                            d.adj[5].data() + begin, d.adj[6].data() + begin,
+                            d.adj[7].data() + begin, d.adj[8].data() + begin,
+                            d.det.data() + begin, nlanes, in, out);
+}
 
-  alignas(ALIGN_BYTES) jacobian_t a0[VEC_SIZE], a1[VEC_SIZE], a2[VEC_SIZE],
-      a3[VEC_SIZE], a4[VEC_SIZE];
-  alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE],
-      a8[VEC_SIZE], det[VEC_SIZE];
-  const int last = nlanes - 1;
-  for (int lane = 0; lane < VEC_SIZE; ++lane) {
-    const int e = lane < nlanes ? lane : last;
-    a0[lane] = d.adj[0][begin + e];
-    a1[lane] = d.adj[1][begin + e];
-    a2[lane] = d.adj[2][begin + e];
-    a3[lane] = d.adj[3][begin + e];
-    a4[lane] = d.adj[4][begin + e];
-    a5[lane] = d.adj[5][begin + e];
-    a6[lane] = d.adj[6][begin + e];
-    a7[lane] = d.adj[7][begin + e];
-    a8[lane] = d.adj[8][begin + e];
-    det[lane] = d.det[begin + e];
-  }
-  cvfem_tet4_ns_upwind_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7,
-                                        a8, det, in, out);
+static SFEM_INLINE void run_jacobian_kernel(const MeshData &d, const scalar_t rho,
+                                            const scalar_t mu,
+                                            const ptrdiff_t begin,
+                                            const int nlanes,
+                                            const Tet4InputPack &in,
+                                            scalar_t Ke[16][16][VEC_SIZE]) {
+  cvfem_run_jacobian_kernel(rho, mu, d.adj[0].data() + begin,
+                            d.adj[1].data() + begin, d.adj[2].data() + begin,
+                            d.adj[3].data() + begin, d.adj[4].data() + begin,
+                            d.adj[5].data() + begin, d.adj[6].data() + begin,
+                            d.adj[7].data() + begin, d.adj[8].data() + begin,
+                            d.det.data() + begin, nlanes, in, Ke);
 }
 
 static SFEM_INLINE void scatter_tet4_pack(MeshData &d, const ptrdiff_t begin,
@@ -538,22 +319,22 @@ static SFEM_INLINE void scatter_tet4_pack(MeshData &d, const ptrdiff_t begin,
     const smesh::idx_t n2 = elems[2][e];
     const smesh::idx_t n3 = elems[3][e];
 
-    atomic_add(rx_ptr, n0, pack.rx0[lane]);
-    atomic_add(rx_ptr, n1, pack.rx1[lane]);
-    atomic_add(rx_ptr, n2, pack.rx2[lane]);
-    atomic_add(rx_ptr, n3, pack.rx3[lane]);
-    atomic_add(ry_ptr, n0, pack.ry0[lane]);
-    atomic_add(ry_ptr, n1, pack.ry1[lane]);
-    atomic_add(ry_ptr, n2, pack.ry2[lane]);
-    atomic_add(ry_ptr, n3, pack.ry3[lane]);
-    atomic_add(rz_ptr, n0, pack.rz0[lane]);
-    atomic_add(rz_ptr, n1, pack.rz1[lane]);
-    atomic_add(rz_ptr, n2, pack.rz2[lane]);
-    atomic_add(rz_ptr, n3, pack.rz3[lane]);
-    atomic_add(rc_ptr, n0, pack.rc0[lane]);
-    atomic_add(rc_ptr, n1, pack.rc1[lane]);
-    atomic_add(rc_ptr, n2, pack.rc2[lane]);
-    atomic_add(rc_ptr, n3, pack.rc3[lane]);
+    atomic_add(rx_ptr, n0, pack.rx[0][lane]);
+    atomic_add(rx_ptr, n1, pack.rx[1][lane]);
+    atomic_add(rx_ptr, n2, pack.rx[2][lane]);
+    atomic_add(rx_ptr, n3, pack.rx[3][lane]);
+    atomic_add(ry_ptr, n0, pack.ry[0][lane]);
+    atomic_add(ry_ptr, n1, pack.ry[1][lane]);
+    atomic_add(ry_ptr, n2, pack.ry[2][lane]);
+    atomic_add(ry_ptr, n3, pack.ry[3][lane]);
+    atomic_add(rz_ptr, n0, pack.rz[0][lane]);
+    atomic_add(rz_ptr, n1, pack.rz[1][lane]);
+    atomic_add(rz_ptr, n2, pack.rz[2][lane]);
+    atomic_add(rz_ptr, n3, pack.rz[3][lane]);
+    atomic_add(rc_ptr, n0, pack.rc[0][lane]);
+    atomic_add(rc_ptr, n1, pack.rc[1][lane]);
+    atomic_add(rc_ptr, n2, pack.rc[2][lane]);
+    atomic_add(rc_ptr, n3, pack.rc[3][lane]);
   }
 }
 
@@ -570,6 +351,77 @@ cvfem_tet4_ns_upwind_apply(MeshData &d, const scalar_t rho, const scalar_t mu) {
     gather_tet4_pack(d, begin, nlanes, in);
     run_microkernel(d, rho, mu, begin, nlanes, in, out);
     scatter_tet4_pack(d, begin, nlanes, out);
+  }
+}
+
+struct BSR4 {
+  std::shared_ptr<smesh::Mesh::NodeToNodeGraph> graph;
+  const smesh::count_t *rowptr{nullptr};
+  const smesh::idx_t *colidx{nullptr};
+  smesh::SharedBuffer<scalar_t> values;
+  ptrdiff_t nnz{0};
+};
+
+static BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
+  BSR4 b;
+  b.graph = mesh->node_to_node_graph();
+  b.rowptr = b.graph->rowptr()->data();
+  b.colidx = b.graph->colidx()->data();
+  b.nnz = b.graph->nnz();
+  b.values = smesh::create_host_buffer<scalar_t>((size_t)b.nnz * 16);
+  return b;
+}
+
+static void zero_bsr4(BSR4 &b) {
+  scalar_t *const v = b.values->data();
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t i = 0; i < b.nnz * 16; ++i)
+    v[i] = 0.0;
+}
+
+static SFEM_NOINLINE void assemble_bsr4_atomic(MeshData &d, BSR4 &b,
+                                               const scalar_t rho,
+                                               const scalar_t mu) {
+  zero_bsr4(b);
+  const ptrdiff_t ne = d.nelements;
+  smesh::idx_t **const SFEM_RESTRICT elems = d.elems;
+  scalar_t *const SFEM_RESTRICT values = b.values->data();
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t begin = 0; begin < ne; begin += VEC_SIZE) {
+    const int nlanes = int(std::min<ptrdiff_t>(ne - begin, VEC_SIZE));
+    Tet4InputPack in;
+    alignas(ALIGN_BYTES) scalar_t Ke[16][16][VEC_SIZE];
+    gather_tet4_pack(d, begin, nlanes, in);
+    run_jacobian_kernel(d, rho, mu, begin, nlanes, in, Ke);
+    for (int lane = 0; lane < nlanes; ++lane) {
+      const ptrdiff_t e = begin + lane;
+      const smesh::idx_t ev[4] = {elems[0][e], elems[1][e], elems[2][e],
+                                  elems[3][e]};
+      scalar_t ke[16 * 16];
+      cvfem_extract_ke_lane(Ke, lane, ke);
+      tet4_local_to_global_bsr4<true>(ev, ke, b.rowptr, b.colidx, values);
+    }
+  }
+}
+
+static void pack_state(const MeshData &d, std::vector<scalar_t> &x) {
+  x.resize((size_t)d.nnodes * 4);
+  for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+    x[(size_t)i * 4 + 0] = d.ux[i];
+    x[(size_t)i * 4 + 1] = d.uy[i];
+    x[(size_t)i * 4 + 2] = d.uz[i];
+    x[(size_t)i * 4 + 3] = d.p[i];
+  }
+}
+
+static void unpack_residual(const MeshData &d, std::vector<scalar_t> &r) {
+  r.resize((size_t)d.nnodes * 4);
+  for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+    r[(size_t)i * 4 + 0] = d.rx[i];
+    r[(size_t)i * 4 + 1] = d.ry[i];
+    r[(size_t)i * 4 + 2] = d.rz[i];
+    r[(size_t)i * 4 + 3] = d.rc[i];
   }
 }
 
@@ -595,6 +447,8 @@ int main(int argc, char **argv) {
   int warmup = 3;
   scalar_t rho = 1.0;
   scalar_t mu = 0.01;
+  int assemble = 0;
+  int verify_jac = 0;
 
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
@@ -608,10 +462,14 @@ int main(int argc, char **argv) {
       rho = std::atof(argv[++i]);
     else if (arg == "--mu" && i + 1 < argc)
       mu = std::atof(argv[++i]);
+    else if (arg == "--assemble")
+      assemble = 1;
+    else if (arg == "--verify-jac")
+      verify_jac = 1;
     else if (arg == "--help") {
-      std::printf(
-          "usage: %s [--n cube_cells_per_dim] [--repeat N] [--warmup N]\n",
-          argv[0]);
+      std::printf("usage: %s [--n cube_cells_per_dim] [--repeat N] [--warmup N]\n"
+                  "          [--assemble] [--verify-jac]\n",
+                  argv[0]);
       if (own_mpi)
         MPI_Finalize();
       return 0;
@@ -637,12 +495,79 @@ int main(int argc, char **argv) {
   fill_fields(d);
   precompute_affine_geometry(d);
 
-  for (int i = 0; i < warmup; ++i)
+  BSR4 bsr;
+  if (assemble || verify_jac)
+    bsr = make_bsr4(d.mesh);
+
+  if (verify_jac) {
+    assemble_bsr4_atomic(d, bsr, rho, mu);
+    std::vector<scalar_t> x0, rm, rp, dir((size_t)d.nnodes * 4, 0.0),
+        jv((size_t)d.nnodes * 4, 0.0);
+    pack_state(d, x0);
+    // Pressure probe: mixed velocity FD hits |mdot|=0 kinks in the upwind flux.
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+      dir[(size_t)i * 4 + 3] = 1.0;
+    const scalar_t eps = 1.0e-6;
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+      d.ux[i] = x0[(size_t)i * 4 + 0] - eps * dir[(size_t)i * 4 + 0];
+      d.uy[i] = x0[(size_t)i * 4 + 1] - eps * dir[(size_t)i * 4 + 1];
+      d.uz[i] = x0[(size_t)i * 4 + 2] - eps * dir[(size_t)i * 4 + 2];
+      d.p[i] = x0[(size_t)i * 4 + 3] - eps * dir[(size_t)i * 4 + 3];
+    }
     cvfem_tet4_ns_upwind_apply(d, rho, mu);
+    unpack_residual(d, rm);
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+      d.ux[i] = x0[(size_t)i * 4 + 0] + eps * dir[(size_t)i * 4 + 0];
+      d.uy[i] = x0[(size_t)i * 4 + 1] + eps * dir[(size_t)i * 4 + 1];
+      d.uz[i] = x0[(size_t)i * 4 + 2] + eps * dir[(size_t)i * 4 + 2];
+      d.p[i] = x0[(size_t)i * 4 + 3] + eps * dir[(size_t)i * 4 + 3];
+    }
+    cvfem_tet4_ns_upwind_apply(d, rho, mu);
+    unpack_residual(d, rp);
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+      d.ux[i] = x0[(size_t)i * 4 + 0];
+      d.uy[i] = x0[(size_t)i * 4 + 1];
+      d.uz[i] = x0[(size_t)i * 4 + 2];
+      d.p[i] = x0[(size_t)i * 4 + 3];
+    }
+    auto spmv = sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, scalar_t>(
+        d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(),
+        bsr.values, scalar_t(0));
+    spmv->apply(dir.data(), jv.data());
+    scalar_t max_fd = 0.0, max_diff = 0.0;
+    for (ptrdiff_t i = 0; i < d.nnodes * 4; ++i) {
+      const scalar_t fd = (rp[(size_t)i] - rm[(size_t)i]) / (2.0 * eps);
+      max_fd = std::max(max_fd, std::fabs(fd));
+      max_diff = std::max(max_diff, std::fabs(jv[(size_t)i] - fd));
+    }
+    const scalar_t rel = max_diff / std::max(max_fd, 1.0e-30);
+    std::printf("verify_jac_spmv_vs_fd_rel: %.6e\n", rel);
+    std::printf("verify_jac_spmv_vs_fd_abs: %.6e\n", max_diff);
+    if (rel > 1.0e-6) {
+      std::fprintf(stderr, "SpMV J d vs FD residual mismatch\n");
+      d.mesh.reset();
+      if (own_mpi)
+        MPI_Finalize();
+      return 1;
+    }
+  }
+
+  if (assemble) {
+    for (int i = 0; i < warmup; ++i)
+      assemble_bsr4_atomic(d, bsr, rho, mu);
+  } else {
+    for (int i = 0; i < warmup; ++i)
+      cvfem_tet4_ns_upwind_apply(d, rho, mu);
+  }
 
   const double t0 = wall_time();
-  for (int i = 0; i < repeat; ++i)
-    cvfem_tet4_ns_upwind_apply(d, rho, mu);
+  if (assemble) {
+    for (int i = 0; i < repeat; ++i)
+      assemble_bsr4_atomic(d, bsr, rho, mu);
+  } else {
+    for (int i = 0; i < repeat; ++i)
+      cvfem_tet4_ns_upwind_apply(d, rho, mu);
+  }
   const double t1 = wall_time();
 
   const double seconds = t1 - t0;
@@ -692,9 +617,28 @@ int main(int argc, char **argv) {
   std::printf("  flops_per_element_model: %.1f\n", flops_per_element);
   std::printf("  bytes_per_element_model: %.1f\n", bytes_per_element);
   std::printf("  checksum: %.16e\n", checksum(d));
+  if (assemble || verify_jac) {
+    std::printf("  bsr_nnz: %td\n", bsr.nnz);
+    std::printf("  flops_per_element_jacobian_model: %.1f\n",
+                CVFEM_JACOBIAN_FLOPS_PER_ELEMENT);
+  }
+  if (assemble) {
+    const double bytes_assemble =
+        double(bsr.nnz) * 16.0 * 8.0 +
+        double(d.nelements) * (8.0 * double(sizeof(smesh::idx_t)) +
+                               10.0 * double(sizeof(jacobian_t)) +
+                               16.0 * double(sizeof(scalar_t)));
+    std::printf("  seconds_per_assemble: %.6e\n", seconds_per_call);
+    std::printf("  MELEM/s_assemble: %.3f\n", melems);
+    std::printf("  GB/s_assemble_model: %.3f\n",
+                double(repeat) * bytes_assemble / seconds / 1.0e9);
+    std::printf("  GFLOP/s_assemble_model: %.3f\n",
+                elem_apps * CVFEM_JACOBIAN_FLOPS_PER_ELEMENT / seconds / 1.0e9);
+  }
 
   d.mesh.reset();
   if (own_mpi)
     MPI_Finalize();
   return 0;
 }
+

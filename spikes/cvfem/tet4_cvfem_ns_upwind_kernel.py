@@ -373,6 +373,219 @@ def tet4_cvfem_ns_upwind_residual(
     return rm, rc
 
 
+N_NODE = 4
+N_FIELD = 4
+N_DOF = N_NODE * N_FIELD
+
+
+def _dof(node: int, field: int) -> int:
+    return node * N_FIELD + field
+
+
+def _shape_grad_x(adj: Matrix33, inv_det: float) -> list[Vector3]:
+    """Physical TET4 shape gradients from adjugate/determinant."""
+
+    g0 = [0.0, 0.0, 0.0]
+    g1 = [0.0, 0.0, 0.0]
+    g2 = [0.0, 0.0, 0.0]
+    g3 = [0.0, 0.0, 0.0]
+    for b in range(3):
+        a0 = adj[0][b] * inv_det
+        a1 = adj[1][b] * inv_det
+        a2 = adj[2][b] * inv_det
+        g1[b] = a0
+        g2[b] = a1
+        g3[b] = a2
+        g0[b] = -(a0 + a1 + a2)
+    return [g0, g1, g2, g3]
+
+
+def tet4_cvfem_ns_upwind_jacobian(
+    geom: Tet4AffineGeometry,
+    velocity: Matrix43,
+    pressure: list[float],
+    rho: float = 1.0,
+    mu: float = 0.0,
+) -> list[list[float]]:
+    """
+    Consistent 16x16 element Jacobian, node-major:
+
+        Ke[(a * 4 + fi) * 16 + (b * 4 + fj)] = d R_{a,fi} / d u_{b,fj}
+
+    Fields: 0=ux, 1=uy, 2=uz, 3=p. Residual: rx, ry, rz, rc.
+    d|mdot|/d mdot = sign(mdot), 0 at mdot == 0.
+    Scalar rho, mu (matches the C++ spike kernel). No divergence correction.
+    """
+
+    u = _check_4x3(velocity, "velocity")
+    p = _check_4(pressure, "pressure")
+    rho_s = float(rho)
+    mu_s = float(mu)
+    adj = geom.jacobian_adjugate
+    inv_det = 1.0 / geom.jacobian_determinant
+    gx = _shape_grad_x(adj, inv_det)
+
+    ux = [u[a][0] for a in range(4)]
+    uy = [u[a][1] for a in range(4)]
+    uz = [u[a][2] for a in range(4)]
+
+    ke = [[0.0] * N_DOF for _ in range(N_DOF)]
+
+    def add_tau_derivs(ii: int, jj: int, ax: float, ay: float, az: float) -> None:
+        for k in range(4):
+            gk0, gk1, gk2 = gx[k]
+            dtx_ux = mu_s * (2.0 * gk0 * ax + gk1 * ay + gk2 * az)
+            dtx_uy = mu_s * (gk0 * ay)
+            dtx_uz = mu_s * (gk0 * az)
+            dty_ux = mu_s * (gk1 * ax)
+            dty_uy = mu_s * (gk0 * ax + 2.0 * gk1 * ay + gk2 * az)
+            dty_uz = mu_s * (gk1 * az)
+            dtz_ux = mu_s * (gk2 * ax)
+            dtz_uy = mu_s * (gk2 * ay)
+            dtz_uz = mu_s * (gk0 * ax + gk1 * ay + 2.0 * gk2 * az)
+            col_x = _dof(k, 0)
+            col_y = _dof(k, 1)
+            col_z = _dof(k, 2)
+            for row_node, sgn_f in ((ii, 1.0), (jj, -1.0)):
+                ke[_dof(row_node, 0)][col_x] -= sgn_f * dtx_ux
+                ke[_dof(row_node, 0)][col_y] -= sgn_f * dtx_uy
+                ke[_dof(row_node, 0)][col_z] -= sgn_f * dtx_uz
+                ke[_dof(row_node, 1)][col_x] -= sgn_f * dty_ux
+                ke[_dof(row_node, 1)][col_y] -= sgn_f * dty_uy
+                ke[_dof(row_node, 1)][col_z] -= sgn_f * dty_uz
+                ke[_dof(row_node, 2)][col_x] -= sgn_f * dtz_ux
+                ke[_dof(row_node, 2)][col_y] -= sgn_f * dtz_uy
+                ke[_dof(row_node, 2)][col_z] -= sgn_f * dtz_uz
+
+    for s in range(6):
+        i = SCS_LEFT[s]
+        j = SCS_RIGHT[s]
+        ax, ay, az = _scs_area_from_adjugate(adj, s)
+
+        adv_x = 0.5 * (ux[i] + ux[j])
+        adv_y = 0.5 * (uy[i] + uy[j])
+        adv_z = 0.5 * (uz[i] + uz[j])
+        mdot = rho_s * (adv_x * ax + adv_y * ay + adv_z * az)
+        mdot_abs = abs(mdot)
+        mdot_pos = 0.5 * (mdot + mdot_abs)
+        mdot_neg = 0.5 * (mdot - mdot_abs)
+        sgn = 0.0 if mdot == 0.0 else (1.0 if mdot > 0.0 else -1.0)
+        d_pos = 0.5 * (1.0 + sgn)
+        d_neg = 0.5 * (1.0 - sgn)
+
+        dmdot_dux = rho_s * 0.5 * ax
+        dmdot_duy = rho_s * 0.5 * ay
+        dmdot_duz = rho_s * 0.5 * az
+
+        def conv_col(dmdot_dq: float, duxi: float, duxj: float, duyi: float, duyj: float, duzi: float, duzj: float):
+            dpos = d_pos * dmdot_dq
+            dneg = d_neg * dmdot_dq
+            dcx = dpos * ux[i] + mdot_pos * duxi + dneg * ux[j] + mdot_neg * duxj
+            dcy = dpos * uy[i] + mdot_pos * duyi + dneg * uy[j] + mdot_neg * duyj
+            dcz = dpos * uz[i] + mdot_pos * duzi + dneg * uz[j] + mdot_neg * duzj
+            return dcx, dcy, dcz
+
+        for k in (i, j):
+            duxi = 1.0 if k == i else 0.0
+            duxj = 1.0 if k == j else 0.0
+            dcx, dcy, dcz = conv_col(dmdot_dux, duxi, duxj, 0.0, 0.0, 0.0, 0.0)
+            col = _dof(k, 0)
+            ke[_dof(i, 0)][col] += dcx
+            ke[_dof(i, 1)][col] += dcy
+            ke[_dof(i, 2)][col] += dcz
+            ke[_dof(j, 0)][col] -= dcx
+            ke[_dof(j, 1)][col] -= dcy
+            ke[_dof(j, 2)][col] -= dcz
+            ke[_dof(i, 3)][col] += dmdot_dux
+            ke[_dof(j, 3)][col] -= dmdot_dux
+
+            dcx, dcy, dcz = conv_col(dmdot_duy, 0.0, 0.0, duxi, duxj, 0.0, 0.0)
+            col = _dof(k, 1)
+            ke[_dof(i, 0)][col] += dcx
+            ke[_dof(i, 1)][col] += dcy
+            ke[_dof(i, 2)][col] += dcz
+            ke[_dof(j, 0)][col] -= dcx
+            ke[_dof(j, 1)][col] -= dcy
+            ke[_dof(j, 2)][col] -= dcz
+            ke[_dof(i, 3)][col] += dmdot_duy
+            ke[_dof(j, 3)][col] -= dmdot_duy
+
+            dcx, dcy, dcz = conv_col(dmdot_duz, 0.0, 0.0, 0.0, 0.0, duxi, duxj)
+            col = _dof(k, 2)
+            ke[_dof(i, 0)][col] += dcx
+            ke[_dof(i, 1)][col] += dcy
+            ke[_dof(i, 2)][col] += dcz
+            ke[_dof(j, 0)][col] -= dcx
+            ke[_dof(j, 1)][col] -= dcy
+            ke[_dof(j, 2)][col] -= dcz
+            ke[_dof(i, 3)][col] += dmdot_duz
+            ke[_dof(j, 3)][col] -= dmdot_duz
+
+        dp_mid = 0.5
+        for k in (i, j):
+            col = _dof(k, 3)
+            ke[_dof(i, 0)][col] += dp_mid * ax
+            ke[_dof(i, 1)][col] += dp_mid * ay
+            ke[_dof(i, 2)][col] += dp_mid * az
+            ke[_dof(j, 0)][col] -= dp_mid * ax
+            ke[_dof(j, 1)][col] -= dp_mid * ay
+            ke[_dof(j, 2)][col] -= dp_mid * az
+
+        add_tau_derivs(i, j, ax, ay, az)
+
+    return ke
+
+
+def _residual_dof_vector(
+    geom: Tet4AffineGeometry,
+    velocity: Matrix43,
+    pressure: list[float],
+    rho: float,
+    mu: float,
+) -> list[float]:
+    rm, rc = tet4_cvfem_ns_upwind_residual(geom, velocity, pressure, rho=rho, mu=mu)
+    out = [0.0] * N_DOF
+    for a in range(4):
+        out[_dof(a, 0)] = rm[a][0]
+        out[_dof(a, 1)] = rm[a][1]
+        out[_dof(a, 2)] = rm[a][2]
+        out[_dof(a, 3)] = rc[a]
+    return out
+
+
+def _fd_jacobian(
+    geom: Tet4AffineGeometry,
+    velocity: Matrix43,
+    pressure: list[float],
+    rho: float,
+    mu: float,
+    eps: float,
+) -> list[list[float]]:
+    u0 = [[velocity[a][c] for c in range(3)] for a in range(4)]
+    p0 = list(pressure)
+    ke = [[0.0] * N_DOF for _ in range(N_DOF)]
+    inv_2eps = 0.5 / eps
+    for col in range(N_DOF):
+        node = col // N_FIELD
+        field = col % N_FIELD
+
+        u_plus = [[u0[a][c] for c in range(3)] for a in range(4)]
+        p_plus = list(p0)
+        u_minus = [[u0[a][c] for c in range(3)] for a in range(4)]
+        p_minus = list(p0)
+        if field < 3:
+            u_plus[node][field] += eps
+            u_minus[node][field] -= eps
+        else:
+            p_plus[node] += eps
+            p_minus[node] -= eps
+        r_plus = _residual_dof_vector(geom, u_plus, p_plus, rho, mu)
+        r_minus = _residual_dof_vector(geom, u_minus, p_minus, rho, mu)
+        for row in range(N_DOF):
+            ke[row][col] = (r_plus[row] - r_minus[row]) * inv_2eps
+    return ke
+
+
 def tet4_kernel_cost_model() -> dict[str, float]:
     """Scalar add/mul/div model matching cvfem_tet4_ns_upwind_simd_microkernel.
 
@@ -477,6 +690,40 @@ def run_self_tests() -> None:
     _assert_vec_close(_sum_cols_4x3(rm), [0.0, 0.0, 0.0], 1e-13, "momentum conservation")
     _assert_close(sum(rc), 0.0, 1e-13, "continuity conservation")
     _assert_close(tet4_kernel_cost_model()["total_flops"], 562.0, 0.0, "folded kernel flop model")
+
+    rho_j = 1.0
+    mu_j = 0.01
+    ke = tet4_cvfem_ns_upwind_jacobian(geom, velocity, pressure, rho=rho_j, mu=mu_j)
+    ke_fd = _fd_jacobian(geom, velocity, pressure, rho_j, mu_j, 1.0e-6)
+    max_abs = 0.0
+    ke_scale = 0.0
+    for row in range(N_DOF):
+        for col in range(N_DOF):
+            ke_scale = max(ke_scale, abs(ke[row][col]), abs(ke_fd[row][col]))
+            max_abs = max(max_abs, abs(ke[row][col] - ke_fd[row][col]))
+    rel_norm = max_abs / max(ke_scale, 1.0e-30)
+    if rel_norm > 1.0e-8:
+        raise AssertionError(f"analytical vs FD Jacobian rel {rel_norm}, abs {max_abs}")
+
+    for col in range(N_DOF):
+        for fi in range(3):
+            row_sum = sum(ke[_dof(a, fi)][col] for a in range(4))
+            _assert_close(row_sum, 0.0, 1e-12, f"momentum Jacobian column {col} field {fi}")
+        cont_sum = sum(ke[_dof(a, 3)][col] for a in range(4))
+        _assert_close(cont_sum, 0.0, 1e-12, f"continuity Jacobian column {col}")
+
+    v0 = [[0.0, 0.0, 0.0] for _ in range(4)]
+    ke0 = tet4_cvfem_ns_upwind_jacobian(geom, v0, pressure, rho=rho_j, mu=mu_j)
+    ke0_fd = _fd_jacobian(geom, v0, pressure, rho_j, mu_j, 1.0e-6)
+    max_abs0 = 0.0
+    ke0_scale = 0.0
+    for row in range(N_DOF):
+        for col in range(N_DOF):
+            ke0_scale = max(ke0_scale, abs(ke0[row][col]), abs(ke0_fd[row][col]))
+            max_abs0 = max(max_abs0, abs(ke0[row][col] - ke0_fd[row][col]))
+    rel_norm0 = max_abs0 / max(ke0_scale, 1.0e-30)
+    if rel_norm0 > 1.0e-5:
+        raise AssertionError(f"zero-velocity (kink) Jacobian rel {rel_norm0}, abs {max_abs0}")
 
 
 def _print_matrix(name: str, a: list[list[float]]) -> None:
