@@ -11,6 +11,7 @@ python/spike/run_nitsche_contact.sh and plans/NITSCHE_CONTACT.md.
 from __future__ import annotations
 
 import argparse
+import copy
 import os
 import sys
 
@@ -44,9 +45,15 @@ def _load_pysfem():
 
 
 TRI3_SIDES = np.array([[0, 1], [1, 2], [2, 0]], dtype=np.int32)
-# Simpson on [0, 1] includes vertices so the Hertz point x=0 is sampled.
-# 2-point Gauss sits on coarse TRI3 chords inside the circle and can miss contact.
-QUAD_1D = ((0.0, 1.0 / 6.0), (0.5, 4.0 / 6.0), (1.0, 1.0 / 6.0))
+# 3-point Gauss–Legendre on [0, 1] (weights sum to 1). Used to average the
+# gap to one P0 traction per EDGE2 (staircase). Collocating γg at each QP
+# checkerboards a P1 trace. --lagrange still uses one midpoint (edge_rows).
+_GL3 = np.sqrt(3.0 / 5.0)
+QUAD_1D = (
+    (0.5 * (1.0 - _GL3), 5.0 / 18.0),
+    (0.5, 8.0 / 18.0),
+    (0.5 * (1.0 + _GL3), 5.0 / 18.0),
+)
 
 
 def lame(E, nu, plane_strain=True):
@@ -112,6 +119,36 @@ def sideset_edges(ps, mesh, sideset):
     return edges, elems, bid
 
 
+def unique_oriented_edges(edges, elems):
+    seen = {}
+    keep = []
+    for i, (n0, n1) in enumerate(edges):
+        key = (min(int(n0), int(n1)), max(int(n0), int(n1)))
+        if key in seen:
+            continue
+        seen[key] = i
+        keep.append(i)
+    if not keep:
+        return edges[:0], elems[:0]
+    idx = np.asarray(keep, dtype=np.int32)
+    return edges[idx], elems[idx]
+
+
+def symmetrize_tri3_square_diagonals(ps, mesh, nx, ny, block_id=0):
+    """Mirror TRI3 diagonals about the parametric midline so P0 σ_n is even in x."""
+    c0 = np.array(ps.elements(mesh, 0, block_id), copy=False)
+    c1 = np.array(ps.elements(mesh, 1, block_id), copy=False)
+    c2 = np.array(ps.elements(mesh, 2, block_id), copy=False)
+    mid = (int(nx) + 1) // 2
+    for yi in range(int(ny)):
+        for xi in range(mid, int(nx)):
+            e = 2 * (yi * int(nx) + xi)
+            i0, i1, i3 = int(c0[e]), int(c1[e]), int(c2[e])
+            i2 = int(c1[e + 1])
+            c0[e], c1[e], c2[e] = i0, i1, i2
+            c0[e + 1], c1[e + 1], c2[e + 1] = i0, i2, i3
+
+
 def unique_nodes_from_edges(edges):
     return np.unique(edges.reshape(-1))
 
@@ -151,16 +188,29 @@ def map_square_to_hemi_annulus(ps, mesh, r_in, r_out):
     xi = (x - xmin) / max(xmax - xmin, 1e-30)
     eta = (y - ymin) / max(ymax - ymin, 1e-30)
     r = r_in + eta * (r_out - r_in)
-    th = np.pi * xi
+    # θ = π(1−ξ) keeps TRI3 orientation. θ=πξ has Jacobian −π r Δr and
+    # flips the obstacle stiffness sign, so contact tension is cheaper
+    # than compression and the block is sucked into the cylinder.
+    th = np.pi * (1.0 - xi)
     x[:] = r * np.cos(th)
     y[:] = r * np.sin(th)
 
 
+def tri3_signed_areas(tris, X, Y):
+    x0, y0 = X[tris[:, 0]], Y[tris[:, 0]]
+    x1, y1 = X[tris[:, 1]], Y[tris[:, 1]]
+    x2, y2 = X[tris[:, 2]], Y[tris[:, 2]]
+    return 0.5 * ((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0))
+
+
 def make_hertz_mesh(ps, nx, ny, radius, r_in, width, height, gap):
+    ny_b = max(2, ny // 2)
     block = ps.create_tri3_square(
-        nx, max(2, ny // 2), -0.5 * width, radius + gap, 0.5 * width, radius + gap + height
+        nx, ny_b, -0.5 * width, radius + gap, 0.5 * width, radius + gap + height
     )
     obstacle = ps.create_tri3_square(nx, ny, 0.0, 0.0, 1.0, 1.0)
+    symmetrize_tri3_square_diagonals(ps, block, nx, ny_b)
+    symmetrize_tri3_square_diagonals(ps, obstacle, nx, ny)
     map_square_to_hemi_annulus(ps, obstacle, r_in, radius)
     n_block = int(block.n_nodes())
     mesh = ps.join_meshes(block, obstacle, "block", "obstacle")
@@ -170,6 +220,11 @@ def make_hertz_mesh(ps, nx, ny, radius, r_in, width, height, gap):
         raise RuntimeError(
             f"hemi-annulus mapping failed: obstacle r in [{r.min():.3g}, {r.max():.3g}], expected ~[{r_in:.3g}, {radius:.3g}]"
         )
+    for bid, name in enumerate(("block", "obstacle")):
+        areas = tri3_signed_areas(block_triangles(ps, mesh, bid), X, Y)
+        amin = float(np.min(areas)) if areas.size else 0.0
+        if areas.size == 0 or amin <= 0.0:
+            raise RuntimeError(f"{name} TRI3 inverted (min area {amin:.3g})")
     return mesh, n_block
 
 
@@ -191,6 +246,35 @@ def edge_geometry(X, Y, n0, n1):
         return 0.0, 0.0, 0.0, 0.0
     nx, ny = ty / length, -tx / length
     return length, nx, ny, 1.0
+
+
+def pair_on_x(x_query, X, Y, edges):
+    """Opposing point on a nearly-horizontal trace, parametrized by x.
+
+    Euclidean closest-point from the cylinder equator snaps to the block
+    corners and reports a bogus negative gap, so unbiased Nitsche glues
+    the sides of the obstacle to the block.
+    """
+    best = None
+    best_span = np.inf
+    for n0, n1 in edges:
+        n0 = int(n0)
+        n1 = int(n1)
+        x0 = float(X[n0])
+        x1 = float(X[n1])
+        lo, hi = (x0, x1) if x0 <= x1 else (x1, x0)
+        if x_query < lo - 1e-14 or x_query > hi + 1e-14:
+            continue
+        span = hi - lo
+        if span > best_span:
+            continue
+        t = 0.0 if abs(x1 - x0) < 1e-30 else (x_query - x0) / (x1 - x0)
+        t = float(np.clip(t, 0.0, 1.0))
+        qx = x0 + t * (x1 - x0)
+        qy = float(Y[n0]) + t * (float(Y[n1]) - float(Y[n0]))
+        best = (n0, n1, t, qx, qy)
+        best_span = span
+    return best
 
 
 def closest_on_edges(px, py, X, Y, edges):
@@ -218,13 +302,47 @@ def project_to_circle(px, py, R):
     return px * s, py * s
 
 
+def master_on_circle(px, py, X, Y, edges, R):
+    """Pair to the analytic circle; interpolate u on the arc by angle.
+
+    Euclidean closest-point on TRI3 chords snaps to vertices (chords lie
+    inside the circle), so every near-crown slave QP dumps its force onto
+    the single crown node and the mesh pinches into a V.
+    """
+    qx, qy = project_to_circle(px, py, R)
+    th = float(np.arctan2(qy, qx))
+    best = None
+    best_span = np.inf
+    for n0, n1 in edges:
+        n0 = int(n0)
+        n1 = int(n1)
+        t0 = float(np.arctan2(Y[n0], X[n0]))
+        t1 = float(np.arctan2(Y[n1], X[n1]))
+        lo, hi = (t0, t1) if t0 <= t1 else (t1, t0)
+        span = hi - lo
+        if span > np.pi or span <= 0.0:
+            continue
+        if th < lo - 1e-14 or th > hi + 1e-14:
+            continue
+        if span > best_span:
+            continue
+        if abs(t1 - t0) < 1e-30:
+            t = 0.0
+        else:
+            t = (th - t0) / (t1 - t0)
+        best = (n0, n1, float(np.clip(t, 0.0, 1.0)), qx, qy)
+        best_span = span
+    if best is None:
+        m0, m1, t, _, _ = closest_on_edges(qx, qy, X, Y, edges)
+        return m0, m1, t, qx, qy
+    return best
+
+
 def closest_contact_point(px, py, X, Y, edges, circle_R):
     """Closest point on the other surface. Circle radius avoids TRI3 chord glue."""
     if circle_R is None or circle_R <= 0:
         return closest_on_edges(px, py, X, Y, edges)
-    qx, qy = project_to_circle(px, py, circle_R)
-    m0, m1, t, _, _ = closest_on_edges(qx, qy, X, Y, edges)
-    return m0, m1, t, qx, qy
+    return master_on_circle(px, py, X, Y, edges, circle_R)
 
 
 def tri3_parent_nodes(ps, mesh, block_id, e):
@@ -265,6 +383,46 @@ def tri3_sigma_n(px, py, u_elem, mu, lam, nx, ny):
     return sn, dsn
 
 
+def collect_edge_qps(X, Y, u, n0, n1, length, nx0, ny0, other_edges, circle_R, snap_self_circle):
+    """Quadrature samples on one EDGE2. Pairing may skip a QP with no opposite face."""
+    samples = []
+    for xi, w_hat in QUAD_1D:
+        w = w_hat * length
+        Na, Nb = 1.0 - xi, xi
+        xref = Na * X[n0] + Nb * X[n1]
+        yref = Na * Y[n0] + Nb * Y[n1]
+        pxp = xref + Na * u[2 * n0] + Nb * u[2 * n1]
+        pyp = yref + Na * u[2 * n0 + 1] + Nb * u[2 * n1 + 1]
+        nx, ny = nx0, ny0
+        tx, ty = -ny, nx
+        if snap_self_circle:
+            rn = float(np.hypot(xref, yref))
+            if rn > 1e-30:
+                nx, ny = xref / rn, yref / rn
+                tx, ty = -ny, nx
+            paired = pair_on_x(xref, X, Y, other_edges)
+            if paired is None:
+                continue
+            m0, m1, t, qx, qy = paired
+        else:
+            m0, m1, t, qx, qy = closest_contact_point(
+                pxp, pyp, X, Y, other_edges, circle_R
+            )
+            if circle_R:
+                rn = float(np.hypot(qx, qy))
+                if rn > 1e-30:
+                    nx, ny = -qx / rn, -qy / rn
+                    tx, ty = -ny, nx
+        Nm0, Nm1 = 1.0 - t, t
+        uqx = Nm0 * u[2 * m0] + Nm1 * u[2 * m1]
+        uqy = Nm0 * u[2 * m0 + 1] + Nm1 * u[2 * m1 + 1]
+        g = (qx + uqx - pxp) * nx + (qy + uqy - pyp) * ny
+        samples.append(
+            (w, xi, g, nx, ny, tx, ty, Na, Nb, int(m0), int(m1), Nm0, Nm1, xref)
+        )
+    return samples
+
+
 def contact_trace(
     X,
     Y,
@@ -282,16 +440,16 @@ def contact_trace(
     circle_R,
     include_sigma,
     snap_self_circle=False,
+    g_open=0.0,
 ):
-    """Cauchy σ_n and applied contact traction on every contact quadrature point."""
-    xs, gs, sns, pns, active = [], [], [], [], []
+    """Cauchy σ_n and applied contact traction, one P0 value per EDGE2."""
+    xs, gs, sns, pns, active, xis, ws = [], [], [], [], [], [], []
     for edge, e_parent in zip(edges, parent_elems):
         n0, n1 = int(edge[0]), int(edge[1])
         length, nx0, ny0 = edge_geometry(X, Y, n0, n1)[:3]
         if length <= 1e-16:
             continue
-        h = length
-        gamma = gamma0 * mu / h
+        gamma = gamma0 * mu / length
         parent_nodes = tri3_parent_nodes(ps, mesh, parent_block, int(e_parent))
         px = np.array([X[i] for i in parent_nodes])
         py = np.array([Y[i] for i in parent_nodes])
@@ -299,39 +457,38 @@ def contact_trace(
         for a, node in enumerate(parent_nodes):
             u_elem[2 * a] = u[2 * node]
             u_elem[2 * a + 1] = u[2 * node + 1]
-        for xi, _ in QUAD_1D:
-            nx, ny = nx0, ny0
-            Na, Nb = 1.0 - xi, xi
-            pxp = Na * X[n0] + Nb * X[n1]
-            pyp = Na * Y[n0] + Nb * Y[n1]
-            if snap_self_circle and circle_R:
-                pxp, pyp = project_to_circle(pxp, pyp, circle_R)
-                rn = float(np.hypot(pxp, pyp))
-                if rn > 1e-30:
-                    nx, ny = pxp / rn, pyp / rn
-            m0, m1, t, qx, qy = closest_contact_point(
-                pxp, pyp, X, Y, other_edges, None if snap_self_circle else circle_R
-            )
-            Nm0, Nm1 = 1.0 - t, t
-            upx = Na * u[2 * n0] + Nb * u[2 * n1]
-            upy = Na * u[2 * n0 + 1] + Nb * u[2 * n1 + 1]
-            uqx = Nm0 * u[2 * m0] + Nm1 * u[2 * m1]
-            uqy = Nm0 * u[2 * m0 + 1] + Nm1 * u[2 * m1 + 1]
-            g = (qx - pxp + uqx - upx) * nx + (qy - pyp + uqy - upy) * ny
-            sn, _ = tri3_sigma_n(px, py, u_elem, mu, lam, nx, ny)
-            Pn = (theta * sn if include_sigma else 0.0) + gamma * g
-            on = g < 0.0
-            xs.append(pxp)
-            gs.append(g)
-            sns.append(sn)
-            pns.append(Pn if on else 0.0)
-            active.append(on)
+        samples = collect_edge_qps(
+            X, Y, u, n0, n1, length, nx0, ny0, other_edges, circle_R, snap_self_circle
+        )
+        if not samples:
+            continue
+        w_int = 0.0
+        g_int = 0.0
+        mid = samples[0]
+        for s in samples:
+            w_int += s[0]
+            g_int += s[0] * s[2]
+            if abs(s[1] - 0.5) < abs(mid[1] - 0.5):
+                mid = s
+        g_bar = g_int / w_int
+        sn, _ = tri3_sigma_n(px, py, u_elem, mu, lam, mid[3], mid[4])
+        Pn = (theta * sn if include_sigma else 0.0) + gamma * g_bar
+        on = Pn < 0.0
+        xs.append(0.5 * (X[n0] + X[n1]))
+        gs.append(g_bar)
+        sns.append(sn)
+        pns.append(Pn if on else 0.0)
+        active.append(on)
+        xis.append(0.5)
+        ws.append(w_int)
     return (
         np.asarray(xs),
         np.asarray(gs),
         np.asarray(sns),
         np.asarray(pns),
         np.asarray(active, dtype=bool),
+        np.asarray(xis),
+        np.asarray(ws),
     )
 
 
@@ -361,24 +518,24 @@ def surface_contrib(
     qp_out=None,
     assemble=True,
     include_sigma=True,
+    forced_active=None,
+    status_out=None,
+    gap_rows_out=None,
 ):
     """Unbiased Nitsche residual/tangent on one contact surface (paper P_{γ,θ}).
 
-    Unilateral Signorini: assemble only where the geometric gap is negative.
-    No freeze / hysteresis (those are bilateral glue). Pair to a circle of
-    radius circle_R so TRI3 chords cannot glue the block onto interior vertices.
+    Unilateral: assemble [P]_- . Gap is sampled with Gauss–Legendre then averaged
+    to one P0 P=θσ_n+γḡ per EDGE2 (staircase, not a P1 checkerboard).
     """
     if new_active is None:
         new_active = set()
     n_active = 0
     for ie, (edge, e_parent) in enumerate(zip(edges, parent_elems)):
         n0, n1 = int(edge[0]), int(edge[1])
-        length, nx, ny = edge_geometry(X, Y, n0, n1)[:3]
+        length, nx0, ny0 = edge_geometry(X, Y, n0, n1)[:3]
         if length <= 1e-16:
             continue
-        tx, ty = -ny, nx
-        h = length
-        gamma = gamma0 * mu / h
+        gamma = gamma0 * mu / length
         parent_nodes = tri3_parent_nodes(ps, mesh, parent_block, int(e_parent))
         px = np.array([X[i] for i in parent_nodes])
         py = np.array([Y[i] for i in parent_nodes])
@@ -386,98 +543,109 @@ def surface_contrib(
         for a, node in enumerate(parent_nodes):
             u_elem[2 * a] = u[2 * node]
             u_elem[2 * a + 1] = u[2 * node + 1]
+        samples = collect_edge_qps(
+            X, Y, u, n0, n1, length, nx0, ny0, other_edges, circle_R, snap_self_circle
+        )
+        if not samples:
+            continue
+        w_int = 0.0
+        g_int = 0.0
+        gt_int = 0.0
+        dg_bar = {}
+        mid = samples[0]
 
-        for iq, (xi, w_hat) in enumerate(QUAD_1D):
-            w = w_hat * length
-            Na = 1.0 - xi
-            Nb = xi
-            pxp = Na * X[n0] + Nb * X[n1]
-            pyp = Na * Y[n0] + Nb * Y[n1]
-            if snap_self_circle and circle_R:
-                pxp, pyp = project_to_circle(pxp, pyp, circle_R)
-                rn = float(np.hypot(pxp, pyp))
-                if rn > 1e-30:
-                    nx, ny = pxp / rn, pyp / rn
-                    tx, ty = -ny, nx
-            m0, m1, t, qx, qy = closest_contact_point(
-                pxp, pyp, X, Y, other_edges, None if snap_self_circle else circle_R
-            )
-            Nm0, Nm1 = 1.0 - t, t
-            upx = Na * u[2 * n0] + Nb * u[2 * n1]
-            upy = Na * u[2 * n0 + 1] + Nb * u[2 * n1 + 1]
-            uqx = Nm0 * u[2 * m0] + Nm1 * u[2 * m1]
-            uqy = Nm0 * u[2 * m0 + 1] + Nm1 * u[2 * m1 + 1]
-            # Frozen reference pairing/normal. g > 0 when separated, so
-            # [u]_n = -g and P = θ σ_n - γ [u]_n = θ σ_n + γ g (paper).
-            g = (qx - pxp + uqx - upx) * nx + (qy - pyp + uqy - upy) * ny
-            # Unilateral: force only while overlapping. No freeze / hysteresis
-            # (glue) and no P_n filter that would leave penetration unloaded.
-            if g >= 0.0:
-                continue
-            sn, dsn = tri3_sigma_n(px, py, u_elem, mu, lam, nx, ny)
-            Pn = (theta * sn if include_sigma else 0.0) + gamma * g
-            key = (surface_id, ie, iq)
-            new_active.add(key)
-            n_active += 1
-            scale = (1.0 / theta) * (1.0 / gamma) * w
-            if energy_acc is not None:
-                energy_acc[0] += 0.5 * scale * Pn * Pn
-            if qp_out is not None:
-                qp_out.append((pxp, g, Pn))
-            if not assemble:
-                continue
-            local_nodes = [n0, n1, m0, m1]
-            Nself = [Na, Nb, 0.0, 0.0]
-            Nother = [0.0, 0.0, Nm0, Nm1]
-            pv = {}
+        def add_dg(dof, val):
+            if val == 0.0:
+                return
+            dg_bar[dof] = dg_bar.get(dof, 0.0) + val
 
-            def add_pv(node, comp, val):
-                if val == 0.0:
-                    return
-                dof = 2 * int(node) + comp
+        for w, xi, g, nx, ny, tx, ty, Na, Nb, m0, m1, Nm0, Nm1, xref in samples:
+            w_int += w
+            g_int += w * g
+            if abs(xi - 0.5) < abs(mid[1] - 0.5):
+                mid = (w, xi, g, nx, ny, tx, ty, Na, Nb, m0, m1, Nm0, Nm1, xref)
+            add_dg(2 * n0, w * (-Na * nx))
+            add_dg(2 * n0 + 1, w * (-Na * ny))
+            add_dg(2 * n1, w * (-Nb * nx))
+            add_dg(2 * n1 + 1, w * (-Nb * ny))
+            add_dg(2 * m0, w * (Nm0 * nx))
+            add_dg(2 * m0 + 1, w * (Nm0 * ny))
+            add_dg(2 * m1, w * (Nm1 * nx))
+            add_dg(2 * m1 + 1, w * (Nm1 * ny))
+            if friction:
+                pxp = (1.0 - xi) * (X[n0] + u[2 * n0]) + xi * (X[n1] + u[2 * n1])
+                pyp = (1.0 - xi) * (Y[n0] + u[2 * n0 + 1]) + xi * (Y[n1] + u[2 * n1 + 1])
+                qdx = Nm0 * (X[m0] + u[2 * m0]) + Nm1 * (X[m1] + u[2 * m1]) - pxp
+                qdy = Nm0 * (Y[m0] + u[2 * m0 + 1]) + Nm1 * (Y[m1] + u[2 * m1 + 1]) - pyp
+                gt_int += w * (qdx * tx + qdy * ty)
+        inv_w = 1.0 / w_int
+        g_bar = g_int * inv_w
+        for dof in list(dg_bar.keys()):
+            dg_bar[dof] *= inv_w
+        sn, dsn = tri3_sigma_n(px, py, u_elem, mu, lam, mid[3], mid[4])
+        Pn = (theta * sn if include_sigma else 0.0) + gamma * g_bar
+        key = (surface_id, ie, 0)
+        xref_mid = 0.5 * (X[n0] + X[n1])
+        if gap_rows_out is not None:
+            gap_rows_out.append((key, float(g_bar), float(xref_mid), dict(dg_bar), float(w_int)))
+        if status_out is not None:
+            status_out[key] = (g_bar, Pn, xref_mid)
+        if forced_active is None:
+            on = Pn < 0.0
+        else:
+            on = key in forced_active
+        if not on:
+            continue
+        new_active.add(key)
+        n_active += 1
+        scale = (1.0 / theta) * (1.0 / gamma) * w_int
+        if energy_acc is not None:
+            energy_acc[0] += 0.5 * scale * Pn * Pn
+        if qp_out is not None:
+            qp_out.append((xref_mid, g_bar, Pn))
+        if not assemble:
+            continue
+        pv = {}
+        for dof, dgd in dg_bar.items():
+            val = gamma * dgd
+            if val != 0.0:
                 pv[dof] = pv.get(dof, 0.0) + val
+        if include_sigma:
+            for a, node in enumerate(parent_nodes):
+                node = int(node)
+                pv[2 * node] = pv.get(2 * node, 0.0) + theta * dsn[2 * a]
+                pv[2 * node + 1] = pv.get(2 * node + 1, 0.0) + theta * dsn[2 * a + 1]
+        for dof, pvi in pv.items():
+            residual[dof] += scale * Pn * pvi
+        for di, pi in pv.items():
+            for dj, pj in pv.items():
+                val = scale * pi * pj
+                if val != 0.0:
+                    coo.append((di, dj, val))
 
-            add_pv(n0, 0, gamma * (-Na * nx))
-            add_pv(n0, 1, gamma * (-Na * ny))
-            add_pv(n1, 0, gamma * (-Nb * nx))
-            add_pv(n1, 1, gamma * (-Nb * ny))
-            add_pv(m0, 0, gamma * (Nm0 * nx))
-            add_pv(m0, 1, gamma * (Nm0 * ny))
-            add_pv(m1, 0, gamma * (Nm1 * nx))
-            add_pv(m1, 1, gamma * (Nm1 * ny))
-            if include_sigma:
-                for a, node in enumerate(parent_nodes):
-                    add_pv(int(node), 0, theta * dsn[2 * a])
-                    add_pv(int(node), 1, theta * dsn[2 * a + 1])
-
-            for dof, pvi in pv.items():
-                residual[dof] += scale * Pn * pvi
-            for di, pi in pv.items():
-                for dj, pj in pv.items():
-                    val = scale * pi * pj
-                    if val != 0.0:
-                        coo.append((di, dj, val))
-
-            if not friction:
-                continue
-
-            gt = (qx - pxp + uqx - upx) * tx + (qy - pyp + uqy - upy) * ty
-            Pt = -gamma * gt
-            for k in range(4):
-                for c in range(2):
-                    tv = (Nself[k] - Nother[k]) * (tx if c == 0 else ty)
-                    residual[2 * local_nodes[k] + c] += w * Pt * tv
-            for i in range(4):
-                for ci in range(2):
-                    tvi = (Nself[i] - Nother[i]) * (tx if ci == 0 else ty)
-                    row = 2 * local_nodes[i] + ci
-                    for j in range(4):
-                        for cj in range(2):
-                            tvj = (Nself[j] - Nother[j]) * (tx if cj == 0 else ty)
-                            col = 2 * local_nodes[j] + cj
-                            val = w * gamma * tvi * tvj
-                            if val != 0.0:
-                                coo.append((row, col, val))
+        if not friction:
+            continue
+        gt_bar = gt_int * inv_w
+        Pt = -gamma * gt_bar
+        tx, ty = mid[5], mid[6]
+        local_nodes = [n0, n1, mid[9], mid[10]]
+        Nself = [0.5, 0.5, 0.0, 0.0]
+        Nother = [0.0, 0.0, 0.5, 0.5]
+        for k in range(4):
+            for c in range(2):
+                tv = (Nself[k] - Nother[k]) * (tx if c == 0 else ty)
+                residual[2 * local_nodes[k] + c] += w_int * Pt * tv
+        for i in range(4):
+            for ci in range(2):
+                tvi = (Nself[i] - Nother[i]) * (tx if ci == 0 else ty)
+                row = 2 * local_nodes[i] + ci
+                for j in range(4):
+                    for cj in range(2):
+                        tvj = (Nself[j] - Nother[j]) * (tx if cj == 0 else ty)
+                        col = 2 * local_nodes[j] + cj
+                        val = w_int * gamma * tvi * tvj
+                        if val != 0.0:
+                            coo.append((row, col, val))
     return n_active
 
 
@@ -556,7 +724,7 @@ def solve_nitsche(ps, args):
     ss_contact_obs = sidesets_from_selector(
         ps,
         mesh,
-        lambda x, y, z: bool(np.hypot(x, y) > 0.85 * radius) and bool(y > 0.05 * radius),
+        lambda x, y, z: bool(np.hypot(x, y) > 0.98 * radius) and bool(y > 0.05 * radius),
         ["obstacle"],
     )
     ss_diam = sidesets_from_selector(
@@ -617,18 +785,30 @@ def solve_nitsche(ps, args):
         edges_o = np.vstack([edges_o, e])
         elems_o = np.concatenate([elems_o, p])
 
-    r_tol = max(4 * tol, 0.05 * radius)
-    edges_b, elems_b = filter_edges(
-        X, Y, edges_b, elems_b, lambda n0, n1: Y[n0] < y_bot + 4 * tol and Y[n1] < y_bot + 4 * tol
-    )
-    edges_o, elems_o = filter_edges(
-        X,
-        Y,
-        edges_o,
-        elems_o,
-        lambda n0, n1: abs(np.hypot(X[n0], Y[n0]) - radius) <= r_tol
-        and abs(np.hypot(X[n1], Y[n1]) - radius) <= r_tol,
-    )
+    dr = (1.0 - args.r_inner) * radius / max(args.ny, 1)
+    r_tol = min(0.35 * dr, 0.02 * radius)
+    x_face = 0.5 * args.width + 4 * tol
+
+    def is_block_bottom(n0, n1):
+        return Y[n0] < y_bot + 4 * tol and Y[n1] < y_bot + 4 * tol
+
+    def is_outer_arc(n0, n1):
+        r0 = float(np.hypot(X[n0], Y[n0]))
+        r1 = float(np.hypot(X[n1], Y[n1]))
+        if abs(r0 - radius) > r_tol or abs(r1 - radius) > r_tol:
+            return False
+        if abs(r0 - r1) > 0.5 * r_tol:
+            return False
+        if abs(X[n0]) > x_face or abs(X[n1]) > x_face:
+            return False
+        if Y[n0] < 0.5 * radius or Y[n1] < 0.5 * radius:
+            return False
+        return True
+
+    edges_b, elems_b = filter_edges(X, Y, edges_b, elems_b, is_block_bottom)
+    edges_o, elems_o = filter_edges(X, Y, edges_o, elems_o, is_outer_arc)
+    edges_b, elems_b = unique_oriented_edges(edges_b, elems_b)
+    edges_o, elems_o = unique_oriented_edges(edges_o, elems_o)
     if edges_b.size == 0 or edges_o.size == 0:
         raise RuntimeError(
             f"empty contact edges after filter: block={edges_b.shape} obstacle={edges_o.shape}"
@@ -636,48 +816,50 @@ def solve_nitsche(ps, args):
     edges_b = orient_edges(X, Y, edges_b, "down")
     edges_o = orient_edges(X, Y, edges_o, "outward")
 
-    # Two-body Hertz: Nitsche/penalty on the block (slave). The obstacle is
-    # still elastic through u_q in the gap. The paper σ_n term (P = θσ_n+γg)
-    # makes the Newton step want g>0 (adhesion) on this coarse pairing; the
-    # default two-body form is geometric penalty P=γg. Rigid obstacle keeps
-    # full Nitsche. --nitsche-stress / --unbiased restore σ_n.
-    theta_b, theta_o = 1.0, 0.0
-    if args.unbiased and not args.rigid_obstacle and not args.rigid_block:
-        theta_b, theta_o = 0.5, 0.5
+    # Default two-body: unbiased Nitsche (Mlika–Renard–Chouly), θ=1/2 on both
+    # surfaces, P = θ σ_n + γ g. Rigid obstacle/block is one-sided Nitsche.
+    # `--biased` / `--penalty` / `--lagrange` opt out.
     if args.rigid_block and not args.rigid_obstacle:
         theta_b, theta_o = 0.0, 1.0
-    include_sigma = bool(
-        args.rigid_obstacle or args.rigid_block or args.unbiased or args.nitsche_stress
-    )
+    elif args.rigid_obstacle or args.biased or args.penalty or args.lagrange:
+        theta_b, theta_o = 1.0, 0.0
+    else:
+        theta_b, theta_o = 0.5, 0.5
+    include_sigma = not args.penalty and not args.lagrange
 
     r_hist = []
     g_c = np.zeros(ndofs)
     qp_samples = []
 
-    def _contact_kwargs(u_vec, residual, coo, new_active, energy_acc=None, assemble=True):
+    def _contact_kwargs(
+        u_vec, residual, coo, new_active, energy_acc=None, assemble=True,
+        forced_active=None, status_out=None, gap_rows_out=None,
+    ):
         n_qp = 0
         if theta_b > 0:
             n_qp += surface_contrib(
                 X, Y, u_vec, edges_b, elems_b, bid_b, edges_o, ps, mesh, mu_b, lam_b,
                 args.gamma0, theta_b, args.friction, args.mu_f, residual, coo, radius,
                 0, new_active, False, energy_acc, qp_samples if assemble else None,
-                assemble, include_sigma,
+                assemble, include_sigma, forced_active, status_out, gap_rows_out,
             )
         if theta_o > 0:
             n_qp += surface_contrib(
                 X, Y, u_vec, edges_o, elems_o, bid_o, edges_b, ps, mesh, mu_o, lam_o,
                 args.gamma0, theta_o, args.friction, args.mu_f, residual, coo, radius,
                 1, new_active, True, energy_acc, qp_samples if assemble else None,
-                assemble, include_sigma,
+                assemble, include_sigma, forced_active, status_out, gap_rows_out,
             )
         return n_qp
 
-    def residual_tangent(u_vec):
+    def residual_tangent(u_vec, forced_active=None):
         qp_samples.clear()
         g_contact = np.zeros(ndofs)
         coo = []
         new_active = set()
-        n_qp = _contact_kwargs(u_vec, g_contact, coo, new_active, assemble=True)
+        n_qp = _contact_kwargs(
+            u_vec, g_contact, coo, new_active, assemble=True, forced_active=forced_active
+        )
         resid = Ke @ u_vec + g_contact
         if coo:
             ii, jj, vv = zip(*coo)
@@ -688,122 +870,338 @@ def solve_nitsche(ps, args):
         Ksys, resid = apply_dirichlet_system(Ksys, resid, constrained, u_vec, u_bc)
         return resid, Ksys, g_contact, Kn, n_qp, new_active
 
-    def total_energy(u_vec):
-        acc = [0.0]
+    x_cmax = 1.25 * float(np.sqrt(max(2.0 * radius * abs(args.indent), 0.0)))
+    g_tol = 1e-8 * max(radius, 1.0)
+
+    def qp_status(u_vec):
+        status = {}
         uc = u_vec.copy()
         uc[constrained] = u_bc[constrained]
-        _contact_kwargs(uc, None, None, set(), energy_acc=acc, assemble=False)
-        return 0.5 * float(uc @ (Ke @ uc)) + acc[0]
+        _contact_kwargs(
+            uc, None, None, set(), assemble=False, forced_active=set(), status_out=status
+        )
+        return status
 
+    def overlapping(status):
+        return {
+            k
+            for k, (g, Pn, xp) in status.items()
+            if Pn < 0.0 and abs(xp) <= x_cmax
+        }
+
+    def elastic_dirichlet(u_vec):
+        resid = Ke @ u_vec
+        Ksys, resid = apply_dirichlet_system(
+            Ke.copy(), resid, constrained, u_vec, u_bc
+        )
+        return resid, Ksys
+
+    def edge_rows(u_vec):
+        """One geometric gap per EDGE2 midpoint (P0 traction, P1-stable)."""
+        rows = []
+        uc = u_vec.copy()
+        uc[constrained] = u_bc[constrained]
+        for ie in range(int(edges_b.shape[0])):
+            n0, n1 = int(edges_b[ie, 0]), int(edges_b[ie, 1])
+            xp = 0.5 * (float(X[n0]) + float(X[n1]))
+            if abs(xp) > x_cmax:
+                continue
+            px = 0.5 * (X[n0] + uc[2 * n0] + X[n1] + uc[2 * n1])
+            py = 0.5 * (Y[n0] + uc[2 * n0 + 1] + Y[n1] + uc[2 * n1 + 1])
+            m0, m1, t, qx, qy = master_on_circle(px, py, X, Y, edges_o, radius)
+            rn = float(np.hypot(qx, qy))
+            if rn <= 1e-30:
+                continue
+            nx, ny = -qx / rn, -qy / rn
+            Nm0, Nm1 = 1.0 - t, t
+            uqx = Nm0 * uc[2 * m0] + Nm1 * uc[2 * m1]
+            uqy = Nm0 * uc[2 * m0 + 1] + Nm1 * uc[2 * m1 + 1]
+            g = (qx + uqx - px) * nx + (qy + uqy - py) * ny
+            dg = {}
+
+            def add(dof, val):
+                if val == 0.0:
+                    return
+                dg[dof] = dg.get(dof, 0.0) + val
+
+            add(2 * n0, -0.5 * nx)
+            add(2 * n0 + 1, -0.5 * ny)
+            add(2 * n1, -0.5 * nx)
+            add(2 * n1 + 1, -0.5 * ny)
+            add(2 * m0, Nm0 * nx)
+            add(2 * m0 + 1, Nm0 * ny)
+            add(2 * m1, Nm1 * nx)
+            add(2 * m1 + 1, Nm1 * ny)
+            rows.append((ie, float(g), xp, dg))
+        return rows
+
+    def edge_overlapping(rows):
+        return {ie for ie, g, xp, _dg in rows if g < 0.0}
+
+    def solve_kkt(u_vec, keys):
+        r_el, Kel = elastic_dirichlet(u_vec)
+        rows = [r for r in edge_rows(u_vec) if r[0] in keys]
+        if not rows:
+            du = spsolve(Kel, -r_el)
+            return du, {}, [], r_el, sparse.csr_matrix((0, ndofs)), np.zeros(0)
+        nA = len(rows)
+        G = sparse.lil_matrix((nA, ndofs))
+        gvec = np.zeros(nA)
+        order = []
+        for i, (ie, gval, _xp, dg) in enumerate(rows):
+            order.append(ie)
+            gvec[i] = gval
+            for dof, val in dg.items():
+                if mask[dof]:
+                    continue
+                G[i, dof] += val
+        G = G.tocsr()
+        # Signorini: min ½ u·Ke u s.t. g≥0. Lagrangian ½ u·Ke u − λ g, λ≥0.
+        # Stationarity Ke u − Gᵀ λ = 0. λ is the edge force; p = λ/L is P0.
+        Kaug = sparse.bmat(
+            [
+                [Kel, -G.T],
+                [G, sparse.eye(nA, format="csr") * (-1e-16)],
+            ],
+            format="csr",
+        )
+        sol = spsolve(Kaug, np.concatenate([-r_el, -gvec]))
+        du = np.asarray(sol[:ndofs], dtype=np.float64)
+        lam = np.asarray(sol[ndofs:], dtype=np.float64)
+        lam_map = {order[i]: float(lam[i]) for i in range(nA)}
+        return du, lam_map, order, r_el, G, lam
+
+    use_kkt = bool(getattr(args, "lagrange", False)) and not bool(
+        args.rigid_obstacle or args.rigid_block
+    )
     u_bc_full = u_bc.copy()
     n_load = args.load_steps if args.load_steps > 0 else 1
     u[:] = 0.0
+    lam_by_key = {}
     for load in range(1, n_load + 1):
         u_bc[:] = u_bc_full * (load / float(n_load))
         u[constrained] = u_bc[constrained]
         if n_load > 1:
             print(f"load[{load}/{n_load}] indent={args.indent * load / n_load:.4g}")
+        A = set()
         for it in range(args.max_newton):
-            residual, K, g_c, Kn, n_qp, new_active = residual_tangent(u)
+            if not use_kkt:
+                status = qp_status(u)
+                A_nat = overlapping(status)
+                residual, K, g_c, Kn, n_qp, A = residual_tangent(u, forced_active=None)
+                rnorm = float(np.linalg.norm(residual))
+                r_hist.append(rnorm)
+                print(
+                    f"newton[{it:02d}] ||r||={rnorm:.3e}  contact_nnz={Kn.nnz}  "
+                    f"nitsche_qp={n_qp}  |A|={len(A)}  |A_nat|={len(A_nat)}"
+                )
+                if rnorm < args.rtol:
+                    break
+                du = spsolve(K, -residual)
+                if not np.all(np.isfinite(du)):
+                    raise RuntimeError("Newton increment is not finite")
+                u[:] = u + du
+                u[constrained] = u_bc[constrained]
+                st = qp_status(u)
+                A_nat = overlapping(st)
+                extra = ""
+                if A_nat:
+                    gs = sorted((st[k][2], st[k][0]) for k in A_nat if k in st)
+                    if len(gs) <= 12:
+                        extra += "  A=[" + ", ".join(f"{x:.2f}:{g:.2e}" for x, g in gs) + "]"
+                    elif gs:
+                        extra += (
+                            f"  A=[{gs[0][0]:.2f}:{gs[0][1]:.2e} ... "
+                            f"{gs[-1][0]:.2f}:{gs[-1][1]:.2e}]"
+                        )
+                print(f"          accept |A|={len(A_nat)}{extra}")
+                continue
+
+            rows = edge_rows(u)
+            A_nat = edge_overlapping(rows)
+            if not A:
+                r_el, Kel = elastic_dirichlet(u)
+                rnorm = float(np.linalg.norm(r_el))
+                r_hist.append(rnorm)
+                print(
+                    f"newton[{it:02d}] ||r||={rnorm:.3e}  contact_nnz=0  "
+                    f"nitsche_qp=0  |A|=0  |A_nat|={len(A_nat)}"
+                )
+                if rnorm < args.rtol and not A_nat:
+                    break
+                du = spsolve(Kel, -r_el)
+                if not np.all(np.isfinite(du)):
+                    raise RuntimeError("Newton increment is not finite")
+                u[:] = u + du
+                u[constrained] = u_bc[constrained]
+                rows = edge_rows(u)
+                A_nat = edge_overlapping(rows)
+                A = set(A_nat)
+                extra = f"  added={len(A)}"
+                if A:
+                    xg = [(xp, g) for ie, g, xp, _d in rows if ie in A]
+                    extra += "  A=[" + ", ".join(f"{x:.2f}:{g:.2e}" for x, g in xg) + "]"
+                print(f"          accept |A|={len(A)}{extra}")
+                continue
+
+            du, lam_map, order, r_el, Gm, lam = solve_kkt(u, A)
+            if not np.all(np.isfinite(du)) or not np.all(np.isfinite(lam)):
+                raise RuntimeError("Newton increment is not finite")
+            u[:] = u + du
+            u[constrained] = u_bc[constrained]
+            lam_by_key = {k: v for k, v in lam_map.items() if v > 0.0}
+            g_c = np.asarray(-Gm.T.dot(lam), dtype=np.float64) if lam.size else np.zeros(ndofs)
+            r_el, _ = elastic_dirichlet(u)
+            residual = r_el + g_c
+            residual[constrained] = 0.0
             rnorm = float(np.linalg.norm(residual))
             r_hist.append(rnorm)
-            print(f"newton[{it:02d}] ||r||={rnorm:.3e}  contact_nnz={Kn.nnz}  nitsche_qp={n_qp}")
-            if rnorm < args.rtol:
-                break
-            du = spsolve(K, -residual)
-            if not np.all(np.isfinite(du)):
-                raise RuntimeError("Newton increment is not finite")
-            def trial(omega):
-                u_try = u + omega * du
-                u_try[constrained] = u_bc[constrained]
-                _, _, _, _, n_try, _ = residual_tangent(u_try)
-                return u_try, total_energy(u_try), n_try
-
-            if n_qp == 0:
-                phi0 = total_energy(u)
-                best_phi, best_u, best_w, best_n = np.inf, None, 0.0, 0
-                omega = 1.0
-                while omega >= 1.0 / 64.0:
-                    u_try, phi, n_try = trial(omega)
-                    if phi < best_phi:
-                        best_phi, best_u, best_w, best_n = phi, u_try.copy(), omega, n_try
-                    omega *= 0.5
-                if best_u is None:
-                    u[:] = u + du
-                else:
-                    u[:] = best_u
-                    print(
-                        f"          enter omega={best_w:g}  n_qp={best_n}  "
-                        f"dphi={best_phi - phi0:.3e}"
+            rows = edge_rows(u)
+            A_nat = edge_overlapping(rows)
+            dropped = {k for k, lv in lam_map.items() if lv < -1e-12}
+            A_new = {k for k in order if k not in dropped}
+            outside = A_nat - A_new
+            added = set(outside)
+            if added:
+                A_new |= added
+            if not A_new and A_nat:
+                added = set(A_nat)
+                A_new = set(added)
+            opened = A - A_new
+            gmin = min((g for _ie, g, _x, _d in rows), default=0.0)
+            print(
+                f"newton[{it:02d}] ||r||={rnorm:.3e}  contact_nnz={Gm.nnz}  "
+                f"nitsche_qp={len(order)}  |A|={len(A)}  |A_nat|={len(A_nat)}"
+            )
+            extra = ""
+            if added:
+                extra += f"  added={len(added)}"
+            if opened:
+                extra += f"  opened={len(opened)}"
+            if dropped:
+                extra += f"  tensile={len(dropped)}"
+            if lam.size:
+                extra += f"  λ∈[{lam.min():.2e},{lam.max():.2e}]"
+            extra += f"  gmin={gmin:.2e}"
+            if A_new:
+                xg = sorted((xp, g) for ie, g, xp, _d in rows if ie in A_new)
+                if len(xg) <= 12:
+                    extra += "  A=[" + ", ".join(f"{x:.2f}:{g:.2e}" for x, g in xg) + "]"
+                elif xg:
+                    extra += (
+                        f"  A=[{xg[0][0]:.2f}:{xg[0][1]:.2e} ... "
+                        f"{xg[-1][0]:.2f}:{xg[-1][1]:.2e}]"
                     )
-            else:
-                phi0 = total_energy(u)
-                slope = float(residual @ du)
-                omega = 1.0
-                best_phi, best_u, best_w, best_n = phi0, None, 0.0, n_qp
-                accepted = False
-                while omega >= 1.0 / 32.0:
-                    u_try, phi, n_try = trial(omega)
-                    if n_try == 0:
-                        omega *= 0.5
-                        continue
-                    if phi < best_phi:
-                        best_phi, best_u, best_w, best_n = phi, u_try.copy(), omega, n_try
-                    if phi <= phi0 + 1e-4 * omega * min(slope, 0.0):
-                        u[:] = u_try
-                        accepted = True
-                        if omega < 1.0:
-                            print(
-                                f"          linesearch omega={omega:g}  "
-                                f"dphi={phi - phi0:.3e}  n_qp={n_try}"
-                            )
-                        break
-                    omega *= 0.5
-                if not accepted:
-                    if best_u is not None and best_phi < phi0:
-                        u[:] = best_u
-                        print(
-                            f"          linesearch omega={best_w:g}  "
-                            f"dphi={best_phi - phi0:.3e}  n_qp={best_n}"
-                        )
-                    else:
-                        print("          linesearch: no energy descent in g<0")
-                        break
-            u[constrained] = u_bc[constrained]
+            print(f"          accept |A|={len(A_new)}{extra}")
+            if rnorm < args.rtol and not added and not dropped and gmin >= -g_tol:
+                A = A_new
+                break
+            A = A_new
 
-    residual, K, g_c, Kn, n_qp, _ = residual_tangent(u)
+    if use_kkt:
+        r_el, _ = elastic_dirichlet(u)
+        g_c = np.zeros(ndofs)
+        if A:
+            _du, lam_map, _order, _r, Gm, lam = solve_kkt(u, A)
+            lam_by_key = {k: v for k, v in lam_map.items() if v > 0.0}
+            if lam.size:
+                g_c = np.asarray(-Gm.T.dot(lam), dtype=np.float64)
+        residual = r_el + g_c
+        residual[constrained] = 0.0
+        Kn = sparse.csr_matrix((ndofs, ndofs))
+        n_qp = len(A)
+    else:
+        residual, K, g_c, Kn, n_qp, A = residual_tangent(u, forced_active=None)
     r_final = float(np.linalg.norm(residual))
     if not r_hist or abs(r_hist[-1] - r_final) > 1e-30:
         r_hist.append(r_final)
-        print(f"newton[final] ||r||={r_final:.3e}  contact_nnz={Kn.nnz}  nitsche_qp={n_qp}")
+        print(f"newton[final] ||r||={r_final:.3e}  contact_nnz={getattr(Kn, 'nnz', 0)}  nitsche_qp={n_qp}")
 
-    xd, yd = deformed(X, Y, u)
     nodes_b = unique_nodes_from_edges(edges_b)
     gap = np.empty(nodes_b.size)
     for i, node in enumerate(nodes_b):
-        qx, qy = project_to_circle(X[node], Y[node], radius)
-        m0, m1, t, _, _ = closest_on_edges(qx, qy, X, Y, edges_o)
+        node = int(node)
+        px = float(X[node] + u[2 * node])
+        py = float(Y[node] + u[2 * node + 1])
+        m0, m1, t, qx, qy = master_on_circle(px, py, X, Y, edges_o, radius)
+        rn = float(np.hypot(qx, qy))
+        if rn <= 1e-30:
+            gap[i] = 0.0
+            continue
+        nx, ny = -qx / rn, -qy / rn
+        uqx = (1.0 - t) * u[2 * m0] + t * u[2 * m1]
         uqy = (1.0 - t) * u[2 * m0 + 1] + t * u[2 * m1 + 1]
-        gap[i] = (qy + uqy - yd[node]) * (-1.0)
+        gap[i] = (qx + uqx - px) * nx + (qy + uqy - py) * ny
     penetration = float(np.linalg.norm(np.minimum(gap, 0.0)))
-    F = abs(float(np.sum(g_c[1 : 2 * n_block : 2])))
+    r_full = np.asarray(Ke @ u + g_c, dtype=np.float64)
+    top = np.flatnonzero(np.abs(Y[:n_block] - y_top) <= 4.0 * tol)
+    F = abs(float(np.sum(r_full[2 * top + 1]))) if top.size else abs(
+        float(np.sum(g_c[1 : 2 * n_block : 2]))
+    )
     E_star = effective_modulus(E_b, nu_b, E_o if not args.rigid_obstacle else 1e300, nu_o)
     xc = 0.5 * (X[edges_b[:, 0]] + X[edges_b[:, 1]])
     p_hertz, a, p0 = hertz_pressure(xc, F, radius, E_star)
-    tr_x, tr_g, tr_sn, tr_pn, tr_on = contact_trace(
+    tr_x, tr_g, tr_sn, tr_pn, tr_on, tr_xi, tr_w = contact_trace(
         X, Y, u, edges_b, elems_b, bid_b, edges_o, ps, mesh, mu_b, lam_b,
-        args.gamma0, theta_b if theta_b > 0 else 1.0, radius, include_sigma, False,
+        args.gamma0, theta_b if theta_b > 0 else 1.0, radius, include_sigma, False, 0.0,
+    )
+    tr_x_o, tr_g_o, tr_sn_o, tr_pn_o, tr_on_o, _, tr_w_o = contact_trace(
+        X, Y, u, edges_o, elems_o, bid_o, edges_b, ps, mesh, mu_o, lam_o,
+        args.gamma0, theta_o if theta_o > 0 else 1.0, radius, include_sigma, True, 0.0,
     )
     p_cauchy = -tr_sn
-    p_applied = np.where(tr_on, -tr_pn, 0.0)
+    p_cauchy_o = -tr_sn_o
+    th = theta_b if theta_b > 0.0 else 1.0
+    p_applied = np.where(tr_on, np.maximum(-tr_pn / th, 0.0), 0.0)
     p_cauchy_max = float(np.max(p_cauchy)) if p_cauchy.size else 0.0
+    p_cauchy_o_max = float(np.max(p_cauchy_o)) if p_cauchy_o.size else 0.0
     p_applied_max = float(np.max(p_applied)) if p_applied.size else 0.0
+    F_int = float(np.sum(p_applied * tr_w)) if tr_w.size else 0.0
+    n_active = int(np.count_nonzero(tr_on))
+    if use_kkt:
+        n_active = len(lam_by_key)
+
+    x_sym = max(1.25 * a, 0.2) if a > 0.0 else 0.45
+
+    def even_l2(x, p, xmax):
+        x = np.asarray(x, dtype=float)
+        p = np.asarray(p, dtype=float)
+        m = np.abs(x) <= xmax
+        x, p = x[m], p[m]
+        if x.size < 2:
+            return float("nan")
+        o = np.argsort(x)
+        x, p = x[o], p[o]
+        num = float(np.sqrt(np.mean((p - np.interp(-x, x, p)) ** 2)))
+        den = max(float(np.sqrt(np.mean(p ** 2))), 1e-30)
+        return num / den
+
+    def pair_l2(x0, p0, x1, p1, xmax):
+        x0 = np.asarray(x0, dtype=float)
+        p0 = np.asarray(p0, dtype=float)
+        x1 = np.asarray(x1, dtype=float)
+        p1 = np.asarray(p1, dtype=float)
+        m0 = np.abs(x0) <= xmax
+        x0, p0 = x0[m0], p0[m0]
+        if x0.size < 2 or x1.size < 2:
+            return float("nan")
+        o1 = np.argsort(x1)
+        p1_on_0 = np.interp(x0, x1[o1], p1[o1])
+        num = float(np.sqrt(np.mean((p0 - p1_on_0) ** 2)))
+        den = max(float(np.sqrt(np.mean(p0 ** 2))), 1e-30)
+        return num / den
+
+    even_b = even_l2(tr_x, p_cauchy, x_sym)
+    even_o = even_l2(tr_x_o, p_cauchy_o, x_sym)
+    react = pair_l2(tr_x, p_cauchy, tr_x_o, p_cauchy_o, x_sym)
 
     print(
-        f"nodes={mesh.n_nodes()} dofs={ndofs} F={F:.4e} a_hertz={a:.4e} p0={p0:.4e} "
-        f"|g_-|={penetration:.3e}  theta=({theta_b:g},{theta_o:g})  "
-        f"sigma={'on' if include_sigma else 'off'}  "
-        f"max(-σ_n)={p_cauchy_max:.4e}  max(-P_n)={p_applied_max:.4e}"
+        f"nodes={mesh.n_nodes()} dofs={ndofs} F={F:.4e} F_int={F_int:.4e} "
+        f"a_hertz={a:.4e} p0={p0:.4e} |g_-|={penetration:.3e}  "
+        f"theta=({theta_b:g},{theta_o:g})  sigma={'on' if include_sigma else 'off'}  "
+        f"n_active={n_active}  max(-σ_n^b)={p_cauchy_max:.4e}  max(-σ_n^o)={p_cauchy_o_max:.4e}  "
+        f"max(-P_n)={p_applied_max:.4e}  even_b={even_b:.3f}  even_o={even_o:.3f}  "
+        f"σ_n b↔o={react:.3f}"
     )
     return {
         "mesh": mesh,
@@ -829,8 +1227,19 @@ def solve_nitsche(ps, args):
         "qp_sn": tr_sn,
         "qp_pn": tr_pn,
         "qp_active": tr_on,
+        "qp_xi": tr_xi,
+        "qp_w": tr_w,
         "p_cauchy": p_cauchy,
+        "p_cauchy_o": p_cauchy_o,
+        "qp_x_o": tr_x_o,
+        "qp_sn_o": tr_sn_o,
         "p_applied": p_applied,
+        "F_int": F_int,
+        "n_active": n_active,
+        "include_sigma": include_sigma,
+        "theta_b": float(theta_b),
+        "theta_o": float(theta_o),
+        "indent": float(args.indent),
     }
 
 
@@ -848,12 +1257,12 @@ def parse_args(argv=None):
     p.add_argument("--E-obstacle", type=float, default=1.0)
     p.add_argument("--nu", type=float, default=0.3)
     p.add_argument("--gamma0", type=float, default=50.0)
-    p.add_argument("--max-newton", type=int, default=25)
+    p.add_argument("--max-newton", type=int, default=40)
     p.add_argument(
         "--load-steps",
         type=int,
         default=0,
-        help="Indent increments. 0/1: apply the full indent in one shot.",
+        help="Indent increments. 0/1: full indent in one shot.",
     )
     p.add_argument("--rtol", type=float, default=1e-8)
     p.add_argument("--friction", action="store_true")
@@ -864,17 +1273,27 @@ def parse_args(argv=None):
     p.add_argument(
         "--biased",
         action="store_true",
-        help="Master/slave (block is slave). Default for two-body Hertz.",
+        help="One-sided Nitsche on the block (θ=1). Default is unbiased (θ=1/2 both).",
     )
     p.add_argument(
         "--unbiased",
         action="store_true",
-        help="Nitsche on both surfaces (paper). Unstable on this coarse pairing.",
+        help="Nitsche on both surfaces (paper). Default for two-body Hertz.",
     )
     p.add_argument(
         "--nitsche-stress",
         action="store_true",
-        help="Include θ σ_n in P for two-body (paper). Default two-body uses P=γg.",
+        help="Kept for compatibility; σ_n is already in P unless --penalty.",
+    )
+    p.add_argument(
+        "--lagrange",
+        action="store_true",
+        help="Two-body: nodal/edge Lagrange (γ=∞), not Nitsche.",
+    )
+    p.add_argument(
+        "--penalty",
+        action="store_true",
+        help="Geometric penalty P=γg (no σ_n). Not Nitsche.",
     )
     p.add_argument("--plot", action="store_true")
     p.add_argument("--conv", action="store_true", help="Mesh refinement study")
@@ -887,8 +1306,8 @@ def plot_solution(result):
 
     X, Y, u = result["X"], result["Y"], result["u"]
     xd, yd = X + u[0::2], Y + u[1::2]
-    mag = np.hypot(u[0::2], u[1::2])
-    vmin, vmax = float(np.min(mag)), float(np.max(mag))
+    uy = u[1::2]
+    vmin, vmax = float(np.min(uy)), float(np.max(uy))
     if vmax <= vmin:
         vmax = vmin + 1e-16
 
@@ -896,18 +1315,22 @@ def plot_solution(result):
     tpc = None
     for tris in (result["tris_b"], result["tris_o"]):
         tpc = ax[0].tripcolor(
-            xd, yd, tris, mag, shading="gouraud", cmap="viridis", vmin=vmin, vmax=vmax
+            xd, yd, tris, uy, shading="gouraud", cmap="coolwarm", vmin=vmin, vmax=vmax
         )
         ax[0].triplot(xd, yd, tris, color="k", lw=0.25, alpha=0.55)
-    fig.colorbar(tpc, ax=ax[0], fraction=0.046, pad=0.04, label="|u|")
+    fig.colorbar(tpc, ax=ax[0], fraction=0.046, pad=0.04, label="u_y")
     ax[0].set_aspect("equal")
     ax[0].set_xlabel("x")
     ax[0].set_ylabel("y")
-    ax[0].set_title(
-        "deformed TRI3 (rigid obstacle)"
-        if result.get("rigid_obstacle")
-        else "deformed TRI3 (two-body elastic)"
-    )
+    if result.get("rigid_obstacle"):
+        mesh_title = "deformed TRI3 (Nitsche vs rigid obstacle)"
+    elif result.get("theta_o", 0.0) > 0.0 and result.get("include_sigma"):
+        mesh_title = "deformed TRI3 (unbiased Nitsche)"
+    elif result.get("include_sigma"):
+        mesh_title = "deformed TRI3 (biased Nitsche)"
+    else:
+        mesh_title = "deformed TRI3 (penalty)"
+    ax[0].set_title(mesh_title)
 
     nodes = result["nodes_b"]
     order = np.argsort(X[nodes])
@@ -919,40 +1342,67 @@ def plot_solution(result):
 
     axg = ax[1]
     axp = axg.twinx()
-    ln_gap = axg.plot(xg, gap, "o-", color="C0", ms=4, label="gap (>0 open, <0 overlap)")
+    tr_x = np.asarray(result.get("qp_x", []))
+    tr_g = np.asarray(result.get("qp_g", []))
+    if tr_x.size and tr_g.size:
+        order_g = np.argsort(tr_x)
+        ln_gap = axg.plot(
+            tr_x[order_g],
+            tr_g[order_g],
+            "o-",
+            color="C0",
+            ms=3,
+            label="gap (edge mean, >0 open, <0 overlap)",
+        )
+    else:
+        ln_gap = axg.plot(xg, gap, "o-", color="C0", ms=4, label="gap (>0 open, <0 overlap)")
     axg.axhline(0.0, color="0.45", lw=0.8)
     a = float(result["a"])
     if a > 0:
         axg.axvline(-a, color="0.55", ls="--", lw=0.8)
         axg.axvline(a, color="0.55", ls="--", lw=0.8)
     ln_hertz = axp.plot(xc, ph, color="C1", label="Hertz p(x) from F")
-    tr_x = np.asarray(result.get("qp_x", []))
     p_cauchy = np.asarray(result.get("p_cauchy", []))
-    p_applied = np.asarray(result.get("p_applied", []))
+    p_cauchy_o = np.asarray(result.get("p_cauchy_o", []))
+    tr_x_o = np.asarray(result.get("qp_x_o", []))
     ln_cauchy = []
-    ln_applied = []
-    if tr_x.size:
-        order_qp = np.argsort(tr_x)
-        xq = tr_x[order_qp]
+    ln_cauchy_o = []
+    if tr_x.size and p_cauchy.size:
+        order_c = np.argsort(tr_x)
         ln_cauchy = axp.plot(
-            xq, p_cauchy[order_qp], "o-", color="C3", ms=4, lw=1.2, label="solution -σ_n"
+            tr_x[order_c],
+            p_cauchy[order_c],
+            drawstyle="steps-mid",
+            color="C3",
+            lw=1.6,
+            label="block $-\\sigma_n$ (P0)",
         )
-        ln_applied = axp.plot(
-            xq,
-            p_applied[order_qp],
-            "s",
-            color="C4",
-            ms=5,
-            label="applied -P_n (g<0, else 0)",
+    if tr_x_o.size and p_cauchy_o.size:
+        order_o = np.argsort(tr_x_o)
+        ln_cauchy_o = axp.plot(
+            tr_x_o[order_o],
+            p_cauchy_o[order_o],
+            drawstyle="steps-mid",
+            color="C2",
+            lw=1.6,
+            label="obstacle $-\\sigma_n$ (P0)",
         )
-    axg.set_xlabel("x (reference, block bottom)")
+    axg.set_xlabel("x (reference)")
     axg.set_ylabel("gap", color="C0")
     axp.set_ylabel("pressure", color="C1")
-    axg.set_title(f"contact cut  a={a:.3g}  p0={result['p0']:.3g}")
-    lines = ln_gap + ln_hertz + ln_cauchy + ln_applied
+    axg.set_title(f"contact cut  a={a:.3g}  p0={result['p0']:.3g}  indent={result.get('indent', '')}")
+    xpad = max(1.6 * a, 0.4) if a > 0.0 else 0.5
+    axg.set_xlim(-xpad, xpad)
+    lines = ln_gap + ln_hertz + ln_cauchy + ln_cauchy_o
     axg.legend(lines, [ln.get_label() for ln in lines], loc="best")
     plt.tight_layout()
-    plt.show()
+    out = os.path.join(os.path.dirname(__file__), "nitsche_contact.png")
+    fig.savefig(out, dpi=140)
+    print(f"saved {out}")
+    try:
+        plt.show()
+    except Exception:
+        pass
 
 
 def refinement_study(ps, args):
@@ -970,44 +1420,113 @@ def refinement_study(ps, args):
         prev_h, prev_pen = h, pen
 
 
+def _fail(msg):
+    raise SystemExit(msg)
+
+
+def check_rigid(result, args):
+    r_hist = result.get("r_hist", [])
+    if not r_hist or not np.all(np.isfinite(r_hist)):
+        _fail("rigid check failed: non-finite Newton residual")
+    if not np.isfinite(result["penetration"]):
+        _fail("rigid check failed: non-finite penetration")
+    if r_hist[-1] > 1e-6:
+        _fail(f"rigid check failed: Newton residual {r_hist[0]:.3e} -> {r_hist[-1]:.3e}")
+    if result["penetration"] > 0.5 * args.indent:
+        _fail(
+            f"rigid check failed: remaining penetration {result['penetration']:.3e} "
+            f"with indent {args.indent:g}"
+        )
+    nodes = result["nodes_b"]
+    i_min = int(np.argmin(result["gap"]))
+    x_min = float(result["X"][nodes[i_min]])
+    if abs(x_min) > 0.25:
+        _fail(f"rigid check failed: deepest gap at x={x_min:.3g}, expected near x=0")
+    if result["F"] <= 0.0:
+        _fail("rigid check failed: non-positive contact force")
+
+
+def check_twobody(result, args, F_rigid):
+    r_hist = result.get("r_hist", [])
+    if not r_hist or not np.all(np.isfinite(r_hist)):
+        _fail("two-body check failed: non-finite Newton residual")
+    if r_hist[-1] > 1e-6:
+        _fail(f"two-body check failed: Newton residual {r_hist[0]:.3e} -> {r_hist[-1]:.3e}")
+    if result["n_active"] < 1:
+        _fail(f"two-body check failed: only {result['n_active']} active quadrature points")
+    if result["F"] < 0.15 * F_rigid:
+        _fail(
+            f"two-body check failed: F={result['F']:.3e} "
+            f"is too small vs rigid F={F_rigid:.3e}"
+        )
+    if result["F"] > 1.5 * F_rigid:
+        _fail(
+            f"two-body check failed: F={result['F']:.3e} "
+            f"exceeds rigid F={F_rigid:.3e}"
+        )
+    nodes = result["nodes_b"]
+    gap = np.asarray(result["gap"])
+    i_min = int(np.argmin(gap))
+    x_min = float(result["X"][nodes[i_min]])
+    if abs(x_min) > 0.25:
+        _fail(f"two-body check failed: deepest gap at x={x_min:.3g}, expected near x=0")
+    xg = result["X"][nodes]
+    far = np.abs(xg) > 0.45 * args.width
+    if np.any(far) and np.min(gap[far]) < -1e-4:
+        _fail("two-body check failed: far-field overlap (not a Hertz patch)")
+    if float(np.min(gap)) < -0.25 * abs(args.indent):
+        _fail(
+            f"two-body check failed: contact face sucked in "
+            f"(min gap {float(np.min(gap)):.3e} vs indent {args.indent:g})"
+        )
+    uy_c = np.asarray(result["u"])[2 * np.asarray(nodes) + 1]
+    if float(np.min(uy_c)) < -1.25 * abs(args.indent):
+        _fail(
+            f"two-body check failed: contact uy={float(np.min(uy_c)):.3e} "
+            f"past indent {args.indent:g} (stretch / suction)"
+        )
+    p_cauchy = np.asarray(result.get("p_cauchy", []))
+    if p_cauchy.size and float(np.max(p_cauchy)) <= 0.0:
+        _fail("two-body check failed: Cauchy -σ_n is not compressive")
+    p_applied = np.asarray(result["p_applied"])
+    gqp = np.asarray(result["qp_g"])
+    if gqp.size and p_applied.size:
+        overlap = gqp < 0.0
+        pn = np.asarray(result["qp_pn"])
+        if np.any(overlap) and pn.size == gqp.size and float(np.mean(pn[overlap])) > 1e-10:
+            _fail("two-body check failed: net tensile P on overlap (adhesion)")
+
+
 def main(argv=None):
     args = parse_args(argv)
-    if args.check:
-        args.nx = 8
-        args.ny = 4
-        args.max_newton = 15
-        args.plot = False
-        args.indent = 0.02
-        args.rigid_obstacle = True
     ps = _load_pysfem()
     ps.init()
     try:
         if args.conv:
             refinement_study(ps, args)
+        elif args.check:
+            rigid_args = copy.copy(args)
+            rigid_args.nx = 8
+            rigid_args.ny = 4
+            rigid_args.max_newton = 20
+            rigid_args.plot = False
+            rigid_args.indent = 0.02
+            rigid_args.rigid_obstacle = True
+            rigid_args.load_steps = 1
+            rigid = solve_nitsche(ps, rigid_args)
+            check_rigid(rigid, rigid_args)
+            two_args = copy.copy(rigid_args)
+            two_args.rigid_obstacle = False
+            two_args.load_steps = 1
+            two_args.max_newton = 80
+            two = solve_nitsche(ps, two_args)
+            check_twobody(two, two_args, rigid["F"])
+            print(
+                f"check ok  rigid F={rigid['F']:.4e}  two-body F={two['F']:.4e}  "
+                f"n_active={two['n_active']}"
+            )
         else:
             result = solve_nitsche(ps, args)
-            if args.check:
-                r_hist = result.get("r_hist", [])
-                if not r_hist or not np.all(np.isfinite(r_hist)):
-                    raise SystemExit("check failed: non-finite Newton residual")
-                if not np.isfinite(result["penetration"]):
-                    raise SystemExit("check failed: non-finite penetration")
-                if r_hist[-1] > 1e-6:
-                    raise SystemExit(
-                        f"check failed: Newton residual {r_hist[0]:.3e} -> {r_hist[-1]:.3e}"
-                    )
-                if result["penetration"] > 0.5 * args.indent:
-                    raise SystemExit(
-                        f"check failed: remaining penetration {result['penetration']:.3e} "
-                        f"with indent {args.indent:g}"
-                    )
-                nodes = result["nodes_b"]
-                i_min = int(np.argmin(result["gap"]))
-                x_min = float(result["X"][nodes[i_min]])
-                if abs(x_min) > 0.25:
-                    raise SystemExit(
-                        f"check failed: deepest gap at x={x_min:.3g}, expected near x=0"
-                    )
             if args.plot:
                 plot_solution(result)
     finally:

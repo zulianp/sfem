@@ -33,5 +33,5 @@ target_compile_options(cvfem_tet4_ns_upwind_bench
         $<$<COMPILE_LANG_AND_ID:CXX,AppleClang,Clang,GNU>:-O3>
         $<$<COMPILE_LANG_AND_ID:CXX,AppleClang,Clang,GNU>:-DNDEBUG>)
 
-set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+# set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
+#     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
