@@ -666,17 +666,19 @@ def solve_mmg(ps, args):
             contact_mask,
         )
         du[fine.constrained] = 0.0
-        if (not np.all(np.isfinite(du))) or lin_rel > 0.25:
+        mg_rel = lin_rel
+        used_direct = (not np.all(np.isfinite(du))) or mg_rel > 1e-4
+        if used_direct:
             du = np.asarray(spsolve(A, -residual), dtype=np.float64)
             du[fine.constrained] = 0.0
-            cycles = 0
             lin_rel = float(np.linalg.norm(residual + A @ du)) / max(rnorm, 1e-30)
         if not np.all(np.isfinite(du)):
             raise RuntimeError("MMG increment is not finite")
         u = u + du
         u[fine.constrained] = fine.u_bc[fine.constrained]
         last_cycles = int(cycles)
-        print(f"          V-cycles={cycles}  lin_rel={lin_rel:.3e}")
+        extra = f"  direct (mg_rel={mg_rel:.3e})" if used_direct else ""
+        print(f"          V-cycles={cycles}  lin_rel={lin_rel:.3e}{extra}")
     residual, A, g_c, Kn, n_qp, active = fine.residual_tangent(u, forced_active=None)
     r_final = float(np.linalg.norm(residual))
     if not r_hist or abs(r_hist[-1] - r_final) > 1e-30:
@@ -711,11 +713,11 @@ def parse_args(argv=None):
     p.add_argument("--gamma0", type=float, default=50.0)
     p.add_argument("--max-iter", type=int, default=40)
     p.add_argument("--rtol", type=float, default=1e-8)
-    p.add_argument("--mg-cycles", type=int, default=2)
+    p.add_argument("--mg-cycles", type=int, default=32)
     p.add_argument("--mg-pre", type=int, default=4)
     p.add_argument("--mg-post", type=int, default=4)
     p.add_argument("--mg-omega", type=float, default=0.4)
-    p.add_argument("--mg-linear-rtol", type=float, default=1e-2)
+    p.add_argument("--mg-linear-rtol", type=float, default=1e-6)
     p.add_argument("--mu-f", type=float, default=0.3)
     p.add_argument("--rigid-block", action="store_true")
     p.add_argument("--rigid-obstacle", action="store_true")
@@ -779,7 +781,8 @@ def main(argv=None):
             args.max_iter = 20
             args.indent = 0.02
             args.plot = False
-            args.mg_cycles = 2
+            args.mg_cycles = 32
+            args.mg_linear_rtol = 1e-6
             result = solve_mmg(ps, args)
             check_mmg(result, args)
             print(f"check ok  F={result['F']:.4e}  n_active={result['n_active']}")
