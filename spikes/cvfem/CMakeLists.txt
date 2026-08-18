@@ -21,17 +21,49 @@ find_package(SCCD CONFIG REQUIRED)
 find_package(ssdf CONFIG REQUIRED)
 find_package(SFEM CONFIG REQUIRED)
 
-add_executable(cvfem_tet4_ns_upwind_bench
-    cvfem_tet4_ns_upwind_bench.cpp)
+# Header-only CUDA Thrust is sometimes exported by SFEM as -lThrust.
+if(NOT TARGET Thrust)
+    add_library(Thrust INTERFACE IMPORTED)
+endif()
 
-target_link_libraries(cvfem_tet4_ns_upwind_bench
-    PRIVATE
-        SFEM::sfem)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
-target_compile_options(cvfem_tet4_ns_upwind_bench
-    PRIVATE
-        $<$<COMPILE_LANG_AND_ID:CXX,AppleClang,Clang,GNU>:-O3>
-        $<$<COMPILE_LANG_AND_ID:CXX,AppleClang,Clang,GNU>:-DNDEBUG>)
+find_package(OpenMP COMPONENTS CXX)
+
+set(_cvfem_perf_opts)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    list(APPEND _cvfem_perf_opts
+        -O3
+        -DNDEBUG
+        -ffast-math
+        -funroll-loops
+        -fomit-frame-pointer
+        -fno-math-errno
+        -fno-trapping-math
+        -ffp-contract=fast)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+        list(APPEND _cvfem_perf_opts -mcpu=native -mtune=native)
+    else()
+        list(APPEND _cvfem_perf_opts -march=native -mtune=native)
+    endif()
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
+        list(APPEND _cvfem_perf_opts -fvectorize -fslp-vectorize)
+    else()
+        list(APPEND _cvfem_perf_opts -ftree-vectorize)
+    endif()
+    message(STATUS "cvfem performance flags: ${_cvfem_perf_opts}")
+endif()
+
+foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baseline)
+    add_executable(${_cvfem_tgt} ${_cvfem_tgt}.cpp)
+    target_link_libraries(${_cvfem_tgt}
+        PRIVATE
+            SFEM::sfem
+            $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+    target_compile_options(${_cvfem_tgt} PRIVATE ${_cvfem_perf_opts})
+endforeach()
 
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

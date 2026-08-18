@@ -45,6 +45,10 @@ endif()
 
 if(@SFEM_ENABLE_CUDA@)
     find_dependency(CUDAToolkit)
+    # Header-only; older SFEM installs exported this as -lThrust.
+    if(NOT TARGET Thrust)
+        add_library(Thrust INTERFACE IMPORTED)
+    endif()
 endif()
 
 if(@SFEM_ENABLE_BLAS@ AND NOT APPLE)

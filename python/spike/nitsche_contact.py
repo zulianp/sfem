@@ -203,8 +203,8 @@ def tri3_signed_areas(tris, X, Y):
     return 0.5 * ((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0))
 
 
-def make_hertz_mesh(ps, nx, ny, radius, r_in, width, height, gap):
-    ny_b = max(2, ny // 2)
+def make_hertz_mesh(ps, nx, ny, radius, r_in, width, height, gap, ny_block=None):
+    ny_b = int(ny_block) if ny_block is not None else max(2, ny // 2)
     block = ps.create_tri3_square(
         nx, ny_b, -0.5 * width, radius + gap, 0.5 * width, radius + gap + height
     )
@@ -423,6 +423,60 @@ def collect_edge_qps(X, Y, u, n0, n1, length, nx0, ny0, other_edges, circle_R, s
     return samples
 
 
+def sample_edge_qps(X, Y, u, n0, n1, length, nx0, ny0, other_edges, circle_R, snap_self_circle):
+    """Frozen pairing/normals/weights at the current configuration."""
+    frozen = []
+    for xi, w_hat in QUAD_1D:
+        w = w_hat * length
+        Na, Nb = 1.0 - xi, xi
+        xref = Na * X[n0] + Nb * X[n1]
+        yref = Na * Y[n0] + Nb * Y[n1]
+        pxp = xref + Na * u[2 * n0] + Nb * u[2 * n1]
+        pyp = yref + Na * u[2 * n0 + 1] + Nb * u[2 * n1 + 1]
+        nx, ny = nx0, ny0
+        tx, ty = -ny, nx
+        if snap_self_circle:
+            rn = float(np.hypot(xref, yref))
+            if rn > 1e-30:
+                nx, ny = xref / rn, yref / rn
+                tx, ty = -ny, nx
+            paired = pair_on_x(xref, X, Y, other_edges)
+            if paired is None:
+                continue
+            m0, m1, t, qx, qy = paired
+        else:
+            m0, m1, t, qx, qy = closest_contact_point(
+                pxp, pyp, X, Y, other_edges, circle_R
+            )
+            if circle_R:
+                rn = float(np.hypot(qx, qy))
+                if rn > 1e-30:
+                    nx, ny = -qx / rn, -qy / rn
+                    tx, ty = -ny, nx
+        Nm0, Nm1 = 1.0 - t, t
+        frozen.append(
+            (
+                w, xi, nx, ny, tx, ty, Na, Nb,
+                int(m0), int(m1), Nm0, Nm1, xref, yref, qx, qy,
+            )
+        )
+    return frozen
+
+
+def eval_frozen_edge_qps(u, n0, n1, frozen):
+    samples = []
+    for w, xi, nx, ny, tx, ty, Na, Nb, m0, m1, Nm0, Nm1, xref, yref, qx, qy in frozen:
+        pxp = xref + Na * u[2 * n0] + Nb * u[2 * n1]
+        pyp = yref + Na * u[2 * n0 + 1] + Nb * u[2 * n1 + 1]
+        uqx = Nm0 * u[2 * m0] + Nm1 * u[2 * m1]
+        uqy = Nm0 * u[2 * m0 + 1] + Nm1 * u[2 * m1 + 1]
+        g = (qx + uqx - pxp) * nx + (qy + uqy - pyp) * ny
+        samples.append(
+            (w, xi, g, nx, ny, tx, ty, Na, Nb, int(m0), int(m1), Nm0, Nm1, xref)
+        )
+    return samples
+
+
 def contact_trace(
     X,
     Y,
@@ -521,6 +575,7 @@ def surface_contrib(
     forced_active=None,
     status_out=None,
     gap_rows_out=None,
+    frozen_edges=None,
 ):
     """Unbiased Nitsche residual/tangent on one contact surface (paper P_{γ,θ}).
 
@@ -543,9 +598,12 @@ def surface_contrib(
         for a, node in enumerate(parent_nodes):
             u_elem[2 * a] = u[2 * node]
             u_elem[2 * a + 1] = u[2 * node + 1]
-        samples = collect_edge_qps(
-            X, Y, u, n0, n1, length, nx0, ny0, other_edges, circle_R, snap_self_circle
-        )
+        if frozen_edges is not None and ie in frozen_edges:
+            samples = eval_frozen_edge_qps(u, n0, n1, frozen_edges[ie])
+        else:
+            samples = collect_edge_qps(
+                X, Y, u, n0, n1, length, nx0, ny0, other_edges, circle_R, snap_self_circle
+            )
         if not samples:
             continue
         w_int = 0.0
@@ -675,7 +733,15 @@ def hertz_pressure(x, F, R, E_star):
 def solve_nitsche(ps, args):
     radius = args.radius
     mesh, n_block = make_hertz_mesh(
-        ps, args.nx, args.ny, radius, args.r_inner * radius, args.width, args.height, args.gap
+        ps,
+        args.nx,
+        args.ny,
+        radius,
+        args.r_inner * radius,
+        args.width,
+        args.height,
+        args.gap,
+        ny_block=getattr(args, "ny_block", None),
     )
     X, Y = coords(ps, mesh)
     dim = 2
@@ -724,7 +790,7 @@ def solve_nitsche(ps, args):
     ss_contact_obs = sidesets_from_selector(
         ps,
         mesh,
-        lambda x, y, z: bool(np.hypot(x, y) > 0.98 * radius) and bool(y > 0.05 * radius),
+        lambda x, y, z: bool(np.hypot(x, y) > 0.85 * radius) and bool(y > 0.05 * radius),
         ["obstacle"],
     )
     ss_diam = sidesets_from_selector(
@@ -828,8 +894,15 @@ def solve_nitsche(ps, args):
     include_sigma = not args.penalty and not args.lagrange
 
     r_hist = []
+    n_active_hist = []
+    n_qp_hist = []
     g_c = np.zeros(ndofs)
     qp_samples = []
+
+    def record_newton(rnorm, n_active, n_qp=0):
+        r_hist.append(float(rnorm))
+        n_active_hist.append(int(n_active))
+        n_qp_hist.append(int(n_qp))
 
     def _contact_kwargs(
         u_vec, residual, coo, new_active, energy_acc=None, assemble=True,
@@ -990,7 +1063,7 @@ def solve_nitsche(ps, args):
                 A_nat = overlapping(status)
                 residual, K, g_c, Kn, n_qp, A = residual_tangent(u, forced_active=None)
                 rnorm = float(np.linalg.norm(residual))
-                r_hist.append(rnorm)
+                record_newton(rnorm, len(A), n_qp)
                 print(
                     f"newton[{it:02d}] ||r||={rnorm:.3e}  contact_nnz={Kn.nnz}  "
                     f"nitsche_qp={n_qp}  |A|={len(A)}  |A_nat|={len(A_nat)}"
@@ -1022,7 +1095,7 @@ def solve_nitsche(ps, args):
             if not A:
                 r_el, Kel = elastic_dirichlet(u)
                 rnorm = float(np.linalg.norm(r_el))
-                r_hist.append(rnorm)
+                record_newton(rnorm, 0, 0)
                 print(
                     f"newton[{it:02d}] ||r||={rnorm:.3e}  contact_nnz=0  "
                     f"nitsche_qp=0  |A|=0  |A_nat|={len(A_nat)}"
@@ -1055,7 +1128,7 @@ def solve_nitsche(ps, args):
             residual = r_el + g_c
             residual[constrained] = 0.0
             rnorm = float(np.linalg.norm(residual))
-            r_hist.append(rnorm)
+            record_newton(rnorm, len(A), len(order))
             rows = edge_rows(u)
             A_nat = edge_overlapping(rows)
             dropped = {k for k, lv in lam_map.items() if lv < -1e-12}
@@ -1114,7 +1187,7 @@ def solve_nitsche(ps, args):
         residual, K, g_c, Kn, n_qp, A = residual_tangent(u, forced_active=None)
     r_final = float(np.linalg.norm(residual))
     if not r_hist or abs(r_hist[-1] - r_final) > 1e-30:
-        r_hist.append(r_final)
+        record_newton(r_final, len(A) if A is not None else 0, n_qp)
         print(f"newton[final] ||r||={r_final:.3e}  contact_nnz={getattr(Kn, 'nnz', 0)}  nitsche_qp={n_qp}")
 
     nodes_b = unique_nodes_from_edges(edges_b)
@@ -1218,6 +1291,9 @@ def solve_nitsche(ps, args):
         "ndofs": ndofs,
         "penetration": penetration,
         "r_hist": r_hist,
+        "n_active_hist": n_active_hist,
+        "n_qp_hist": n_qp_hist,
+        "rtol": float(args.rtol),
         "n_block": n_block,
         "tris_b": block_triangles(ps, mesh, bid_b),
         "tris_o": block_triangles(ps, mesh, bid_o),
@@ -1303,6 +1379,7 @@ def parse_args(argv=None):
 
 def plot_solution(result):
     import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec
 
     X, Y, u = result["X"], result["Y"], result["u"]
     xd, yd = X + u[0::2], Y + u[1::2]
@@ -1311,17 +1388,34 @@ def plot_solution(result):
     if vmax <= vmin:
         vmax = vmin + 1e-16
 
-    fig, ax = plt.subplots(1, 2, figsize=(11, 4.6))
+    pad = 0.04 * max(float(np.ptp(xd)), float(np.ptp(yd)), 1e-12)
+    x0, x1 = float(np.min(xd)) - pad, float(np.max(xd)) + pad
+    y0, y1 = float(np.min(yd)) - pad, float(np.max(yd)) + pad
+    fig = plt.figure(figsize=(14.5, 7.2), layout="constrained")
+    gs = GridSpec(
+        2,
+        3,
+        figure=fig,
+        width_ratios=[1.7, 0.055, 1.0],
+        height_ratios=[1.15, 1.0],
+    )
+    ax0 = fig.add_subplot(gs[:, 0])
+    cax = fig.add_subplot(gs[:, 1])
+    axg = fig.add_subplot(gs[0, 2])
+    axc = fig.add_subplot(gs[1, 2])
     tpc = None
     for tris in (result["tris_b"], result["tris_o"]):
-        tpc = ax[0].tripcolor(
+        tpc = ax0.tripcolor(
             xd, yd, tris, uy, shading="gouraud", cmap="coolwarm", vmin=vmin, vmax=vmax
         )
-        ax[0].triplot(xd, yd, tris, color="k", lw=0.25, alpha=0.55)
-    fig.colorbar(tpc, ax=ax[0], fraction=0.046, pad=0.04, label="u_y")
-    ax[0].set_aspect("equal")
-    ax[0].set_xlabel("x")
-    ax[0].set_ylabel("y")
+        ax0.triplot(xd, yd, tris, color="k", lw=0.25, alpha=0.55)
+    ax0.set_xlim(x0, x1)
+    ax0.set_ylim(y0, y1)
+    ax0.set_box_aspect((y1 - y0) / (x1 - x0))
+    ax0.set_aspect("equal")
+    fig.colorbar(tpc, cax=cax, label="u_y")
+    ax0.set_xlabel("x")
+    ax0.set_ylabel("y")
     if result.get("rigid_obstacle"):
         mesh_title = "deformed TRI3 (Nitsche vs rigid obstacle)"
     elif result.get("theta_o", 0.0) > 0.0 and result.get("include_sigma"):
@@ -1330,7 +1424,7 @@ def plot_solution(result):
         mesh_title = "deformed TRI3 (biased Nitsche)"
     else:
         mesh_title = "deformed TRI3 (penalty)"
-    ax[0].set_title(mesh_title)
+    ax0.set_title(mesh_title)
 
     nodes = result["nodes_b"]
     order = np.argsort(X[nodes])
@@ -1340,7 +1434,6 @@ def plot_solution(result):
     xc = np.asarray(result["xc"])[xc_order]
     ph = np.asarray(result["p_hertz"])[xc_order]
 
-    axg = ax[1]
     axp = axg.twinx()
     tr_x = np.asarray(result.get("qp_x", []))
     tr_g = np.asarray(result.get("qp_g", []))
@@ -1395,7 +1488,68 @@ def plot_solution(result):
     axg.set_xlim(-xpad, xpad)
     lines = ln_gap + ln_hertz + ln_cauchy + ln_cauchy_o
     axg.legend(lines, [ln.get_label() for ln in lines], loc="best")
-    plt.tight_layout()
+
+    rh = np.asarray(result.get("r_hist", []), dtype=float)
+    if rh.size:
+        rh = np.maximum(rh, 1e-30)
+        vh = np.asarray(result.get("vcycle_hist", []), dtype=float)
+        use_vcycles = vh.size == rh.size
+        if use_vcycles:
+            xs = np.cumsum(vh)
+            xlabel = "V-cycles"
+            n_vc = int(np.sum(vh))
+            conv_title = f"solver convergence  ({n_vc} V-cycles)"
+        else:
+            xs = np.arange(rh.size, dtype=float)
+            xlabel = "Newton iteration"
+            conv_title = "solver convergence"
+        ln_r = axc.semilogy(xs, rh, "o-", color="C4", ms=4, label=r"$\|r\|$")
+        if use_vcycles:
+            for x, y, dv in zip(xs, rh, vh):
+                if dv > 0:
+                    axc.annotate(
+                        f"{int(dv)}",
+                        (x, y),
+                        textcoords="offset points",
+                        xytext=(4, 4),
+                        fontsize=8,
+                        color="C4",
+                    )
+        rtol = result.get("rtol")
+        ln_tol = []
+        if rtol is not None and float(rtol) > 0.0:
+            ln_tol = axc.axhline(
+                float(rtol), color="0.45", ls="--", lw=0.9, label=f"rtol={float(rtol):g}"
+            )
+            ln_tol = [ln_tol]
+        axc.set_xlabel(xlabel)
+        axc.set_ylabel(r"$\|r\|$")
+        axc.set_title(conv_title)
+        axc.grid(True, which="both", ls=":", alpha=0.45)
+        if not use_vcycles:
+            axc.set_xticks(xs)
+        conv_lines = list(ln_r) + ln_tol
+        ah = np.asarray(result.get("n_active_hist", []), dtype=float)
+        qh = np.asarray(result.get("n_qp_hist", []), dtype=float)
+        if ah.size == rh.size:
+            axa = axc.twinx()
+            ln_a = axa.plot(xs, ah, "s--", color="C5", ms=4, label="$|A|$")
+            conv_lines += ln_a
+            if qh.size == rh.size and not np.allclose(qh, ah):
+                ln_q = axa.plot(xs, qh, "^:", color="C6", ms=4, label="nitsche qp")
+                conv_lines += ln_q
+            if use_vcycles:
+                ln_v = axa.plot(
+                    xs, vh, "v-", color="C8", ms=5, label="V-cycles / step"
+                )
+                conv_lines += ln_v
+            axa.set_ylabel("active set" + (" / V-cycles" if use_vcycles else ""))
+            axa.set_ylim(bottom=-0.2)
+        axc.legend(conv_lines, [ln.get_label() for ln in conv_lines], loc="best")
+    else:
+        axc.set_axis_off()
+        axc.set_title("solver convergence (no history)")
+
     out = os.path.join(os.path.dirname(__file__), "nitsche_contact.png")
     fig.savefig(out, dpi=140)
     print(f"saved {out}")
