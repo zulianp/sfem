@@ -374,19 +374,30 @@ def tet4_cvfem_ns_upwind_residual(
 
 
 def tet4_kernel_cost_model() -> dict[str, float]:
-    """Rough scalar operation and cold-memory model for the residual kernel."""
+    """Scalar add/mul/div model matching cvfem_tet4_ns_upwind_simd_microkernel.
 
+    Counts source operations. Does not count abs/ternary neg, float→double
+    casts, or residual zero-stores. Three SCS faces have a zero reference-area
+    component and use 9 FLOPs instead of 15.
+    """
+
+    flops_inv_det = 1.0
+    flops_ref_diff = 9.0
+    flops_grad = 9.0 * 6.0
+    flops_area = 3.0 * 15.0 + 3.0 * 9.0
+    flops_scs_body = 6.0 + 6.0 + 4.0 + 2.0 + 27.0 + 18.0 + 8.0
+    total = flops_inv_det + flops_ref_diff + flops_grad + flops_area + 6.0 * flops_scs_body
     return {
-        "gradient_flops_from_adjugate": 81.0,
-        "area_transform_flops_per_scs": 15.0,
-        "upwind_flux_flops_per_scs_excluding_area": 80.0,
+        "gradient_flops_from_adjugate": flops_inv_det + flops_ref_diff + flops_grad,
+        "area_transform_flops": flops_area,
+        "upwind_flux_flops_per_scs_excluding_area": flops_scs_body,
         "scs_per_element": 6.0,
-        "total_flops": 81.0 + 6.0 * (15.0 + 80.0),
+        "total_flops": total,
         "connectivity_bytes": 4.0 * 4.0,
         "field_gather_bytes": 4.0 * 4.0 * 8.0,
-        "adjugate_plus_determinant_bytes": 10.0 * 8.0,
+        "adjugate_plus_determinant_bytes": 10.0 * 4.0,
         "residual_read_write_bytes": 2.0 * 4.0 * 4.0 * 8.0,
-        "cold_total_bytes": 16.0 + 128.0 + 80.0 + 256.0,
+        "cold_total_bytes": 16.0 + 128.0 + 40.0 + 256.0,
     }
 
 
@@ -465,6 +476,7 @@ def run_self_tests() -> None:
 
     _assert_vec_close(_sum_cols_4x3(rm), [0.0, 0.0, 0.0], 1e-13, "momentum conservation")
     _assert_close(sum(rc), 0.0, 1e-13, "continuity conservation")
+    _assert_close(tet4_kernel_cost_model()["total_flops"], 562.0, 0.0, "folded kernel flop model")
 
 
 def _print_matrix(name: str, a: list[list[float]]) -> None:
