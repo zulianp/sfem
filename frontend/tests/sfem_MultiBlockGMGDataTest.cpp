@@ -163,6 +163,61 @@ namespace {
         return std::make_shared<smesh::Mesh>(base->comm(), blocks, base->points());
     }
 
+    std::shared_ptr<smesh::Mesh> create_two_block_tet4_cube(const ptrdiff_t nx, const ptrdiff_t ny, const ptrdiff_t nz) {
+        auto base = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), nx, ny, nz);
+        if (!base) {
+            return nullptr;
+        }
+
+        auto elements = base->elements(0)->data();
+        auto points   = base->points()->data();
+
+        std::vector<ptrdiff_t> left_ids;
+        std::vector<ptrdiff_t> right_ids;
+        left_ids.reserve((size_t)base->n_elements());
+        right_ids.reserve((size_t)base->n_elements());
+
+        for (ptrdiff_t e = 0; e < base->n_elements(); ++e) {
+            geom_t cx = 0;
+            for (int d = 0; d < 4; ++d) {
+                cx += points[0][elements[d][e]];
+            }
+            cx *= geom_t(0.25);
+            if (cx < geom_t(0.5)) {
+                left_ids.push_back(e);
+            } else {
+                right_ids.push_back(e);
+            }
+        }
+
+        auto copy_block = [&](const std::vector<ptrdiff_t> &ids) {
+            auto block_elements = sfem::create_host_buffer<idx_t>(4, ids.size());
+            auto dst            = block_elements->data();
+            for (ptrdiff_t i = 0; i < (ptrdiff_t)ids.size(); ++i) {
+                const ptrdiff_t e = ids[(size_t)i];
+                for (int d = 0; d < 4; ++d) {
+                    dst[d][i] = elements[d][e];
+                }
+            }
+            return block_elements;
+        };
+
+        std::vector<std::shared_ptr<smesh::Mesh::Block>> blocks;
+        auto                                             left_block = std::make_shared<smesh::Mesh::Block>();
+        left_block->set_name("left");
+        left_block->set_element_type(smesh::TET4);
+        left_block->set_elements(copy_block(left_ids));
+        blocks.push_back(left_block);
+
+        auto right_block = std::make_shared<smesh::Mesh::Block>();
+        right_block->set_name("right");
+        right_block->set_element_type(smesh::TET4);
+        right_block->set_elements(copy_block(right_ids));
+        blocks.push_back(right_block);
+
+        return std::make_shared<smesh::Mesh>(base->comm(), blocks, base->points());
+    }
+
     int apply_laplacian(const std::shared_ptr<sfem::FunctionSpace> &fs,
                         const real_t                                k_w,
                         const real_t                                k_b,
@@ -450,6 +505,42 @@ int test_two_block_quad4_ssgmg_residual() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_two_block_tet4_ssgmg_residual() {
+    auto split = create_two_block_tet4_cube(2, 2, 2);
+    auto cube  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    SFEM_TEST_ASSERT(split != nullptr);
+    SFEM_TEST_ASSERT(cube != nullptr);
+
+    auto split_f = make_ss_poisson(split, false);
+    auto cube_f  = make_ss_poisson(cube, false);
+    SFEM_TEST_ASSERT(split_f != nullptr);
+    SFEM_TEST_ASSERT(cube_f != nullptr);
+
+    auto split_data = sfem::create_gmg_data(split_f);
+    SFEM_TEST_ASSERT(split_data != nullptr);
+    SFEM_TEST_EQ(split_data->functions.size(), smesh::derefinement_levels(split_f->space()->mesh()).size());
+
+    SSGMGResidual split_res;
+    SSGMGResidual cube_res;
+    SFEM_TEST_ASSERT(compute_ssgmg_residual(split_f, split_res) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(compute_ssgmg_residual(cube_f, cube_res) == SFEM_TEST_SUCCESS);
+
+    printf("two-block tet4 ssgmg residual abs %g rel %g; cube abs %g rel %g\n",
+           (double)split_res.abs_res,
+           (double)split_res.rel_res,
+           (double)cube_res.abs_res,
+           (double)cube_res.rel_res);
+
+    const real_t abs_tol = sizeof(real_t) == sizeof(double) ? real_t(2e-3) : real_t(2e-2);
+    const real_t rel_tol = sizeof(real_t) == sizeof(double) ? real_t(2e-4) : real_t(2e-3);
+    SFEM_TEST_ASSERT(split_res.abs_res < abs_tol || split_res.rel_res < rel_tol);
+    SFEM_TEST_ASSERT(cube_res.abs_res < abs_tol || cube_res.rel_res < rel_tol);
+
+    const real_t comparable_factor = real_t(100);
+    SFEM_TEST_ASSERT(split_res.rel_res <= comparable_factor * cube_res.rel_res + rel_tol);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
@@ -458,6 +549,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_checkerboard_dirichlet_hessian_diag);
     SFEM_RUN_TEST(test_checkerboard_ssgmg_residual);
     SFEM_RUN_TEST(test_two_block_quad4_ssgmg_residual);
+    SFEM_RUN_TEST(test_two_block_tet4_ssgmg_residual);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

@@ -44,11 +44,9 @@ namespace sfem {
                 return nullptr;
             }
 
-            if (family != smesh::HEX8 && family != smesh::QUAD4) {
-                SFEM_ERROR(
-                        "create_gmg_data: SS family %s is not implemented in SSGMG yet "
-                        "(TET requires semistructured operator dispatch)\n",
-                        smesh::type_to_string(family));
+            if (family != smesh::HEX8 && family != smesh::QUAD4 && family != smesh::TET4) {
+                SFEM_ERROR("create_gmg_data: SS family %s is not implemented in SSGMG yet\n",
+                           smesh::type_to_string(family));
                 return nullptr;
             }
         }

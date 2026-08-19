@@ -13,6 +13,7 @@
 #include "spectral_hex_laplacian.hpp"
 #include "sshex8_laplacian.hpp"
 #include "ssquad4_laplacian.hpp"
+#include "sstet4_laplacian.hpp"
 
 #include "sfem_defs.hpp"
 
@@ -73,6 +74,9 @@ int laplacian_apply(smesh::ElemType                   element_type,
         }
         if (smesh::is_quad_ss_family(element_type)) {
             return ssquad4_laplacian_apply(level, nelements, elements, points, u, values);
+        }
+        if (smesh::is_tet_ss_family(element_type)) {
+            return sstet4_laplacian_apply_points(level, nelements, elements, points, u, values);
         }
 
         SFEM_ERROR("laplacian_apply not implemented for semi-structured element type %s\n",
@@ -180,6 +184,9 @@ int laplacian_diag(smesh::ElemType              element_type,
         }
         if (smesh::is_quad_ss_family(element_type)) {
             return ssquad4_laplacian_diag(level, nelements, elements, points, values);
+        }
+        if (smesh::is_tet_ss_family(element_type)) {
+            return sstet4_laplacian_diag_points(level, nelements, elements, points, values);
         }
 
         SFEM_ERROR("laplacian_diag not implemented for semi-structured element type %s\n",
