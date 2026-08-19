@@ -22,12 +22,33 @@ namespace sfem {
         auto  es     = f->execution_space();
         auto &ssmesh = f->space()->mesh();
 
+        smesh::ElemType family = smesh::INVALID;
         for (size_t b = 0; b < ssmesh.n_blocks(); ++b) {
             const auto bid = static_cast<smesh::block_idx_t>(b);
-            if (!smesh::is_hex_ss_family(ssmesh.element_type(bid))) {
-                SFEM_ERROR("create_gmg_data: HEX-family SS only (TET/QUAD B5.5, mixed B5.6); block %zu type %s\n",
+            const auto type = ssmesh.element_type(bid);
+            if (!smesh::is_semistructured_type(type)) {
+                SFEM_ERROR("create_gmg_data: block %zu is not semistructured (type %s)\n",
                            b,
-                           smesh::type_to_string(ssmesh.element_type(bid)));
+                           smesh::type_to_string(type));
+                return nullptr;
+            }
+
+            const auto block_family = smesh::ss_source_family(type);
+            if (family == smesh::INVALID) {
+                family = block_family;
+            } else if (family != block_family) {
+                SFEM_ERROR("create_gmg_data: mixed SS families are not implemented (block %zu type %s, expected %s)\n",
+                           b,
+                           smesh::type_to_string(type),
+                           smesh::type_to_string(family));
+                return nullptr;
+            }
+
+            if (family != smesh::HEX8 && family != smesh::QUAD4) {
+                SFEM_ERROR(
+                        "create_gmg_data: SS family %s is not implemented in SSGMG yet "
+                        "(TET requires semistructured operator dispatch)\n",
+                        smesh::type_to_string(family));
                 return nullptr;
             }
         }

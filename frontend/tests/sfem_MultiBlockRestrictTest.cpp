@@ -27,8 +27,9 @@ void fill_linear(const smesh::Mesh &mesh, const sfem::SharedBuffer<real_t> &v) {
     auto            p = mesh.points()->data();
     auto            d = v->data();
     const ptrdiff_t n = mesh.n_nodes();
+    const bool      has_z = mesh.spatial_dimension() > 2;
     for (ptrdiff_t i = 0; i < n; ++i) {
-        d[i] = (real_t)p[0][i] + real_t(2) * (real_t)p[1][i] + real_t(3) * (real_t)p[2][i];
+        d[i] = (real_t)p[0][i] + real_t(2) * (real_t)p[1][i] + (has_z ? real_t(3) * (real_t)p[2][i] : real_t(0));
     }
 }
 
@@ -36,6 +37,7 @@ int map_nodes_by_xyz(const smesh::Mesh &from, const smesh::Mesh &to, std::vector
     SFEM_TEST_EQ(from.n_nodes(), to.n_nodes());
     const ptrdiff_t n   = from.n_nodes();
     const geom_t    tol = geom_tol();
+    const bool      use_z = from.spatial_dimension() > 2 && to.spatial_dimension() > 2;
     from_to_to.assign((size_t)n, -1);
 
     auto pa = from.points()->data();
@@ -44,7 +46,7 @@ int map_nodes_by_xyz(const smesh::Mesh &from, const smesh::Mesh &to, std::vector
         ptrdiff_t found = -1;
         for (ptrdiff_t j = 0; j < n; ++j) {
             if (std::fabs(pa[0][i] - pb[0][j]) <= tol && std::fabs(pa[1][i] - pb[1][j]) <= tol &&
-                std::fabs(pa[2][i] - pb[2][j]) <= tol) {
+                (!use_z || std::fabs(pa[2][i] - pb[2][j]) <= tol)) {
                 found = j;
                 break;
             }
@@ -77,12 +79,122 @@ struct SSPair {
     std::shared_ptr<sfem::FunctionSpace> coarse;
 };
 
-SSPair make_ss_pair(const std::shared_ptr<smesh::Mesh> &hex) {
+SSPair make_ss_pair(const std::shared_ptr<smesh::Mesh> &mesh) {
     const int L  = 4;
-    auto      ss = smesh::to_semistructured(L, hex, true, false);
+    auto      ss = smesh::to_semistructured(L, mesh, true, false);
     auto      fine   = sfem::FunctionSpace::create(ss, 1);
     auto      coarse = fine->derefine(2);
     return {fine, coarse};
+}
+
+std::shared_ptr<smesh::Mesh> create_two_block_quad4_square(const ptrdiff_t nx, const ptrdiff_t ny) {
+    auto base = sfem::Mesh::create_quad4_square(sfem::Communicator::self(), nx, ny, 0, 0, 1, 1);
+    if (!base) {
+        return nullptr;
+    }
+
+    auto elements = base->elements(0)->data();
+    auto points   = base->points()->data();
+
+    std::vector<ptrdiff_t> left_ids;
+    std::vector<ptrdiff_t> right_ids;
+    left_ids.reserve((size_t)base->n_elements());
+    right_ids.reserve((size_t)base->n_elements());
+
+    for (ptrdiff_t e = 0; e < base->n_elements(); ++e) {
+        geom_t cx = 0;
+        for (int d = 0; d < 4; ++d) {
+            cx += points[0][elements[d][e]];
+        }
+        cx *= geom_t(0.25);
+        if (cx < geom_t(0.5)) {
+            left_ids.push_back(e);
+        } else {
+            right_ids.push_back(e);
+        }
+    }
+
+    auto copy_block = [&](const std::vector<ptrdiff_t> &ids) {
+        auto block_elements = sfem::create_host_buffer<idx_t>(4, ids.size());
+        auto dst            = block_elements->data();
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)ids.size(); ++i) {
+            const ptrdiff_t e = ids[(size_t)i];
+            for (int d = 0; d < 4; ++d) {
+                dst[d][i] = elements[d][e];
+            }
+        }
+        return block_elements;
+    };
+
+    std::vector<std::shared_ptr<smesh::Mesh::Block>> blocks;
+    auto                                             left_block = std::make_shared<smesh::Mesh::Block>();
+    left_block->set_name("left");
+    left_block->set_element_type(smesh::QUAD4);
+    left_block->set_elements(copy_block(left_ids));
+    blocks.push_back(left_block);
+
+    auto right_block = std::make_shared<smesh::Mesh::Block>();
+    right_block->set_name("right");
+    right_block->set_element_type(smesh::QUAD4);
+    right_block->set_elements(copy_block(right_ids));
+    blocks.push_back(right_block);
+
+    return std::make_shared<smesh::Mesh>(base->comm(), blocks, base->points());
+}
+
+std::shared_ptr<smesh::Mesh> create_two_block_tet4_cube(const ptrdiff_t nx, const ptrdiff_t ny, const ptrdiff_t nz) {
+    auto base = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), nx, ny, nz);
+    if (!base) {
+        return nullptr;
+    }
+
+    auto elements = base->elements(0)->data();
+    auto points   = base->points()->data();
+
+    std::vector<ptrdiff_t> left_ids;
+    std::vector<ptrdiff_t> right_ids;
+    left_ids.reserve((size_t)base->n_elements());
+    right_ids.reserve((size_t)base->n_elements());
+
+    for (ptrdiff_t e = 0; e < base->n_elements(); ++e) {
+        geom_t cx = 0;
+        for (int d = 0; d < 4; ++d) {
+            cx += points[0][elements[d][e]];
+        }
+        cx *= geom_t(0.25);
+        if (cx < geom_t(0.5)) {
+            left_ids.push_back(e);
+        } else {
+            right_ids.push_back(e);
+        }
+    }
+
+    auto copy_block = [&](const std::vector<ptrdiff_t> &ids) {
+        auto block_elements = sfem::create_host_buffer<idx_t>(4, ids.size());
+        auto dst            = block_elements->data();
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)ids.size(); ++i) {
+            const ptrdiff_t e = ids[(size_t)i];
+            for (int d = 0; d < 4; ++d) {
+                dst[d][i] = elements[d][e];
+            }
+        }
+        return block_elements;
+    };
+
+    std::vector<std::shared_ptr<smesh::Mesh::Block>> blocks;
+    auto                                             left_block = std::make_shared<smesh::Mesh::Block>();
+    left_block->set_name("left");
+    left_block->set_element_type(smesh::TET4);
+    left_block->set_elements(copy_block(left_ids));
+    blocks.push_back(left_block);
+
+    auto right_block = std::make_shared<smesh::Mesh::Block>();
+    right_block->set_name("right");
+    right_block->set_element_type(smesh::TET4);
+    right_block->set_elements(copy_block(right_ids));
+    blocks.push_back(right_block);
+
+    return std::make_shared<smesh::Mesh>(base->comm(), blocks, base->points());
 }
 
 }  // namespace
@@ -197,12 +309,157 @@ int test_checkerboard_vs_cube() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_two_block_quad4_vs_square() {
+    auto split  = create_two_block_quad4_square(4, 4);
+    auto square = sfem::Mesh::create_quad4_square(sfem::Communicator::self(), 4, 4, 0, 0, 1, 1);
+
+    SFEM_TEST_ASSERT(split != nullptr);
+    SFEM_TEST_ASSERT(square != nullptr);
+    SFEM_TEST_EQ(split->n_blocks(), static_cast<size_t>(2));
+
+    auto split_pair  = make_ss_pair(split);
+    auto square_pair = make_ss_pair(square);
+
+    SFEM_TEST_EQ(split_pair.fine->n_dofs(), square_pair.fine->n_dofs());
+    SFEM_TEST_EQ(split_pair.coarse->n_dofs(), square_pair.coarse->n_dofs());
+
+    std::vector<ptrdiff_t> fine_split2square;
+    std::vector<ptrdiff_t> coarse_split2square;
+    SFEM_TEST_ASSERT(
+            map_nodes_by_xyz(split_pair.fine->mesh(), square_pair.fine->mesh(), fine_split2square) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(split_pair.coarse->mesh(), square_pair.coarse->mesh(), coarse_split2square) ==
+                     SFEM_TEST_SUCCESS);
+
+    auto es = sfem::EXECUTION_SPACE_HOST;
+
+    {
+        auto p_split  = sfem::create_hierarchical_prolongation(split_pair.coarse, split_pair.fine, es);
+        auto p_square = sfem::create_hierarchical_prolongation(square_pair.coarse, square_pair.fine, es);
+
+        auto c_split  = sfem::create_host_buffer<real_t>(split_pair.coarse->n_dofs());
+        auto c_square = sfem::create_host_buffer<real_t>(square_pair.coarse->n_dofs());
+        auto f_split  = sfem::create_host_buffer<real_t>(split_pair.fine->n_dofs());
+        auto f_square = sfem::create_host_buffer<real_t>(square_pair.fine->n_dofs());
+
+        fill_ones(c_split);
+        fill_ones(c_square);
+        SFEM_TEST_ASSERT(p_split->apply(c_split->data(), f_split->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(p_square->apply(c_square->data(), f_square->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(compare_mapped(f_split, f_square, fine_split2square) == SFEM_TEST_SUCCESS);
+
+        fill_linear(split_pair.coarse->mesh(), c_split);
+        fill_linear(square_pair.coarse->mesh(), c_square);
+        SFEM_TEST_ASSERT(p_split->apply(c_split->data(), f_split->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(p_square->apply(c_square->data(), f_square->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(compare_mapped(f_split, f_square, fine_split2square) == SFEM_TEST_SUCCESS);
+    }
+
+    {
+        auto r_split  = sfem::create_hierarchical_restriction(split_pair.fine, split_pair.coarse, es);
+        auto r_square = sfem::create_hierarchical_restriction(square_pair.fine, square_pair.coarse, es);
+
+        auto f_split  = sfem::create_host_buffer<real_t>(split_pair.fine->n_dofs());
+        auto f_square = sfem::create_host_buffer<real_t>(square_pair.fine->n_dofs());
+        auto c_split  = sfem::create_host_buffer<real_t>(split_pair.coarse->n_dofs());
+        auto c_square = sfem::create_host_buffer<real_t>(square_pair.coarse->n_dofs());
+
+        fill_ones(f_split);
+        fill_ones(f_square);
+        SFEM_TEST_ASSERT(r_split->apply(f_split->data(), c_split->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(r_square->apply(f_square->data(), c_square->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(compare_mapped(c_split, c_square, coarse_split2square) == SFEM_TEST_SUCCESS);
+
+        fill_linear(split_pair.fine->mesh(), f_split);
+        fill_linear(square_pair.fine->mesh(), f_square);
+        c_split  = sfem::create_host_buffer<real_t>(split_pair.coarse->n_dofs());
+        c_square = sfem::create_host_buffer<real_t>(square_pair.coarse->n_dofs());
+        SFEM_TEST_ASSERT(r_split->apply(f_split->data(), c_split->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(r_square->apply(f_square->data(), c_square->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(compare_mapped(c_split, c_square, coarse_split2square) == SFEM_TEST_SUCCESS);
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_two_block_tet4_vs_cube() {
+    auto split = create_two_block_tet4_cube(2, 2, 2);
+    auto cube  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+
+    SFEM_TEST_ASSERT(split != nullptr);
+    SFEM_TEST_ASSERT(cube != nullptr);
+    SFEM_TEST_EQ(split->n_blocks(), static_cast<size_t>(2));
+
+    auto split_pair = make_ss_pair(split);
+    auto cube_pair  = make_ss_pair(cube);
+
+    SFEM_TEST_EQ(split_pair.fine->n_dofs(), cube_pair.fine->n_dofs());
+    SFEM_TEST_EQ(split_pair.coarse->n_dofs(), cube_pair.coarse->n_dofs());
+
+    std::vector<ptrdiff_t> fine_split2cube;
+    std::vector<ptrdiff_t> coarse_split2cube;
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(split_pair.fine->mesh(), cube_pair.fine->mesh(), fine_split2cube) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(split_pair.coarse->mesh(), cube_pair.coarse->mesh(), coarse_split2cube) ==
+                     SFEM_TEST_SUCCESS);
+
+    auto es = sfem::EXECUTION_SPACE_HOST;
+
+    {
+        auto p_split = sfem::create_hierarchical_prolongation(split_pair.coarse, split_pair.fine, es);
+        auto p_cube  = sfem::create_hierarchical_prolongation(cube_pair.coarse, cube_pair.fine, es);
+
+        auto c_split = sfem::create_host_buffer<real_t>(split_pair.coarse->n_dofs());
+        auto c_cube  = sfem::create_host_buffer<real_t>(cube_pair.coarse->n_dofs());
+        auto f_split = sfem::create_host_buffer<real_t>(split_pair.fine->n_dofs());
+        auto f_cube  = sfem::create_host_buffer<real_t>(cube_pair.fine->n_dofs());
+
+        fill_ones(c_split);
+        fill_ones(c_cube);
+        SFEM_TEST_ASSERT(p_split->apply(c_split->data(), f_split->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(p_cube->apply(c_cube->data(), f_cube->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(compare_mapped(f_split, f_cube, fine_split2cube) == SFEM_TEST_SUCCESS);
+
+        fill_linear(split_pair.coarse->mesh(), c_split);
+        fill_linear(cube_pair.coarse->mesh(), c_cube);
+        SFEM_TEST_ASSERT(p_split->apply(c_split->data(), f_split->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(p_cube->apply(c_cube->data(), f_cube->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(compare_mapped(f_split, f_cube, fine_split2cube) == SFEM_TEST_SUCCESS);
+    }
+
+    {
+        auto r_split = sfem::create_hierarchical_restriction(split_pair.fine, split_pair.coarse, es);
+        auto r_cube  = sfem::create_hierarchical_restriction(cube_pair.fine, cube_pair.coarse, es);
+
+        auto f_split = sfem::create_host_buffer<real_t>(split_pair.fine->n_dofs());
+        auto f_cube  = sfem::create_host_buffer<real_t>(cube_pair.fine->n_dofs());
+        auto c_split = sfem::create_host_buffer<real_t>(split_pair.coarse->n_dofs());
+        auto c_cube  = sfem::create_host_buffer<real_t>(cube_pair.coarse->n_dofs());
+
+        fill_ones(f_split);
+        fill_ones(f_cube);
+        SFEM_TEST_ASSERT(r_split->apply(f_split->data(), c_split->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(r_cube->apply(f_cube->data(), c_cube->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(compare_mapped(c_split, c_cube, coarse_split2cube) == SFEM_TEST_SUCCESS);
+
+        fill_linear(split_pair.fine->mesh(), f_split);
+        fill_linear(cube_pair.fine->mesh(), f_cube);
+        c_split = sfem::create_host_buffer<real_t>(split_pair.coarse->n_dofs());
+        c_cube  = sfem::create_host_buffer<real_t>(cube_pair.coarse->n_dofs());
+        SFEM_TEST_ASSERT(r_split->apply(f_split->data(), c_split->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(r_cube->apply(f_cube->data(), c_cube->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(compare_mapped(c_split, c_cube, coarse_split2cube) == SFEM_TEST_SUCCESS);
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
     SFEM_RUN_TEST(test_checkerboard_prolong_ones);
     SFEM_RUN_TEST(test_checkerboard_restrict_finite);
     SFEM_RUN_TEST(test_checkerboard_vs_cube);
+    SFEM_RUN_TEST(test_two_block_quad4_vs_square);
+    SFEM_RUN_TEST(test_two_block_tet4_vs_cube);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

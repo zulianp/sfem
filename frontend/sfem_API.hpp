@@ -15,6 +15,8 @@
 #include "smesh_sshex8_prolongation.hpp"
 #include "smesh_sshex8_restriction.hpp"
 #include "smesh_ssquad4.hpp"
+#include "smesh_ssquad4_prolongation.hpp"
+#include "smesh_sstet4_prolongation.hpp"
 
 // C++ includes
 #include "acrs.hpp"
@@ -410,24 +412,51 @@ namespace sfem {
         return crs_graph;
     }
 
-    static void assert_hex_ss_transfer_meshes(const Mesh &from, const Mesh &to) {
+    static smesh::ElemType transfer_source_family(const smesh::ElemType type) {
+        return smesh::is_semistructured_type(type) ? smesh::ss_source_family(type) : type;
+    }
+
+    static smesh::ElemType assert_supported_ss_transfer_meshes(const Mesh &from, const Mesh &to) {
         if (from.n_blocks() != to.n_blocks()) {
             SFEM_ERROR("hierarchical transfer: from/to n_blocks mismatch (%zu vs %zu)\n", from.n_blocks(), to.n_blocks());
         }
+
+        smesh::ElemType family = smesh::INVALID;
         for (size_t b = 0; b < from.n_blocks(); ++b) {
             const auto bid = static_cast<smesh::block_idx_t>(b);
-            if (!smesh::is_hex_ss_family(from.element_type(bid))) {
-                SFEM_ERROR(
-                        "hierarchical transfer: HEX-family SS only (TET/QUAD B5.5, mixed B5.6); from block %zu type %s\n",
-                        b,
-                        smesh::type_to_string(from.element_type(bid)));
-            }
-            if (!smesh::is_hex_ss_family(to.element_type(bid))) {
-                SFEM_ERROR("hierarchical transfer: to-mesh block %zu is not HEX-family (type %s)\n",
+            const auto from_type = from.element_type(bid);
+            const auto to_type   = to.element_type(bid);
+            if (!smesh::is_semistructured_type(to_type)) {
+                SFEM_ERROR("hierarchical transfer: to-mesh block %zu is not semistructured (type %s)\n",
                            b,
-                           smesh::type_to_string(to.element_type(bid)));
+                           smesh::type_to_string(to_type));
+            }
+
+            const auto from_family = transfer_source_family(from_type);
+            const auto to_family   = smesh::ss_source_family(to_type);
+            if (from_family != to_family) {
+                SFEM_ERROR("hierarchical transfer: from/to block %zu family mismatch (%s vs %s)\n",
+                           b,
+                           smesh::type_to_string(from_type),
+                           smesh::type_to_string(to_type));
+            }
+
+            if (family == smesh::INVALID) {
+                family = to_family;
+            } else if (family != to_family) {
+                SFEM_ERROR(
+                        "hierarchical transfer: mixed SS families are not implemented (block %zu type %s, expected %s)\n",
+                        b,
+                        smesh::type_to_string(to_type),
+                        smesh::type_to_string(family));
+            }
+
+            if (family != smesh::HEX8 && family != smesh::QUAD4 && family != smesh::TET4) {
+                SFEM_ERROR("hierarchical transfer: SS family %s is not implemented\n", smesh::type_to_string(family));
             }
         }
+
+        return family;
     }
 
     static std::shared_ptr<Operator<real_t>> wrap_prolongation_coarse_gather(
@@ -460,15 +489,18 @@ namespace sfem {
                                                                               const ExecutionSpace                  es) {
         const bool to_ss   = to_space->has_semi_structured_mesh();
         const bool from_ss = from_space->has_semi_structured_mesh();
-        if (to_ss) {
-            assert_hex_ss_transfer_meshes(from_space->mesh(), to_space->mesh());
-        } else if (to_space->mesh().n_blocks() > 1) {
+        const auto ss_family =
+                to_ss ? assert_supported_ss_transfer_meshes(from_space->mesh(), to_space->mesh()) : smesh::INVALID;
+        if (!to_ss && to_space->mesh().n_blocks() > 1) {
             SFEM_ERROR("create_hierarchical_prolongation: unstructured multi-block is not implemented\n");
         }
 
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == es) {
             if (to_ss) {
+                if (ss_family != smesh::HEX8) {
+                    SFEM_ERROR("create_hierarchical_prolongation: DEVICE SS transfer is implemented for HEX-family only\n");
+                }
                 if (from_ss) {
                     return wrap_prolongation_coarse_gather(
                             from_space,
@@ -591,6 +623,11 @@ namespace sfem {
                     const bool mpi_hex = from_mesh && from_mesh->is_distributed() && from_mesh->comm() &&
                                          from_mesh->comm()->size() > 1;
                     if (mpi_hex) {
+                        if (ss_family != smesh::HEX8) {
+                            SFEM_ERROR(
+                                    "create_hierarchical_prolongation: distributed unstructured-to-SS transfer is "
+                                    "implemented for HEX-family only\n");
+                        }
                         return wrap_prolongation_coarse_gather(
                                 from_space,
                                 es,
@@ -635,7 +672,7 @@ namespace sfem {
                                     to_space->n_dofs(),
                                     from_space->n_dofs(),
                                     [=](const real_t *const from, real_t *const to) {
-                                        SFEM_TRACE_SCOPE("sshex8_hierarchical_prolongation");
+                                        SFEM_TRACE_SCOPE("ss_hierarchical_prolongation");
 
                                         auto     &ssm   = to_space->mesh();
                                         const int level = smesh::semistructured_level(ssm);
@@ -645,8 +682,28 @@ namespace sfem {
                                             if (ne == 0) {
                                                 continue;
                                             }
-                                            smesh::sshex8_hierarchical_prolongation(
-                                                    level, ne, to_b->elements()->data(), from_space->block_size(), from, to);
+                                            if (ss_family == smesh::HEX8) {
+                                                smesh::sshex8_hierarchical_prolongation(level,
+                                                                                       ne,
+                                                                                       to_b->elements()->data(),
+                                                                                       from_space->block_size(),
+                                                                                       from,
+                                                                                       to);
+                                            } else if (ss_family == smesh::QUAD4) {
+                                                smesh::ssquad4_hierarchical_prolongation(level,
+                                                                                        ne,
+                                                                                        to_b->elements()->data(),
+                                                                                        from_space->block_size(),
+                                                                                        from,
+                                                                                        to);
+                                            } else {
+                                                smesh::sstet4_hierarchical_prolongation(level,
+                                                                                       ne,
+                                                                                       to_b->elements()->data(),
+                                                                                       from_space->block_size(),
+                                                                                       from,
+                                                                                       to);
+                                            }
                                         }
                                     },
                                     EXECUTION_SPACE_HOST));
@@ -661,7 +718,7 @@ namespace sfem {
                                 to_space->n_dofs(),
                                 from_space->n_dofs(),
                                 [=](const real_t *const from, real_t *const to) {
-                                    SFEM_TRACE_SCOPE("sshex8_prolongate");
+                                    SFEM_TRACE_SCOPE("ss_prolongate");
 
                                     auto     &from_ssm   = from_space->mesh();
                                     auto     &to_ssm     = to_space->mesh();
@@ -674,16 +731,40 @@ namespace sfem {
                                         if (ne == 0) {
                                             continue;
                                         }
-                                        smesh::sshex8_prolongate(ne,
-                                                                 from_level,
-                                                                 1,
-                                                                 from_b->elements()->data(),
-                                                                 to_level,
-                                                                 1,
-                                                                 to_b->elements()->data(),
-                                                                 from_space->block_size(),
-                                                                 from,
-                                                                 to);
+                                        if (ss_family == smesh::HEX8) {
+                                            smesh::sshex8_prolongate(ne,
+                                                                     from_level,
+                                                                     1,
+                                                                     from_b->elements()->data(),
+                                                                     to_level,
+                                                                     1,
+                                                                     to_b->elements()->data(),
+                                                                     from_space->block_size(),
+                                                                     from,
+                                                                     to);
+                                        } else if (ss_family == smesh::QUAD4) {
+                                            smesh::ssquad4_prolongate(ne,
+                                                                      from_level,
+                                                                      1,
+                                                                      from_b->elements()->data(),
+                                                                      to_level,
+                                                                      1,
+                                                                      to_b->elements()->data(),
+                                                                      from_space->block_size(),
+                                                                      from,
+                                                                      to);
+                                        } else {
+                                            smesh::sstet4_prolongate(ne,
+                                                                     from_level,
+                                                                     1,
+                                                                     from_b->elements()->data(),
+                                                                     to_level,
+                                                                     1,
+                                                                     to_b->elements()->data(),
+                                                                     from_space->block_size(),
+                                                                     from,
+                                                                     to);
+                                        }
                                     }
                                 },
                                 EXECUTION_SPACE_HOST));

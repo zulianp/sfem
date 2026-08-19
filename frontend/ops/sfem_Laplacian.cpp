@@ -76,6 +76,14 @@ namespace sfem {
             }
         }
 
+        static bool laplacian_domain_uses_fff(const smesh::ElemType element_type) {
+            if (smesh::is_semistructured_type(element_type)) {
+                return smesh::is_hex_ss_family(element_type);
+            }
+
+            return element_type == smesh::TET4 || element_type == smesh::TET10 || element_type == smesh::HEX8;
+        }
+
         /// SoA view of [begin, begin+ne). begin==0 is the original columns (SS HEX nxe can be huge).
         idx_t **element_soa_view(idx_t **const elems,
                                  const int     nxe,
@@ -210,6 +218,11 @@ namespace sfem {
         for (auto &n2d : impl_->domains->domains()) {
             OpDomain &domain = n2d.second;
             auto      block  = domain.block;
+
+            if (!laplacian_domain_uses_fff(domain.element_type)) {
+                domain.user_data = nullptr;
+                continue;
+            }
 
             const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *block);
             auto                     fff      = smesh::FFF::create_AoS(mesh, smesh::MEMORY_SPACE_HOST, block_id);
@@ -427,4 +440,3 @@ namespace sfem {
     void Laplacian::set_option(const std::string & /*name*/, bool /*val*/) {}
 
 }  // namespace sfem
-

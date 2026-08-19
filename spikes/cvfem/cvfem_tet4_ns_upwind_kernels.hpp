@@ -497,44 +497,6 @@ static SFEM_INLINE void cvfem_run_residual_kernel(const scalar_t                
     cvfem_tet4_ns_upwind_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, in, out);
 }
 
-static SFEM_INLINE void cvfem_run_jacobian_kernel(const scalar_t                        rho,
-                                                  const scalar_t                        mu,
-                                                  const jacobian_t *const SFEM_RESTRICT adj0,
-                                                  const jacobian_t *const SFEM_RESTRICT adj1,
-                                                  const jacobian_t *const SFEM_RESTRICT adj2,
-                                                  const jacobian_t *const SFEM_RESTRICT adj3,
-                                                  const jacobian_t *const SFEM_RESTRICT adj4,
-                                                  const jacobian_t *const SFEM_RESTRICT adj5,
-                                                  const jacobian_t *const SFEM_RESTRICT adj6,
-                                                  const jacobian_t *const SFEM_RESTRICT adj7,
-                                                  const jacobian_t *const SFEM_RESTRICT adj8,
-                                                  const jacobian_t *const SFEM_RESTRICT det,
-                                                  const int                             nlanes,
-                                                  const Tet4InputPack                  &in,
-                                                  scalar_t                              Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF]) {
-    for (int lane = 0; lane < nlanes; ++lane) {
-        const scalar_t ux[4] = {in.ux[0][lane], in.ux[1][lane], in.ux[2][lane], in.ux[3][lane]};
-        const scalar_t uy[4] = {in.uy[0][lane], in.uy[1][lane], in.uy[2][lane], in.uy[3][lane]};
-        const scalar_t uz[4] = {in.uz[0][lane], in.uz[1][lane], in.uz[2][lane], in.uz[3][lane]};
-        cvfem_tet4_ns_upwind_jacobian_dense(rho,
-                                            mu,
-                                            scalar_t(adj0[lane]),
-                                            scalar_t(adj1[lane]),
-                                            scalar_t(adj2[lane]),
-                                            scalar_t(adj3[lane]),
-                                            scalar_t(adj4[lane]),
-                                            scalar_t(adj5[lane]),
-                                            scalar_t(adj6[lane]),
-                                            scalar_t(adj7[lane]),
-                                            scalar_t(adj8[lane]),
-                                            scalar_t(det[lane]),
-                                            ux,
-                                            uy,
-                                            uz,
-                                            Ke[lane]);
-    }
-}
-
 template <typename Idx>
 static SFEM_INLINE Idx cvfem_linear_search(const Idx target, const Idx *const arr, const int size) {
     int i = 0;
@@ -555,12 +517,12 @@ static SFEM_INLINE void cvfem_find_cols4(const Idx *const SFEM_RESTRICT targets,
                                          const Idx *const SFEM_RESTRICT row,
                                          const int                      lenrow,
                                          Idx *const SFEM_RESTRICT       ks) {
-    if (lenrow > 32) {
-        for (int d = 0; d < 4; ++d) {
-            ks[d] = cvfem_linear_search(targets[d], row, lenrow);
-        }
-        return;
-    }
+    // if (lenrow > 32) {
+    //     for (int d = 0; d < 4; ++d) {
+    //         ks[d] = cvfem_linear_search(targets[d], row, lenrow);
+    //     }
+    //     return;
+    // }
     for (int d = 0; d < 4; ++d) ks[d] = 0;
     for (int i = 0; i < lenrow; ++i) {
         for (int d = 0; d < 4; ++d) {
@@ -624,5 +586,7 @@ static SFEM_INLINE void tet4_local_to_global_bsr4(const Idx *const SFEM_RESTRICT
         }
     }
 }
+
+#include "cvfem_tet4_ns_upwind_sympy_kernels.hpp"
 
 #endif
