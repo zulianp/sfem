@@ -1,5 +1,5 @@
-#ifndef MACRO_TET4_LAPLACIAN_H
-#define MACRO_TET4_LAPLACIAN_H
+#ifndef SSTET4_LAPLACIAN_H
+#define SSTET4_LAPLACIAN_H
 
 // Adapted from Bole Ma implementation in https://github.com/zulianp/hpcfem
 
@@ -19,7 +19,20 @@ int sstet4_laplacian_apply(const int                             level,
                            const real_t *const SFEM_RESTRICT     u,
                            real_t *const SFEM_RESTRICT           values);
 
+int sstet4_laplacian_apply_points(const int                         level,
+                                  const ptrdiff_t                   nelements,
+                                  idx_t **const SFEM_RESTRICT       elements,
+                                  geom_t **const SFEM_RESTRICT      points,
+                                  const real_t *const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT       values);
+
+int sstet4_laplacian_diag_points(const int                    level,
+                                 const ptrdiff_t              nelements,
+                                 idx_t **const SFEM_RESTRICT  elements,
+                                 geom_t **const SFEM_RESTRICT points,
+                                 real_t *const SFEM_RESTRICT  values);
+
 #ifdef __cplusplus
 }
 #endif
-#endif  // MACRO_TET4_LAPLACIAN_H
+#endif  // SSTET4_LAPLACIAN_H
