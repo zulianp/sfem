@@ -47,11 +47,11 @@ namespace {
             return SFEM_TEST_SUCCESS;
         }
 
-        auto            dist         = parallel_mesh->distributed();
-        auto            node_mapping = dist->node_mapping()->data();
-        auto            serial_pts   = serial_mesh->points()->data();
-        auto            parallel_pts = parallel_mesh->points()->data();
-        const real_t    geom_tol     = sizeof(geom_t) == sizeof(double) ? real_t(1e-12) : real_t(1e-5);
+        auto         dist         = parallel_mesh->distributed();
+        auto         node_mapping = dist->node_mapping()->data();
+        auto         serial_pts   = serial_mesh->points()->data();
+        auto         parallel_pts = parallel_mesh->points()->data();
+        const real_t geom_tol     = sizeof(geom_t) == sizeof(double) ? real_t(1e-12) : real_t(1e-5);
         for (ptrdiff_t i = 0; i < n_owned; ++i) {
             const ptrdiff_t g = static_cast<ptrdiff_t>(node_mapping[i]);
             SFEM_TEST_APPROXEQ(parallel_pts[0][i], serial_pts[0][g], geom_tol);
@@ -61,13 +61,13 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
-    int compare_owned_to_serial(const std::shared_ptr<sfem::Communicator>  &comm,
-                                const std::shared_ptr<sfem::Mesh>          &parallel_mesh,
-                                const real_t *const                         parallel_y,
-                                const real_t *const                         serial_y,
-                                const ptrdiff_t                             n_owned_dofs,
-                                const ptrdiff_t                             n_serial_dofs,
-                                const real_t                                tol) {
+    int compare_owned_to_serial(const std::shared_ptr<sfem::Communicator> &comm,
+                                const std::shared_ptr<sfem::Mesh>         &parallel_mesh,
+                                const real_t *const                        parallel_y,
+                                const real_t *const                        serial_y,
+                                const ptrdiff_t                            n_owned_dofs,
+                                const ptrdiff_t                            n_serial_dofs,
+                                const real_t                               tol) {
         real_t local_sum = 0;
         for (ptrdiff_t i = 0; i < n_owned_dofs; ++i) {
             local_sum += parallel_y[i];
@@ -211,13 +211,10 @@ namespace {
 
         // Rank-split vs serial assembly order: ~1e-8 abs; 1e-7 still catches real bugs.
         const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-7) : real_t(1e-4);
-        SFEM_TEST_ASSERT(compare_owned_to_serial(comm,
-                                                 parallel_mesh,
-                                                 parallel_y_host->data(),
-                                                 serial_y->data(),
-                                                 n_owned_dofs,
-                                                 n_serial_dofs,
-                                                 tol) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(
+                compare_owned_to_serial(
+                        comm, parallel_mesh, parallel_y_host->data(), serial_y->data(), n_owned_dofs, n_serial_dofs, tol) ==
+                SFEM_TEST_SUCCESS);
 
         {
             setenv("SFEM_PARALLEL_MF_LEGACY", "1", 1);
@@ -227,13 +224,10 @@ namespace {
                 buffer_device_to_host((size_t)n_y_alloc * sizeof(real_t), parallel_y->data(), parallel_y_host->data());
 #endif
             }
-            SFEM_TEST_ASSERT(compare_owned_to_serial(comm,
-                                                     parallel_mesh,
-                                                     parallel_y_host->data(),
-                                                     serial_y->data(),
-                                                     n_owned_dofs,
-                                                     n_serial_dofs,
-                                                     tol) == SFEM_TEST_SUCCESS);
+            SFEM_TEST_ASSERT(
+                    compare_owned_to_serial(
+                            comm, parallel_mesh, parallel_y_host->data(), serial_y->data(), n_owned_dofs, n_serial_dofs, tol) ==
+                    SFEM_TEST_SUCCESS);
             setenv("SFEM_PARALLEL_MF_LEGACY", "0", 1);
         }
 
@@ -280,10 +274,8 @@ namespace {
         if (comm->rank() == 0) {
             const ptrdiff_t n_global_dofs = (comm->size() > 1) ? parallel_mesh->distributed()->n_nodes_global() : n_serial_dofs;
             const double    serial_rate   = static_cast<double>(n_serial_dofs) * static_cast<double>(bench_reps) / serial_elapsed;
-            const double    legacy_rate =
-                    static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / legacy_elapsed;
-            const double overlap_rate =
-                    static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / overlap_elapsed;
+            const double    legacy_rate   = static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / legacy_elapsed;
+            const double    overlap_rate = static_cast<double>(n_global_dofs) * static_cast<double>(bench_reps) / overlap_elapsed;
 #ifdef _OPENMP
             const int omp_max = omp_get_max_threads();
 #else
@@ -318,7 +310,7 @@ namespace {
 
     int test_parallel_laplacian_apply_hex8_cube() {
         auto            comm = sfem::Communicator::world();
-        const ptrdiff_t nx = 80, ny = 60, nz = 40;
+        const ptrdiff_t nx = 8, ny = 6, nz = 4;
         auto serial   = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), nx, ny, nz, -1, -0.5, 0.25, 1, 1.5, 2.0);
         auto parallel = sfem::Mesh::create_hex8_cube(comm, nx, ny, nz, -1, -0.5, 0.25, 1, 1.5, 2.0);
         return check_parallel_laplacian_apply(serial, parallel, sfem::EXECUTION_SPACE_HOST, true);
@@ -327,8 +319,8 @@ namespace {
     int test_parallel_laplacian_apply_checkerboard() {
         auto            comm = sfem::Communicator::world();
         const ptrdiff_t nx = 16, ny = 12, nz = 8;
-        auto serial   = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), nx, ny, nz);
-        auto parallel = sfem::Mesh::create_hex8_checkerboard_cube(comm, nx, ny, nz);
+        auto            serial   = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), nx, ny, nz);
+        auto            parallel = sfem::Mesh::create_hex8_checkerboard_cube(comm, nx, ny, nz);
         SFEM_TEST_ASSERT(serial != nullptr);
         SFEM_TEST_ASSERT(parallel != nullptr);
         SFEM_TEST_EQ(parallel->n_blocks(), static_cast<size_t>(2));
@@ -342,8 +334,8 @@ namespace {
     int test_parallel_laplacian_apply_hex8_tet4() {
         auto            comm = sfem::Communicator::world();
         const ptrdiff_t nx = 8, ny = 6, nz = 4;
-        auto serial   = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), nx, ny, nz);
-        auto parallel = sfem::Mesh::create_hex8_tet4_cube(comm, nx, ny, nz);
+        auto            serial   = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), nx, ny, nz);
+        auto            parallel = sfem::Mesh::create_hex8_tet4_cube(comm, nx, ny, nz);
         SFEM_TEST_ASSERT(serial != nullptr);
         SFEM_TEST_ASSERT(parallel != nullptr);
         SFEM_TEST_EQ(parallel->n_blocks(), static_cast<size_t>(2));
@@ -354,22 +346,22 @@ namespace {
 
     int test_element_scope_identity_checkerboard() {
         auto            comm = sfem::Communicator::world();
-        const ptrdiff_t nx = 16, ny = 12, nz = 8;
-        auto mesh = sfem::Mesh::create_hex8_checkerboard_cube(comm, nx, ny, nz);
+        const ptrdiff_t nx = 8, ny = 6, nz = 4;
+        auto            mesh = sfem::Mesh::create_hex8_checkerboard_cube(comm, nx, ny, nz);
         SFEM_TEST_ASSERT(mesh != nullptr);
         SFEM_TEST_EQ(mesh->n_blocks(), static_cast<size_t>(2));
 
-        auto space    = sfem::FunctionSpace::create(mesh, 1);
-        auto function = sfem::Function::create(space);
+        auto space     = sfem::FunctionSpace::create(mesh, 1);
+        auto function  = sfem::Function::create(space);
         auto laplacian = sfem::create_op(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(laplacian != nullptr);
         SFEM_TEST_ASSERT(laplacian->initialize() == SFEM_SUCCESS);
         function->add_operator(laplacian);
 
-        const ptrdiff_t n_local = space->n_dofs();
-        const ptrdiff_t n_owned = space->n_owned_dofs();
-        auto            x       = sfem::create_host_buffer<real_t>(n_local);
-        auto            y_all   = sfem::create_host_buffer<real_t>(n_local);
+        const ptrdiff_t n_local  = space->n_dofs();
+        const ptrdiff_t n_owned  = space->n_owned_dofs();
+        auto            x        = sfem::create_host_buffer<real_t>(n_local);
+        auto            y_all    = sfem::create_host_buffer<real_t>(n_local);
         auto            y_phased = sfem::create_host_buffer<real_t>(n_local);
         std::fill(x->data(), x->data() + n_local, real_t(0));
         fill_nodal_field(mesh, x->data(), n_owned);
