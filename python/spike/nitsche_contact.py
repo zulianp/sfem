@@ -1504,9 +1504,37 @@ def plot_solution(result):
             xlabel = "Newton iteration"
             conv_title = "solver convergence"
         ln_r = axc.semilogy(xs, rh, "o-", color="C4", ms=4, label=r"$\|r\|$")
+        dh = np.asarray(result.get("direct_hist", []), dtype=bool)
+        ln_dir = []
+        n_direct = 0
+        if dh.size == rh.size and np.any(dh):
+            n_direct = int(np.count_nonzero(dh))
+            ln_dir = axc.semilogy(
+                xs[dh],
+                rh[dh],
+                "x",
+                color="k",
+                ms=8,
+                mew=1.8,
+                label=f"spsolve ({n_direct})",
+                zorder=5,
+            )
         if use_vcycles:
-            for x, y, dv in zip(xs, rh, vh):
-                if dv > 0:
+            n_vc = int(np.sum(vh))
+            extra = f", {n_direct} spsolve" if n_direct else ""
+            conv_title = f"solver convergence  ({n_vc} V-cycles{extra})"
+            for x, y, dv, is_d in zip(xs, rh, vh, dh if dh.size == rh.size else [False] * rh.size):
+                if is_d:
+                    axc.annotate(
+                        "D",
+                        (x, y),
+                        textcoords="offset points",
+                        xytext=(4, -10),
+                        fontsize=8,
+                        color="k",
+                        fontweight="bold",
+                    )
+                elif dv > 0:
                     axc.annotate(
                         f"{int(dv)}",
                         (x, y),
@@ -1528,7 +1556,7 @@ def plot_solution(result):
         axc.grid(True, which="both", ls=":", alpha=0.45)
         if not use_vcycles:
             axc.set_xticks(xs)
-        conv_lines = list(ln_r) + ln_tol
+        conv_lines = list(ln_r) + list(ln_dir) + ln_tol
         ah = np.asarray(result.get("n_active_hist", []), dtype=float)
         qh = np.asarray(result.get("n_qp_hist", []), dtype=float)
         if ah.size == rh.size:

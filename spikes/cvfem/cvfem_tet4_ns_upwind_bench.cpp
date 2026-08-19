@@ -130,9 +130,11 @@ struct PackedData {
     ptrdiff_t                                      max_actual_nodes_per_pack{0};
     std::vector<std::vector<int>>                  local_rowptr;
     std::vector<std::vector<pack_idx_t>>           local_colidx;
+    std::vector<std::vector<smesh::count_t>>       local_global_slot;
     ptrdiff_t                                      max_local_nnz{0};
     std::vector<ptrdiff_t>                         ghost_mat_ptr;
     std::vector<smesh::idx_t>                      ghost_mat_col;
+    std::vector<smesh::count_t>                    ghost_mat_slot;
     std::vector<scalar_t>                          ghost_mat_val;
 };
 
@@ -304,9 +306,22 @@ static SFEM_INLINE smesh::idx_t pack_local_to_global(const PackedData &p,
     return p.ghost_idx[p.ghost_ptr[pack] + ((ptrdiff_t)local - n_contiguous)];
 }
 
-static void build_pack_local_crs(PackedData &p, const ptrdiff_t nelements) {
+static SFEM_INLINE smesh::count_t bsr4_find_slot(const smesh::count_t *const SFEM_RESTRICT rowptr,
+                                                 const smesh::idx_t *const SFEM_RESTRICT   colidx,
+                                                 const smesh::idx_t                        row,
+                                                 const smesh::idx_t                        col) {
+    const int          len = int(rowptr[row + 1] - rowptr[row]);
+    const smesh::idx_t ks  = cvfem_linear_search(col, &colidx[rowptr[row]], len);
+    return rowptr[row] + (smesh::count_t)ks;
+}
+
+static void build_pack_local_crs(PackedData               &p,
+                                 const ptrdiff_t           nelements,
+                                 const smesh::count_t     *rowptr_g,
+                                 const smesh::idx_t       *colidx_g) {
     p.local_rowptr.resize((size_t)p.n_packs);
     p.local_colidx.resize((size_t)p.n_packs);
+    p.local_global_slot.resize((size_t)p.n_packs);
     p.max_local_nnz = 0;
 
     for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
@@ -339,6 +354,17 @@ static void build_pack_local_crs(PackedData &p, const ptrdiff_t nelements) {
             const auto &row = adj[(size_t)i];
             std::memcpy(colidx.data() + rowptr[(size_t)i], row.data(), row.size() * sizeof(pack_idx_t));
         }
+        auto &slots = p.local_global_slot[(size_t)pack];
+        slots.resize(colidx.size());
+        for (ptrdiff_t i = 0; i < n_pack_nodes; ++i) {
+            const smesh::idx_t grow  = pack_local_to_global(p, pack, n_contiguous, (pack_idx_t)i);
+            const int          begin = rowptr[(size_t)i];
+            const int          end   = rowptr[(size_t)i + 1];
+            for (int t = begin; t < end; ++t) {
+                const smesh::idx_t gcol = pack_local_to_global(p, pack, n_contiguous, colidx[(size_t)t]);
+                slots[(size_t)t]        = bsr4_find_slot(rowptr_g, colidx_g, grow, gcol);
+            }
+        }
         p.max_local_nnz = std::max(p.max_local_nnz, (ptrdiff_t)colidx.size());
     }
 
@@ -356,6 +382,7 @@ static void build_pack_local_crs(PackedData &p, const ptrdiff_t nelements) {
     for (ptrdiff_t i = 0; i < p.n_ghost_entries; ++i) p.ghost_mat_ptr[(size_t)i + 1] += p.ghost_mat_ptr[(size_t)i];
     const ptrdiff_t gnnz = p.ghost_mat_ptr[(size_t)p.n_ghost_entries];
     p.ghost_mat_col.resize((size_t)gnnz);
+    p.ghost_mat_slot.resize((size_t)gnnz);
     p.ghost_mat_val.assign((size_t)gnnz * 16, 0.0);
 
     for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
@@ -368,9 +395,12 @@ static void build_pack_local_crs(PackedData &p, const ptrdiff_t nelements) {
             const ptrdiff_t local_i = n_contiguous + k;
             const int       begin   = rowptr[(size_t)local_i];
             const int       end     = rowptr[(size_t)local_i + 1];
-            const ptrdiff_t dest    = p.ghost_mat_ptr[(size_t)ghost_off + (size_t)k];
+            const ptrdiff_t    dest = p.ghost_mat_ptr[(size_t)ghost_off + (size_t)k];
+            const smesh::idx_t grow = p.ghost_idx[(size_t)ghost_off + (size_t)k];
             for (int t = 0; t < end - begin; ++t) {
-                p.ghost_mat_col[(size_t)dest + (size_t)t] = pack_local_to_global(p, pack, n_contiguous, colidx[(size_t)begin + t]);
+                const smesh::idx_t gcol                    = pack_local_to_global(p, pack, n_contiguous, colidx[(size_t)begin + t]);
+                p.ghost_mat_col[(size_t)dest + (size_t)t]  = gcol;
+                p.ghost_mat_slot[(size_t)dest + (size_t)t] = bsr4_find_slot(rowptr_g, colidx_g, grow, gcol);
             }
         }
     }
@@ -394,33 +424,7 @@ static BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
     return b;
 }
 
-static void zero_bsr4(BSR4 &b) {
-    scalar_t *const v = b.values->data();
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < b.nnz * 16; ++i) v[i] = 0.0;
-}
-
-static SFEM_INLINE void bsr4_add_block(const smesh::count_t *const SFEM_RESTRICT rowptr,
-                                       const smesh::idx_t *const SFEM_RESTRICT   colidx,
-                                       scalar_t *const SFEM_RESTRICT             values,
-                                       const smesh::idx_t                        row,
-                                       const smesh::idx_t                        col,
-                                       const scalar_t *const SFEM_RESTRICT       block,
-                                       const bool                                use_atomic) {
-    const int              len  = int(rowptr[row + 1] - rowptr[row]);
-    const smesh::idx_t     ks   = cvfem_linear_search(col, &colidx[rowptr[row]], len);
-    scalar_t *const SFEM_RESTRICT dst = &values[(rowptr[row] + ks) * 16];
-    if (use_atomic) {
-        for (int t = 0; t < 16; ++t) {
-#pragma omp atomic update
-            dst[t] += block[t];
-        }
-    } else {
-        for (int t = 0; t < 16; ++t) dst[t] += block[t];
-    }
-}
-
-
+static void zero_bsr4(BSR4 &b) { cvfem_zero_scalars(b.values->data(), b.nnz * 16); }
 
 static SFEM_INLINE size_t packed_scratch_n(const PackedData &p) {
     const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
@@ -545,7 +549,7 @@ static SFEM_INLINE void run_jacobian_kernel(const MeshData      &d,
                                             const ptrdiff_t      begin,
                                             const int            nlanes,
                                             const Tet4InputPack &in,
-                                            scalar_t             Ke[16][16][VEC_SIZE]) {
+                                            scalar_t             Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF]) {
     cvfem_run_jacobian_kernel(rho,
                               mu,
                               d.adj[0].data() + begin,
@@ -753,22 +757,21 @@ static SFEM_NOINLINE void assemble_bsr4_atomic(MeshData &d, BSR4 &b, const scala
     for (ptrdiff_t begin = 0; begin < ne; begin += VEC_SIZE) {
         const int        nlanes = int(std::min<ptrdiff_t>(ne - begin, VEC_SIZE));
         Tet4InputPack    in;
-        alignas(ALIGN_BYTES) scalar_t Ke[16][16][VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF];
         gather_tet4_pack_global(d, begin, nlanes, in);
         run_jacobian_kernel(d, rho, mu, begin, nlanes, in, Ke);
         for (int lane = 0; lane < nlanes; ++lane) {
             const ptrdiff_t e = begin + lane;
             const smesh::idx_t ev[4] = {elems[0][e], elems[1][e], elems[2][e], elems[3][e]};
-            scalar_t ke[16 * 16];
-            cvfem_extract_ke_lane(Ke, lane, ke);
-            tet4_local_to_global_bsr4<true>(ev, ke, b.rowptr, b.colidx, values);
+            tet4_local_to_global_bsr4<true>(ev, Ke[lane], b.rowptr, b.colidx, values);
         }
     }
 }
 
 static SFEM_NOINLINE void assemble_bsr4_packed(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
-    std::fill(p.ghost_mat_val.begin(), p.ghost_mat_val.end(), 0.0);
+    if (!p.ghost_mat_val.empty())
+        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -789,6 +792,7 @@ static SFEM_NOINLINE void assemble_bsr4_packed(MeshData &d, PackedData &p, BSR4 
             const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const auto                             &lrowptr      = p.local_rowptr[(size_t)pack];
             const auto                             &lcolidx      = p.local_colidx[(size_t)pack];
+            const auto                             &lslots       = p.local_global_slot[(size_t)pack];
             const int                               local_nnz    = lrowptr.empty() ? 0 : lrowptr.back();
 
             std::memset(local_vals, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
@@ -813,27 +817,20 @@ static SFEM_NOINLINE void assemble_bsr4_packed(MeshData &d, PackedData &p, BSR4 
             for (ptrdiff_t begin = e_start; begin < e_end; begin += VEC_SIZE) {
                 const int        nlanes = int(MIN((ptrdiff_t)VEC_SIZE, e_end - begin));
                 Tet4InputPack    in;
-                alignas(ALIGN_BYTES) scalar_t Ke[16][16][VEC_SIZE];
+                alignas(ALIGN_BYTES) scalar_t Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF];
                 gather_tet4_pack_local(p.elems, pack_u, begin, nlanes, in);
                 run_jacobian_kernel(d, rho, mu, begin, nlanes, in, Ke);
                 for (int lane = 0; lane < nlanes; ++lane) {
                     const ptrdiff_t e = begin + lane;
                     const pack_idx_t ev[4] = {p.elems[0][e], p.elems[1][e], p.elems[2][e], p.elems[3][e]};
-                    scalar_t ke[16 * 16];
-                    cvfem_extract_ke_lane(Ke, lane, ke);
-                    tet4_local_to_global_bsr4<false>(ev, ke, lrowptr.data(), lcolidx.data(), local_vals);
+                    tet4_local_to_global_bsr4<false>(ev, Ke[lane], lrowptr.data(), lcolidx.data(), local_vals);
                 }
             }
 
-            scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
-            for (ptrdiff_t i = 0; i < n_contiguous; ++i) {
-                const smesh::idx_t grow  = smesh::idx_t(owned + i);
-                const int          begin = lrowptr[(size_t)i];
-                const int          end   = lrowptr[(size_t)i + 1];
-                for (int t = begin; t < end; ++t) {
-                    const smesh::idx_t gcol = pack_local_to_global(p, pack, n_contiguous, lcolidx[(size_t)t]);
-                    bsr4_add_block(b.rowptr, b.colidx, gvalues, grow, gcol, local_vals + (ptrdiff_t)t * 16, false);
-                }
+            scalar_t *const SFEM_RESTRICT gvalues   = b.values->data();
+            const int                     owned_nnz = n_contiguous > 0 ? lrowptr[(size_t)n_contiguous] : 0;
+            for (int t = 0; t < owned_nnz; ++t) {
+                cvfem_bsr4_add16(&gvalues[(ptrdiff_t)lslots[(size_t)t] * 16], local_vals + (ptrdiff_t)t * 16);
             }
 
             const ptrdiff_t ghost_off = p.ghost_ptr[pack];
@@ -851,7 +848,7 @@ static SFEM_NOINLINE void assemble_bsr4_packed(MeshData &d, PackedData &p, BSR4 
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        (void)p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         for (ptrdiff_t j = begin; j < end; ++j) {
@@ -859,7 +856,8 @@ static SFEM_NOINLINE void assemble_bsr4_packed(MeshData &d, PackedData &p, BSR4 
             const ptrdiff_t k0          = p.ghost_mat_ptr[(size_t)ghost_entry];
             const ptrdiff_t k1          = p.ghost_mat_ptr[(size_t)ghost_entry + 1];
             for (ptrdiff_t t = k0; t < k1; ++t) {
-                bsr4_add_block(b.rowptr, b.colidx, gvalues, dest, p.ghost_mat_col[(size_t)t], p.ghost_mat_val.data() + t * 16, false);
+                cvfem_bsr4_add16(&gvalues[(ptrdiff_t)p.ghost_mat_slot[(size_t)t] * 16],
+                                 p.ghost_mat_val.data() + t * 16);
             }
         }
     }
@@ -908,14 +906,13 @@ static void apply_ke_to_dir(MeshData &d, const scalar_t rho, const scalar_t mu, 
     for (ptrdiff_t begin = 0; begin < d.nelements; begin += VEC_SIZE) {
         const int     nlanes = int(std::min<ptrdiff_t>(d.nelements - begin, VEC_SIZE));
         Tet4InputPack in;
-        alignas(ALIGN_BYTES) scalar_t Ke[16][16][VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF];
         gather_tet4_pack_global(d, begin, nlanes, in);
         run_jacobian_kernel(d, rho, mu, begin, nlanes, in, Ke);
         for (int lane = 0; lane < nlanes; ++lane) {
             const ptrdiff_t    e     = begin + lane;
             const smesh::idx_t ev[4] = {elems[0][e], elems[1][e], elems[2][e], elems[3][e]};
-            scalar_t           ke[16 * 16];
-            cvfem_extract_ke_lane(Ke, lane, ke);
+            const scalar_t *const ke = Ke[lane];
             scalar_t loc[16];
             for (int a = 0; a < 4; ++a)
                 for (int f = 0; f < 4; ++f) loc[a * 4 + f] = dir[(ptrdiff_t)ev[a] * 4 + f];
@@ -931,10 +928,9 @@ static void apply_ke_to_dir(MeshData &d, const scalar_t rho, const scalar_t mu, 
 static scalar_t verify_element_kernel_jac(MeshData &d, const scalar_t rho, const scalar_t mu) {
     Tet4InputPack in;
     gather_tet4_pack_global(d, 0, 1, in);
-    alignas(ALIGN_BYTES) scalar_t Ke[16][16][VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF];
     run_jacobian_kernel(d, rho, mu, 0, 1, in, Ke);
-    scalar_t ke[16 * 16];
-    cvfem_extract_ke_lane(Ke, 0, ke);
+    const scalar_t *const ke = Ke[0];
 
     const scalar_t eps     = 1.0e-6;
     scalar_t       max_abs = 0.0;
@@ -1121,7 +1117,7 @@ int main(int argc, char **argv) {
 
     BSR4 bsr;
     if (assemble || verify_jac) bsr = make_bsr4(d.mesh);
-    if (use_packed && (assemble || verify_jac)) build_pack_local_crs(packed, d.nelements);
+    if (use_packed && (assemble || verify_jac)) build_pack_local_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
 
     if (use_packed) {
         const size_t scratch_n = packed_scratch_n(packed);
