@@ -289,18 +289,25 @@ static SFEM_INLINE void run_microkernel(const MeshData &d, const scalar_t rho,
                             d.det.data() + begin, nlanes, in, out);
 }
 
-static SFEM_INLINE void run_jacobian_kernel(const MeshData &d, const scalar_t rho,
-                                            const scalar_t mu,
-                                            const ptrdiff_t begin,
-                                            const int nlanes,
-                                            const Tet4InputPack &in,
-                                            scalar_t Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF]) {
-  cvfem_run_jacobian_kernel(rho, mu, d.adj[0].data() + begin,
-                            d.adj[1].data() + begin, d.adj[2].data() + begin,
-                            d.adj[3].data() + begin, d.adj[4].data() + begin,
-                            d.adj[5].data() + begin, d.adj[6].data() + begin,
-                            d.adj[7].data() + begin, d.adj[8].data() + begin,
-                            d.det.data() + begin, nlanes, in, Ke);
+static SFEM_INLINE void jacobian_element_global(const MeshData &d,
+                                                const ptrdiff_t e,
+                                                const smesh::idx_t *const ev,
+                                                const scalar_t rho,
+                                                const scalar_t mu,
+                                                scalar_t *const SFEM_RESTRICT Ke) {
+  const scalar_t ux[4] = {d.ux[ev[0]], d.ux[ev[1]], d.ux[ev[2]], d.ux[ev[3]]};
+  const scalar_t uy[4] = {d.uy[ev[0]], d.uy[ev[1]], d.uy[ev[2]], d.uy[ev[3]]};
+  const scalar_t uz[4] = {d.uz[ev[0]], d.uz[ev[1]], d.uz[ev[2]], d.uz[ev[3]]};
+  cvfem_tet4_ns_upwind_jacobian_dense(rho, mu, scalar_t(d.adj[0][e]),
+                                      scalar_t(d.adj[1][e]),
+                                      scalar_t(d.adj[2][e]),
+                                      scalar_t(d.adj[3][e]),
+                                      scalar_t(d.adj[4][e]),
+                                      scalar_t(d.adj[5][e]),
+                                      scalar_t(d.adj[6][e]),
+                                      scalar_t(d.adj[7][e]),
+                                      scalar_t(d.adj[8][e]),
+                                      scalar_t(d.det[e]), ux, uy, uz, Ke);
 }
 
 static SFEM_INLINE void scatter_tet4_pack(MeshData &d, const ptrdiff_t begin,
@@ -382,18 +389,15 @@ static SFEM_NOINLINE void assemble_bsr4_atomic(MeshData &d, BSR4 &b,
   smesh::idx_t **const SFEM_RESTRICT elems = d.elems;
   scalar_t *const SFEM_RESTRICT values = b.values->data();
 
-#pragma omp parallel for schedule(static)
-  for (ptrdiff_t begin = 0; begin < ne; begin += VEC_SIZE) {
-    const int nlanes = int(std::min<ptrdiff_t>(ne - begin, VEC_SIZE));
-    Tet4InputPack in;
-    alignas(ALIGN_BYTES) scalar_t Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF];
-    gather_tet4_pack(d, begin, nlanes, in);
-    run_jacobian_kernel(d, rho, mu, begin, nlanes, in, Ke);
-    for (int lane = 0; lane < nlanes; ++lane) {
-      const ptrdiff_t e = begin + lane;
+#pragma omp parallel
+  {
+    alignas(ALIGN_BYTES) scalar_t Ke[CVFEM_N_DOF * CVFEM_N_DOF];
+#pragma omp for schedule(static)
+    for (ptrdiff_t e = 0; e < ne; ++e) {
       const smesh::idx_t ev[4] = {elems[0][e], elems[1][e], elems[2][e],
                                   elems[3][e]};
-      tet4_local_to_global_bsr4<true>(ev, Ke[lane], b.rowptr, b.colidx, values);
+      jacobian_element_global(d, e, ev, rho, mu, Ke);
+      tet4_local_to_global_bsr4<true>(ev, Ke, b.rowptr, b.colidx, values);
     }
   }
 }
@@ -634,5 +638,3 @@ int main(int argc, char **argv) {
     MPI_Finalize();
   return 0;
 }
-
-

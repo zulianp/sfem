@@ -1,22 +1,25 @@
 #pragma once
 #include "sfem_Op.hpp"
 
+#include <vector>
+
 namespace sfem {
     class SemiStructuredEMLaplacian : public Op {
     public:
-        std::shared_ptr<FunctionSpace>    space;
-        smesh::ElemType                     element_type { smesh::INVALID };
-        std::shared_ptr<Buffer<scalar_t>> element_matrix;
-        long                              calls{0};
-        double                            total_time{0};
+        std::shared_ptr<FunctionSpace>                 space;
+        smesh::ElemType                                element_type{smesh::INVALID};
+        std::shared_ptr<Buffer<scalar_t>>              element_matrix;
+        std::vector<std::shared_ptr<Buffer<scalar_t>>> element_matrices;
+        long                                           calls{0};
+        double                                         total_time{0};
         ~SemiStructuredEMLaplacian();
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
         std::shared_ptr<Op>        lor_op(const std::shared_ptr<FunctionSpace> &space) override;
         std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
         const char                *name() const override;
         inline bool                is_linear() const override { return true; }
-        inline ptrdiff_t                  n_dofs_domain() const override { return space->n_dofs(); }
-        inline ptrdiff_t                  n_dofs_image() const override { return space->n_dofs(); }
+        inline ptrdiff_t           n_dofs_domain() const override { return space->n_dofs(); }
+        inline ptrdiff_t           n_dofs_image() const override { return space->n_dofs(); }
         int                        initialize(const std::vector<std::string> &block_names = {}) override;
         SemiStructuredEMLaplacian(const std::shared_ptr<FunctionSpace> &space);
         int                 hessian_crs(const real_t *const  x,

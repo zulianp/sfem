@@ -2,16 +2,19 @@
 
 #include "sfem_Op.hpp"
 
+#include <vector>
+
 namespace sfem {
     class SemiStructuredEMLinearElasticity : public Op {
     public:
-        std::shared_ptr<FunctionSpace>    space;
-        smesh::ElemType                   element_type{smesh::INVALID};
-        std::shared_ptr<Buffer<scalar_t>> element_matrix;
-        real_t                            mu{1};
-        real_t                            lambda{1};
-        long                              calls{0};
-        double                            total_time{0};
+        std::shared_ptr<FunctionSpace>                 space;
+        smesh::ElemType                                element_type{smesh::INVALID};
+        std::shared_ptr<Buffer<scalar_t>>              element_matrix;
+        std::vector<std::shared_ptr<Buffer<scalar_t>>> element_matrices;
+        real_t                                         mu{1};
+        real_t                                         lambda{1};
+        long                                           calls{0};
+        double                                         total_time{0};
 
         ~SemiStructuredEMLinearElasticity();
 
