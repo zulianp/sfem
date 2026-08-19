@@ -294,7 +294,7 @@ static SFEM_INLINE void run_jacobian_kernel(const MeshData &d, const scalar_t rh
                                             const ptrdiff_t begin,
                                             const int nlanes,
                                             const Tet4InputPack &in,
-                                            scalar_t Ke[16][16][VEC_SIZE]) {
+                                            scalar_t Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF]) {
   cvfem_run_jacobian_kernel(rho, mu, d.adj[0].data() + begin,
                             d.adj[1].data() + begin, d.adj[2].data() + begin,
                             d.adj[3].data() + begin, d.adj[4].data() + begin,
@@ -372,12 +372,7 @@ static BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
   return b;
 }
 
-static void zero_bsr4(BSR4 &b) {
-  scalar_t *const v = b.values->data();
-#pragma omp parallel for schedule(static)
-  for (ptrdiff_t i = 0; i < b.nnz * 16; ++i)
-    v[i] = 0.0;
-}
+static void zero_bsr4(BSR4 &b) { cvfem_zero_scalars(b.values->data(), b.nnz * 16); }
 
 static SFEM_NOINLINE void assemble_bsr4_atomic(MeshData &d, BSR4 &b,
                                                const scalar_t rho,
@@ -391,16 +386,14 @@ static SFEM_NOINLINE void assemble_bsr4_atomic(MeshData &d, BSR4 &b,
   for (ptrdiff_t begin = 0; begin < ne; begin += VEC_SIZE) {
     const int nlanes = int(std::min<ptrdiff_t>(ne - begin, VEC_SIZE));
     Tet4InputPack in;
-    alignas(ALIGN_BYTES) scalar_t Ke[16][16][VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF];
     gather_tet4_pack(d, begin, nlanes, in);
     run_jacobian_kernel(d, rho, mu, begin, nlanes, in, Ke);
     for (int lane = 0; lane < nlanes; ++lane) {
       const ptrdiff_t e = begin + lane;
       const smesh::idx_t ev[4] = {elems[0][e], elems[1][e], elems[2][e],
                                   elems[3][e]};
-      scalar_t ke[16 * 16];
-      cvfem_extract_ke_lane(Ke, lane, ke);
-      tet4_local_to_global_bsr4<true>(ev, ke, b.rowptr, b.colidx, values);
+      tet4_local_to_global_bsr4<true>(ev, Ke[lane], b.rowptr, b.colidx, values);
     }
   }
 }
@@ -641,4 +634,5 @@ int main(int argc, char **argv) {
     MPI_Finalize();
   return 0;
 }
+
 

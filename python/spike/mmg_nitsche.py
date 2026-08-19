@@ -523,7 +523,9 @@ def mg_linear_solve(
     return x, used, rel
 
 
-def pack_result(fine: NitscheLevel, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist=None):
+def pack_result(
+    fine: NitscheLevel, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist=None, direct_hist=None
+):
     X, Y = fine.X, fine.Y
     n_block = fine.n_block
     residual, K, g_c, Kn, n_qp, A = fine.residual_tangent(u, forced_active=None)
@@ -583,6 +585,7 @@ def pack_result(fine: NitscheLevel, args, u, r_hist, n_active_hist, n_qp_hist, v
         "n_active_hist": n_active_hist,
         "n_qp_hist": n_qp_hist,
         "vcycle_hist": [] if vcycle_hist is None else list(vcycle_hist),
+        "direct_hist": [] if direct_hist is None else [bool(v) for v in direct_hist],
         "rtol": float(args.rtol),
         "n_block": n_block,
         "tris_b": nc.block_triangles(fine.ps, fine.mesh, fine.bid_b),
@@ -628,9 +631,11 @@ def solve_mmg(ps, args):
     n_active_hist = []
     n_qp_hist = []
     vcycle_hist = []
+    direct_hist = []
     active = set()
     n_qp = 0
     last_cycles = 0
+    last_direct = False
     for it in range(args.max_iter):
         residual, A, g_c, Kn, n_qp, active = fine.residual_tangent(
             u, forced_active=None
@@ -640,6 +645,7 @@ def solve_mmg(ps, args):
         n_active_hist.append(len(active))
         n_qp_hist.append(n_qp)
         vcycle_hist.append(int(last_cycles))
+        direct_hist.append(bool(last_direct))
         geom = sample_contact_geometry(fine, u)
         contact_mask = frozen_touch_dofs(fine, geom, active)
         masks = filter_hierarchy(levels, prolong, contact_mask)
@@ -677,6 +683,7 @@ def solve_mmg(ps, args):
         u = u + du
         u[fine.constrained] = fine.u_bc[fine.constrained]
         last_cycles = int(cycles)
+        last_direct = bool(used_direct)
         extra = f"  direct (mg_rel={mg_rel:.3e})" if used_direct else ""
         print(f"          V-cycles={cycles}  lin_rel={lin_rel:.3e}{extra}")
     residual, A, g_c, Kn, n_qp, active = fine.residual_tangent(u, forced_active=None)
@@ -686,8 +693,11 @@ def solve_mmg(ps, args):
         n_active_hist.append(len(active))
         n_qp_hist.append(n_qp)
         vcycle_hist.append(int(last_cycles))
+        direct_hist.append(bool(last_direct))
         print(f"mmg[final] ||r||={r_final:.3e}  |A|={len(active)}")
-    result = pack_result(fine, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist)
+    result = pack_result(
+        fine, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist, direct_hist
+    )
     print(
         f"nodes={fine.mesh.n_nodes()} dofs={fine.ndofs} F={result['F']:.4e} "
         f"a_hertz={result['a']:.4e} p0={result['p0']:.4e} |g_-|={result['penetration']:.3e}  "

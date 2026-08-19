@@ -4,6 +4,11 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
@@ -41,12 +46,27 @@ static SFEM_INLINE const jacobian_t *cvfem_aligned_geom(const jacobian_t *p) {
 
 static constexpr double CVFEM_RESIDUAL_FLOPS_PER_ELEMENT = 562.0;
 
-// Source add/mul/div in cvfem_tet4_ns_upwind_simd_jacobian. Not counted: abs/ternary,
+// Source add/mul/div in cvfem_tet4_ns_upwind_jacobian_dense. Not counted: abs/ternary,
 // float→double casts, Ke zero-stores. Folded zero SCS areas: 3×15 + 3×9.
 // Body per SCS: adv 6 + mdot 6 + pos/neg 4 + d_pos/d_neg 4 + dmdot 4
 //   + 6 conv columns (14 mul + 17 add) + pressure (3+12) + viscous 4 nodes (27 mul + 24 add).
 static constexpr double CVFEM_JACOBIAN_FLOPS_PER_ELEMENT = 1.0 + 9.0 + 6.0 + (3.0 * 15.0 + 3.0 * 9.0) +
                                                            6.0 * (6.0 + 6.0 + 4.0 + 4.0 + 4.0 + 6.0 * 31.0 + 15.0 + 4.0 * 51.0);
+
+static SFEM_INLINE void cvfem_zero_scalars(scalar_t *const SFEM_RESTRICT p, const ptrdiff_t n) {
+#ifdef _OPENMP
+#pragma omp parallel
+    {
+        const int       tid   = omp_get_thread_num();
+        const int       nt    = omp_get_num_threads();
+        const ptrdiff_t begin = (n * (ptrdiff_t)tid) / (ptrdiff_t)nt;
+        const ptrdiff_t end   = (n * (ptrdiff_t)(tid + 1)) / (ptrdiff_t)nt;
+        std::memset(p + begin, 0, (size_t)(end - begin) * sizeof(scalar_t));
+    }
+#else
+    std::memset(p, 0, (size_t)n * sizeof(scalar_t));
+#endif
+}
 
 static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(const scalar_t                        rho_s,
                                                               const scalar_t                        mu_s,
@@ -218,64 +238,74 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(const scalar_t    
     SCS_FLUX_LANES(2, 3, SCS_AREA_AR0_0(-c24, c24));
 
 #undef SCS_FLUX_LANES
+#undef SCS_AREA3
+#undef SCS_AREA_AR2_0
+#undef SCS_AREA_AR1_0
+#undef SCS_AREA_AR0_0
+#undef GEOM_SIMD_PRAGMA
 }
 
-static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_jacobian(const scalar_t                        rho_s,
-                                                           const scalar_t                        mu_s,
-                                                           const jacobian_t *const SFEM_RESTRICT adj0_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT adj1_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT adj2_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT adj3_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT adj4_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT adj5_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT adj6_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT adj7_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT adj8_ptr,
-                                                           const jacobian_t *const SFEM_RESTRICT det_ptr,
-                                                           const Tet4InputPack                  &in,
-                                                           scalar_t Ke[16][16][VEC_SIZE]) {
+static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_dense(const scalar_t                rho,
+                                                            const scalar_t                mu,
+                                                            const scalar_t                adj0,
+                                                            const scalar_t                adj1,
+                                                            const scalar_t                adj2,
+                                                            const scalar_t                adj3,
+                                                            const scalar_t                adj4,
+                                                            const scalar_t                adj5,
+                                                            const scalar_t                adj6,
+                                                            const scalar_t                adj7,
+                                                            const scalar_t                adj8,
+                                                            const scalar_t                det,
+                                                            const scalar_t                ux[4],
+                                                            const scalar_t                uy[4],
+                                                            const scalar_t                uz[4],
+                                                            scalar_t *const SFEM_RESTRICT ke) {
     const scalar_t half = 0.5;
     const scalar_t two  = 2.0;
     const scalar_t one  = 1.0;
-    const scalar_t rho  = rho_s;
-    const scalar_t mu   = mu_s;
     const scalar_t c12  = 1.0 / 12.0;
     const scalar_t c24  = 1.0 / 24.0;
+    const scalar_t inv_det = 1.0 / det;
 
-    alignas(ALIGN_BYTES) scalar_t gx[4][VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t gy[4][VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t gz[4][VEC_SIZE];
+    scalar_t gx[4], gy[4], gz[4];
+    gx[1] = adj0 * inv_det;
+    gy[1] = adj1 * inv_det;
+    gz[1] = adj2 * inv_det;
+    gx[2] = adj3 * inv_det;
+    gy[2] = adj4 * inv_det;
+    gz[2] = adj5 * inv_det;
+    gx[3] = adj6 * inv_det;
+    gy[3] = adj7 * inv_det;
+    gz[3] = adj8 * inv_det;
+    gx[0] = -(gx[1] + gx[2] + gx[3]);
+    gy[0] = -(gy[1] + gy[2] + gy[3]);
+    gz[0] = -(gz[1] + gz[2] + gz[3]);
 
-#pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr : 64)
-    for (int lane = 0; lane < VEC_SIZE; ++lane) {
-        const scalar_t adj0    = scalar_t(adj0_ptr[lane]);
-        const scalar_t adj1    = scalar_t(adj1_ptr[lane]);
-        const scalar_t adj2    = scalar_t(adj2_ptr[lane]);
-        const scalar_t adj3    = scalar_t(adj3_ptr[lane]);
-        const scalar_t adj4    = scalar_t(adj4_ptr[lane]);
-        const scalar_t adj5    = scalar_t(adj5_ptr[lane]);
-        const scalar_t adj6    = scalar_t(adj6_ptr[lane]);
-        const scalar_t adj7    = scalar_t(adj7_ptr[lane]);
-        const scalar_t adj8    = scalar_t(adj8_ptr[lane]);
-        const scalar_t inv_det = 1.0 / scalar_t(det_ptr[lane]);
-        gx[1][lane]            = adj0 * inv_det;
-        gy[1][lane]            = adj1 * inv_det;
-        gz[1][lane]            = adj2 * inv_det;
-        gx[2][lane]            = adj3 * inv_det;
-        gy[2][lane]            = adj4 * inv_det;
-        gz[2][lane]            = adj5 * inv_det;
-        gx[3][lane]            = adj6 * inv_det;
-        gy[3][lane]            = adj7 * inv_det;
-        gz[3][lane]            = adj8 * inv_det;
-        gx[0][lane]            = -(gx[1][lane] + gx[2][lane] + gx[3][lane]);
-        gy[0][lane]            = -(gy[1][lane] + gy[2][lane] + gy[3][lane]);
-        gz[0][lane]            = -(gz[1][lane] + gz[2][lane] + gz[3][lane]);
-        for (int r = 0; r < 16; ++r) {
-            for (int c = 0; c < 16; ++c) {
-                Ke[r][c][lane] = 0.0;
-            }
-        }
-    }
+#pragma omp simd aligned(ke : 64)
+    for (int t = 0; t < CVFEM_N_DOF * CVFEM_N_DOF; ++t) ke[t] = 0.0;
+
+#define KE(r, c) ke[(r) * CVFEM_N_DOF + (c)]
+
+#define JAC_AREA3(AR0, AR1, AR2)                       \
+    const scalar_t ax = adj0 * (AR0) + adj3 * (AR1) + adj6 * (AR2); \
+    const scalar_t ay = adj1 * (AR0) + adj4 * (AR1) + adj7 * (AR2); \
+    const scalar_t az = adj2 * (AR0) + adj5 * (AR1) + adj8 * (AR2)
+
+#define JAC_AREA_AR2_0(AR0, AR1)                       \
+    const scalar_t ax = adj0 * (AR0) + adj3 * (AR1);   \
+    const scalar_t ay = adj1 * (AR0) + adj4 * (AR1);   \
+    const scalar_t az = adj2 * (AR0) + adj5 * (AR1)
+
+#define JAC_AREA_AR1_0(AR0, AR2)                       \
+    const scalar_t ax = adj0 * (AR0) + adj6 * (AR2);   \
+    const scalar_t ay = adj1 * (AR0) + adj7 * (AR2);   \
+    const scalar_t az = adj2 * (AR0) + adj8 * (AR2)
+
+#define JAC_AREA_AR0_0(AR1, AR2)                       \
+    const scalar_t ax = adj3 * (AR1) + adj6 * (AR2);   \
+    const scalar_t ay = adj4 * (AR1) + adj7 * (AR2);   \
+    const scalar_t az = adj5 * (AR1) + adj8 * (AR2)
 
 #define JAC_CONV_COL(I, J, K, FIELD, DMDOT, DUXI, DUXJ, DUYI, DUYJ, DUZI, DUZJ) \
     do {                                                                        \
@@ -285,113 +315,111 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_jacobian(const scalar_t       
         const scalar_t dcy  = dpos * uyI + mdot_pos * (DUYI) + dneg * uyJ + mdot_neg * (DUYJ); \
         const scalar_t dcz  = dpos * uzI + mdot_pos * (DUZI) + dneg * uzJ + mdot_neg * (DUZJ); \
         const int      col  = (K) * 4 + (FIELD);                                \
-        Ke[(I) * 4 + 0][col][lane] += dcx;                                      \
-        Ke[(I) * 4 + 1][col][lane] += dcy;                                      \
-        Ke[(I) * 4 + 2][col][lane] += dcz;                                      \
-        Ke[(J) * 4 + 0][col][lane] -= dcx;                                      \
-        Ke[(J) * 4 + 1][col][lane] -= dcy;                                      \
-        Ke[(J) * 4 + 2][col][lane] -= dcz;                                      \
-        Ke[(I) * 4 + 3][col][lane] += (DMDOT);                                  \
-        Ke[(J) * 4 + 3][col][lane] -= (DMDOT);                                  \
+        KE((I) * 4 + 0, col) += dcx;                                            \
+        KE((I) * 4 + 1, col) += dcy;                                            \
+        KE((I) * 4 + 2, col) += dcz;                                            \
+        KE((J) * 4 + 0, col) -= dcx;                                            \
+        KE((J) * 4 + 1, col) -= dcy;                                            \
+        KE((J) * 4 + 2, col) -= dcz;                                            \
+        KE((I) * 4 + 3, col) += (DMDOT);                                        \
+        KE((J) * 4 + 3, col) -= (DMDOT);                                        \
     } while (0)
 
-#define SCS_JAC_LANES(I, J, AREA)                                                                   \
-    do {                                                                                            \
-        GEOM_SIMD_PRAGMA for (int lane = 0; lane < VEC_SIZE; ++lane) {                              \
-            AREA;                                                                                   \
-            const scalar_t uxI      = in.ux[I][lane];                                               \
-            const scalar_t uxJ      = in.ux[J][lane];                                               \
-            const scalar_t uyI      = in.uy[I][lane];                                               \
-            const scalar_t uyJ      = in.uy[J][lane];                                               \
-            const scalar_t uzI      = in.uz[I][lane];                                               \
-            const scalar_t uzJ      = in.uz[J][lane];                                               \
-            const scalar_t adv_x    = half * (uxI + uxJ);                                           \
-            const scalar_t adv_y    = half * (uyI + uyJ);                                           \
-            const scalar_t adv_z    = half * (uzI + uzJ);                                           \
-            const scalar_t mdot     = rho * (adv_x * ax + adv_y * ay + adv_z * az);                 \
-            const scalar_t mdot_abs = mdot < scalar_t(0) ? -mdot : mdot;                            \
-            const scalar_t mdot_pos = half * (mdot + mdot_abs);                                     \
-            const scalar_t mdot_neg = half * (mdot - mdot_abs);                                     \
-            const scalar_t sgn      = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : 0.0); \
-            const scalar_t d_pos    = half * (one + sgn);                                           \
-            const scalar_t d_neg    = half * (one - sgn);                                           \
-            const scalar_t rh       = rho * half;                                                   \
-            const scalar_t dmdot_dux = rh * ax;                                                     \
-            const scalar_t dmdot_duy = rh * ay;                                                     \
-            const scalar_t dmdot_duz = rh * az;                                                     \
-            JAC_CONV_COL(I, J, I, 0, dmdot_dux, one, 0.0, 0.0, 0.0, 0.0, 0.0);                      \
-            JAC_CONV_COL(I, J, I, 1, dmdot_duy, 0.0, 0.0, one, 0.0, 0.0, 0.0);                      \
-            JAC_CONV_COL(I, J, I, 2, dmdot_duz, 0.0, 0.0, 0.0, 0.0, one, 0.0);                      \
-            JAC_CONV_COL(I, J, J, 0, dmdot_dux, 0.0, one, 0.0, 0.0, 0.0, 0.0);                      \
-            JAC_CONV_COL(I, J, J, 1, dmdot_duy, 0.0, 0.0, 0.0, one, 0.0, 0.0);                      \
-            JAC_CONV_COL(I, J, J, 2, dmdot_duz, 0.0, 0.0, 0.0, 0.0, 0.0, one);                      \
-            const scalar_t dpx = half * ax;                                                         \
-            const scalar_t dpy = half * ay;                                                         \
-            const scalar_t dpz = half * az;                                                         \
-            Ke[(I) * 4 + 0][(I) * 4 + 3][lane] += dpx;                                              \
-            Ke[(I) * 4 + 1][(I) * 4 + 3][lane] += dpy;                                              \
-            Ke[(I) * 4 + 2][(I) * 4 + 3][lane] += dpz;                                              \
-            Ke[(J) * 4 + 0][(I) * 4 + 3][lane] -= dpx;                                              \
-            Ke[(J) * 4 + 1][(I) * 4 + 3][lane] -= dpy;                                              \
-            Ke[(J) * 4 + 2][(I) * 4 + 3][lane] -= dpz;                                              \
-            Ke[(I) * 4 + 0][(J) * 4 + 3][lane] += dpx;                                              \
-            Ke[(I) * 4 + 1][(J) * 4 + 3][lane] += dpy;                                              \
-            Ke[(I) * 4 + 2][(J) * 4 + 3][lane] += dpz;                                              \
-            Ke[(J) * 4 + 0][(J) * 4 + 3][lane] -= dpx;                                              \
-            Ke[(J) * 4 + 1][(J) * 4 + 3][lane] -= dpy;                                              \
-            Ke[(J) * 4 + 2][(J) * 4 + 3][lane] -= dpz;                                              \
-            for (int k = 0; k < 4; ++k) {                                                           \
-                const scalar_t gk0    = gx[k][lane];                                                \
-                const scalar_t gk1    = gy[k][lane];                                                \
-                const scalar_t gk2    = gz[k][lane];                                                \
-                const scalar_t dtx_ux = mu * (two * gk0 * ax + gk1 * ay + gk2 * az);                \
-                const scalar_t dtx_uy = mu * (gk0 * ay);                                            \
-                const scalar_t dtx_uz = mu * (gk0 * az);                                            \
-                const scalar_t dty_ux = mu * (gk1 * ax);                                            \
-                const scalar_t dty_uy = mu * (gk0 * ax + two * gk1 * ay + gk2 * az);                \
-                const scalar_t dty_uz = mu * (gk1 * az);                                            \
-                const scalar_t dtz_ux = mu * (gk2 * ax);                                            \
-                const scalar_t dtz_uy = mu * (gk2 * ay);                                            \
-                const scalar_t dtz_uz = mu * (gk0 * ax + gk1 * ay + two * gk2 * az);                \
-                const int      col_x  = k * 4 + 0;                                                  \
-                const int      col_y  = k * 4 + 1;                                                  \
-                const int      col_z  = k * 4 + 2;                                                  \
-                Ke[(I) * 4 + 0][col_x][lane] -= dtx_ux;                                             \
-                Ke[(I) * 4 + 0][col_y][lane] -= dtx_uy;                                             \
-                Ke[(I) * 4 + 0][col_z][lane] -= dtx_uz;                                             \
-                Ke[(I) * 4 + 1][col_x][lane] -= dty_ux;                                             \
-                Ke[(I) * 4 + 1][col_y][lane] -= dty_uy;                                             \
-                Ke[(I) * 4 + 1][col_z][lane] -= dty_uz;                                             \
-                Ke[(I) * 4 + 2][col_x][lane] -= dtz_ux;                                             \
-                Ke[(I) * 4 + 2][col_y][lane] -= dtz_uy;                                             \
-                Ke[(I) * 4 + 2][col_z][lane] -= dtz_uz;                                             \
-                Ke[(J) * 4 + 0][col_x][lane] += dtx_ux;                                             \
-                Ke[(J) * 4 + 0][col_y][lane] += dtx_uy;                                             \
-                Ke[(J) * 4 + 0][col_z][lane] += dtx_uz;                                             \
-                Ke[(J) * 4 + 1][col_x][lane] += dty_ux;                                             \
-                Ke[(J) * 4 + 1][col_y][lane] += dty_uy;                                             \
-                Ke[(J) * 4 + 1][col_z][lane] += dty_uz;                                             \
-                Ke[(J) * 4 + 2][col_x][lane] += dtz_ux;                                             \
-                Ke[(J) * 4 + 2][col_y][lane] += dtz_uy;                                             \
-                Ke[(J) * 4 + 2][col_z][lane] += dtz_uz;                                             \
-            }                                                                                       \
-        }                                                                                           \
+#define SCS_JAC(I, J, AREA)                                                                     \
+    do {                                                                                        \
+        AREA;                                                                                   \
+        const scalar_t uxI      = ux[I];                                                        \
+        const scalar_t uxJ      = ux[J];                                                        \
+        const scalar_t uyI      = uy[I];                                                        \
+        const scalar_t uyJ      = uy[J];                                                        \
+        const scalar_t uzI      = uz[I];                                                        \
+        const scalar_t uzJ      = uz[J];                                                        \
+        const scalar_t adv_x    = half * (uxI + uxJ);                                           \
+        const scalar_t adv_y    = half * (uyI + uyJ);                                           \
+        const scalar_t adv_z    = half * (uzI + uzJ);                                           \
+        const scalar_t mdot     = rho * (adv_x * ax + adv_y * ay + adv_z * az);                 \
+        const scalar_t mdot_abs = mdot < scalar_t(0) ? -mdot : mdot;                            \
+        const scalar_t mdot_pos = half * (mdot + mdot_abs);                                     \
+        const scalar_t mdot_neg = half * (mdot - mdot_abs);                                     \
+        const scalar_t sgn      = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : 0.0); \
+        const scalar_t d_pos    = half * (one + sgn);                                           \
+        const scalar_t d_neg    = half * (one - sgn);                                           \
+        const scalar_t rh       = rho * half;                                                   \
+        const scalar_t dmdot_dux = rh * ax;                                                     \
+        const scalar_t dmdot_duy = rh * ay;                                                     \
+        const scalar_t dmdot_duz = rh * az;                                                     \
+        JAC_CONV_COL(I, J, I, 0, dmdot_dux, one, 0.0, 0.0, 0.0, 0.0, 0.0);                      \
+        JAC_CONV_COL(I, J, I, 1, dmdot_duy, 0.0, 0.0, one, 0.0, 0.0, 0.0);                      \
+        JAC_CONV_COL(I, J, I, 2, dmdot_duz, 0.0, 0.0, 0.0, 0.0, one, 0.0);                      \
+        JAC_CONV_COL(I, J, J, 0, dmdot_dux, 0.0, one, 0.0, 0.0, 0.0, 0.0);                      \
+        JAC_CONV_COL(I, J, J, 1, dmdot_duy, 0.0, 0.0, 0.0, one, 0.0, 0.0);                      \
+        JAC_CONV_COL(I, J, J, 2, dmdot_duz, 0.0, 0.0, 0.0, 0.0, 0.0, one);                      \
+        const scalar_t dpx = half * ax;                                                         \
+        const scalar_t dpy = half * ay;                                                         \
+        const scalar_t dpz = half * az;                                                         \
+        KE((I) * 4 + 0, (I) * 4 + 3) += dpx;                                                    \
+        KE((I) * 4 + 1, (I) * 4 + 3) += dpy;                                                    \
+        KE((I) * 4 + 2, (I) * 4 + 3) += dpz;                                                    \
+        KE((J) * 4 + 0, (I) * 4 + 3) -= dpx;                                                    \
+        KE((J) * 4 + 1, (I) * 4 + 3) -= dpy;                                                    \
+        KE((J) * 4 + 2, (I) * 4 + 3) -= dpz;                                                    \
+        KE((I) * 4 + 0, (J) * 4 + 3) += dpx;                                                    \
+        KE((I) * 4 + 1, (J) * 4 + 3) += dpy;                                                    \
+        KE((I) * 4 + 2, (J) * 4 + 3) += dpz;                                                    \
+        KE((J) * 4 + 0, (J) * 4 + 3) -= dpx;                                                    \
+        KE((J) * 4 + 1, (J) * 4 + 3) -= dpy;                                                    \
+        KE((J) * 4 + 2, (J) * 4 + 3) -= dpz;                                                    \
+        for (int k = 0; k < 4; ++k) {                                                           \
+            const scalar_t gk0    = gx[k];                                                      \
+            const scalar_t gk1    = gy[k];                                                      \
+            const scalar_t gk2    = gz[k];                                                      \
+            const scalar_t dtx_ux = mu * (two * gk0 * ax + gk1 * ay + gk2 * az);                \
+            const scalar_t dtx_uy = mu * (gk0 * ay);                                            \
+            const scalar_t dtx_uz = mu * (gk0 * az);                                            \
+            const scalar_t dty_ux = mu * (gk1 * ax);                                            \
+            const scalar_t dty_uy = mu * (gk0 * ax + two * gk1 * ay + gk2 * az);                \
+            const scalar_t dty_uz = mu * (gk1 * az);                                            \
+            const scalar_t dtz_ux = mu * (gk2 * ax);                                            \
+            const scalar_t dtz_uy = mu * (gk2 * ay);                                            \
+            const scalar_t dtz_uz = mu * (gk0 * ax + gk1 * ay + two * gk2 * az);                \
+            const int      col_x  = k * 4 + 0;                                                  \
+            const int      col_y  = k * 4 + 1;                                                  \
+            const int      col_z  = k * 4 + 2;                                                  \
+            KE((I) * 4 + 0, col_x) -= dtx_ux;                                                   \
+            KE((I) * 4 + 0, col_y) -= dtx_uy;                                                   \
+            KE((I) * 4 + 0, col_z) -= dtx_uz;                                                   \
+            KE((I) * 4 + 1, col_x) -= dty_ux;                                                   \
+            KE((I) * 4 + 1, col_y) -= dty_uy;                                                   \
+            KE((I) * 4 + 1, col_z) -= dty_uz;                                                   \
+            KE((I) * 4 + 2, col_x) -= dtz_ux;                                                   \
+            KE((I) * 4 + 2, col_y) -= dtz_uy;                                                   \
+            KE((I) * 4 + 2, col_z) -= dtz_uz;                                                   \
+            KE((J) * 4 + 0, col_x) += dtx_ux;                                                   \
+            KE((J) * 4 + 0, col_y) += dtx_uy;                                                   \
+            KE((J) * 4 + 0, col_z) += dtx_uz;                                                   \
+            KE((J) * 4 + 1, col_x) += dty_ux;                                                   \
+            KE((J) * 4 + 1, col_y) += dty_uy;                                                   \
+            KE((J) * 4 + 1, col_z) += dty_uz;                                                   \
+            KE((J) * 4 + 2, col_x) += dtz_ux;                                                   \
+            KE((J) * 4 + 2, col_y) += dtz_uy;                                                   \
+            KE((J) * 4 + 2, col_z) += dtz_uz;                                                   \
+        }                                                                                       \
     } while (0)
 
-    SCS_JAC_LANES(0, 1, SCS_AREA3(c12, c24, c24));
-    SCS_JAC_LANES(0, 2, SCS_AREA3(c24, c12, c24));
-    SCS_JAC_LANES(0, 3, SCS_AREA3(c24, c24, c12));
-    SCS_JAC_LANES(1, 2, SCS_AREA_AR2_0(-c24, c24));
-    SCS_JAC_LANES(1, 3, SCS_AREA_AR1_0(-c24, c24));
-    SCS_JAC_LANES(2, 3, SCS_AREA_AR0_0(-c24, c24));
+    SCS_JAC(0, 1, JAC_AREA3(c12, c24, c24));
+    SCS_JAC(0, 2, JAC_AREA3(c24, c12, c24));
+    SCS_JAC(0, 3, JAC_AREA3(c24, c24, c12));
+    SCS_JAC(1, 2, JAC_AREA_AR2_0(-c24, c24));
+    SCS_JAC(1, 3, JAC_AREA_AR1_0(-c24, c24));
+    SCS_JAC(2, 3, JAC_AREA_AR0_0(-c24, c24));
 
-#undef SCS_JAC_LANES
+#undef SCS_JAC
 #undef JAC_CONV_COL
-#undef SCS_AREA3
-#undef SCS_AREA_AR2_0
-#undef SCS_AREA_AR1_0
-#undef SCS_AREA_AR0_0
-#undef GEOM_SIMD_PRAGMA
+#undef JAC_AREA3
+#undef JAC_AREA_AR2_0
+#undef JAC_AREA_AR1_0
+#undef JAC_AREA_AR0_0
+#undef KE
 }
 
 static SFEM_INLINE void cvfem_pad_geom_lanes(const jacobian_t *const SFEM_RESTRICT adj0,
@@ -483,37 +511,27 @@ static SFEM_INLINE void cvfem_run_jacobian_kernel(const scalar_t                
                                                   const jacobian_t *const SFEM_RESTRICT det,
                                                   const int                             nlanes,
                                                   const Tet4InputPack                  &in,
-                                                  scalar_t                              Ke[16][16][VEC_SIZE]) {
-    if (nlanes == VEC_SIZE) {
-        cvfem_tet4_ns_upwind_simd_jacobian(rho,
-                                           mu,
-                                           cvfem_aligned_geom(adj0),
-                                           cvfem_aligned_geom(adj1),
-                                           cvfem_aligned_geom(adj2),
-                                           cvfem_aligned_geom(adj3),
-                                           cvfem_aligned_geom(adj4),
-                                           cvfem_aligned_geom(adj5),
-                                           cvfem_aligned_geom(adj6),
-                                           cvfem_aligned_geom(adj7),
-                                           cvfem_aligned_geom(adj8),
-                                           cvfem_aligned_geom(det),
-                                           in,
-                                           Ke);
-        return;
-    }
-    alignas(ALIGN_BYTES) jacobian_t a0[VEC_SIZE], a1[VEC_SIZE], a2[VEC_SIZE], a3[VEC_SIZE], a4[VEC_SIZE];
-    alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE], a8[VEC_SIZE], detp[VEC_SIZE];
-    cvfem_pad_geom_lanes(adj0, adj1, adj2, adj3, adj4, adj5, adj6, adj7, adj8, det, nlanes, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp);
-    cvfem_tet4_ns_upwind_simd_jacobian(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, in, Ke);
-}
-
-static SFEM_INLINE void cvfem_extract_ke_lane(const scalar_t Ke[16][16][VEC_SIZE],
-                                              const int      lane,
-                                              scalar_t *const SFEM_RESTRICT ke) {
-    for (int r = 0; r < 16; ++r) {
-        for (int c = 0; c < 16; ++c) {
-            ke[r * 16 + c] = Ke[r][c][lane];
-        }
+                                                  scalar_t                              Ke[VEC_SIZE][CVFEM_N_DOF * CVFEM_N_DOF]) {
+    for (int lane = 0; lane < nlanes; ++lane) {
+        const scalar_t ux[4] = {in.ux[0][lane], in.ux[1][lane], in.ux[2][lane], in.ux[3][lane]};
+        const scalar_t uy[4] = {in.uy[0][lane], in.uy[1][lane], in.uy[2][lane], in.uy[3][lane]};
+        const scalar_t uz[4] = {in.uz[0][lane], in.uz[1][lane], in.uz[2][lane], in.uz[3][lane]};
+        cvfem_tet4_ns_upwind_jacobian_dense(rho,
+                                            mu,
+                                            scalar_t(adj0[lane]),
+                                            scalar_t(adj1[lane]),
+                                            scalar_t(adj2[lane]),
+                                            scalar_t(adj3[lane]),
+                                            scalar_t(adj4[lane]),
+                                            scalar_t(adj5[lane]),
+                                            scalar_t(adj6[lane]),
+                                            scalar_t(adj7[lane]),
+                                            scalar_t(adj8[lane]),
+                                            scalar_t(det[lane]),
+                                            ux,
+                                            uy,
+                                            uz,
+                                            Ke[lane]);
     }
 }
 
@@ -551,6 +569,41 @@ static SFEM_INLINE void cvfem_find_cols4(const Idx *const SFEM_RESTRICT targets,
     }
 }
 
+template <bool Atomic>
+static SFEM_INLINE void cvfem_bsr4_accum_dense_block(scalar_t *const SFEM_RESTRICT       block,
+                                                     const scalar_t *const SFEM_RESTRICT src00) {
+    if constexpr (Atomic) {
+        for (int fi = 0; fi < 4; ++fi) {
+            const scalar_t *const s = src00 + fi * 16;
+            scalar_t *const       d = block + fi * 4;
+#pragma omp atomic update
+            d[0] += s[0];
+#pragma omp atomic update
+            d[1] += s[1];
+#pragma omp atomic update
+            d[2] += s[2];
+#pragma omp atomic update
+            d[3] += s[3];
+        }
+    } else {
+#pragma unroll(4)
+        for (int fi = 0; fi < 4; ++fi) {
+            const scalar_t *const s = src00 + fi * 16;
+            scalar_t *const       d = block + fi * 4;
+            d[0] += s[0];
+            d[1] += s[1];
+            d[2] += s[2];
+            d[3] += s[3];
+        }
+    }
+}
+
+static SFEM_INLINE void cvfem_bsr4_add16(scalar_t *const SFEM_RESTRICT       dst,
+                                         const scalar_t *const SFEM_RESTRICT src) {
+#pragma omp simd
+    for (int t = 0; t < 16; ++t) dst[t] += src[t];
+}
+
 template <bool Atomic, typename Count, typename Idx>
 static SFEM_INLINE void tet4_local_to_global_bsr4(const Idx *const SFEM_RESTRICT           ev,
                                                   const scalar_t *const SFEM_RESTRICT      element_matrix,
@@ -559,26 +612,15 @@ static SFEM_INLINE void tet4_local_to_global_bsr4(const Idx *const SFEM_RESTRICT
                                                   scalar_t *const SFEM_RESTRICT            values) {
     Idx ks[4];
     for (int edof_i = 0; edof_i < 4; ++edof_i) {
-        const Idx   dof_i  = ev[edof_i];
-        const int   lenrow = int(rowptr[dof_i + 1] - rowptr[dof_i]);
-        const Idx  *cols   = &colidx[rowptr[dof_i]];
+        const Idx  dof_i  = ev[edof_i];
+        const int  lenrow = int(rowptr[dof_i + 1] - rowptr[dof_i]);
+        const Idx *cols   = &colidx[rowptr[dof_i]];
         cvfem_find_cols4(ev, cols, lenrow, ks);
 
+        const scalar_t *const ke_i = element_matrix + (edof_i * 4) * 16;
         for (int edof_j = 0; edof_j < 4; ++edof_j) {
             scalar_t *const SFEM_RESTRICT block = &values[(rowptr[dof_i] + ks[edof_j]) * 16];
-            for (int fi = 0; fi < 4; ++fi) {
-                const int ii = edof_i * 4 + fi;
-                for (int fj = 0; fj < 4; ++fj) {
-                    const int      jj  = edof_j * 4 + fj;
-                    const scalar_t val = element_matrix[ii * 16 + jj];
-                    if constexpr (Atomic) {
-#pragma omp atomic update
-                        block[fi * 4 + fj] += val;
-                    } else {
-                        block[fi * 4 + fj] += val;
-                    }
-                }
-            }
+            cvfem_bsr4_accum_dense_block<Atomic>(block, ke_i + edof_j * 4);
         }
     }
 }
