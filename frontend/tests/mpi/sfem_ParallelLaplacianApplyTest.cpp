@@ -201,6 +201,16 @@ namespace {
             parallel_y = parallel_y_host;
         }
 
+        auto reset_parallel_output = [&]() {
+            std::fill(parallel_y_host->data(), parallel_y_host->data() + n_y_alloc, real_t(0));
+            if (es == sfem::EXECUTION_SPACE_DEVICE) {
+#ifdef SFEM_ENABLE_CUDA
+                buffer_host_to_device((size_t)n_y_alloc * sizeof(real_t), parallel_y_host->data(), parallel_y->data());
+#endif
+            }
+        };
+
+        reset_parallel_output();
         SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
 
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
@@ -218,6 +228,7 @@ namespace {
 
         {
             setenv("SFEM_PARALLEL_MF_LEGACY", "1", 1);
+            reset_parallel_output();
             SFEM_TEST_ASSERT(parallel_op->apply(parallel_h->data(), parallel_y->data()) == SFEM_SUCCESS);
             if (es == sfem::EXECUTION_SPACE_DEVICE) {
 #ifdef SFEM_ENABLE_CUDA
