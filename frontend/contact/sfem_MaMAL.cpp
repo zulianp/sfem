@@ -646,8 +646,8 @@ namespace sfem {
             cf->constraints_mask(mask->data());
             cf->hessian_block_diag_sym(nullptr, diag->data());
 
-            auto jacobi                  = sfem::create_shiftable_block_sym_jacobi<real_t>(fs->block_size(), diag, mask, es);
-            jacobi->relaxation_parameter = real_t(1) / fs->block_size();
+            auto jacobi = sfem::create_shiftable_block_sym_jacobi<real_t>(fs->block_size(), diag, mask, es);
+            jacobi->set_relaxation_parameter(real_t(1) / fs->block_size());
             smoothers[level]->set_preconditioner_op(jacobi);
             smoothers[level]->set_max_it(100000);
         }

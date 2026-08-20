@@ -1,5 +1,6 @@
 #include "sstet4_laplacian.hpp"
 
+#include "hierarchy/sstet4/smesh_sstet4_transfer.impl.hpp"
 #include "smesh_sstet4.hpp"
 #include "tet4_inline_cpu.hpp"
 #include "tet4_laplacian_inline_cpu.hpp"
@@ -166,6 +167,7 @@ static SFEM_INLINE void sstet4_for_each_microtet_fff(const int                  
                                                      F &&                                 f) {
     int      ev[4];
     scalar_t fff[6];
+    const int n = level + 1;
 
     if (level == 1) {
         sstet4_sub_fff_0(1, macro_fff, fff);
@@ -184,13 +186,13 @@ static SFEM_INLINE void sstet4_for_each_microtet_fff(const int                  
         sstet4_sub_fff_0(level, macro_fff, fff);
 
         int p = 0;
-        for (int i = 0; i < level - 1; i++) {
-            int layer_items = (level - i + 1) * (level - i) / 2;
-            for (int j = 0; j < level - i - 1; j++) {
-                for (int k = 0; k < level - i - j - 1; k++) {
+        for (int i = 0; i < n - 1; i++) {
+            int layer_items = (n - i + 1) * (n - i) / 2;
+            for (int j = 0; j < n - i - 1; j++) {
+                for (int k = 0; k < n - i - j - 1; k++) {
                     ev[0] = p;
                     ev[1] = p + 1;
-                    ev[2] = p + level - i - j;
+                    ev[2] = p + n - i - j;
                     ev[3] = p + layer_items - j;
                     f(ev, fff);
                     p++;
@@ -208,15 +210,15 @@ static SFEM_INLINE void sstet4_for_each_microtet_fff(const int                  
         sstet4_sub_fff_1(level, macro_fff, fff);
 
         int p = 0;
-        for (int i = 0; i < level - 1; i++) {
-            int layer_items = (level - i) * (level - i - 1) / 2;
-            for (int j = 0; j < level - i - 1; j++) {
+        for (int i = 0; i < n - 1; i++) {
+            int layer_items = (n - i) * (n - i - 1) / 2;
+            for (int j = 0; j < n - i - 1; j++) {
                 p++;
-                for (int k = 1; k < level - i - j - 1; k++) {
+                for (int k = 1; k < n - i - j - 1; k++) {
                     ev[0] = p;
-                    ev[1] = p + layer_items + level - i - j - 1;
-                    ev[2] = p + layer_items + level - i - j;
-                    ev[3] = p + layer_items + level - i - j - 1 + level - i - j - 1;
+                    ev[1] = p + layer_items + n - i - j - 1;
+                    ev[2] = p + layer_items + n - i - j;
+                    ev[3] = p + layer_items + n - i - j - 1 + n - i - j - 1;
                     f(ev, fff);
                     p++;
                 }
@@ -233,15 +235,15 @@ static SFEM_INLINE void sstet4_for_each_microtet_fff(const int                  
         sstet4_sub_fff_2(level, macro_fff, fff);
 
         int p = 0;
-        for (int i = 0; i < level - 1; i++) {
-            int layer_items = (level - i) * (level - i - 1) / 2;
-            for (int j = 0; j < level - i - 1; j++) {
+        for (int i = 0; i < n - 1; i++) {
+            int layer_items = (n - i) * (n - i - 1) / 2;
+            for (int j = 0; j < n - i - 1; j++) {
                 p++;
-                for (int k = 1; k < level - i - j - 1; k++) {
+                for (int k = 1; k < n - i - j - 1; k++) {
                     ev[0] = p;
-                    ev[1] = p + level - i - j;
-                    ev[3] = p + layer_items + level - i - j;
-                    ev[2] = p + layer_items + level - i - j - 1 + level - i - j - 1;
+                    ev[1] = p + n - i - j;
+                    ev[3] = p + layer_items + n - i - j;
+                    ev[2] = p + layer_items + n - i - j - 1 + n - i - j - 1;
                     f(ev, fff);
                     p++;
                 }
@@ -258,15 +260,15 @@ static SFEM_INLINE void sstet4_for_each_microtet_fff(const int                  
         sstet4_sub_fff_3(level, macro_fff, fff);
 
         int p = 0;
-        for (int i = 0; i < level - 1; i++) {
-            int layer_items = (level - i) * (level - i - 1) / 2;
-            for (int j = 0; j < level - i - 1; j++) {
+        for (int i = 0; i < n - 1; i++) {
+            int layer_items = (n - i) * (n - i - 1) / 2;
+            for (int j = 0; j < n - i - 1; j++) {
                 p++;
-                for (int k = 1; k < level - i - j - 1; k++) {
+                for (int k = 1; k < n - i - j - 1; k++) {
                     ev[0] = p;
-                    ev[1] = p + level - i - j - 1;
-                    ev[2] = p + layer_items + level - i - j - 1;
-                    ev[3] = p + layer_items + level - i - j - 1 + level - i - j - 1;
+                    ev[1] = p + n - i - j - 1;
+                    ev[2] = p + layer_items + n - i - j - 1;
+                    ev[3] = p + layer_items + n - i - j - 1 + n - i - j - 1;
                     f(ev, fff);
                     p++;
                 }
@@ -283,16 +285,16 @@ static SFEM_INLINE void sstet4_for_each_microtet_fff(const int                  
         sstet4_sub_fff_4(level, macro_fff, fff);
 
         int p = 0;
-        for (int i = 1; i < level - 1; i++) {
-            p               = p + level - i + 1;
-            int layer_items = (level - i) * (level - i - 1) / 2;
-            for (int j = 0; j < level - i - 1; j++) {
+        for (int i = 1; i < n - 1; i++) {
+            p               = p + n - i + 1;
+            int layer_items = (n - i) * (n - i - 1) / 2;
+            for (int j = 0; j < n - i - 1; j++) {
                 p++;
-                for (int k = 1; k < level - i - j - 1; k++) {
+                for (int k = 1; k < n - i - j - 1; k++) {
                     ev[0] = p;
-                    ev[1] = p + layer_items + level - i;
-                    ev[2] = p + layer_items + level - i - j + level - i;
-                    ev[3] = p + layer_items + level - i - j + level - i - 1;
+                    ev[1] = p + layer_items + n - i;
+                    ev[2] = p + layer_items + n - i - j + n - i;
+                    ev[3] = p + layer_items + n - i - j + n - i - 1;
                     f(ev, fff);
                     p++;
                 }
@@ -309,15 +311,15 @@ static SFEM_INLINE void sstet4_for_each_microtet_fff(const int                  
         sstet4_sub_fff_5(level, macro_fff, fff);
 
         int p = 0;
-        for (int i = 0; i < level - 1; i++) {
-            int layer_items = (level - i) * (level - i - 1) / 2;
-            for (int j = 0; j < level - i - 1; j++) {
+        for (int i = 0; i < n - 1; i++) {
+            int layer_items = (n - i) * (n - i - 1) / 2;
+            for (int j = 0; j < n - i - 1; j++) {
                 p++;
-                for (int k = 1; k < level - i - j - 1; k++) {
+                for (int k = 1; k < n - i - j - 1; k++) {
                     ev[0] = p;
-                    ev[1] = p + level - i - j - 1;
-                    ev[2] = p + layer_items + level - i - j - 1 + level - i - j - 1;
-                    ev[3] = p + level - i - j;
+                    ev[1] = p + n - i - j - 1;
+                    ev[2] = p + layer_items + n - i - j - 1 + n - i - j - 1;
+                    ev[3] = p + n - i - j;
                     f(ev, fff);
                     p++;
                 }
@@ -336,11 +338,22 @@ int sstet4_laplacian_apply_points(const int                         level,
                                   real_t *const SFEM_RESTRICT       values) {
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
-        jacobian_t macro_fff[6];
-        sstet4_macro_fff(level, elements, points, e, macro_fff);
-
-        sstet4_for_each_microtet_fff(level, macro_fff, [&](const int *const lev, const scalar_t *const fff) {
+        smesh::sstet4_transfer::for_each_microtet(level, [&](const int *const lev) {
             idx_t gv[4] = {elements[lev[0]][e], elements[lev[1]][e], elements[lev[2]][e], elements[lev[3]][e]};
+            scalar_t fff[6];
+            tet4_fff_s(points[0][gv[0]],
+                       points[0][gv[1]],
+                       points[0][gv[2]],
+                       points[0][gv[3]],
+                       points[1][gv[0]],
+                       points[1][gv[1]],
+                       points[1][gv[2]],
+                       points[1][gv[3]],
+                       points[2][gv[0]],
+                       points[2][gv[1]],
+                       points[2][gv[2]],
+                       points[2][gv[3]],
+                       fff);
             accumulator_t v[4];
             tet4_laplacian_apply_fff(fff, u[gv[0]], u[gv[1]], u[gv[2]], u[gv[3]], &v[0], &v[1], &v[2], &v[3]);
             for (int d = 0; d < 4; ++d) {
@@ -360,11 +373,22 @@ int sstet4_laplacian_diag_points(const int                    level,
                                  real_t *const SFEM_RESTRICT  values) {
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
-        jacobian_t macro_fff[6];
-        sstet4_macro_fff(level, elements, points, e, macro_fff);
-
-        sstet4_for_each_microtet_fff(level, macro_fff, [&](const int *const lev, const scalar_t *const fff) {
+        smesh::sstet4_transfer::for_each_microtet(level, [&](const int *const lev) {
             idx_t gv[4] = {elements[lev[0]][e], elements[lev[1]][e], elements[lev[2]][e], elements[lev[3]][e]};
+            scalar_t fff[6];
+            tet4_fff_s(points[0][gv[0]],
+                       points[0][gv[1]],
+                       points[0][gv[2]],
+                       points[0][gv[3]],
+                       points[1][gv[0]],
+                       points[1][gv[1]],
+                       points[1][gv[2]],
+                       points[1][gv[3]],
+                       points[2][gv[0]],
+                       points[2][gv[1]],
+                       points[2][gv[2]],
+                       points[2][gv[3]],
+                       fff);
             accumulator_t v[4];
             tet4_laplacian_diag_fff(fff, &v[0], &v[1], &v[2], &v[3]);
             for (int d = 0; d < 4; ++d) {
@@ -383,249 +407,28 @@ int sstet4_laplacian_apply(const int                             level,
                            const real_t *const SFEM_RESTRICT     u,
                            real_t *const SFEM_RESTRICT           values) {
     const int nxe = sstet4_nxe(level);
-    const int txe = sstet4_txe(level);
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
-        int           ev[4];
-        scalar_t      fff[6];
-        accumulator_t v[4];
-
         const real_t *const element_u      = &u[e * nxe];
         real_t *const       element_vector = &values[e * nxe];
 
-        ///////////////////////////////////
-        // Cat 0
-        ///////////////////////////////////
-        {
-            sstet4_sub_fff_0(level, &g_fff[e * 6], fff);
+        sstet4_for_each_microtet_fff(level, &g_fff[e * 6], [&](const int *const ev, const scalar_t *const fff) {
+            accumulator_t v[4];
+            tet4_laplacian_apply_fff(fff,
+                                     element_u[ev[0]],
+                                     element_u[ev[1]],
+                                     element_u[ev[2]],
+                                     element_u[ev[3]],
+                                     &v[0],
+                                     &v[1],
+                                     &v[2],
+                                     &v[3]);
 
-            int p = 0;
-            for (int i = 0; i < level - 1; i++) {
-                int layer_items = (level - i + 1) * (level - i) / 2;
-                for (int j = 0; j < level - i - 1; j++) {
-                    for (int k = 0; k < level - i - j - 1; k++) {
-                        ev[0] = p;
-                        ev[1] = p + 1;
-                        ev[2] = p + level - i - j;
-                        ev[3] = p + layer_items - j;
-
-                        tet4_laplacian_apply_fff(fff,
-                                                 element_u[ev[0]],
-                                                 element_u[ev[1]],
-                                                 element_u[ev[2]],
-                                                 element_u[ev[3]],
-                                                 &v[0],
-                                                 &v[1],
-                                                 &v[2],
-                                                 &v[3]);
-
-                        for (int d = 0; d < 4; d++) {
-                            element_vector[ev[d]] += v[d];
-                        }
-
-                        p++;
-                    }
-                    p++;
-                }
-                p++;
+            for (int d = 0; d < 4; ++d) {
+                element_vector[ev[d]] += v[d];
             }
-        }
-
-        ///////////////////////////////////
-        // Cat 1
-        ///////////////////////////////////
-        {
-            sstet4_sub_fff_1(level, &g_fff[e * 6], fff);
-
-            int p = 0;
-            for (int i = 0; i < level - 1; i++) {
-                int layer_items = (level - i) * (level - i - 1) / 2;
-                for (int j = 0; j < level - i - 1; j++) {
-                    p++;
-                    for (int k = 1; k < level - i - j - 1; k++) {
-                        ev[0] = p;
-                        ev[1] = p + layer_items + level - i - j - 1;
-                        ev[2] = p + layer_items + level - i - j;
-                        ev[3] = p + layer_items + level - i - j - 1 + level - i - j - 1;
-
-                        tet4_laplacian_apply_fff(fff,
-                                                 element_u[ev[0]],
-                                                 element_u[ev[1]],
-                                                 element_u[ev[2]],
-                                                 element_u[ev[3]],
-                                                 &v[0],
-                                                 &v[1],
-                                                 &v[2],
-                                                 &v[3]);
-
-                        for (int d = 0; d < 4; d++) {
-                            element_vector[ev[d]] += v[d];
-                        }
-                        p++;
-                    }
-                    p++;
-                }
-                p++;
-            }
-        }
-
-        ///////////////////////////////////
-        // Cat 2
-        ///////////////////////////////////
-        {
-            sstet4_sub_fff_2(level, &g_fff[e * 6], fff);
-
-            int p = 0;
-            for (int i = 0; i < level - 1; i++) {
-                int layer_items = (level - i) * (level - i - 1) / 2;
-                for (int j = 0; j < level - i - 1; j++) {
-                    p++;
-                    for (int k = 1; k < level - i - j - 1; k++) {
-                        ev[0] = p;
-                        ev[1] = p + level - i - j;
-                        ev[3] = p + layer_items + level - i - j;
-                        ev[2] = p + layer_items + level - i - j - 1 + level - i - j - 1;
-
-                        tet4_laplacian_apply_fff(fff,
-                                                 element_u[ev[0]],
-                                                 element_u[ev[1]],
-                                                 element_u[ev[2]],
-                                                 element_u[ev[3]],
-                                                 &v[0],
-                                                 &v[1],
-                                                 &v[2],
-                                                 &v[3]);
-
-                        for (int d = 0; d < 4; d++) {
-                            element_vector[ev[d]] += v[d];
-                        }
-
-                        p++;
-                    }
-                    p++;
-                }
-                p++;
-            }
-        }
-
-        ///////////////////////////////////
-        // Cat 3
-        ///////////////////////////////////
-        {
-            sstet4_sub_fff_3(level, &g_fff[e * 6], fff);
-
-            int p = 0;
-            for (int i = 0; i < level - 1; i++) {
-                int layer_items = (level - i) * (level - i - 1) / 2;
-                for (int j = 0; j < level - i - 1; j++) {
-                    p++;
-                    for (int k = 1; k < level - i - j - 1; k++) {
-                        ev[0] = p;
-                        ev[1] = p + level - i - j - 1;
-                        ev[2] = p + layer_items + level - i - j - 1;
-                        ev[3] = p + layer_items + level - i - j - 1 + level - i - j - 1;
-
-                        tet4_laplacian_apply_fff(fff,
-                                                 element_u[ev[0]],
-                                                 element_u[ev[1]],
-                                                 element_u[ev[2]],
-                                                 element_u[ev[3]],
-                                                 &v[0],
-                                                 &v[1],
-                                                 &v[2],
-                                                 &v[3]);
-
-                        for (int d = 0; d < 4; d++) {
-                            element_vector[ev[d]] += v[d];
-                        }
-
-                        p++;
-                    }
-                    p++;
-                }
-                p++;
-            }
-        }
-
-        ///////////////////////////////////
-        // Cat 4
-        ///////////////////////////////////
-        {
-            sstet4_sub_fff_4(level, &g_fff[e * 6], fff);
-
-            int p = 0;
-            for (int i = 1; i < level - 1; i++) {
-                p               = p + level - i + 1;
-                int layer_items = (level - i) * (level - i - 1) / 2;
-                for (int j = 0; j < level - i - 1; j++) {
-                    p++;
-                    for (int k = 1; k < level - i - j - 1; k++) {
-                        ev[0] = p;
-                        ev[1] = p + layer_items + level - i;
-                        ev[2] = p + layer_items + level - i - j + level - i;
-                        ev[3] = p + layer_items + level - i - j + level - i - 1;
-
-                        tet4_laplacian_apply_fff(fff,
-                                                 element_u[ev[0]],
-                                                 element_u[ev[1]],
-                                                 element_u[ev[2]],
-                                                 element_u[ev[3]],
-                                                 &v[0],
-                                                 &v[1],
-                                                 &v[2],
-                                                 &v[3]);
-
-                        for (int d = 0; d < 4; d++) {
-                            element_vector[ev[d]] += v[d];
-                        }
-
-                        p++;
-                    }
-                    p++;
-                }
-                p++;
-            }
-        }
-
-        ///////////////////////////////////
-        // Cat 5
-        ///////////////////////////////////
-        {
-            sstet4_sub_fff_5(level, &g_fff[e * 6], fff);
-
-            int p = 0;
-            for (int i = 0; i < level - 1; i++) {
-                int layer_items = (level - i) * (level - i - 1) / 2;
-                for (int j = 0; j < level - i - 1; j++) {
-                    p++;
-                    for (int k = 1; k < level - i - j - 1; k++) {
-                        ev[0] = p;
-                        ev[1] = p + level - i - j - 1;
-                        ev[2] = p + layer_items + level - i - j - 1 + level - i - j - 1;
-                        ev[3] = p + level - i - j;
-
-                        tet4_laplacian_apply_fff(fff,
-                                                 element_u[ev[0]],
-                                                 element_u[ev[1]],
-                                                 element_u[ev[2]],
-                                                 element_u[ev[3]],
-                                                 &v[0],
-                                                 &v[1],
-                                                 &v[2],
-                                                 &v[3]);
-
-                        for (int d = 0; d < 4; d++) {
-                            element_vector[ev[d]] += v[d];
-                        }
-
-                        p++;
-                    }
-                    p++;
-                }
-                p++;
-            }
-        }
+        });
     }
 
     return SFEM_SUCCESS;

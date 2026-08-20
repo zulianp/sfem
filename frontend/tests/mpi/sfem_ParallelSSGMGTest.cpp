@@ -40,10 +40,12 @@ namespace {
     sfem::SharedBuffer<idx_t> nodeset_from_point_selector(const std::shared_ptr<smesh::Mesh> &mesh, Pred pred) {
         auto               pts = mesh->points()->data();
         const ptrdiff_t    n   = mesh->n_nodes();
+        const bool         has_z = mesh->spatial_dimension() > 2;
         std::vector<idx_t> ids;
         ids.reserve((size_t)n);
         for (ptrdiff_t i = 0; i < n; ++i) {
-            if (pred(pts[0][i], pts[1][i], pts[2][i])) {
+            const geom_t z = has_z ? pts[2][i] : geom_t(0);
+            if (pred(pts[0][i], pts[1][i], z)) {
                 ids.push_back((idx_t)i);
             }
         }
@@ -111,38 +113,64 @@ namespace {
         return f;
     }
 
+    std::shared_ptr<sfem::Function> make_homogeneous_ss_poisson(const int                          element_level,
+                                                                const std::shared_ptr<sfem::Mesh> &mesh) {
+        auto ss = smesh::to_semistructured(element_level, mesh, true, false);
+        if (!ss) {
+            return nullptr;
+        }
+
+        auto fs = sfem::FunctionSpace::create(ss, 1);
+        auto f  = sfem::Function::create(fs);
+        auto op = sfem::create_op(fs, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+        if (!op || op->initialize() != SFEM_SUCCESS) {
+            return nullptr;
+        }
+        f->add_operator(op);
+
+        auto bottom_pred = [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; };
+        auto right_pred  = [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
+            return x > 1 - 1e-5 && x < 1 + 1e-5;
+        };
+
+        sfem::DirichletConditions::Condition bottom{
+                .nodeset   = nodeset_from_point_selector(ss, bottom_pred),
+                .value     = -1,
+                .component = 0};
+        sfem::DirichletConditions::Condition right{
+                .nodeset   = nodeset_from_point_selector(ss, right_pred),
+                .value     = 1,
+                .component = 0};
+        f->add_constraint(sfem::create_dirichlet_conditions(fs, {bottom, right}, sfem::EXECUTION_SPACE_HOST));
+        return f;
+    }
+
     int find_serial_node(const geom_t *const *serial_pts,
+                         const int           serial_spatial_dim,
                          const ptrdiff_t      n_serial,
                          const geom_t         x,
                          const geom_t         y,
                          const geom_t         z,
                          const geom_t         tol) {
+        const bool has_z = serial_spatial_dim > 2;
         for (ptrdiff_t j = 0; j < n_serial; ++j) {
+            const geom_t serial_z = has_z ? serial_pts[2][j] : geom_t(0);
             if (std::fabs(serial_pts[0][j] - x) <= tol && std::fabs(serial_pts[1][j] - y) <= tol &&
-                std::fabs(serial_pts[2][j] - z) <= tol) {
+                std::fabs(serial_z - z) <= tol) {
                 return (int)j;
             }
         }
         return -1;
     }
 
-    int test_parallel_checkerboard_ssgmg() {
-        SFEM_TRACE_SCOPE("test_parallel_checkerboard_ssgmg");
+    int solve_and_check_parallel_ssgmg(const char                          *label,
+                                       const std::shared_ptr<sfem::Function> &serial_f,
+                                       const std::shared_ptr<sfem::Function> &parallel_f,
+                                       const real_t                          abs_tol,
+                                       const real_t                          rel_tol,
+                                       const real_t                          sol_tol,
+                                       const int                             max_it) {
         auto comm = sfem::Communicator::world();
-
-        const ptrdiff_t n = smesh::Env::read("SFEM_BASE_RESOLUTION", 2);
-        const int       l = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 8);
-
-        auto serial_hex   = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), n, n, n);
-        auto parallel_hex = sfem::Mesh::create_hex8_checkerboard_cube(comm, n, n, n);
-        SFEM_TEST_ASSERT(serial_hex != nullptr);
-        SFEM_TEST_ASSERT(parallel_hex != nullptr);
-        SFEM_TEST_EQ(parallel_hex->n_blocks(), static_cast<size_t>(2));
-        SFEM_TEST_ASSERT(parallel_hex->block(0)->name() == "white");
-        SFEM_TEST_ASSERT(parallel_hex->block(1)->name() == "black");
-
-        auto serial_f   = make_homogeneous_checkerboard_ss_poisson(l, serial_hex);
-        auto parallel_f = make_homogeneous_checkerboard_ss_poisson(l, parallel_hex);
         SFEM_TEST_ASSERT(serial_f != nullptr);
         SFEM_TEST_ASSERT(parallel_f != nullptr);
 
@@ -170,6 +198,7 @@ namespace {
             auto serial_mg = sfem::create_ssgmg(serial_f, serial_f->execution_space());
             SFEM_TEST_ASSERT(serial_mg != nullptr);
             serial_mg->verbose = false;
+            serial_mg->set_max_it(max_it);
             SFEM_TEST_ASSERT(serial_mg->apply(serial_rhs->data(), serial_x->data()) == SFEM_SUCCESS);
         } else if (comm->rank() == 0) {
             printf("skipping serial solution comparison (%td dofs > %d)\n", (ptrdiff_t)n_global, compare_max_dofs);
@@ -183,6 +212,7 @@ namespace {
         auto parallel_mg = sfem::create_ssgmg(parallel_f, parallel_f->execution_space());
         SFEM_TEST_ASSERT(parallel_mg != nullptr);
         parallel_mg->verbose = smesh::Env::read("SFEM_VERBOSE", false);
+        parallel_mg->set_max_it(max_it);
         SFEM_TEST_ASSERT(parallel_mg->apply(parallel_rhs->data(), parallel_x->data()) == SFEM_SUCCESS);
 
         auto A  = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, parallel_f, nullptr, parallel_f->execution_space());
@@ -201,21 +231,21 @@ namespace {
         const real_t rhs_nrm = std::sqrt(comm->sum(local_b2));
         const real_t rel_res = abs_res / (rhs_nrm + real_t(1e-16));
         if (comm->rank() == 0) {
-            printf("parallel checkerboard ssgmg residual abs %g rel %g\n", (double)abs_res, (double)rel_res);
+            printf("parallel %s ssgmg residual abs %g rel %g\n", label, (double)abs_res, (double)rel_res);
         }
 
-        const real_t abs_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
-        SFEM_TEST_ASSERT(abs_res < abs_tol || rel_res < abs_tol);
+        SFEM_TEST_ASSERT(abs_res < abs_tol || rel_res < rel_tol);
 
         if (compare_serial) {
-            const real_t    sol_tol      = abs_tol;
             const geom_t    geom_tol     = sizeof(geom_t) == sizeof(double) ? geom_t(1e-12) : geom_t(1e-5);
             auto            serial_pts   = serial_mesh->points()->data();
             auto            parallel_pts = parallel_mesh->points()->data();
             const ptrdiff_t n_serial     = serial_fs->n_dofs();
+            const bool      parallel_has_z = parallel_mesh->spatial_dimension() > 2;
             for (ptrdiff_t i = 0; i < n_owned; ++i) {
-                const int j = find_serial_node(
-                        serial_pts, n_serial, parallel_pts[0][i], parallel_pts[1][i], parallel_pts[2][i], geom_tol);
+                const geom_t z = parallel_has_z ? parallel_pts[2][i] : geom_t(0);
+                const int j    = find_serial_node(
+                        serial_pts, serial_mesh->spatial_dimension(), n_serial, parallel_pts[0][i], parallel_pts[1][i], z, geom_tol);
                 SFEM_TEST_ASSERT(j >= 0);
                 SFEM_TEST_APPROXEQ(parallel_x->data()[i], serial_x->data()[j], sol_tol);
             }
@@ -224,11 +254,86 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    int test_parallel_checkerboard_ssgmg() {
+        SFEM_TRACE_SCOPE("test_parallel_checkerboard_ssgmg");
+        auto comm = sfem::Communicator::world();
+
+        const ptrdiff_t n = smesh::Env::read("SFEM_BASE_RESOLUTION", 2);
+        const int       l = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 8);
+
+        auto serial_hex   = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), n, n, n);
+        auto parallel_hex = sfem::Mesh::create_hex8_checkerboard_cube(comm, n, n, n);
+        SFEM_TEST_ASSERT(serial_hex != nullptr);
+        SFEM_TEST_ASSERT(parallel_hex != nullptr);
+        SFEM_TEST_EQ(parallel_hex->n_blocks(), static_cast<size_t>(2));
+        SFEM_TEST_ASSERT(parallel_hex->block(0)->name() == "white");
+        SFEM_TEST_ASSERT(parallel_hex->block(1)->name() == "black");
+
+        const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+        return solve_and_check_parallel_ssgmg("checkerboard",
+                                              make_homogeneous_checkerboard_ss_poisson(l, serial_hex),
+                                              make_homogeneous_checkerboard_ss_poisson(l, parallel_hex),
+                                              tol,
+                                              tol,
+                                              tol,
+                                              smesh::Env::read("SFEM_MG_MAX_IT", 40));
+    }
+
+    int test_parallel_quad4_ssgmg() {
+        SFEM_TRACE_SCOPE("test_parallel_quad4_ssgmg");
+        auto comm = sfem::Communicator::world();
+
+        const ptrdiff_t default_n = std::max<ptrdiff_t>(comm->size(), 4);
+        const ptrdiff_t n         = smesh::Env::read("SFEM_QUAD_BASE_RESOLUTION", static_cast<int>(default_n));
+        const int       l         = smesh::Env::read("SFEM_QUAD_ELEMENT_REFINE_LEVEL", 4);
+
+        auto serial_quad   = sfem::Mesh::create_quad4_square(sfem::Communicator::self(), n, n, 0, 0, 1, 1);
+        auto parallel_quad = sfem::Mesh::create_quad4_square(comm, n, n, 0, 0, 1, 1);
+        SFEM_TEST_ASSERT(serial_quad != nullptr);
+        SFEM_TEST_ASSERT(parallel_quad != nullptr);
+
+        const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+        return solve_and_check_parallel_ssgmg("quad4",
+                                              make_homogeneous_ss_poisson(l, serial_quad),
+                                              make_homogeneous_ss_poisson(l, parallel_quad),
+                                              tol,
+                                              tol,
+                                              tol,
+                                              smesh::Env::read("SFEM_MG_MAX_IT", 40));
+    }
+
+    int test_parallel_tet4_ssgmg() {
+        SFEM_TRACE_SCOPE("test_parallel_tet4_ssgmg");
+        auto comm = sfem::Communicator::world();
+
+        const ptrdiff_t default_n = 3;
+        const ptrdiff_t n         = smesh::Env::read("SFEM_TET_BASE_RESOLUTION", static_cast<int>(default_n));
+        const int       l         = smesh::Env::read("SFEM_TET_ELEMENT_REFINE_LEVEL", 4);
+
+        auto serial_tet   = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), n, n, n);
+        auto parallel_tet = sfem::Mesh::create_tet4_cube(comm, n, n, n);
+        SFEM_TEST_ASSERT(serial_tet != nullptr);
+        SFEM_TEST_ASSERT(parallel_tet != nullptr);
+
+        const real_t abs_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+        const real_t rel_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+        const real_t sol_tol = sizeof(real_t) == sizeof(double) ? real_t(5e-6) : real_t(1e-4);
+        return solve_and_check_parallel_ssgmg("tet4",
+                                              make_homogeneous_ss_poisson(l, serial_tet),
+                                              make_homogeneous_ss_poisson(l, parallel_tet),
+                                              abs_tol,
+                                              rel_tol,
+                                              sol_tol,
+                                              smesh::Env::read("SFEM_MG_MAX_IT", 40));
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_parallel_checkerboard_ssgmg);
+    SFEM_RUN_TEST(test_parallel_quad4_ssgmg);
+    SFEM_RUN_TEST(test_parallel_tet4_ssgmg);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
