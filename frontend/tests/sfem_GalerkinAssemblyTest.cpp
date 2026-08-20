@@ -41,6 +41,112 @@
         fflush(stdout);                                        \
     } while (0)
 
+template <typename Pred>
+sfem::SharedBuffer<idx_t> nodeset_from_selector(const std::shared_ptr<smesh::Mesh> &mesh, Pred pred) {
+    auto      pts = mesh->points()->data();
+    ptrdiff_t n   = 0;
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        if (pred(pts[0][i], pts[1][i], pts[2][i])) {
+            ++n;
+        }
+    }
+
+    auto ret = sfem::create_host_buffer<idx_t>(n);
+    n        = 0;
+    for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+        if (pred(pts[0][i], pts[1][i], pts[2][i])) {
+            ret->data()[n++] = static_cast<idx_t>(i);
+        }
+    }
+
+    return ret;
+}
+
+static int test_expanded_tet4_laplacian(const std::shared_ptr<sfem::Mesh> &ss_mesh,
+                                        const char *const                  op_name,
+                                        const sfem::ExecutionSpace         es,
+                                        const int                          block_size) {
+    SFEM_TEST_ASSERT(es == sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(smesh::is_tet_ss_family(ss_mesh->element_type(0)));
+
+    auto tet4_mesh = smesh::convert_to(smesh::TET4, ss_mesh);
+    SFEM_TEST_ASSERT(tet4_mesh != nullptr);
+    SFEM_TEST_ASSERT(tet4_mesh->n_nodes() == ss_mesh->n_nodes());
+
+    auto ss_fs   = sfem::FunctionSpace::create(ss_mesh, block_size);
+    auto tet4_fs = sfem::FunctionSpace::create(tet4_mesh, block_size);
+
+    auto ss_fun   = sfem::Function::create(ss_fs);
+    auto tet4_fun = sfem::Function::create(tet4_fs);
+
+    auto ss_op   = sfem::create_op(ss_fs, op_name, es);
+    auto tet4_op = sfem::create_op(tet4_fs, op_name, es);
+    SFEM_TEST_ASSERT(ss_op != nullptr);
+    SFEM_TEST_ASSERT(tet4_op != nullptr);
+    SFEM_TEST_ASSERT(ss_op->initialize() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(tet4_op->initialize() == SFEM_SUCCESS);
+    ss_fun->add_operator(ss_op);
+    tet4_fun->add_operator(tet4_op);
+
+    auto ss_linear   = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, ss_fun, nullptr, es);
+    auto tet4_linear = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, tet4_fun, nullptr, es);
+
+    const ptrdiff_t n_dofs = ss_fs->n_dofs();
+    SFEM_TEST_ASSERT(tet4_fs->n_dofs() == n_dofs);
+
+    auto input     = sfem::create_buffer<real_t>(n_dofs, es);
+    auto ss_out    = sfem::create_buffer<real_t>(n_dofs, es);
+    auto tet4_out  = sfem::create_buffer<real_t>(n_dofs, es);
+    auto ss_diag   = sfem::create_buffer<real_t>(n_dofs, es);
+    auto tet4_diag = sfem::create_buffer<real_t>(n_dofs, es);
+
+    auto points = ss_mesh->points()->data();
+    for (ptrdiff_t i = 0; i < ss_mesh->n_nodes(); ++i) {
+        const real_t x = points[0][i];
+        const real_t y = points[1][i];
+        const real_t z = points[2][i];
+        for (int b = 0; b < block_size; ++b) {
+            input->data()[i * block_size + b] =
+                    (b + 1) * (0.37 + x * x + 0.5 * y + 0.25 * z * z + 0.125 * x * y);
+        }
+    }
+
+    SFEM_TEST_ASSERT(ss_linear->apply(input->data(), ss_out->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(tet4_linear->apply(input->data(), tet4_out->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(ss_fun->hessian_diag(nullptr, ss_diag->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(tet4_fun->hessian_diag(nullptr, tet4_diag->data()) == SFEM_SUCCESS);
+
+    real_t    apply_largest_diff = 0;
+    real_t    diag_largest_diff  = 0;
+    ptrdiff_t apply_arg          = SFEM_PTRDIFF_INVALID;
+    ptrdiff_t diag_arg           = SFEM_PTRDIFF_INVALID;
+
+    for (ptrdiff_t i = 0; i < n_dofs; ++i) {
+        const real_t apply_diff = fabs(ss_out->data()[i] - tet4_out->data()[i]);
+        const real_t diag_diff  = fabs(ss_diag->data()[i] - tet4_diag->data()[i]);
+
+        if (apply_diff > apply_largest_diff || apply_diff != apply_diff) {
+            apply_largest_diff = apply_diff;
+            apply_arg          = i;
+        }
+
+        if (diag_diff > diag_largest_diff || diag_diff != diag_diff) {
+            diag_largest_diff = diag_diff;
+            diag_arg          = i;
+        }
+    }
+
+    printf("expanded TET4 check apply_largest_diff(%ld) = %g diag_largest_diff(%ld) = %g\n",
+           apply_arg,
+           (double)apply_largest_diff,
+           diag_arg,
+           (double)diag_largest_diff);
+    SFEM_TEST_ASSERT(apply_largest_diff < 1e-8);
+    SFEM_TEST_ASSERT(diag_largest_diff < 1e-8);
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_cube() {
     auto comm = sfem::Communicator::world();
     auto es   = sfem::EXECUTION_SPACE_HOST;
@@ -76,6 +182,15 @@ int test_cube() {
     int SFEM_DEBUG_PRINT = 0;
     SFEM_READ_ENV(SFEM_DEBUG_PRINT, atoi);
 
+    int SFEM_FULL_GALERKIN_CHECK = 0;
+    SFEM_READ_ENV(SFEM_FULL_GALERKIN_CHECK, atoi);
+
+    int SFEM_EXPANDED_TET_CHECK = 0;
+    SFEM_READ_ENV(SFEM_EXPANDED_TET_CHECK, atoi);
+
+    int SFEM_APPLY_TEST_CONSTRAINTS = 0;
+    SFEM_READ_ENV(SFEM_APPLY_TEST_CONSTRAINTS, atoi);
+
     int SFEM_REPEAT = 1;
     SFEM_READ_ENV(SFEM_REPEAT, atoi);
 
@@ -85,16 +200,33 @@ int test_cube() {
     int SFEM_BLOCK_SIZE = 1;
     SFEM_READ_ENV(SFEM_BLOCK_SIZE, atoi);
 
-    auto m = sfem::Mesh::create_hex8_cube(comm,
-                                          SFEM_BASE_RESOLUTION * 1,
-                                          SFEM_BASE_RESOLUTION * 1,
-                                          SFEM_BASE_RESOLUTION * 1,
-                                          0,
-                                          0,
-                                          0,
-                                          1,
-                                          1,
-                                          1);
+    const char *SFEM_BASE_ELEMENT = "HEX8";
+    SFEM_READ_ENV(SFEM_BASE_ELEMENT, );
+
+    std::shared_ptr<sfem::Mesh> m;
+    if (!strcmp(SFEM_BASE_ELEMENT, "TET4")) {
+        m = sfem::Mesh::create_tet4_cube(comm,
+                                         SFEM_BASE_RESOLUTION,
+                                         SFEM_BASE_RESOLUTION,
+                                         SFEM_BASE_RESOLUTION,
+                                         0,
+                                         0,
+                                         0,
+                                         1,
+                                         1,
+                                         1);
+    } else {
+        m = sfem::Mesh::create_hex8_cube(comm,
+                                         SFEM_BASE_RESOLUTION,
+                                         SFEM_BASE_RESOLUTION,
+                                         SFEM_BASE_RESOLUTION,
+                                         0,
+                                         0,
+                                         0,
+                                         1,
+                                         1,
+                                         1);
+    }
 
     if (SFEM_ELEMENT_REFINE_LEVEL > 0) {
         m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
@@ -116,6 +248,22 @@ int test_cube() {
 
     op->initialize();
     f->add_operator(op);
+
+    if (SFEM_EXPANDED_TET_CHECK) {
+        SFEM_TEST_ASSERT(!strcmp(SFEM_BASE_ELEMENT, "TET4"));
+        SFEM_TEST_ASSERT(test_expanded_tet4_laplacian(m, SFEM_OPERATOR, es, SFEM_BLOCK_SIZE) == SFEM_TEST_SUCCESS);
+    }
+
+    if (SFEM_APPLY_TEST_CONSTRAINTS) {
+        auto bottom_ns = nodeset_from_selector(
+                m, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
+        auto right_ns = nodeset_from_selector(
+                m, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > 1 - 1e-5 && x < 1 + 1e-5; });
+
+        sfem::DirichletConditions::Condition bottom{.nodeset = bottom_ns, .value = -1, .component = 0};
+        sfem::DirichletConditions::Condition right{.nodeset = right_ns, .value = 1, .component = 0};
+        f->add_constraint(sfem::create_dirichlet_conditions(fs, {bottom, right}, sfem::EXECUTION_SPACE_HOST));
+    }
 
     std::shared_ptr<sfem::Operator<real_t>> fine_op, coarse_op;
 
@@ -286,6 +434,52 @@ int test_cube() {
                 printf("largest_diff(%ld) = %g, %g\n", arg_largest_diff, largest_diff, largest_diff_factor);
                 SFEM_TEST_ASSERT(largest_diff < 1e-7);
             }
+        }
+
+        if (SFEM_FULL_GALERKIN_CHECK) {
+            SFEM_TEST_ASSERT(es == sfem::EXECUTION_SPACE_HOST);
+
+            const ptrdiff_t n_coarse = fs_coarse->n_dofs();
+            auto            basis    = sfem::create_buffer<real_t>(n_coarse, es);
+            auto            lhs      = sfem::create_buffer<real_t>(n_coarse, es);
+            auto            rhs      = sfem::create_buffer<real_t>(n_coarse, es);
+
+            real_t    largest_diff     = 0;
+            ptrdiff_t arg_largest_row  = SFEM_PTRDIFF_INVALID;
+            ptrdiff_t arg_largest_col  = SFEM_PTRDIFF_INVALID;
+
+            for (ptrdiff_t j = 0; j < n_coarse; ++j) {
+                for (ptrdiff_t i = 0; i < n_coarse; ++i) {
+                    basis->data()[i] = 0;
+                    lhs->data()[i]   = 0;
+                    rhs->data()[i]   = 0;
+                }
+                for (ptrdiff_t i = 0; i < fs->n_dofs(); ++i) {
+                    prolongated->data()[i] = 0;
+                    Ax_fine->data()[i]     = 0;
+                }
+
+                basis->data()[j] = 1;
+                SFEM_TEST_ASSERT(coarse_op->apply(basis->data(), rhs->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(prolongation->apply(basis->data(), prolongated->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(fine_op->apply(prolongated->data(), Ax_fine->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(restriction->apply(Ax_fine->data(), lhs->data()) == SFEM_SUCCESS);
+
+                for (ptrdiff_t i = 0; i < n_coarse; ++i) {
+                    const real_t diff = fabs(lhs->data()[i] - rhs->data()[i]);
+                    if (diff > largest_diff || diff != diff) {
+                        largest_diff    = diff;
+                        arg_largest_row = i;
+                        arg_largest_col = j;
+                    }
+                }
+            }
+
+            printf("full Galerkin largest_diff(%ld,%ld) = %g\n",
+                   arg_largest_row,
+                   arg_largest_col,
+                   (double)largest_diff);
+            SFEM_TEST_ASSERT(largest_diff < 1e-7);
         }
     }
 

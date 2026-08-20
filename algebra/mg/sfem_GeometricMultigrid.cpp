@@ -138,8 +138,8 @@ namespace sfem {
                 f->hessian_diag(nullptr, diag->data());
                 f->set_value_to_constrained_dofs(1, diag->data());
 
-                auto jacobi                  = sfem::create_shiftable_jacobi(diag, es);
-                jacobi->relaxation_parameter = 1.;
+                auto jacobi = sfem::create_shiftable_jacobi(diag, es);
+                jacobi->set_relaxation_parameter(smesh::Env::read("SFEM_MG_JACOBI_RELAXATION", real_t(1)));
                 return jacobi;
             } else {
                 auto fs   = f->space();
@@ -153,12 +153,12 @@ namespace sfem {
                 if (enable_mixed_precision) {
                     auto temp =
                             sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(block_size, diag, mask, es);
-                    temp->relaxation_parameter = 1. / block_size;
-                    jacobi                     = temp;
+                    temp->set_relaxation_parameter(1. / block_size);
+                    jacobi = temp;
                 } else {
-                    auto temp                  = sfem::create_shiftable_block_sym_jacobi(block_size, diag, mask, es);
-                    temp->relaxation_parameter = 1. / block_size;
-                    jacobi                     = temp;
+                    auto temp = sfem::create_shiftable_block_sym_jacobi(block_size, diag, mask, es);
+                    temp->set_relaxation_parameter(1. / block_size);
+                    jacobi = temp;
                 }
 
                 return jacobi;
@@ -195,8 +195,8 @@ namespace sfem {
             auto f    = data->functions.back();
             auto diag = sfem::create_buffer<real_t>(f->space()->n_dofs(), es);
             f->hessian_diag(nullptr, diag->data());
-            auto sj_coarse                  = sfem::create_shiftable_jacobi(diag, es);
-            sj_coarse->relaxation_parameter = 1. / block_size;
+            auto sj_coarse = sfem::create_shiftable_jacobi(diag, es);
+            sj_coarse->set_relaxation_parameter(1. / block_size);
             coarse_solver->set_preconditioner_op(sj_coarse);
 
             // This is not working for some reason. BCs?

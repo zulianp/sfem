@@ -28,6 +28,14 @@ namespace sfem {
             execution_space_ = EXECUTION_SPACE_HOST;
         }
 
+        void set_relaxation_parameter(const T relaxation) {
+            if (inv_diag && relaxation_parameter != T(0)) {
+                blas->scal(inv_diag->size(), relaxation / relaxation_parameter, inv_diag->data());
+            }
+
+            relaxation_parameter = relaxation;
+        }
+
         void set_diag(const SharedBuffer<T>& d) {
             diag     = d;
             inv_diag = create_buffer<T>(d->size(), execution_space());
@@ -86,6 +94,14 @@ namespace sfem {
             blas = make_openmp_blas<T>();
             ShiftableBlockSymJacobi_OpenMP<T>::build(block_size, impl);
             execution_space_ = EXECUTION_SPACE_HOST;
+        }
+
+        void set_relaxation_parameter(const T relaxation) {
+            if (inv_diag && relaxation_parameter != T(0)) {
+                blas->scal(inv_diag->size(), relaxation / relaxation_parameter, inv_diag->data());
+            }
+
+            relaxation_parameter = relaxation;
         }
 
         void read_sparse_update_policy() {

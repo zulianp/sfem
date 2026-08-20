@@ -199,9 +199,8 @@ int main(int argc, char** argv) {
     // Krylov PCs: overwrite inverse scaling. ShiftableJacobi defaults to damped accumulate
     // apply intended for smoothers.
     auto jacobi                   = create_inverse_diagonal_scaling(diag, es);
-    auto bjacobi                  = create_shiftable_block_sym_jacobi(BS, B_sym6, mask, es);
-    bjacobi->relaxation_parameter = 1;
-    bjacobi->set_diag(B_sym6);
+    auto bjacobi = create_shiftable_block_sym_jacobi(BS, B_sym6, mask, es);
+    bjacobi->set_relaxation_parameter(1);
 
     // Separate damped copies for stationary smoothers
     auto jacobi_smooth  = create_shiftable_jacobi(diag, es);

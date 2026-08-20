@@ -74,7 +74,7 @@ namespace sfem {
         f->set_value_to_constrained_dofs(1, d->data());
 
         auto sj = sfem::create_shiftable_jacobi(d, es);
-        sj->relaxation_parameter = 1. / fs->block_size();
+        sj->set_relaxation_parameter(1. / fs->block_size());
         auto smoother = sfem::create_stationary<real_t>(linear_op, sj, es);
         smoother->set_max_it(3);
 
@@ -216,7 +216,7 @@ namespace sfem {
                     prev_mat->offdiag_colidx->data(),
                     diag_smoother->data());
         auto amg_smoother = sfem::create_shiftable_jacobi(diag_smoother, es);
-        amg_smoother->relaxation_parameter = SFEM_MG_RELAXATION;
+        amg_smoother->set_relaxation_parameter(SFEM_MG_RELAXATION);
 
         ptrdiff_t ndofs = fine_ndofs;
         count_t fine_memory = fine_ndofs + offdiag_nnz;
@@ -314,7 +314,7 @@ namespace sfem {
                         prev_mat->offdiag_colidx->data(),
                         diag_smoother->data());
             amg_smoother = sfem::create_shiftable_jacobi(diag_smoother, es);
-            amg_smoother->relaxation_parameter = SFEM_MG_RELAXATION;
+            amg_smoother->set_relaxation_parameter(SFEM_MG_RELAXATION);
         }
 
         // Create a coarsest level solver, could also just smooth here if coarsest problem isn't

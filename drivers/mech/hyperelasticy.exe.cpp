@@ -192,8 +192,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     if (smesh::Env::read("SFEM_USE_PRECONDITIONER", false)) {
         if (fs->element_type() == smesh::HEX8) {
             auto diag                = sfem::create_buffer<real_t>(ndofs, es);
-            auto sj                  = sfem::create_shiftable_jacobi(diag, es);
-            sj->relaxation_parameter = 1. / fs->block_size();
+            auto sj = sfem::create_shiftable_jacobi(diag, es);
+            sj->set_relaxation_parameter(1. / fs->block_size());
             cg->set_preconditioner_op(sj);
             update_preconditioner = [=](const real_t *const disp) {
                 f->hessian_diag(disp, diag->data());

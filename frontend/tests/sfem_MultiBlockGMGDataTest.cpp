@@ -531,8 +531,8 @@ int test_two_block_tet4_ssgmg_residual() {
            (double)cube_res.abs_res,
            (double)cube_res.rel_res);
 
-    const real_t abs_tol = sizeof(real_t) == sizeof(double) ? real_t(2e-3) : real_t(2e-2);
-    const real_t rel_tol = sizeof(real_t) == sizeof(double) ? real_t(2e-4) : real_t(2e-3);
+    const real_t abs_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+    const real_t rel_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
     SFEM_TEST_ASSERT(split_res.abs_res < abs_tol || split_res.rel_res < rel_tol);
     SFEM_TEST_ASSERT(cube_res.abs_res < abs_tol || cube_res.rel_res < rel_tol);
 

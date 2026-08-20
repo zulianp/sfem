@@ -620,14 +620,9 @@ namespace sfem {
             if (to_ss) {
                 if (!from_ss) {
                     auto from_mesh = from_space->mesh_ptr();
-                    const bool mpi_hex = from_mesh && from_mesh->is_distributed() && from_mesh->comm() &&
-                                         from_mesh->comm()->size() > 1;
-                    if (mpi_hex) {
-                        if (ss_family != smesh::HEX8) {
-                            SFEM_ERROR(
-                                    "create_hierarchical_prolongation: distributed unstructured-to-SS transfer is "
-                                    "implemented for HEX-family only\n");
-                        }
+                    const bool mpi_from = from_mesh && from_mesh->is_distributed() && from_mesh->comm() &&
+                                          from_mesh->comm()->size() > 1;
+                    if (mpi_from && ss_family == smesh::HEX8) {
                         return wrap_prolongation_coarse_gather(
                                 from_space,
                                 es,

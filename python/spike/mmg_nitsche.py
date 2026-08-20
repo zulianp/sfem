@@ -3,13 +3,15 @@
 
 Fine level: Mlika–Renard–Chouly Nitsche residual/tangent from
 ``nitsche_contact.py``. Contact geometry (pairing, normals, weights) is
-resampled every outer iteration, as in Newton. The active set follows
-[P]_- at the current iterate.
+updated before every nonlinear multigrid cycle. The active set follows
+``[P]_-`` at the current iterate.
 
-Each outer iteration rebuilds the Nitsche tangent and takes a filtered
-V-cycle step. Coarse correction is Galerkin ``P^T A P`` with jump-free
-elimination of every displacement DOF touched by the current active
-contact.
+The algorithmic skeleton mirrors ``sfem_ShiftedPenaltyMultigrid``:
+outer iterations run inner nonlinear cycles; each nonlinear cycle does
+fine nonlinear smoothing, restricts the current residual, solves a
+coarse multigrid correction, prolongs it, and smooths again. The
+coarse space remains filtered: every coarse displacement DOF touched by
+the variational restriction of the active-contact support is eliminated.
 """
 
 from __future__ import annotations
@@ -407,9 +409,13 @@ def restrict_dof_mask(P, fine_mask):
 
 
 def filter_hierarchy(levels, prolong, fine_contact_mask):
-    """Fine: Dirichlet only (contact is smoothed). Coarse: Dirichlet plus
-    the variational restriction of the active-contact support."""
-    masks = [dirichlet_mask(levels[0])]
+    """Jump-free masks: fine and coarse active-contact support plus Dirichlet.
+
+    This is the section-3.5 topological filter: every displacement component
+    at nodes touched by active directed contact rows is removed from the coarse
+    correction space.
+    """
+    masks = [dirichlet_mask(levels[0]) | fine_contact_mask]
     current = fine_contact_mask.copy()
     for k, P in enumerate(prolong):
         coarse_contact = restrict_dof_mask(P, current)
@@ -418,14 +424,24 @@ def filter_hierarchy(levels, prolong, fine_contact_mask):
     return masks
 
 
-def elastic_solve(level: NitscheLevel):
-    u = level.u_bc.copy()
-    r = np.asarray(level.Ke @ u, dtype=np.float64)
-    K, r = nc.apply_dirichlet_system(level.Ke.copy(), r, level.constrained, u, level.u_bc)
-    du = spsolve(K, -r)
-    u = u + np.asarray(du, dtype=np.float64)
-    u[level.constrained] = level.u_bc[level.constrained]
-    return u
+def contact_penetration_norm(level: NitscheLevel, u):
+    X, Y = level.X, level.Y
+    nodes_b = nc.unique_nodes_from_edges(level.edges_b)
+    gap = np.empty(nodes_b.size)
+    for i, node in enumerate(nodes_b):
+        node = int(node)
+        px = float(X[node] + u[2 * node])
+        py = float(Y[node] + u[2 * node + 1])
+        m0, m1, t, qx, qy = nc.master_on_circle(px, py, X, Y, level.edges_o, level.radius)
+        rn = float(np.hypot(qx, qy))
+        if rn <= 1e-30:
+            gap[i] = 0.0
+            continue
+        nx, ny = -qx / rn, -qy / rn
+        uqx = (1.0 - t) * u[2 * m0] + t * u[2 * m1]
+        uqy = (1.0 - t) * u[2 * m0 + 1] + t * u[2 * m1 + 1]
+        gap[i] = (qx + uqx - px) * nx + (qy + uqy - py) * ny
+    return float(np.linalg.norm(np.minimum(gap, 0.0)))
 
 
 def jacobi(A, rhs, x, mask, steps, omega):
@@ -438,6 +454,83 @@ def jacobi(A, rhs, x, mask, steps, omega):
     for _ in range(steps):
         res = rhs - A @ x
         x[allowed] += omega * res[allowed] / diag[allowed]
+        x[mask] = 0.0
+    return x
+
+
+def block_jacobi(A, rhs, x, mask, steps, omega):
+    if steps <= 0:
+        return x
+    rows = A.shape[0]
+    if rows % 2:
+        return jacobi(A, rhs, x, mask, steps, omega)
+    diag = A.diagonal().copy()
+    diag[np.abs(diag) < 1e-30] = 1.0
+    blocks = []
+    for node in range(rows // 2):
+        dofs = np.array((2 * node, 2 * node + 1), dtype=np.int64)
+        free = ~mask[dofs]
+        if not np.any(free):
+            blocks.append((dofs, free, None, None))
+            continue
+        if np.all(free):
+            B = A[np.ix_(dofs, dofs)].toarray()
+            det = B[0, 0] * B[1, 1] - B[0, 1] * B[1, 0]
+            if abs(det) > 1e-30:
+                Binv = np.array(
+                    ((B[1, 1], -B[0, 1]), (-B[1, 0], B[0, 0])),
+                    dtype=np.float64,
+                ) / det
+                blocks.append((dofs, free, Binv, None))
+                continue
+        blocks.append((dofs, free, None, diag[dofs]))
+    for _ in range(steps):
+        res = rhs - A @ x
+        for dofs, free, Binv, d in blocks:
+            if not np.any(free):
+                continue
+            if Binv is not None:
+                x[dofs] += omega * (Binv @ res[dofs])
+            else:
+                ii = dofs[free]
+                x[ii] += omega * res[ii] / d[free]
+        x[mask] = 0.0
+    return x
+
+
+def gauss_seidel(A, rhs, x, mask, steps, omega, symmetric=False):
+    if steps <= 0:
+        return x
+    A = A.tocsr()
+    rows = A.shape[0]
+    indptr = A.indptr
+    indices = A.indices
+    data = A.data
+
+    def sweep(order):
+        for i in order:
+            if mask[i]:
+                x[i] = 0.0
+                continue
+            row_start, row_end = indptr[i], indptr[i + 1]
+            diag = 0.0
+            sigma = 0.0
+            for p in range(row_start, row_end):
+                j = indices[p]
+                aij = data[p]
+                if j == i:
+                    diag = aij
+                else:
+                    sigma += aij * x[j]
+            if abs(diag) > 1e-30:
+                x[i] = (1.0 - omega) * x[i] + omega * (rhs[i] - sigma) / diag
+
+    forward = range(rows)
+    backward = range(rows - 1, -1, -1)
+    for _ in range(steps):
+        sweep(forward)
+        if symmetric:
+            sweep(backward)
         x[mask] = 0.0
     return x
 
@@ -466,32 +559,41 @@ def patch_solve(A, rhs, x, patch, exclude):
     return x
 
 
-def filtered_vcycle(operators, prolong, ell, rhs, masks, pre, post, omega, contact_patch=None):
+def smooth_correction(A, rhs, x, mask, steps, omega, contact_patch=None, smoother="block"):
+    if smoother == "sgs":
+        x = gauss_seidel(A, rhs, x, mask, steps, omega, symmetric=True)
+    elif smoother == "gs":
+        x = gauss_seidel(A, rhs, x, mask, steps, omega)
+    elif smoother == "block":
+        x = block_jacobi(A, rhs, x, mask, steps, omega)
+    else:
+        x = jacobi(A, rhs, x, mask, steps, omega)
+    if contact_patch is not None:
+        x = patch_solve(A, rhs, x, contact_patch, mask)
+    return x
+
+
+def linear_cycle(operators, prolong, ell, rhs, masks, pre, post, omega, cycle_type, smoother):
+    """Recursive coarse correction cycle, matching ShiftedPenaltyMultigrid::cycle."""
     A = operators[ell]
     mask = masks[ell]
     rhs_eff = rhs.copy()
     rhs_eff[mask] = 0.0
     if ell == len(operators) - 1:
         return masked_direct_solve(A, rhs_eff, mask)
+
     x = np.zeros_like(rhs_eff)
-    x = jacobi(A, rhs_eff, x, mask, pre, omega)
-    if ell == 0 and contact_patch is not None:
-        x = patch_solve(A, rhs_eff, x, contact_patch, mask)
-    res = rhs_eff - A @ x
-    res[mask] = 0.0
-    if ell == 0 and contact_patch is not None:
-        res[contact_patch] = 0.0
-    coarse_rhs = np.asarray(prolong[ell].T @ res).ravel()
-    coarse_error = filtered_vcycle(
-        operators, prolong, ell + 1, coarse_rhs, masks, pre, post, omega, contact_patch
-    )
-    x = x + prolong[ell] @ coarse_error
-    x[mask] = 0.0
-    if ell == 0 and contact_patch is not None:
-        x = patch_solve(A, rhs_eff, x, contact_patch, mask)
-    x = jacobi(A, rhs_eff, x, mask, post, omega)
-    if ell == 0 and contact_patch is not None:
-        x = patch_solve(A, rhs_eff, x, contact_patch, mask)
+    for _ in range(cycle_type):
+        x = smooth_correction(A, rhs_eff, x, mask, pre, omega, smoother=smoother)
+        res = rhs_eff - A @ x
+        res[mask] = 0.0
+        coarse_rhs = np.asarray(prolong[ell].T @ res).ravel()
+        coarse_error = linear_cycle(
+            operators, prolong, ell + 1, coarse_rhs, masks, pre, post, omega, cycle_type, smoother
+        )
+        x = x + prolong[ell] @ coarse_error
+        x[mask] = 0.0
+        x = smooth_correction(A, rhs_eff, x, mask, post, omega, smoother=smoother)
     return np.asarray(x, dtype=np.float64)
 
 
@@ -503,24 +605,88 @@ def coarse_operators(levels, prolong, fine_A):
     return ops
 
 
-def mg_linear_solve(
-    levels, prolong, operators, rhs, masks, cycles, rtol, pre, post, omega, contact_patch=None
-):
-    x = np.zeros_like(rhs)
-    A = operators[0]
-    rhs_norm = max(float(np.linalg.norm(rhs)), 1e-30)
-    rel = float(np.linalg.norm(rhs - A @ x)) / rhs_norm
-    used = 0
-    for _ in range(cycles):
-        if rel <= rtol:
-            break
-        x = x + filtered_vcycle(
-            operators, prolong, 0, rhs - A @ x, masks, pre, post, omega, contact_patch
+def filtered_hierarchy(levels, prolong, fine, u):
+    residual, A, g_c, Kn, n_qp, active = fine.residual_tangent(u, forced_active=None)
+    geom = sample_contact_geometry(fine, u)
+    contact_mask = frozen_touch_dofs(fine, geom, active)
+    masks = filter_hierarchy(levels, prolong, contact_mask)
+    return residual, A, g_c, Kn, n_qp, active, contact_mask, masks
+
+
+def nonlinear_smooth(fine, u, contact_mask, nlsmooth_steps, smoother_steps, omega, smoother):
+    # Fine smoothing is allowed to move active contact nodes; the jump-free
+    # mask is for coarse corrections.
+    mask = dirichlet_mask(fine)
+    info = None
+    for _ in range(nlsmooth_steps):
+        residual, A, g_c, Kn, n_qp, active = fine.residual_tangent(u, forced_active=None)
+        geom = sample_contact_geometry(fine, u)
+        contact_mask = frozen_touch_dofs(fine, geom, active)
+        du = np.zeros_like(u)
+        du = smooth_correction(
+            A, -residual, du, mask, smoother_steps, omega, contact_mask, smoother
         )
-        x[masks[0]] = 0.0
-        used += 1
-        rel = float(np.linalg.norm(rhs - A @ x)) / rhs_norm
-    return x, used, rel
+        if not np.all(np.isfinite(du)):
+            raise RuntimeError("nonlinear smoother increment is not finite")
+        u[:] = u + du
+        u[fine.constrained] = fine.u_bc[fine.constrained]
+        info = (residual, A, g_c, Kn, n_qp, active)
+    if info is None:
+        info = fine.residual_tangent(u, forced_active=None)
+    return info
+
+
+def nonlinear_cycle(levels, prolong, fine, u, args):
+    """Fine nonlinear cycle: smooth, restrict residual, coarse correction, smooth."""
+    residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
+        levels, prolong, fine, u
+    )
+    nonlinear_smooth(
+        fine, u, contact_mask, args.nlsmooth_steps, args.mg_pre, args.mg_omega, args.smoother
+    )
+    residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
+        levels, prolong, fine, u
+    )
+    if args.skip_coarse:
+        nonlinear_smooth(
+            fine, u, contact_mask, args.nlsmooth_steps, args.mg_post, args.mg_omega, args.smoother
+        )
+        residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
+            levels, prolong, fine, u
+        )
+        return residual, A, g_c, Kn, n_qp, active, contact_mask, masks
+
+    operators = coarse_operators(levels, prolong, A)
+    fine_mask = dirichlet_mask(fine)
+    rhs = -residual
+    rhs[fine_mask] = 0.0
+    coarse_rhs = np.asarray(prolong[0].T @ rhs).ravel()
+    coarse_error = linear_cycle(
+        operators,
+        prolong,
+        1,
+        coarse_rhs,
+        masks,
+        args.mg_pre,
+        args.mg_post,
+        args.mg_omega,
+        args.cycle_type,
+        args.smoother,
+    )
+    correction = np.asarray(prolong[0] @ coarse_error).ravel()
+    correction[masks[0]] = 0.0
+    u[:] = u + correction
+    u[fine.constrained] = fine.u_bc[fine.constrained]
+    residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
+        levels, prolong, fine, u
+    )
+    nonlinear_smooth(
+        fine, u, contact_mask, args.nlsmooth_steps, args.mg_post, args.mg_omega, args.smoother
+    )
+    residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
+        levels, prolong, fine, u
+    )
+    return residual, A, g_c, Kn, n_qp, active, contact_mask, masks
 
 
 def pack_result(
@@ -550,8 +716,10 @@ def pack_result(
     y_top = float(np.max(Y[:n_block]))
     top = np.flatnonzero(np.abs(Y[:n_block] - y_top) <= 4.0 * tol)
     F = abs(float(np.sum(r_full[2 * top + 1]))) if top.size else 0.0
-    E_o = args.E_obstacle if not args.rigid_obstacle else 1e300
-    E_star = nc.effective_modulus(args.E_block, args.nu, E_o, args.nu)
+    E_b = args.E_block * (args.rigid_stiffness if args.rigid_block else 1.0)
+    E_o = args.E_obstacle * (args.rigid_stiffness if args.rigid_obstacle else 1.0)
+    E_o_hertz = E_o if not args.rigid_obstacle else 1e300
+    E_star = nc.effective_modulus(E_b, args.nu, E_o_hertz, args.nu)
     xc = 0.5 * (X[fine.edges_b[:, 0]] + X[fine.edges_b[:, 1]])
     p_hertz, a, p0 = nc.hertz_pressure(xc, F, args.radius, E_star)
     tr_x, tr_g, tr_sn, tr_pn, tr_on, tr_xi, tr_w = nc.contact_trace(
@@ -613,6 +781,11 @@ def pack_result(
 
 
 def solve_mmg(ps, args):
+    if args.max_inner_it < 1:
+        raise ValueError("--max-inner-it must be positive")
+    if args.nlsmooth_steps < 0 or args.mg_pre < 0 or args.mg_post < 0:
+        raise ValueError("smoothing step counts must be non-negative")
+
     sizes = hierarchy_sizes(args.nx, args.ny, args.levels)
     levels = []
     for nxk, nyk, nyb in sizes:
@@ -632,68 +805,61 @@ def solve_mmg(ps, args):
     n_qp_hist = []
     vcycle_hist = []
     direct_hist = []
-    active = set()
-    n_qp = 0
-    last_cycles = 0
-    last_direct = False
+    residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
+        levels, prolong, fine, u
+    )
+    residual_norm_0 = max(float(np.linalg.norm(residual)), 1e-30)
+    count_inner_iter = 0
+    count_smoothing_steps = 0
+    sweep_factor = 2 if args.smoother == "sgs" else 1
+    sweeps_per_cycle = args.nlsmooth_steps * (args.mg_pre + args.mg_post) * sweep_factor
     for it in range(args.max_iter):
-        residual, A, g_c, Kn, n_qp, active = fine.residual_tangent(
-            u, forced_active=None
-        )
-        rnorm = float(np.linalg.norm(residual))
+        rnorm_previous = 1e300
+        inner_used = 0
+        stagnation = False
+        for inner in range(args.max_inner_it):
+            residual, A, g_c, Kn, n_qp, active, contact_mask, masks = nonlinear_cycle(
+                levels, prolong, fine, u, args
+            )
+            count_inner_iter += 1
+            inner_used += 1
+            count_smoothing_steps += sweeps_per_cycle
+            rnorm = float(np.linalg.norm(residual))
+            rel = rnorm / residual_norm_0
+            stagnation = abs(rnorm / rnorm_previous) > args.stagnation_threshold
+            rnorm_previous = rnorm
+            n_filt = [int(np.count_nonzero(m)) for m in masks]
+            n_contact = int(np.count_nonzero(contact_mask & ~dirichlet_mask(fine)))
+            print(
+                f"mmg[{it:02d}:{inner:02d}] ||r||={rnorm:.3e}  ||r/r0||={rel:.3e}  "
+                f"|A|={len(active)}  nitsche_qp={n_qp}  contact_dofs={n_contact}  "
+                f"filt_dofs={n_filt}  contact_nnz={Kn.nnz}"
+            )
+            if ((rnorm < args.atol or rel < args.rtol) and inner != 0) or stagnation:
+                break
+
+        norm_pen = contact_penetration_norm(fine, u)
         r_hist.append(rnorm)
         n_active_hist.append(len(active))
         n_qp_hist.append(n_qp)
-        vcycle_hist.append(int(last_cycles))
-        direct_hist.append(bool(last_direct))
-        geom = sample_contact_geometry(fine, u)
-        contact_mask = frozen_touch_dofs(fine, geom, active)
-        masks = filter_hierarchy(levels, prolong, contact_mask)
-        n_filt = [int(np.count_nonzero(m)) for m in masks]
-        n_contact = int(np.count_nonzero(contact_mask & ~masks[0]))
+        vcycle_hist.append(int(inner_used))
+        direct_hist.append(False)
         print(
-            f"mmg[{it:02d}] ||r||={rnorm:.3e}  |A|={len(active)}  nitsche_qp={n_qp}  "
-            f"contact_dofs={n_contact}  filt_dofs={n_filt}  contact_nnz={Kn.nnz}"
+            f"          inner={count_inner_iter}  smooth={count_smoothing_steps}  "
+            f"|g_-|={norm_pen:.3e}  stagnation={stagnation}"
         )
-        if rnorm < args.rtol:
+        residual_converged = rnorm < args.atol or rnorm / residual_norm_0 < args.rtol
+        if residual_converged and norm_pen < args.ptol:
             break
-        operators = coarse_operators(levels, prolong, A)
-        du, cycles, lin_rel = mg_linear_solve(
-            levels,
-            prolong,
-            operators,
-            -residual,
-            masks,
-            args.mg_cycles,
-            args.mg_linear_rtol,
-            args.mg_pre,
-            args.mg_post,
-            args.mg_omega,
-            contact_mask,
-        )
-        du[fine.constrained] = 0.0
-        mg_rel = lin_rel
-        used_direct = (not np.all(np.isfinite(du))) or mg_rel > 1e-4
-        if used_direct:
-            du = np.asarray(spsolve(A, -residual), dtype=np.float64)
-            du[fine.constrained] = 0.0
-            lin_rel = float(np.linalg.norm(residual + A @ du)) / max(rnorm, 1e-30)
-        if not np.all(np.isfinite(du)):
-            raise RuntimeError("MMG increment is not finite")
-        u = u + du
-        u[fine.constrained] = fine.u_bc[fine.constrained]
-        last_cycles = int(cycles)
-        last_direct = bool(used_direct)
-        extra = f"  direct (mg_rel={mg_rel:.3e})" if used_direct else ""
-        print(f"          V-cycles={cycles}  lin_rel={lin_rel:.3e}{extra}")
+
     residual, A, g_c, Kn, n_qp, active = fine.residual_tangent(u, forced_active=None)
     r_final = float(np.linalg.norm(residual))
     if not r_hist or abs(r_hist[-1] - r_final) > 1e-30:
         r_hist.append(r_final)
         n_active_hist.append(len(active))
         n_qp_hist.append(n_qp)
-        vcycle_hist.append(int(last_cycles))
-        direct_hist.append(bool(last_direct))
+        vcycle_hist.append(0)
+        direct_hist.append(False)
         print(f"mmg[final] ||r||={r_final:.3e}  |A|={len(active)}")
     result = pack_result(
         fine, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist, direct_hist
@@ -722,12 +888,18 @@ def parse_args(argv=None):
     p.add_argument("--nu", type=float, default=0.3)
     p.add_argument("--gamma0", type=float, default=50.0)
     p.add_argument("--max-iter", type=int, default=40)
-    p.add_argument("--rtol", type=float, default=1e-8)
-    p.add_argument("--mg-cycles", type=int, default=32)
-    p.add_argument("--mg-pre", type=int, default=4)
-    p.add_argument("--mg-post", type=int, default=4)
+    p.add_argument("--max-inner-it", type=int, default=3)
+    p.add_argument("--nlsmooth-steps", type=int, default=3)
+    p.add_argument("--cycle-type", type=int, default=1, choices=(1, 2))
+    p.add_argument("--atol", type=float, default=1e-10)
+    p.add_argument("--ptol", type=float, default=float("inf"))
+    p.add_argument("--rtol", type=float, default=1e-10)
+    p.add_argument("--mg-pre", type=int, default=8)
+    p.add_argument("--mg-post", type=int, default=8)
     p.add_argument("--mg-omega", type=float, default=0.4)
-    p.add_argument("--mg-linear-rtol", type=float, default=1e-6)
+    p.add_argument("--smoother", choices=("sgs", "gs", "block", "scalar"), default="sgs")
+    p.add_argument("--stagnation-threshold", type=float, default=0.999)
+    p.add_argument("--skip-coarse", action="store_true")
     p.add_argument("--mu-f", type=float, default=0.3)
     p.add_argument("--rigid-block", action="store_true")
     p.add_argument("--rigid-obstacle", action="store_true")
@@ -789,10 +961,10 @@ def main(argv=None):
             args.ny = 4
             args.levels = 2
             args.max_iter = 20
+            args.max_inner_it = 3
+            args.nlsmooth_steps = 3
             args.indent = 0.02
             args.plot = False
-            args.mg_cycles = 32
-            args.mg_linear_rtol = 1e-6
             result = solve_mmg(ps, args)
             check_mmg(result, args)
             print(f"check ok  F={result['F']:.4e}  n_active={result['n_active']}")
