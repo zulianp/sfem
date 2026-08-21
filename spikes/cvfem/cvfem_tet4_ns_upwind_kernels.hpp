@@ -46,6 +46,37 @@ static SFEM_INLINE const jacobian_t *cvfem_aligned_geom(const jacobian_t *p) {
 
 static constexpr double CVFEM_RESIDUAL_FLOPS_PER_ELEMENT = 562.0;
 
+#ifndef CVFEM_SIMD_BYTES
+#if defined(__AVX512F__)
+#define CVFEM_SIMD_BYTES 64
+#elif defined(__AVX__)
+#define CVFEM_SIMD_BYTES 32
+#else
+#define CVFEM_SIMD_BYTES 16
+#endif
+#endif
+
+static constexpr int SIMD_SIZE = CVFEM_SIMD_BYTES / int(sizeof(scalar_t));
+static_assert(SIMD_SIZE >= 1, "invalid SIMD size");
+
+using scalar_v __attribute__((vector_size(CVFEM_SIMD_BYTES))) = scalar_t;
+
+static SFEM_INLINE scalar_v cvfem_load_scalar_v(const scalar_t *const SFEM_RESTRICT p) {
+    return *reinterpret_cast<const scalar_v *>(p);
+}
+
+static SFEM_INLINE scalar_v cvfem_splat_scalar_v(const scalar_t a) {
+    return scalar_v{} + a;
+}
+
+static SFEM_INLINE void cvfem_store_scalar_v(scalar_t *const SFEM_RESTRICT p, const scalar_v v) {
+    *reinterpret_cast<scalar_v *>(p) = v;
+}
+
+static SFEM_INLINE void cvfem_store_scalar_v(scalar_t *const SFEM_RESTRICT p, const scalar_t v) {
+    cvfem_store_scalar_v(p, cvfem_splat_scalar_v(v));
+}
+
 // Source add/mul/div in cvfem_tet4_ns_upwind_jacobian_dense. Not counted: abs/ternary,
 // float→double casts, Ke zero-stores. Folded zero SCS areas: 3×15 + 3×9.
 // Body per SCS: adv 6 + mdot 6 + pos/neg 4 + d_pos/d_neg 4 + dmdot 4
@@ -583,6 +614,40 @@ static SFEM_INLINE void tet4_local_to_global_bsr4(const Idx *const SFEM_RESTRICT
         for (int edof_j = 0; edof_j < 4; ++edof_j) {
             scalar_t *const SFEM_RESTRICT block = &values[(rowptr[dof_i] + ks[edof_j]) * 16];
             cvfem_bsr4_accum_dense_block<Atomic>(block, ke_i + edof_j * 4);
+        }
+    }
+}
+
+static SFEM_INLINE void tet4_local_slots_to_bsr4(const int *const SFEM_RESTRICT      slots,
+                                                 const scalar_t *const SFEM_RESTRICT element_matrix,
+                                                 scalar_t *const SFEM_RESTRICT       values) {
+    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+        const scalar_t *const ke_i = element_matrix + (edof_i * 4) * 16;
+        for (int edof_j = 0; edof_j < 4; ++edof_j) {
+            scalar_t *const SFEM_RESTRICT block = values + (ptrdiff_t)slots[edof_i * 4 + edof_j] * 16;
+            cvfem_bsr4_accum_dense_block<false>(block, ke_i + edof_j * 4);
+        }
+    }
+}
+
+static SFEM_INLINE void tet4_local_slots_to_bsr4_vec_lane(const int *const SFEM_RESTRICT      slots,
+                                                          const scalar_t *const SFEM_RESTRICT element_matrix_vec,
+                                                          const int                           lane,
+                                                          scalar_t *const SFEM_RESTRICT       values) {
+    for (int edof_i = 0; edof_i < 4; ++edof_i) {
+        for (int edof_j = 0; edof_j < 4; ++edof_j) {
+            scalar_t *const SFEM_RESTRICT block = values + (ptrdiff_t)slots[edof_i * 4 + edof_j] * 16;
+            const int                     row0  = edof_i * 4;
+            const int                     col0  = edof_j * 4;
+#pragma unroll(4)
+            for (int fi = 0; fi < 4; ++fi) {
+                const int row = row0 + fi;
+                scalar_t *const SFEM_RESTRICT d = block + fi * 4;
+                d[0] += element_matrix_vec[((row * 16 + col0 + 0) * SIMD_SIZE) + lane];
+                d[1] += element_matrix_vec[((row * 16 + col0 + 1) * SIMD_SIZE) + lane];
+                d[2] += element_matrix_vec[((row * 16 + col0 + 2) * SIMD_SIZE) + lane];
+                d[3] += element_matrix_vec[((row * 16 + col0 + 3) * SIMD_SIZE) + lane];
+            }
         }
     }
 }

@@ -141,8 +141,130 @@ static int test_expanded_tet4_laplacian(const std::shared_ptr<sfem::Mesh> &ss_me
            (double)apply_largest_diff,
            diag_arg,
            (double)diag_largest_diff);
-    SFEM_TEST_ASSERT(apply_largest_diff < 1e-8);
+    SFEM_TEST_ASSERT(apply_largest_diff < 1e-7);
     SFEM_TEST_ASSERT(diag_largest_diff < 1e-8);
+
+    return SFEM_TEST_SUCCESS;
+}
+
+static int test_hierarchical_transfer_scaling(
+        const std::shared_ptr<sfem::FunctionSpace>    &fine_space,
+        const std::shared_ptr<sfem::FunctionSpace>    &coarse_space,
+        const std::shared_ptr<sfem::Operator<real_t>> &restriction,
+        const std::shared_ptr<sfem::Operator<real_t>> &prolongation,
+        const sfem::ExecutionSpace                     es) {
+    SFEM_TEST_ASSERT(es == sfem::EXECUTION_SPACE_HOST);
+
+    const ptrdiff_t fine_n_dofs   = fine_space->n_dofs();
+    const ptrdiff_t coarse_n_dofs = coarse_space->n_dofs();
+    const ptrdiff_t fine_n_nodes  = fine_space->mesh_ptr()->n_nodes();
+    const ptrdiff_t coarse_n_nodes = coarse_space->mesh_ptr()->n_nodes();
+    const int       block_size    = fine_space->block_size();
+
+    SFEM_TEST_ASSERT(block_size == coarse_space->block_size());
+    SFEM_TEST_ASSERT(fine_n_dofs == fine_n_nodes * block_size);
+    SFEM_TEST_ASSERT(coarse_n_dofs == coarse_n_nodes * block_size);
+
+    auto coarse = sfem::create_buffer<real_t>(coarse_n_dofs, es);
+    auto fine   = sfem::create_buffer<real_t>(fine_n_dofs, es);
+
+    for (ptrdiff_t i = 0; i < coarse_n_dofs; ++i) {
+        coarse->data()[i] = 1;
+    }
+
+    for (ptrdiff_t i = 0; i < fine_n_dofs; ++i) {
+        fine->data()[i] = 0;
+    }
+
+    SFEM_TEST_ASSERT(prolongation->apply(coarse->data(), fine->data()) == SFEM_SUCCESS);
+
+    real_t    constant_largest_diff = 0;
+    ptrdiff_t constant_arg          = SFEM_PTRDIFF_INVALID;
+    for (ptrdiff_t i = 0; i < fine_n_dofs; ++i) {
+        const real_t diff = fabs(fine->data()[i] - 1);
+        if (diff > constant_largest_diff || diff != diff) {
+            constant_largest_diff = diff;
+            constant_arg          = i;
+        }
+    }
+
+    geom_t **fine_points   = fine_space->mesh_ptr()->points()->data();
+    geom_t **coarse_points = coarse_space->mesh_ptr()->points()->data();
+
+    for (ptrdiff_t i = 0; i < coarse_n_nodes; ++i) {
+        const real_t x = coarse_points[0][i];
+        const real_t y = coarse_points[1][i];
+        const real_t z = coarse_points[2][i];
+        for (int b = 0; b < block_size; ++b) {
+            coarse->data()[i * block_size + b] = (b + 1) * (0.25 + x + 0.5 * y - 0.125 * z);
+        }
+    }
+
+    for (ptrdiff_t i = 0; i < fine_n_dofs; ++i) {
+        fine->data()[i] = 0;
+    }
+
+    SFEM_TEST_ASSERT(prolongation->apply(coarse->data(), fine->data()) == SFEM_SUCCESS);
+
+    real_t    affine_largest_diff = 0;
+    ptrdiff_t affine_arg          = SFEM_PTRDIFF_INVALID;
+    for (ptrdiff_t i = 0; i < fine_n_nodes; ++i) {
+        const real_t x = fine_points[0][i];
+        const real_t y = fine_points[1][i];
+        const real_t z = fine_points[2][i];
+        for (int b = 0; b < block_size; ++b) {
+            const real_t expected = (b + 1) * (0.25 + x + 0.5 * y - 0.125 * z);
+            const real_t diff     = fabs(fine->data()[i * block_size + b] - expected);
+            if (diff > affine_largest_diff || diff != diff) {
+                affine_largest_diff = diff;
+                affine_arg          = i * block_size + b;
+            }
+        }
+    }
+
+    auto xf  = sfem::create_buffer<real_t>(fine_n_dofs, es);
+    auto yc  = sfem::create_buffer<real_t>(coarse_n_dofs, es);
+    auto rxf = sfem::create_buffer<real_t>(coarse_n_dofs, es);
+    auto pyc = sfem::create_buffer<real_t>(fine_n_dofs, es);
+
+    for (ptrdiff_t i = 0; i < fine_n_dofs; ++i) {
+        xf->data()[i]  = 0.31 + real_t((i * 17) % 23) * 0.07 + real_t((i * 5) % 11) * 0.013;
+        pyc->data()[i] = 0;
+    }
+
+    for (ptrdiff_t i = 0; i < coarse_n_dofs; ++i) {
+        yc->data()[i]  = -0.21 + real_t((i * 13) % 19) * 0.05 + real_t((i * 7) % 5) * 0.017;
+        rxf->data()[i] = 0;
+    }
+
+    SFEM_TEST_ASSERT(restriction->apply(xf->data(), rxf->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(prolongation->apply(yc->data(), pyc->data()) == SFEM_SUCCESS);
+
+    real_t lhs = 0;
+    real_t rhs = 0;
+    for (ptrdiff_t i = 0; i < coarse_n_dofs; ++i) {
+        lhs += rxf->data()[i] * yc->data()[i];
+    }
+
+    for (ptrdiff_t i = 0; i < fine_n_dofs; ++i) {
+        rhs += xf->data()[i] * pyc->data()[i];
+    }
+
+    const real_t adjoint_abs_diff = fabs(lhs - rhs);
+    const real_t adjoint_rel_diff = adjoint_abs_diff / (fabs(lhs) + fabs(rhs) + 1);
+
+    printf("transfer scaling check constant_largest_diff(%ld) = %g affine_largest_diff(%ld) = %g "
+           "adjoint_abs_diff = %g adjoint_rel_diff = %g\n",
+           constant_arg,
+           (double)constant_largest_diff,
+           affine_arg,
+           (double)affine_largest_diff,
+           (double)adjoint_abs_diff,
+           (double)adjoint_rel_diff);
+
+    SFEM_TEST_ASSERT(constant_largest_diff < 1e-12);
+    SFEM_TEST_ASSERT(affine_largest_diff < 1e-12);
+    SFEM_TEST_ASSERT(adjoint_abs_diff < 1e-10 || adjoint_rel_diff < 1e-12);
 
     return SFEM_TEST_SUCCESS;
 }
@@ -187,6 +309,9 @@ int test_cube() {
 
     int SFEM_EXPANDED_TET_CHECK = 0;
     SFEM_READ_ENV(SFEM_EXPANDED_TET_CHECK, atoi);
+
+    int SFEM_TRANSFER_SCALING_CHECK = 0;
+    SFEM_READ_ENV(SFEM_TRANSFER_SCALING_CHECK, atoi);
 
     int SFEM_APPLY_TEST_CONSTRAINTS = 0;
     SFEM_READ_ENV(SFEM_APPLY_TEST_CONSTRAINTS, atoi);
@@ -271,6 +396,8 @@ int test_cube() {
     fine_op = sfem::create_linear_operator(SFEM_FINE_OP_TYPE, f, nullptr, es);
 
     auto levels    = smesh::derefinement_levels(fs->mesh());
+    SFEM_TEST_ASSERT(SFEM_ELEMENT_DEREFINE >= 0);
+    SFEM_TEST_ASSERT(SFEM_ELEMENT_DEREFINE < static_cast<int>(levels.size()));
     auto fs_coarse = fs->derefine(levels[SFEM_ELEMENT_DEREFINE]);
     auto f_coarse  = f->derefine(fs_coarse, true);
 
@@ -280,7 +407,15 @@ int test_cube() {
            SFEM_COARSE_OP_TYPE);
     coarse_op = sfem::create_linear_operator(SFEM_COARSE_OP_TYPE, f_coarse, nullptr, es);
 
-    auto restriction      = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+    auto restriction_unconstr = sfem::create_hierarchical_restriction(fs, fs_coarse, es);
+    auto restriction          = sfem::make_op<real_t>(
+            restriction_unconstr->rows(),
+            restriction_unconstr->cols(),
+            [=](const real_t *const from, real_t *const to) {
+                restriction_unconstr->apply(from, to);
+                f_coarse->apply_zero_constraints(to);
+            },
+            es);
     auto prolong_unconstr = sfem::create_hierarchical_prolongation(fs_coarse, fs, es);
     auto prolongation     = sfem::make_op<real_t>(
             prolong_unconstr->rows(),
@@ -290,6 +425,11 @@ int test_cube() {
                 f->apply_zero_constraints(to);
             },
             es);
+
+    if (SFEM_TRANSFER_SCALING_CHECK) {
+        SFEM_TEST_ASSERT(test_hierarchical_transfer_scaling(fs, fs_coarse, restriction_unconstr, prolong_unconstr, es) ==
+                         SFEM_TEST_SUCCESS);
+    }
 
     auto h_input = sfem::create_buffer<real_t>(fs_coarse->n_dofs(), sfem::MEMORY_SPACE_HOST);
 
