@@ -25,6 +25,8 @@ DEFAULT_KERNELS = (
     "sympy_simd",
     "sympy_simd_clean",
     "sympy_block_simd",
+    "sympy_row_simd",
+    "sympy_row_simd_fused",
     "sympy_face_simd",
 )
 
@@ -63,7 +65,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--build", action="store_true", help="build cvfem_tet4_ns_upwind_bench before running")
     p.add_argument("--build-dir", type=Path, default=HERE / "build", help="CMake build directory for --build")
     p.add_argument("--extra", nargs=argparse.REMAINDER, help="extra arguments appended to every benchmark command")
-    return p.parse_args()
+    args = p.parse_args()
+    cwd = Path.cwd()
+    if not args.bench.is_absolute():
+        args.bench = (cwd / args.bench).resolve()
+    if not args.build_dir.is_absolute():
+        args.build_dir = (cwd / args.build_dir).resolve()
+    return args
 
 
 def maybe_build(args: argparse.Namespace) -> None:

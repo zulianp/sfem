@@ -4663,6 +4663,1838 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_blockw
     }
 }
 
+static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise_vector_values(
+        const scalar_t                        rho,
+        const scalar_t                        mu,
+        const scalar_v adj0,
+        const scalar_v adj1,
+        const scalar_v adj2,
+        const scalar_v adj3,
+        const scalar_v adj4,
+        const scalar_v adj5,
+        const scalar_v adj6,
+        const scalar_v adj7,
+        const scalar_v adj8,
+        const scalar_v det,
+        const scalar_v ux0,
+        const scalar_v ux1,
+        const scalar_v ux2,
+        const scalar_v ux3,
+        const scalar_v uy0,
+        const scalar_v uy1,
+        const scalar_v uy2,
+        const scalar_v uy3,
+        const scalar_v uz0,
+        const scalar_v uz1,
+        const scalar_v uz2,
+        const scalar_v uz3,
+        const int *const SFEM_RESTRICT        slots_base,
+        scalar_t *const SFEM_RESTRICT         values) {
+    const scalar_v zero_v = scalar_v{};
+    const scalar_v one_v = zero_v + scalar_t(1);
+    const scalar_v neg_one_v = zero_v - scalar_t(1);
+    const scalar_v mdot0 = rho*(((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1)*((scalar_t(1) / scalar_t(12))*adj0 + (scalar_t(1) / scalar_t(24))*adj3 + (scalar_t(1) / scalar_t(24))*adj6) + ((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1)*((scalar_t(1) / scalar_t(12))*adj1 + (scalar_t(1) / scalar_t(24))*adj4 + (scalar_t(1) / scalar_t(24))*adj7) + ((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1)*((scalar_t(1) / scalar_t(12))*adj2 + (scalar_t(1) / scalar_t(24))*adj5 + (scalar_t(1) / scalar_t(24))*adj8));
+    const scalar_v sgn0 = (mdot0 > zero_v) ? one_v : ((mdot0 < zero_v) ? neg_one_v : zero_v);
+    const scalar_v mdot1 = rho*(((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux2)*((scalar_t(1) / scalar_t(24))*adj0 + (scalar_t(1) / scalar_t(12))*adj3 + (scalar_t(1) / scalar_t(24))*adj6) + ((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy2)*((scalar_t(1) / scalar_t(24))*adj1 + (scalar_t(1) / scalar_t(12))*adj4 + (scalar_t(1) / scalar_t(24))*adj7) + ((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz2)*((scalar_t(1) / scalar_t(24))*adj2 + (scalar_t(1) / scalar_t(12))*adj5 + (scalar_t(1) / scalar_t(24))*adj8));
+    const scalar_v sgn1 = (mdot1 > zero_v) ? one_v : ((mdot1 < zero_v) ? neg_one_v : zero_v);
+    const scalar_v mdot2 = rho*(((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3)*((scalar_t(1) / scalar_t(24))*adj0 + (scalar_t(1) / scalar_t(24))*adj3 + (scalar_t(1) / scalar_t(12))*adj6) + ((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3)*((scalar_t(1) / scalar_t(24))*adj1 + (scalar_t(1) / scalar_t(24))*adj4 + (scalar_t(1) / scalar_t(12))*adj7) + ((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3)*((scalar_t(1) / scalar_t(24))*adj2 + (scalar_t(1) / scalar_t(24))*adj5 + (scalar_t(1) / scalar_t(12))*adj8));
+    const scalar_v sgn2 = (mdot2 > zero_v) ? one_v : ((mdot2 < zero_v) ? neg_one_v : zero_v);
+    const scalar_v mdot3 = rho*((-scalar_t(1) / scalar_t(24)*adj0 + (scalar_t(1) / scalar_t(24))*adj3)*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (-scalar_t(1) / scalar_t(24)*adj1 + (scalar_t(1) / scalar_t(24))*adj4)*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (-scalar_t(1) / scalar_t(24)*adj2 + (scalar_t(1) / scalar_t(24))*adj5)*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+    const scalar_v sgn3 = (mdot3 > zero_v) ? one_v : ((mdot3 < zero_v) ? neg_one_v : zero_v);
+    const scalar_v mdot4 = rho*((-scalar_t(1) / scalar_t(24)*adj0 + (scalar_t(1) / scalar_t(24))*adj6)*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux3) + (-scalar_t(1) / scalar_t(24)*adj1 + (scalar_t(1) / scalar_t(24))*adj7)*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy3) + (-scalar_t(1) / scalar_t(24)*adj2 + (scalar_t(1) / scalar_t(24))*adj8)*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz3));
+    const scalar_v sgn4 = (mdot4 > zero_v) ? one_v : ((mdot4 < zero_v) ? neg_one_v : zero_v);
+    const scalar_v mdot5 = rho*((-scalar_t(1) / scalar_t(24)*adj3 + (scalar_t(1) / scalar_t(24))*adj6)*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (-scalar_t(1) / scalar_t(24)*adj4 + (scalar_t(1) / scalar_t(24))*adj7)*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (-scalar_t(1) / scalar_t(24)*adj5 + (scalar_t(1) / scalar_t(24))*adj8)*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+    const scalar_v sgn5 = (mdot5 > zero_v) ? one_v : ((mdot5 < zero_v) ? neg_one_v : zero_v);
+    {
+        const auto x0 = adj1 + adj4;
+        const auto x1 = adj7 + x0;
+        const auto x2 = scalar_t(2)*adj7 + x0;
+        const auto x3 = adj2 + adj5;
+        const auto x4 = adj8 + x3;
+        const auto x5 = scalar_t(2)*adj8 + x3;
+        const auto x6 = adj0 + adj3;
+        const auto x7 = scalar_t(2)*adj6 + x6;
+        const auto x8 = adj6 + x6;
+        const auto x9 = scalar_t(2)*x8;
+        const auto x10 = scalar_t(4)*mu;
+        const auto x11 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x12 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x13 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x14 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x15 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x16 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x17 = x14*(uy0 + uy1) + x15*(uz0 + uz1) + x16*(ux0 + ux1);
+        const auto x18 = x11*(uy0 + uy2) + x12*(uz0 + uz2) + x13*(ux0 + ux2);
+        const auto x19 = x2*(uy0 + uy3) + x5*(uz0 + uz3) + x7*(ux0 + ux3);
+        const auto x20 = ux0*(sgn0 + scalar_t(1));
+        const auto x21 = ux0*(sgn1 + scalar_t(1));
+        const auto x22 = ux0*(sgn2 + scalar_t(1));
+        const auto x23 = ux1*(sgn0 + scalar_t(-1));
+        const auto x24 = ux2*(sgn1 + scalar_t(-1));
+        const auto x25 = ux3*(sgn2 + scalar_t(-1));
+        const auto x26 = det*rho;
+        const auto x27 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x28 = x10*x8;
+        const auto b0 = x27*(x10*(x1*x11 + x12*x4 + x13*x9) + x10*(x1*x14 + x15*x4 + x16*x9) + x10*(x1*x2 + x4*x5 + x7*x9) + x26*(sgn0*x17 + sgn1*x18 + sgn2*x19 + x13*x21 - x13*x24 + x16*x20 - x16*x23 + x17 + x18 + x19 + x22*x7 - x25*x7));
+        const auto b1 = x27*(x11*x28 + x14*x28 + x2*x28 + x26*(x11*x21 - x11*x24 + x14*x20 - x14*x23 + x2*x22 - x2*x25));
+        const auto b2 = x27*(x12*x28 + x15*x28 + x26*(x12*x21 - x12*x24 + x15*x20 - x15*x23 + x22*x5 - x25*x5) + x28*x5);
+        const auto b3 = (scalar_t(1) / scalar_t(12))*x8;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 0] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x1 = adj1 + adj4;
+        const auto x2 = adj7 + x1;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = x2*x3;
+        const auto x5 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x6 = adj3 + adj6;
+        const auto x7 = scalar_t(2)*adj0 + x6;
+        const auto x8 = uy0*(sgn0 + scalar_t(1));
+        const auto x9 = uy0*(sgn1 + scalar_t(1));
+        const auto x10 = uy0*(sgn2 + scalar_t(1));
+        const auto x11 = uy1*(sgn0 + scalar_t(-1));
+        const auto x12 = uy2*(sgn1 + scalar_t(-1));
+        const auto x13 = uy3*(sgn2 + scalar_t(-1));
+        const auto x14 = det*rho;
+        const auto x15 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x16 = adj0 + x6;
+        const auto x17 = adj2 + adj5;
+        const auto x18 = adj8 + x17;
+        const auto x19 = scalar_t(2)*adj8 + x17;
+        const auto x20 = scalar_t(2)*adj7 + x1;
+        const auto x21 = scalar_t(2)*x2;
+        const auto x22 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x23 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x24 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x25 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x26 = x24*(uz0 + uz1) + x25*(uy0 + uy1) + x7*(ux0 + ux1);
+        const auto x27 = x22*(uz0 + uz2) + x23*(uy0 + uy2) + x5*(ux0 + ux2);
+        const auto x28 = x0*(ux0 + ux3) + x19*(uz0 + uz3) + x20*(uy0 + uy3);
+        const auto b0 = x15*(x0*x4 + x14*(x0*x10 - x0*x13 - x11*x7 - x12*x5 + x5*x9 + x7*x8) + x4*x5 + x4*x7);
+        const auto b1 = x15*(x14*(sgn0*x26 + sgn1*x27 + sgn2*x28 + x10*x20 - x11*x25 - x12*x23 - x13*x20 + x23*x9 + x25*x8 + x26 + x27 + x28) + x3*(x0*x16 + x18*x19 + x20*x21) + x3*(x16*x5 + x18*x22 + x21*x23) + x3*(x16*x7 + x18*x24 + x21*x25));
+        const auto b2 = x15*(x14*(x10*x19 - x11*x24 - x12*x22 - x13*x19 + x22*x9 + x24*x8) + x19*x4 + x22*x4 + x24*x4);
+        const auto b3 = (scalar_t(1) / scalar_t(12))*x2;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 0] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x1 = adj2 + adj5;
+        const auto x2 = adj8 + x1;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = x2*x3;
+        const auto x5 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x6 = adj3 + adj6;
+        const auto x7 = scalar_t(2)*adj0 + x6;
+        const auto x8 = uz0*(sgn0 + scalar_t(1));
+        const auto x9 = uz0*(sgn1 + scalar_t(1));
+        const auto x10 = uz0*(sgn2 + scalar_t(1));
+        const auto x11 = uz1*(sgn0 + scalar_t(-1));
+        const auto x12 = uz2*(sgn1 + scalar_t(-1));
+        const auto x13 = uz3*(sgn2 + scalar_t(-1));
+        const auto x14 = det*rho;
+        const auto x15 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x16 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x17 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x18 = adj4 + adj7;
+        const auto x19 = scalar_t(2)*adj1 + x18;
+        const auto x20 = adj0 + x6;
+        const auto x21 = adj1 + x18;
+        const auto x22 = scalar_t(2)*adj8 + x1;
+        const auto x23 = scalar_t(2)*x2;
+        const auto x24 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x25 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x26 = x19*(uy0 + uy1) + x25*(uz0 + uz1) + x7*(ux0 + ux1);
+        const auto x27 = x17*(uy0 + uy2) + x24*(uz0 + uz2) + x5*(ux0 + ux2);
+        const auto x28 = x0*(ux0 + ux3) + x16*(uy0 + uy3) + x22*(uz0 + uz3);
+        const auto b0 = x15*(x0*x4 + x14*(x0*x10 - x0*x13 - x11*x7 - x12*x5 + x5*x9 + x7*x8) + x4*x5 + x4*x7);
+        const auto b1 = x15*(x14*(x10*x16 - x11*x19 - x12*x17 - x13*x16 + x17*x9 + x19*x8) + x16*x4 + x17*x4 + x19*x4);
+        const auto b2 = x15*(x14*(sgn0*x26 + sgn1*x27 + sgn2*x28 + x10*x22 - x11*x25 - x12*x24 - x13*x22 + x24*x9 + x25*x8 + x26 + x27 + x28) + x3*(x0*x20 + x16*x21 + x22*x23) + x3*(x17*x21 + x20*x5 + x23*x24) + x3*(x19*x21 + x20*x7 + x23*x25));
+        const auto b3 = (scalar_t(1) / scalar_t(12))*x2;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 0] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(12))*rho;
+        const auto b0 = x0*(adj0 + adj3 + adj6);
+        const auto b1 = x0*(adj1 + adj4 + adj7);
+        const auto b2 = x0*(adj2 + adj5 + adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 0] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x1 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x2 = scalar_t(2)*adj0;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x5 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x6 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x7 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x8 = adj3 + adj6 + x2;
+        const auto x9 = x6*(uy0 + uy1) + x7*(uz0 + uz1) + x8*(ux0 + ux1);
+        const auto x10 = ux0*(sgn0 + scalar_t(1));
+        const auto x11 = ux1*(sgn0 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = adj0*x3;
+        const auto x15 = x12*(x10 - x11);
+        const auto b0 = -x13*(-x12*(-sgn0*x9 + x10*x8 - x11*x8 + x9) + x3*(adj1*x0 + adj2*x1 + x2*(adj0 + adj3 + scalar_t(2)*adj6)) + x3*(adj1*x4 + adj2*x5 + x2*(adj0 + scalar_t(2)*adj3 + adj6)) + x3*(adj1*x6 + adj2*x7 + x2*x8));
+        const auto b1 = -x13*(x0*x14 + x14*x4 + x14*x6 - x15*x6);
+        const auto b2 = -x13*(x1*x14 + x14*x5 + x14*x7 - x15*x7);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x8;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 1] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj1*x1;
+        const auto x3 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uy0*(sgn0 + scalar_t(1));
+        const auto x6 = uy1*(sgn0 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x11 = scalar_t(2)*adj1;
+        const auto x12 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x13 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x14 = adj4 + adj7 + x11;
+        const auto x15 = x13*(uz0 + uz1) + x14*(uy0 + uy1) + x4*(ux0 + ux1);
+        const auto b0 = -x9*(x0*x2 + x2*x3 + x2*x4 - x4*x8);
+        const auto b1 = -x9*(x1*(adj0*x0 + adj2*x10 + x11*(adj1 + adj4 + scalar_t(2)*adj7)) + x1*(adj0*x3 + adj2*x12 + x11*(adj1 + scalar_t(2)*adj4 + adj7)) + x1*(adj0*x4 + adj2*x13 + x11*x14) - x7*(-sgn0*x15 + x14*x5 - x14*x6 + x15));
+        const auto b2 = -x9*(x10*x2 + x12*x2 + x13*x2 - x13*x8);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 1] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj2*x1;
+        const auto x3 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uz0*(sgn0 + scalar_t(1));
+        const auto x6 = uz1*(sgn0 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x11 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x12 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x13 = scalar_t(2)*adj2;
+        const auto x14 = adj5 + adj8 + x13;
+        const auto x15 = x12*(uy0 + uy1) + x14*(uz0 + uz1) + x4*(ux0 + ux1);
+        const auto b0 = -x9*(x0*x2 + x2*x3 + x2*x4 - x4*x8);
+        const auto b1 = -x9*(x10*x2 + x11*x2 + x12*x2 - x12*x8);
+        const auto b2 = -x9*(x1*(adj0*x0 + adj1*x10 + x13*(adj2 + adj5 + scalar_t(2)*adj8)) + x1*(adj0*x3 + adj1*x11 + x13*(adj2 + scalar_t(2)*adj5 + adj8)) + x1*(adj0*x4 + adj1*x12 + x13*x14) - x7*(-sgn0*x15 + x14*x5 - x14*x6 + x15));
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 1] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = x0*(scalar_t(2)*adj0 + adj3 + adj6);
+        const auto b1 = x0*(scalar_t(2)*adj1 + adj4 + adj7);
+        const auto b2 = x0*(scalar_t(2)*adj2 + adj5 + adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 1] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x1 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x2 = scalar_t(2)*adj3;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x5 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x6 = adj0 + adj6 + x2;
+        const auto x7 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x8 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x9 = x4*(uy0 + uy2) + x5*(uz0 + uz2) + x6*(ux0 + ux2);
+        const auto x10 = ux0*(sgn1 + scalar_t(1));
+        const auto x11 = ux2*(sgn1 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = adj3*x3;
+        const auto x15 = x12*(x10 - x11);
+        const auto b0 = -x13*(-x12*(-sgn1*x9 + x10*x6 - x11*x6 + x9) + x3*(adj4*x0 + adj5*x1 + x2*(adj0 + adj3 + scalar_t(2)*adj6)) + x3*(adj4*x4 + adj5*x5 + x2*x6) + x3*(adj4*x7 + adj5*x8 + x2*(scalar_t(2)*adj0 + adj3 + adj6)));
+        const auto b1 = -x13*(x0*x14 + x14*x4 + x14*x7 - x15*x4);
+        const auto b2 = -x13*(x1*x14 + x14*x5 + x14*x8 - x15*x5);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x6;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 2] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj4*x1;
+        const auto x3 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uy0*(sgn1 + scalar_t(1));
+        const auto x6 = uy2*(sgn1 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x11 = scalar_t(2)*adj4;
+        const auto x12 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x13 = adj1 + adj7 + x11;
+        const auto x14 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x15 = x12*(uz0 + uz2) + x13*(uy0 + uy2) + x3*(ux0 + ux2);
+        const auto b0 = -x9*(x0*x2 + x2*x3 + x2*x4 - x3*x8);
+        const auto b1 = -x9*(x1*(adj3*x0 + adj5*x10 + x11*(adj1 + adj4 + scalar_t(2)*adj7)) + x1*(adj3*x3 + adj5*x12 + x11*x13) + x1*(adj3*x4 + adj5*x14 + x11*(scalar_t(2)*adj1 + adj4 + adj7)) - x7*(-sgn1*x15 + x13*x5 - x13*x6 + x15));
+        const auto b2 = -x9*(x10*x2 + x12*x2 - x12*x8 + x14*x2);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x13;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 2] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj5*x1;
+        const auto x3 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uz0*(sgn1 + scalar_t(1));
+        const auto x6 = uz2*(sgn1 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x11 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x12 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x13 = scalar_t(2)*adj5;
+        const auto x14 = adj2 + adj8 + x13;
+        const auto x15 = x11*(uy0 + uy2) + x14*(uz0 + uz2) + x3*(ux0 + ux2);
+        const auto b0 = -x9*(x0*x2 + x2*x3 + x2*x4 - x3*x8);
+        const auto b1 = -x9*(x10*x2 + x11*x2 - x11*x8 + x12*x2);
+        const auto b2 = -x9*(x1*(adj3*x0 + adj4*x10 + x13*(adj2 + adj5 + scalar_t(2)*adj8)) + x1*(adj3*x3 + adj4*x11 + x13*x14) + x1*(adj3*x4 + adj4*x12 + x13*(scalar_t(2)*adj2 + adj5 + adj8)) - x7*(-sgn1*x15 + x14*x5 - x14*x6 + x15));
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 2] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = x0*(adj0 + scalar_t(2)*adj3 + adj6);
+        const auto b1 = x0*(adj1 + scalar_t(2)*adj4 + adj7);
+        const auto b2 = x0*(adj2 + scalar_t(2)*adj5 + adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 2] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x1 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x2 = scalar_t(2)*adj6;
+        const auto x3 = adj0 + adj3 + x2;
+        const auto x4 = scalar_t(4)*mu;
+        const auto x5 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x6 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x7 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x8 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x9 = x0*(uy0 + uy3) + x1*(uz0 + uz3) + x3*(ux0 + ux3);
+        const auto x10 = ux0*(sgn2 + scalar_t(1));
+        const auto x11 = ux3*(sgn2 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = adj6*x4;
+        const auto x15 = x12*(x10 - x11);
+        const auto b0 = -x13*(-x12*(-sgn2*x9 + x10*x3 - x11*x3 + x9) + x4*(adj7*x0 + adj8*x1 + x2*x3) + x4*(adj7*x5 + adj8*x6 + x2*(adj0 + scalar_t(2)*adj3 + adj6)) + x4*(adj7*x7 + adj8*x8 + x2*(scalar_t(2)*adj0 + adj3 + adj6)));
+        const auto b1 = -x13*(x0*x14 - x0*x15 + x14*x5 + x14*x7);
+        const auto b2 = -x13*(x1*x14 - x1*x15 + x14*x6 + x14*x8);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x3;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 3] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj7*x1;
+        const auto x3 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uy0*(sgn2 + scalar_t(1));
+        const auto x6 = uy3*(sgn2 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x11 = scalar_t(2)*adj7;
+        const auto x12 = adj1 + adj4 + x11;
+        const auto x13 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x14 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x15 = x0*(ux0 + ux3) + x10*(uz0 + uz3) + x12*(uy0 + uy3);
+        const auto b0 = -x9*(x0*x2 - x0*x8 + x2*x3 + x2*x4);
+        const auto b1 = -x9*(x1*(adj6*x0 + adj8*x10 + x11*x12) + x1*(adj6*x3 + adj8*x13 + x11*(adj1 + scalar_t(2)*adj4 + adj7)) + x1*(adj6*x4 + adj8*x14 + x11*(scalar_t(2)*adj1 + adj4 + adj7)) - x7*(-sgn2*x15 + x12*x5 - x12*x6 + x15));
+        const auto b2 = -x9*(x10*x2 - x10*x8 + x13*x2 + x14*x2);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x12;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 3] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj8*x1;
+        const auto x3 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uz0*(sgn2 + scalar_t(1));
+        const auto x6 = uz3*(sgn2 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x11 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x12 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x13 = scalar_t(2)*adj8;
+        const auto x14 = adj2 + adj5 + x13;
+        const auto x15 = x0*(ux0 + ux3) + x10*(uy0 + uy3) + x14*(uz0 + uz3);
+        const auto b0 = -x9*(x0*x2 - x0*x8 + x2*x3 + x2*x4);
+        const auto b1 = -x9*(x10*x2 - x10*x8 + x11*x2 + x12*x2);
+        const auto b2 = -x9*(x1*(adj6*x0 + adj7*x10 + x13*x14) + x1*(adj6*x3 + adj7*x11 + x13*(adj2 + scalar_t(2)*adj5 + adj8)) + x1*(adj6*x4 + adj7*x12 + x13*(scalar_t(2)*adj2 + adj5 + adj8)) - x7*(-sgn2*x15 + x14*x5 - x14*x6 + x15));
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 3] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = x0*(adj0 + adj3 + scalar_t(2)*adj6);
+        const auto b1 = x0*(adj1 + adj4 + scalar_t(2)*adj7);
+        const auto b2 = x0*(adj2 + adj5 + scalar_t(2)*adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 3] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj4 + adj7;
+        const auto x1 = adj1 + x0;
+        const auto x2 = adj1 - adj4;
+        const auto x3 = adj5 + adj8;
+        const auto x4 = adj2 + x3;
+        const auto x5 = adj2 - adj5;
+        const auto x6 = adj3 + adj6;
+        const auto x7 = adj0 + x6;
+        const auto x8 = scalar_t(2)*x7;
+        const auto x9 = scalar_t(4)*mu;
+        const auto x10 = adj1 - adj7;
+        const auto x11 = adj2 - adj8;
+        const auto x12 = scalar_t(2)*adj1 + x0;
+        const auto x13 = scalar_t(2)*adj2 + x3;
+        const auto x14 = scalar_t(2)*adj0 + x6;
+        const auto x15 = x12*(uy0 + uy1) + x13*(uz0 + uz1) + x14*(ux0 + ux1);
+        const auto x16 = ux0*(sgn0 + scalar_t(1));
+        const auto x17 = ux1*(sgn0 + scalar_t(-1));
+        const auto x18 = det*rho;
+        const auto x19 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x20 = x7*x9;
+        const auto x21 = x18*(x16 - x17);
+        const auto b0 = -x19*(x18*(sgn0*x15 + x14*x16 - x14*x17 + x15) + x9*(x1*x10 + x11*x4 + x8*(adj0 - adj6)) + x9*(x1*x12 + x13*x4 + x14*x8) + x9*(x1*x2 + x4*x5 + x8*(adj0 - adj3)));
+        const auto b1 = -x19*(x10*x20 + x12*x20 + x12*x21 + x2*x20);
+        const auto b2 = -x19*(x11*x20 + x13*x20 + x13*x21 + x20*x5);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 4] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = adj4 + adj7;
+        const auto x2 = adj1 + x1;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = x2*x3;
+        const auto x5 = adj0 - adj6;
+        const auto x6 = adj3 + adj6;
+        const auto x7 = scalar_t(2)*adj0 + x6;
+        const auto x8 = uy0*(sgn0 + scalar_t(1));
+        const auto x9 = uy1*(sgn0 + scalar_t(-1));
+        const auto x10 = det*rho;
+        const auto x11 = x10*(x8 - x9);
+        const auto x12 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x13 = adj0 + x6;
+        const auto x14 = adj5 + adj8;
+        const auto x15 = adj2 + x14;
+        const auto x16 = adj2 - adj5;
+        const auto x17 = scalar_t(2)*x2;
+        const auto x18 = adj2 - adj8;
+        const auto x19 = scalar_t(2)*adj2 + x14;
+        const auto x20 = scalar_t(2)*adj1 + x1;
+        const auto x21 = x19*(uz0 + uz1) + x20*(uy0 + uy1) + x7*(ux0 + ux1);
+        const auto b0 = -x12*(x0*x4 + x11*x7 + x4*x5 + x4*x7);
+        const auto b1 = -x12*(x10*(sgn0*x21 + x20*x8 - x20*x9 + x21) + x3*(x0*x13 + x15*x16 + x17*(adj1 - adj4)) + x3*(x13*x5 + x15*x18 + x17*(adj1 - adj7)) + x3*(x13*x7 + x15*x19 + x17*x20));
+        const auto b2 = -x12*(x11*x19 + x16*x4 + x18*x4 + x19*x4);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x20;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 4] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = adj5 + adj8;
+        const auto x2 = adj2 + x1;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = x2*x3;
+        const auto x5 = adj0 - adj6;
+        const auto x6 = adj3 + adj6;
+        const auto x7 = scalar_t(2)*adj0 + x6;
+        const auto x8 = uz0*(sgn0 + scalar_t(1));
+        const auto x9 = uz1*(sgn0 + scalar_t(-1));
+        const auto x10 = det*rho;
+        const auto x11 = x10*(x8 - x9);
+        const auto x12 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x13 = adj1 - adj4;
+        const auto x14 = adj1 - adj7;
+        const auto x15 = adj4 + adj7;
+        const auto x16 = scalar_t(2)*adj1 + x15;
+        const auto x17 = adj0 + x6;
+        const auto x18 = adj1 + x15;
+        const auto x19 = scalar_t(2)*x2;
+        const auto x20 = scalar_t(2)*adj2 + x1;
+        const auto x21 = x16*(uy0 + uy1) + x20*(uz0 + uz1) + x7*(ux0 + ux1);
+        const auto b0 = -x12*(x0*x4 + x11*x7 + x4*x5 + x4*x7);
+        const auto b1 = -x12*(x11*x16 + x13*x4 + x14*x4 + x16*x4);
+        const auto b2 = -x12*(x10*(sgn0*x21 + x20*x8 - x20*x9 + x21) + x3*(x0*x17 + x13*x18 + x19*(adj2 - adj5)) + x3*(x14*x18 + x17*x5 + x19*(adj2 - adj8)) + x3*(x16*x18 + x17*x7 + x19*x20));
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x20;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 4] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = -x0*(scalar_t(2)*adj0 + adj3 + adj6);
+        const auto b1 = -x0*(scalar_t(2)*adj1 + adj4 + adj7);
+        const auto b2 = -x0*(scalar_t(2)*adj2 + adj5 + adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 4] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 - adj4;
+        const auto x1 = adj2 - adj5;
+        const auto x2 = adj0 - adj3;
+        const auto x3 = scalar_t(2)*adj0;
+        const auto x4 = scalar_t(4)*mu;
+        const auto x5 = adj1 - adj7;
+        const auto x6 = adj2 - adj8;
+        const auto x7 = adj0 - adj6;
+        const auto x8 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x9 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x10 = adj3 + adj6 + x3;
+        const auto x11 = x0*(uy1 + uy2) + x1*(uz1 + uz2) + x2*(ux1 + ux2);
+        const auto x12 = x5*(uy1 + uy3) + x6*(uz1 + uz3) + x7*(ux1 + ux3);
+        const auto x13 = x10*(ux0 + ux1) + x8*(uy0 + uy1) + x9*(uz0 + uz1);
+        const auto x14 = ux0*(sgn0 + scalar_t(1));
+        const auto x15 = ux1*(sgn3 + scalar_t(1));
+        const auto x16 = ux1*(sgn4 + scalar_t(1));
+        const auto x17 = ux1*(sgn0 + scalar_t(-1));
+        const auto x18 = ux2*(sgn3 + scalar_t(-1));
+        const auto x19 = ux3*(sgn4 + scalar_t(-1));
+        const auto x20 = det*rho;
+        const auto x21 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x22 = adj0*x4;
+        const auto b0 = x21*(-x20*(-sgn0*x13 + sgn3*x11 + sgn4*x12 + x10*x14 - x10*x17 + x11 + x12 + x13 + x15*x2 + x16*x7 - x18*x2 - x19*x7) + x4*(adj1*x0 + adj2*x1 + x2*x3) + x4*(adj1*x5 + adj2*x6 + x3*x7) + x4*(adj1*x8 + adj2*x9 + x10*x3));
+        const auto b1 = x21*(x0*x22 - x20*(x0*x15 - x0*x18 + x14*x8 + x16*x5 - x17*x8 - x19*x5) + x22*x5 + x22*x8);
+        const auto b2 = x21*(x1*x22 - x20*(x1*x15 - x1*x18 + x14*x9 + x16*x6 - x17*x9 - x19*x6) + x22*x6 + x22*x9);
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj0;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 5] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj1*x1;
+        const auto x3 = adj0 - adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uy1*(sgn3 + scalar_t(1));
+        const auto x6 = uy1*(sgn4 + scalar_t(1));
+        const auto x7 = uy0*(sgn0 + scalar_t(1));
+        const auto x8 = uy2*(sgn3 + scalar_t(-1));
+        const auto x9 = uy3*(sgn4 + scalar_t(-1));
+        const auto x10 = uy1*(sgn0 + scalar_t(-1));
+        const auto x11 = det*rho;
+        const auto x12 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x13 = adj2 - adj5;
+        const auto x14 = adj1 - adj4;
+        const auto x15 = scalar_t(2)*adj1;
+        const auto x16 = adj2 - adj8;
+        const auto x17 = adj1 - adj7;
+        const auto x18 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x19 = adj4 + adj7 + x15;
+        const auto x20 = x0*(ux1 + ux2) + x13*(uz1 + uz2) + x14*(uy1 + uy2);
+        const auto x21 = x16*(uz1 + uz3) + x17*(uy1 + uy3) + x3*(ux1 + ux3);
+        const auto x22 = x18*(uz0 + uz1) + x19*(uy0 + uy1) + x4*(ux0 + ux1);
+        const auto b0 = x12*(x0*x2 - x11*(x0*x5 - x0*x8 - x10*x4 + x3*x6 - x3*x9 + x4*x7) + x2*x3 + x2*x4);
+        const auto b1 = x12*(x1*(adj0*x0 + adj2*x13 + x14*x15) + x1*(adj0*x3 + adj2*x16 + x15*x17) + x1*(adj0*x4 + adj2*x18 + x15*x19) - x11*(-sgn0*x22 + sgn3*x20 + sgn4*x21 - x10*x19 + x14*x5 - x14*x8 + x17*x6 - x17*x9 + x19*x7 + x20 + x21 + x22));
+        const auto b2 = x12*(-x11*(-x10*x18 + x13*x5 - x13*x8 + x16*x6 - x16*x9 + x18*x7) + x13*x2 + x16*x2 + x18*x2);
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj1;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 5] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj2*x1;
+        const auto x3 = adj0 - adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uz1*(sgn3 + scalar_t(1));
+        const auto x6 = uz1*(sgn4 + scalar_t(1));
+        const auto x7 = uz0*(sgn0 + scalar_t(1));
+        const auto x8 = uz2*(sgn3 + scalar_t(-1));
+        const auto x9 = uz3*(sgn4 + scalar_t(-1));
+        const auto x10 = uz1*(sgn0 + scalar_t(-1));
+        const auto x11 = det*rho;
+        const auto x12 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x13 = adj1 - adj4;
+        const auto x14 = adj1 - adj7;
+        const auto x15 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x16 = adj2 - adj5;
+        const auto x17 = scalar_t(2)*adj2;
+        const auto x18 = adj2 - adj8;
+        const auto x19 = adj5 + adj8 + x17;
+        const auto x20 = x0*(ux1 + ux2) + x13*(uy1 + uy2) + x16*(uz1 + uz2);
+        const auto x21 = x14*(uy1 + uy3) + x18*(uz1 + uz3) + x3*(ux1 + ux3);
+        const auto x22 = x15*(uy0 + uy1) + x19*(uz0 + uz1) + x4*(ux0 + ux1);
+        const auto b0 = x12*(x0*x2 - x11*(x0*x5 - x0*x8 - x10*x4 + x3*x6 - x3*x9 + x4*x7) + x2*x3 + x2*x4);
+        const auto b1 = x12*(-x11*(-x10*x15 + x13*x5 - x13*x8 + x14*x6 - x14*x9 + x15*x7) + x13*x2 + x14*x2 + x15*x2);
+        const auto b2 = x12*(x1*(adj0*x0 + adj1*x13 + x16*x17) + x1*(adj0*x3 + adj1*x14 + x17*x18) + x1*(adj0*x4 + adj1*x15 + x17*x19) - x11*(-sgn0*x22 + sgn3*x20 + sgn4*x21 - x10*x19 + x16*x5 - x16*x8 + x18*x6 - x18*x9 + x19*x7 + x20 + x21 + x22));
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj2;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 5] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(12))*rho;
+        const auto b0 = -adj0*x0;
+        const auto b1 = -adj1*x0;
+        const auto b2 = -adj2*x0;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 5] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 - adj4;
+        const auto x1 = adj2 - adj5;
+        const auto x2 = adj0 - adj3;
+        const auto x3 = scalar_t(2)*adj3;
+        const auto x4 = scalar_t(4)*mu;
+        const auto x5 = adj1 - adj7;
+        const auto x6 = adj2 - adj8;
+        const auto x7 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x8 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x9 = x0*(uy1 + uy2) + x1*(uz1 + uz2) + x2*(ux1 + ux2);
+        const auto x10 = ux1*(sgn3 + scalar_t(1));
+        const auto x11 = ux2*(sgn3 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = adj3*x4;
+        const auto x15 = x12*(x10 - x11);
+        const auto b0 = x13*(-x12*(-sgn3*x9 + x10*x2 - x11*x2 + x9) + x4*(adj4*x0 + adj5*x1 + x2*x3) + x4*(adj4*x5 + adj5*x6 + x3*(adj0 - adj6)) + x4*(adj4*x7 + adj5*x8 + x3*(scalar_t(2)*adj0 + adj3 + adj6)));
+        const auto b1 = x13*(x0*x14 - x0*x15 + x14*x5 + x14*x7);
+        const auto b2 = x13*(x1*x14 - x1*x15 + x14*x6 + x14*x8);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x2;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 6] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj4*x1;
+        const auto x3 = adj0 - adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uy1*(sgn3 + scalar_t(1));
+        const auto x6 = uy2*(sgn3 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj2 - adj5;
+        const auto x11 = adj1 - adj4;
+        const auto x12 = scalar_t(2)*adj4;
+        const auto x13 = adj2 - adj8;
+        const auto x14 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x15 = x0*(ux1 + ux2) + x10*(uz1 + uz2) + x11*(uy1 + uy2);
+        const auto b0 = x9*(x0*x2 - x0*x8 + x2*x3 + x2*x4);
+        const auto b1 = x9*(x1*(adj3*x0 + adj5*x10 + x11*x12) + x1*(adj3*x3 + adj5*x13 + x12*(adj1 - adj7)) + x1*(adj3*x4 + adj5*x14 + x12*(scalar_t(2)*adj1 + adj4 + adj7)) - x7*(-sgn3*x15 + x11*x5 - x11*x6 + x15));
+        const auto b2 = x9*(x10*x2 - x10*x8 + x13*x2 + x14*x2);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x11;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 6] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj5*x1;
+        const auto x3 = adj0 - adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uz1*(sgn3 + scalar_t(1));
+        const auto x6 = uz2*(sgn3 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj1 - adj4;
+        const auto x11 = adj1 - adj7;
+        const auto x12 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x13 = adj2 - adj5;
+        const auto x14 = scalar_t(2)*adj5;
+        const auto x15 = x0*(ux1 + ux2) + x10*(uy1 + uy2) + x13*(uz1 + uz2);
+        const auto b0 = x9*(x0*x2 - x0*x8 + x2*x3 + x2*x4);
+        const auto b1 = x9*(x10*x2 - x10*x8 + x11*x2 + x12*x2);
+        const auto b2 = x9*(x1*(adj3*x0 + adj4*x10 + x13*x14) + x1*(adj3*x3 + adj4*x11 + x14*(adj2 - adj8)) + x1*(adj3*x4 + adj4*x12 + x14*(scalar_t(2)*adj2 + adj5 + adj8)) - x7*(-sgn3*x15 + x13*x5 - x13*x6 + x15));
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x13;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 6] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = -x0*(adj0 - adj3);
+        const auto b1 = -x0*(adj1 - adj4);
+        const auto b2 = -x0*(adj2 - adj5);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 6] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 - adj4;
+        const auto x1 = adj2 - adj5;
+        const auto x2 = scalar_t(2)*adj6;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = adj1 - adj7;
+        const auto x5 = adj2 - adj8;
+        const auto x6 = adj0 - adj6;
+        const auto x7 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x8 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x9 = x4*(uy1 + uy3) + x5*(uz1 + uz3) + x6*(ux1 + ux3);
+        const auto x10 = ux1*(sgn4 + scalar_t(1));
+        const auto x11 = ux3*(sgn4 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = adj6*x3;
+        const auto x15 = x12*(x10 - x11);
+        const auto b0 = x13*(-x12*(-sgn4*x9 + x10*x6 - x11*x6 + x9) + x3*(adj7*x0 + adj8*x1 + x2*(adj0 - adj3)) + x3*(adj7*x4 + adj8*x5 + x2*x6) + x3*(adj7*x7 + adj8*x8 + x2*(scalar_t(2)*adj0 + adj3 + adj6)));
+        const auto b1 = x13*(x0*x14 + x14*x4 + x14*x7 - x15*x4);
+        const auto b2 = x13*(x1*x14 + x14*x5 + x14*x8 - x15*x5);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x6;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 7] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj7*x1;
+        const auto x3 = adj0 - adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uy1*(sgn4 + scalar_t(1));
+        const auto x6 = uy3*(sgn4 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj2 - adj5;
+        const auto x11 = scalar_t(2)*adj7;
+        const auto x12 = adj2 - adj8;
+        const auto x13 = adj1 - adj7;
+        const auto x14 = scalar_t(2)*adj2 + adj5 + adj8;
+        const auto x15 = x12*(uz1 + uz3) + x13*(uy1 + uy3) + x3*(ux1 + ux3);
+        const auto b0 = x9*(x0*x2 + x2*x3 + x2*x4 - x3*x8);
+        const auto b1 = x9*(x1*(adj6*x0 + adj8*x10 + x11*(adj1 - adj4)) + x1*(adj6*x3 + adj8*x12 + x11*x13) + x1*(adj6*x4 + adj8*x14 + x11*(scalar_t(2)*adj1 + adj4 + adj7)) - x7*(-sgn4*x15 + x13*x5 - x13*x6 + x15));
+        const auto b2 = x9*(x10*x2 + x12*x2 - x12*x8 + x14*x2);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x13;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 7] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj8*x1;
+        const auto x3 = adj0 - adj6;
+        const auto x4 = scalar_t(2)*adj0 + adj3 + adj6;
+        const auto x5 = uz1*(sgn4 + scalar_t(1));
+        const auto x6 = uz3*(sgn4 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj1 - adj4;
+        const auto x11 = adj1 - adj7;
+        const auto x12 = scalar_t(2)*adj1 + adj4 + adj7;
+        const auto x13 = scalar_t(2)*adj8;
+        const auto x14 = adj2 - adj8;
+        const auto x15 = x11*(uy1 + uy3) + x14*(uz1 + uz3) + x3*(ux1 + ux3);
+        const auto b0 = x9*(x0*x2 + x2*x3 + x2*x4 - x3*x8);
+        const auto b1 = x9*(x10*x2 + x11*x2 - x11*x8 + x12*x2);
+        const auto b2 = x9*(x1*(adj6*x0 + adj7*x10 + x13*(adj2 - adj5)) + x1*(adj6*x3 + adj7*x11 + x13*x14) + x1*(adj6*x4 + adj7*x12 + x13*(scalar_t(2)*adj2 + adj5 + adj8)) - x7*(-sgn4*x15 + x14*x5 - x14*x6 + x15));
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 7] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = -x0*(adj0 - adj6);
+        const auto b1 = -x0*(adj1 - adj7);
+        const auto b2 = -x0*(adj2 - adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 7] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 + adj7;
+        const auto x1 = adj4 + x0;
+        const auto x2 = adj1 - adj4;
+        const auto x3 = adj2 + adj8;
+        const auto x4 = adj5 + x3;
+        const auto x5 = adj2 - adj5;
+        const auto x6 = adj0 + adj6;
+        const auto x7 = adj3 + x6;
+        const auto x8 = scalar_t(2)*x7;
+        const auto x9 = scalar_t(4)*mu;
+        const auto x10 = adj4 - adj7;
+        const auto x11 = adj5 - adj8;
+        const auto x12 = scalar_t(2)*adj4 + x0;
+        const auto x13 = scalar_t(2)*adj5 + x3;
+        const auto x14 = scalar_t(2)*adj3 + x6;
+        const auto x15 = x12*(uy0 + uy2) + x13*(uz0 + uz2) + x14*(ux0 + ux2);
+        const auto x16 = ux0*(sgn1 + scalar_t(1));
+        const auto x17 = ux2*(sgn1 + scalar_t(-1));
+        const auto x18 = det*rho;
+        const auto x19 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x20 = x7*x9;
+        const auto x21 = x18*(x16 - x17);
+        const auto b0 = -x19*(x18*(sgn1*x15 + x14*x16 - x14*x17 + x15) + x9*(x1*x10 + x11*x4 + x8*(adj3 - adj6)) + x9*(x1*x12 + x13*x4 + x14*x8) - x9*(x1*x2 + x4*x5 + x8*(adj0 - adj3)));
+        const auto b1 = -x19*(x10*x20 + x12*x20 + x12*x21 - x2*x20);
+        const auto b2 = -x19*(x11*x20 + x13*x20 + x13*x21 - x20*x5);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 8] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = adj1 + adj7;
+        const auto x2 = adj4 + x1;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = x2*x3;
+        const auto x5 = adj3 - adj6;
+        const auto x6 = adj0 + adj6;
+        const auto x7 = scalar_t(2)*adj3 + x6;
+        const auto x8 = uy0*(sgn1 + scalar_t(1));
+        const auto x9 = uy2*(sgn1 + scalar_t(-1));
+        const auto x10 = det*rho;
+        const auto x11 = x10*(x8 - x9);
+        const auto x12 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x13 = adj3 + x6;
+        const auto x14 = adj2 + adj8;
+        const auto x15 = adj5 + x14;
+        const auto x16 = adj2 - adj5;
+        const auto x17 = scalar_t(2)*x2;
+        const auto x18 = adj5 - adj8;
+        const auto x19 = scalar_t(2)*adj5 + x14;
+        const auto x20 = scalar_t(2)*adj4 + x1;
+        const auto x21 = x19*(uz0 + uz2) + x20*(uy0 + uy2) + x7*(ux0 + ux2);
+        const auto b0 = -x12*(-x0*x4 + x11*x7 + x4*x5 + x4*x7);
+        const auto b1 = -x12*(x10*(sgn1*x21 + x20*x8 - x20*x9 + x21) - x3*(x0*x13 + x15*x16 + x17*(adj1 - adj4)) + x3*(x13*x5 + x15*x18 + x17*(adj4 - adj7)) + x3*(x13*x7 + x15*x19 + x17*x20));
+        const auto b2 = -x12*(x11*x19 - x16*x4 + x18*x4 + x19*x4);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x20;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 8] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = adj2 + adj8;
+        const auto x2 = adj5 + x1;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = x2*x3;
+        const auto x5 = adj3 - adj6;
+        const auto x6 = adj0 + adj6;
+        const auto x7 = scalar_t(2)*adj3 + x6;
+        const auto x8 = uz0*(sgn1 + scalar_t(1));
+        const auto x9 = uz2*(sgn1 + scalar_t(-1));
+        const auto x10 = det*rho;
+        const auto x11 = x10*(x8 - x9);
+        const auto x12 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x13 = adj1 - adj4;
+        const auto x14 = adj4 - adj7;
+        const auto x15 = adj1 + adj7;
+        const auto x16 = scalar_t(2)*adj4 + x15;
+        const auto x17 = adj3 + x6;
+        const auto x18 = adj4 + x15;
+        const auto x19 = scalar_t(2)*x2;
+        const auto x20 = scalar_t(2)*adj5 + x1;
+        const auto x21 = x16*(uy0 + uy2) + x20*(uz0 + uz2) + x7*(ux0 + ux2);
+        const auto b0 = -x12*(-x0*x4 + x11*x7 + x4*x5 + x4*x7);
+        const auto b1 = -x12*(x11*x16 - x13*x4 + x14*x4 + x16*x4);
+        const auto b2 = -x12*(x10*(sgn1*x21 + x20*x8 - x20*x9 + x21) - x3*(x0*x17 + x13*x18 + x19*(adj2 - adj5)) + x3*(x14*x18 + x17*x5 + x19*(adj5 - adj8)) + x3*(x16*x18 + x17*x7 + x19*x20));
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x20;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 8] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = -x0*(adj0 + scalar_t(2)*adj3 + adj6);
+        const auto b1 = -x0*(adj1 + scalar_t(2)*adj4 + adj7);
+        const auto b2 = -x0*(adj2 + scalar_t(2)*adj5 + adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 8] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 - adj4;
+        const auto x1 = adj2 - adj5;
+        const auto x2 = adj0 - adj3;
+        const auto x3 = scalar_t(2)*adj0;
+        const auto x4 = scalar_t(4)*mu;
+        const auto x5 = adj4 - adj7;
+        const auto x6 = adj5 - adj8;
+        const auto x7 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x8 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x9 = x0*(uy1 + uy2) + x1*(uz1 + uz2) + x2*(ux1 + ux2);
+        const auto x10 = ux1*(sgn3 + scalar_t(1));
+        const auto x11 = ux2*(sgn3 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = adj0*x4;
+        const auto x15 = x12*(x10 - x11);
+        const auto b0 = x13*(x12*(sgn3*x9 + x10*x2 - x11*x2 + x9) - x4*(adj1*x0 + adj2*x1 + x2*x3) + x4*(adj1*x5 + adj2*x6 + x3*(adj3 - adj6)) + x4*(adj1*x7 + adj2*x8 + x3*(adj0 + scalar_t(2)*adj3 + adj6)));
+        const auto b1 = x13*(-x0*x14 + x0*x15 + x14*x5 + x14*x7);
+        const auto b2 = x13*(-x1*x14 + x1*x15 + x14*x6 + x14*x8);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x2;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 9] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj1*x1;
+        const auto x3 = adj3 - adj6;
+        const auto x4 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x5 = uy1*(sgn3 + scalar_t(1));
+        const auto x6 = uy2*(sgn3 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj2 - adj5;
+        const auto x11 = adj1 - adj4;
+        const auto x12 = scalar_t(2)*adj1;
+        const auto x13 = adj5 - adj8;
+        const auto x14 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x15 = x0*(ux1 + ux2) + x10*(uz1 + uz2) + x11*(uy1 + uy2);
+        const auto b0 = x9*(-x0*x2 + x0*x8 + x2*x3 + x2*x4);
+        const auto b1 = x9*(-x1*(adj0*x0 + adj2*x10 + x11*x12) + x1*(adj0*x3 + adj2*x13 + x12*(adj4 - adj7)) + x1*(adj0*x4 + adj2*x14 + x12*(adj1 + scalar_t(2)*adj4 + adj7)) + x7*(sgn3*x15 + x11*x5 - x11*x6 + x15));
+        const auto b2 = x9*(-x10*x2 + x10*x8 + x13*x2 + x14*x2);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x11;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 9] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj2*x1;
+        const auto x3 = adj3 - adj6;
+        const auto x4 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x5 = uz1*(sgn3 + scalar_t(1));
+        const auto x6 = uz2*(sgn3 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj1 - adj4;
+        const auto x11 = adj4 - adj7;
+        const auto x12 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x13 = adj2 - adj5;
+        const auto x14 = scalar_t(2)*adj2;
+        const auto x15 = x0*(ux1 + ux2) + x10*(uy1 + uy2) + x13*(uz1 + uz2);
+        const auto b0 = x9*(-x0*x2 + x0*x8 + x2*x3 + x2*x4);
+        const auto b1 = x9*(-x10*x2 + x10*x8 + x11*x2 + x12*x2);
+        const auto b2 = x9*(-x1*(adj0*x0 + adj1*x10 + x13*x14) + x1*(adj0*x3 + adj1*x11 + x14*(adj5 - adj8)) + x1*(adj0*x4 + adj1*x12 + x14*(adj2 + scalar_t(2)*adj5 + adj8)) + x7*(sgn3*x15 + x13*x5 - x13*x6 + x15));
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x13;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 9] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = x0*(adj0 - adj3);
+        const auto b1 = x0*(adj1 - adj4);
+        const auto b2 = x0*(adj2 - adj5);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 9] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 - adj4;
+        const auto x1 = adj2 - adj5;
+        const auto x2 = adj0 - adj3;
+        const auto x3 = scalar_t(2)*adj3;
+        const auto x4 = scalar_t(4)*mu;
+        const auto x5 = adj4 - adj7;
+        const auto x6 = adj5 - adj8;
+        const auto x7 = adj3 - adj6;
+        const auto x8 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x9 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x10 = adj0 + adj6 + x3;
+        const auto x11 = x2*(ux1 + ux2);
+        const auto x12 = x0*(uy1 + uy2);
+        const auto x13 = x1*(uz1 + uz2);
+        const auto x14 = x5*(uy2 + uy3) + x6*(uz2 + uz3) + x7*(ux2 + ux3);
+        const auto x15 = x10*(ux0 + ux2) + x8*(uy0 + uy2) + x9*(uz0 + uz2);
+        const auto x16 = ux0*(sgn1 + scalar_t(1));
+        const auto x17 = ux2*(sgn5 + scalar_t(1));
+        const auto x18 = ux2*(sgn3 + scalar_t(-1));
+        const auto x19 = ux1*(sgn3 + scalar_t(1));
+        const auto x20 = ux2*(sgn1 + scalar_t(-1));
+        const auto x21 = ux3*(sgn5 + scalar_t(-1));
+        const auto x22 = det*rho;
+        const auto x23 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x24 = adj3*x4;
+        const auto b0 = -x23*(x22*(-sgn1*x15 + sgn3*(x11 + x12 + x13) + sgn5*x14 + x10*x16 - x10*x20 - x11 - x12 - x13 + x14 + x15 + x17*x7 + x18*x2 - x19*x2 - x21*x7) + x4*(adj4*x0 + adj5*x1 + x2*x3) - x4*(adj4*x5 + adj5*x6 + x3*x7) - x4*(adj4*x8 + adj5*x9 + x10*x3));
+        const auto b1 = -x23*(x0*x24 + x22*(x0*x18 - x0*x19 + x16*x8 + x17*x5 - x20*x8 - x21*x5) - x24*x5 - x24*x8);
+        const auto b2 = -x23*(x1*x24 + x22*(x1*x18 - x1*x19 + x16*x9 + x17*x6 - x20*x9 - x21*x6) - x24*x6 - x24*x9);
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj3;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 10] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj4*x1;
+        const auto x3 = adj3 - adj6;
+        const auto x4 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x5 = uy2*(sgn3 + scalar_t(-1));
+        const auto x6 = uy2*(sgn5 + scalar_t(1));
+        const auto x7 = uy0*(sgn1 + scalar_t(1));
+        const auto x8 = uy1*(sgn3 + scalar_t(1));
+        const auto x9 = uy3*(sgn5 + scalar_t(-1));
+        const auto x10 = uy2*(sgn1 + scalar_t(-1));
+        const auto x11 = det*rho;
+        const auto x12 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x13 = adj2 - adj5;
+        const auto x14 = adj1 - adj4;
+        const auto x15 = scalar_t(2)*adj4;
+        const auto x16 = adj5 - adj8;
+        const auto x17 = adj4 - adj7;
+        const auto x18 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x19 = adj1 + adj7 + x15;
+        const auto x20 = x0*(ux1 + ux2);
+        const auto x21 = x14*(uy1 + uy2);
+        const auto x22 = x13*(uz1 + uz2);
+        const auto x23 = x16*(uz2 + uz3) + x17*(uy2 + uy3) + x3*(ux2 + ux3);
+        const auto x24 = x18*(uz0 + uz2) + x19*(uy0 + uy2) + x4*(ux0 + ux2);
+        const auto b0 = -x12*(x0*x2 + x11*(x0*x5 - x0*x8 - x10*x4 + x3*x6 - x3*x9 + x4*x7) - x2*x3 - x2*x4);
+        const auto b1 = -x12*(x1*(adj3*x0 + adj5*x13 + x14*x15) - x1*(adj3*x3 + adj5*x16 + x15*x17) - x1*(adj3*x4 + adj5*x18 + x15*x19) + x11*(-sgn1*x24 + sgn3*(x20 + x21 + x22) + sgn5*x23 - x10*x19 + x14*x5 - x14*x8 + x17*x6 - x17*x9 + x19*x7 - x20 - x21 - x22 + x23 + x24));
+        const auto b2 = -x12*(x11*(-x10*x18 + x13*x5 - x13*x8 + x16*x6 - x16*x9 + x18*x7) + x13*x2 - x16*x2 - x18*x2);
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj4;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 10] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj5*x1;
+        const auto x3 = adj3 - adj6;
+        const auto x4 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x5 = uz2*(sgn3 + scalar_t(-1));
+        const auto x6 = uz2*(sgn5 + scalar_t(1));
+        const auto x7 = uz0*(sgn1 + scalar_t(1));
+        const auto x8 = uz1*(sgn3 + scalar_t(1));
+        const auto x9 = uz3*(sgn5 + scalar_t(-1));
+        const auto x10 = uz2*(sgn1 + scalar_t(-1));
+        const auto x11 = det*rho;
+        const auto x12 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x13 = adj1 - adj4;
+        const auto x14 = adj4 - adj7;
+        const auto x15 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x16 = adj2 - adj5;
+        const auto x17 = scalar_t(2)*adj5;
+        const auto x18 = adj5 - adj8;
+        const auto x19 = adj2 + adj8 + x17;
+        const auto x20 = x0*(ux1 + ux2);
+        const auto x21 = x13*(uy1 + uy2);
+        const auto x22 = x16*(uz1 + uz2);
+        const auto x23 = x14*(uy2 + uy3) + x18*(uz2 + uz3) + x3*(ux2 + ux3);
+        const auto x24 = x15*(uy0 + uy2) + x19*(uz0 + uz2) + x4*(ux0 + ux2);
+        const auto b0 = -x12*(x0*x2 + x11*(x0*x5 - x0*x8 - x10*x4 + x3*x6 - x3*x9 + x4*x7) - x2*x3 - x2*x4);
+        const auto b1 = -x12*(x11*(-x10*x15 + x13*x5 - x13*x8 + x14*x6 - x14*x9 + x15*x7) + x13*x2 - x14*x2 - x15*x2);
+        const auto b2 = -x12*(x1*(adj3*x0 + adj4*x13 + x16*x17) - x1*(adj3*x3 + adj4*x14 + x17*x18) - x1*(adj3*x4 + adj4*x15 + x17*x19) + x11*(-sgn1*x24 + sgn3*(x20 + x21 + x22) + sgn5*x23 - x10*x19 + x16*x5 - x16*x8 + x18*x6 - x18*x9 + x19*x7 - x20 - x21 - x22 + x23 + x24));
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj5;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 10] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(12))*rho;
+        const auto b0 = -adj3*x0;
+        const auto b1 = -adj4*x0;
+        const auto b2 = -adj5*x0;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 10] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 - adj4;
+        const auto x1 = adj2 - adj5;
+        const auto x2 = scalar_t(2)*adj6;
+        const auto x3 = scalar_t(4)*mu;
+        const auto x4 = adj4 - adj7;
+        const auto x5 = adj5 - adj8;
+        const auto x6 = adj3 - adj6;
+        const auto x7 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x8 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x9 = x4*(uy2 + uy3) + x5*(uz2 + uz3) + x6*(ux2 + ux3);
+        const auto x10 = ux2*(sgn5 + scalar_t(1));
+        const auto x11 = ux3*(sgn5 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = adj6*x3;
+        const auto x15 = x12*(x10 - x11);
+        const auto b0 = -x13*(x12*(-sgn5*x9 + x10*x6 - x11*x6 + x9) + x3*(adj7*x0 + adj8*x1 + x2*(adj0 - adj3)) - x3*(adj7*x4 + adj8*x5 + x2*x6) - x3*(adj7*x7 + adj8*x8 + x2*(adj0 + scalar_t(2)*adj3 + adj6)));
+        const auto b1 = -x13*(x0*x14 - x14*x4 - x14*x7 + x15*x4);
+        const auto b2 = -x13*(x1*x14 - x14*x5 - x14*x8 + x15*x5);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x6;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 11] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj7*x1;
+        const auto x3 = adj3 - adj6;
+        const auto x4 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x5 = uy2*(sgn5 + scalar_t(1));
+        const auto x6 = uy3*(sgn5 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj2 - adj5;
+        const auto x11 = scalar_t(2)*adj7;
+        const auto x12 = adj5 - adj8;
+        const auto x13 = adj4 - adj7;
+        const auto x14 = adj2 + scalar_t(2)*adj5 + adj8;
+        const auto x15 = x12*(uz2 + uz3) + x13*(uy2 + uy3) + x3*(ux2 + ux3);
+        const auto b0 = -x9*(x0*x2 - x2*x3 - x2*x4 + x3*x8);
+        const auto b1 = -x9*(x1*(adj6*x0 + adj8*x10 + x11*(adj1 - adj4)) - x1*(adj6*x3 + adj8*x12 + x11*x13) - x1*(adj6*x4 + adj8*x14 + x11*(adj1 + scalar_t(2)*adj4 + adj7)) + x7*(-sgn5*x15 + x13*x5 - x13*x6 + x15));
+        const auto b2 = -x9*(x10*x2 - x12*x2 + x12*x8 - x14*x2);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x13;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 11] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = adj0 - adj3;
+        const auto x1 = scalar_t(4)*mu;
+        const auto x2 = adj8*x1;
+        const auto x3 = adj3 - adj6;
+        const auto x4 = adj0 + scalar_t(2)*adj3 + adj6;
+        const auto x5 = uz2*(sgn5 + scalar_t(1));
+        const auto x6 = uz3*(sgn5 + scalar_t(-1));
+        const auto x7 = det*rho;
+        const auto x8 = x7*(x5 - x6);
+        const auto x9 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x10 = adj1 - adj4;
+        const auto x11 = adj4 - adj7;
+        const auto x12 = adj1 + scalar_t(2)*adj4 + adj7;
+        const auto x13 = scalar_t(2)*adj8;
+        const auto x14 = adj5 - adj8;
+        const auto x15 = x11*(uy2 + uy3) + x14*(uz2 + uz3) + x3*(ux2 + ux3);
+        const auto b0 = -x9*(x0*x2 - x2*x3 - x2*x4 + x3*x8);
+        const auto b1 = -x9*(x10*x2 - x11*x2 + x11*x8 - x12*x2);
+        const auto b2 = -x9*(x1*(adj6*x0 + adj7*x10 + x13*(adj2 - adj5)) - x1*(adj6*x3 + adj7*x11 + x13*x14) - x1*(adj6*x4 + adj7*x12 + x13*(adj2 + scalar_t(2)*adj5 + adj8)) + x7*(-sgn5*x15 + x14*x5 - x14*x6 + x15));
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 11] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = -x0*(adj3 - adj6);
+        const auto b1 = -x0*(adj4 - adj7);
+        const auto b2 = -x0*(adj5 - adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 11] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = adj1 + adj4;
+        const auto x1 = adj7 + x0;
+        const auto x2 = -adj7;
+        const auto x3 = adj1 + x2;
+        const auto x4 = adj2 + adj5;
+        const auto x5 = adj8 + x4;
+        const auto x6 = -adj8;
+        const auto x7 = adj2 + x6;
+        const auto x8 = -adj6;
+        const auto x9 = adj0 + adj3;
+        const auto x10 = adj6 + x9;
+        const auto x11 = scalar_t(2)*x10;
+        const auto x12 = scalar_t(4)*mu;
+        const auto x13 = adj4 + x2;
+        const auto x14 = adj5 + x6;
+        const auto x15 = scalar_t(2)*adj7 + x0;
+        const auto x16 = scalar_t(2)*adj8 + x4;
+        const auto x17 = scalar_t(2)*adj6 + x9;
+        const auto x18 = x15*(uy0 + uy3) + x16*(uz0 + uz3) + x17*(ux0 + ux3);
+        const auto x19 = ux0*(sgn2 + scalar_t(1));
+        const auto x20 = ux3*(sgn2 + scalar_t(-1));
+        const auto x21 = det*rho;
+        const auto x22 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x23 = x10*x12;
+        const auto x24 = x21*(x19 - x20);
+        const auto b0 = -x22*(-x12*(x1*x13 + x11*(adj3 + x8) + x14*x5) + x12*(x1*x15 + x11*x17 + x16*x5) - x12*(x1*x3 + x11*(adj0 + x8) + x5*x7) + x21*(sgn2*x18 + x17*x19 - x17*x20 + x18));
+        const auto b1 = -x22*(-x13*x23 + x15*x23 + x15*x24 - x23*x3);
+        const auto b2 = -x22*(-x14*x23 + x16*x23 + x16*x24 - x23*x7);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x17;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 12] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = -adj6;
+        const auto x1 = adj0 + x0;
+        const auto x2 = adj1 + adj4;
+        const auto x3 = adj7 + x2;
+        const auto x4 = scalar_t(4)*mu;
+        const auto x5 = x3*x4;
+        const auto x6 = adj3 + x0;
+        const auto x7 = adj0 + adj3;
+        const auto x8 = scalar_t(2)*adj6 + x7;
+        const auto x9 = uy0*(sgn2 + scalar_t(1));
+        const auto x10 = uy3*(sgn2 + scalar_t(-1));
+        const auto x11 = det*rho;
+        const auto x12 = x11*(-x10 + x9);
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = adj6 + x7;
+        const auto x15 = adj2 + adj5;
+        const auto x16 = adj8 + x15;
+        const auto x17 = -adj8;
+        const auto x18 = adj2 + x17;
+        const auto x19 = -adj7;
+        const auto x20 = scalar_t(2)*x3;
+        const auto x21 = adj5 + x17;
+        const auto x22 = scalar_t(2)*adj8 + x15;
+        const auto x23 = scalar_t(2)*adj7 + x2;
+        const auto x24 = x22*(uz0 + uz3) + x23*(uy0 + uy3) + x8*(ux0 + ux3);
+        const auto b0 = -x13*(-x1*x5 + x12*x8 - x5*x6 + x5*x8);
+        const auto b1 = -x13*(x11*(sgn2*x24 - x10*x23 + x23*x9 + x24) - x4*(x1*x14 + x16*x18 + x20*(adj1 + x19)) - x4*(x14*x6 + x16*x21 + x20*(adj4 + x19)) + x4*(x14*x8 + x16*x22 + x20*x23));
+        const auto b2 = -x13*(x12*x22 - x18*x5 - x21*x5 + x22*x5);
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x23;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 12] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = -adj6;
+        const auto x1 = adj0 + x0;
+        const auto x2 = adj2 + adj5;
+        const auto x3 = adj8 + x2;
+        const auto x4 = scalar_t(4)*mu;
+        const auto x5 = x3*x4;
+        const auto x6 = adj3 + x0;
+        const auto x7 = adj0 + adj3;
+        const auto x8 = scalar_t(2)*adj6 + x7;
+        const auto x9 = uz0*(sgn2 + scalar_t(1));
+        const auto x10 = uz3*(sgn2 + scalar_t(-1));
+        const auto x11 = det*rho;
+        const auto x12 = x11*(-x10 + x9);
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = -adj7;
+        const auto x15 = adj1 + x14;
+        const auto x16 = adj4 + x14;
+        const auto x17 = adj1 + adj4;
+        const auto x18 = scalar_t(2)*adj7 + x17;
+        const auto x19 = adj6 + x7;
+        const auto x20 = adj7 + x17;
+        const auto x21 = -adj8;
+        const auto x22 = scalar_t(2)*x3;
+        const auto x23 = scalar_t(2)*adj8 + x2;
+        const auto x24 = x18*(uy0 + uy3) + x23*(uz0 + uz3) + x8*(ux0 + ux3);
+        const auto b0 = -x13*(-x1*x5 + x12*x8 - x5*x6 + x5*x8);
+        const auto b1 = -x13*(x12*x18 - x15*x5 - x16*x5 + x18*x5);
+        const auto b2 = -x13*(x11*(sgn2*x24 - x10*x23 + x23*x9 + x24) - x4*(x1*x19 + x15*x20 + x22*(adj2 + x21)) - x4*(x16*x20 + x19*x6 + x22*(adj5 + x21)) + x4*(x18*x20 + x19*x8 + x22*x23));
+        const auto b3 = -scalar_t(1) / scalar_t(48)*x23;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 12] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = -x0*(adj0 + adj3 + scalar_t(2)*adj6);
+        const auto b1 = -x0*(adj1 + adj4 + scalar_t(2)*adj7);
+        const auto b2 = -x0*(adj2 + adj5 + scalar_t(2)*adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 12] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = -adj7;
+        const auto x1 = adj1 + x0;
+        const auto x2 = -adj8;
+        const auto x3 = adj2 + x2;
+        const auto x4 = -adj6;
+        const auto x5 = adj0 + x4;
+        const auto x6 = scalar_t(2)*adj0;
+        const auto x7 = scalar_t(4)*mu;
+        const auto x8 = adj4 + x0;
+        const auto x9 = adj5 + x2;
+        const auto x10 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x11 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x12 = x1*(uy1 + uy3) + x3*(uz1 + uz3) + x5*(ux1 + ux3);
+        const auto x13 = ux1*(sgn4 + scalar_t(1));
+        const auto x14 = ux3*(sgn4 + scalar_t(-1));
+        const auto x15 = det*rho;
+        const auto x16 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x17 = adj0*x7;
+        const auto x18 = x15*(x13 - x14);
+        const auto b0 = x16*(x15*(sgn4*x12 + x12 + x13*x5 - x14*x5) - x7*(adj1*x1 + adj2*x3 + x5*x6) + x7*(adj1*x10 + adj2*x11 + x6*(adj0 + adj3 + scalar_t(2)*adj6)) - x7*(adj1*x8 + adj2*x9 + x6*(adj3 + x4)));
+        const auto b1 = -x16*(x1*x17 - x1*x18 - x10*x17 + x17*x8);
+        const auto b2 = -x16*(-x11*x17 + x17*x3 + x17*x9 - x18*x3);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x5;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 13] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = -adj6;
+        const auto x1 = adj0 + x0;
+        const auto x2 = scalar_t(4)*mu;
+        const auto x3 = adj1*x2;
+        const auto x4 = adj3 + x0;
+        const auto x5 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x6 = uy1*(sgn4 + scalar_t(1));
+        const auto x7 = uy3*(sgn4 + scalar_t(-1));
+        const auto x8 = det*rho;
+        const auto x9 = x8*(x6 - x7);
+        const auto x10 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x11 = -adj8;
+        const auto x12 = adj2 + x11;
+        const auto x13 = -adj7;
+        const auto x14 = adj1 + x13;
+        const auto x15 = scalar_t(2)*adj1;
+        const auto x16 = adj5 + x11;
+        const auto x17 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x18 = x1*(ux1 + ux3) + x12*(uz1 + uz3) + x14*(uy1 + uy3);
+        const auto b0 = -x10*(x1*x3 - x1*x9 + x3*x4 - x3*x5);
+        const auto b1 = x10*(-x2*(adj0*x1 + adj2*x12 + x14*x15) - x2*(adj0*x4 + adj2*x16 + x15*(adj4 + x13)) + x2*(adj0*x5 + adj2*x17 + x15*(adj1 + adj4 + scalar_t(2)*adj7)) + x8*(sgn4*x18 + x14*x6 - x14*x7 + x18));
+        const auto b2 = -x10*(x12*x3 - x12*x9 + x16*x3 - x17*x3);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x14;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 13] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = -adj6;
+        const auto x1 = adj0 + x0;
+        const auto x2 = scalar_t(4)*mu;
+        const auto x3 = adj2*x2;
+        const auto x4 = adj3 + x0;
+        const auto x5 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x6 = uz1*(sgn4 + scalar_t(1));
+        const auto x7 = uz3*(sgn4 + scalar_t(-1));
+        const auto x8 = det*rho;
+        const auto x9 = x8*(x6 - x7);
+        const auto x10 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x11 = -adj7;
+        const auto x12 = adj1 + x11;
+        const auto x13 = adj4 + x11;
+        const auto x14 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x15 = -adj8;
+        const auto x16 = adj2 + x15;
+        const auto x17 = scalar_t(2)*adj2;
+        const auto x18 = x1*(ux1 + ux3) + x12*(uy1 + uy3) + x16*(uz1 + uz3);
+        const auto b0 = -x10*(x1*x3 - x1*x9 + x3*x4 - x3*x5);
+        const auto b1 = -x10*(x12*x3 - x12*x9 + x13*x3 - x14*x3);
+        const auto b2 = x10*(-x2*(adj0*x1 + adj1*x12 + x16*x17) - x2*(adj0*x4 + adj1*x13 + x17*(adj5 + x15)) + x2*(adj0*x5 + adj1*x14 + x17*(adj2 + adj5 + scalar_t(2)*adj8)) + x8*(sgn4*x18 + x16*x6 - x16*x7 + x18));
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x16;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 13] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = x0*(adj0 - adj6);
+        const auto b1 = x0*(adj1 - adj7);
+        const auto b2 = x0*(adj2 - adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 13] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = -adj7;
+        const auto x1 = adj1 + x0;
+        const auto x2 = -adj8;
+        const auto x3 = adj2 + x2;
+        const auto x4 = -adj6;
+        const auto x5 = scalar_t(2)*adj3;
+        const auto x6 = scalar_t(4)*mu;
+        const auto x7 = adj4 + x0;
+        const auto x8 = adj5 + x2;
+        const auto x9 = adj3 + x4;
+        const auto x10 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x11 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x12 = x7*(uy2 + uy3) + x8*(uz2 + uz3) + x9*(ux2 + ux3);
+        const auto x13 = ux2*(sgn5 + scalar_t(1));
+        const auto x14 = ux3*(sgn5 + scalar_t(-1));
+        const auto x15 = det*rho;
+        const auto x16 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x17 = adj3*x6;
+        const auto x18 = x15*(x13 - x14);
+        const auto b0 = x16*(x15*(sgn5*x12 + x12 + x13*x9 - x14*x9) - x6*(adj4*x1 + adj5*x3 + x5*(adj0 + x4)) + x6*(adj4*x10 + adj5*x11 + x5*(adj0 + adj3 + scalar_t(2)*adj6)) - x6*(adj4*x7 + adj5*x8 + x5*x9));
+        const auto b1 = -x16*(x1*x17 - x10*x17 + x17*x7 - x18*x7);
+        const auto b2 = -x16*(-x11*x17 + x17*x3 + x17*x8 - x18*x8);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x9;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 14] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = -adj6;
+        const auto x1 = adj0 + x0;
+        const auto x2 = scalar_t(4)*mu;
+        const auto x3 = adj4*x2;
+        const auto x4 = adj3 + x0;
+        const auto x5 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x6 = uy2*(sgn5 + scalar_t(1));
+        const auto x7 = uy3*(sgn5 + scalar_t(-1));
+        const auto x8 = det*rho;
+        const auto x9 = x8*(x6 - x7);
+        const auto x10 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x11 = -adj8;
+        const auto x12 = adj2 + x11;
+        const auto x13 = -adj7;
+        const auto x14 = scalar_t(2)*adj4;
+        const auto x15 = adj5 + x11;
+        const auto x16 = adj4 + x13;
+        const auto x17 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x18 = x15*(uz2 + uz3) + x16*(uy2 + uy3) + x4*(ux2 + ux3);
+        const auto b0 = -x10*(x1*x3 + x3*x4 - x3*x5 - x4*x9);
+        const auto b1 = x10*(-x2*(adj3*x1 + adj5*x12 + x14*(adj1 + x13)) - x2*(adj3*x4 + adj5*x15 + x14*x16) + x2*(adj3*x5 + adj5*x17 + x14*(adj1 + adj4 + scalar_t(2)*adj7)) + x8*(sgn5*x18 + x16*x6 - x16*x7 + x18));
+        const auto b2 = -x10*(x12*x3 + x15*x3 - x15*x9 - x17*x3);
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x16;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 14] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = -adj6;
+        const auto x1 = adj0 + x0;
+        const auto x2 = scalar_t(4)*mu;
+        const auto x3 = adj5*x2;
+        const auto x4 = adj3 + x0;
+        const auto x5 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x6 = uz2*(sgn5 + scalar_t(1));
+        const auto x7 = uz3*(sgn5 + scalar_t(-1));
+        const auto x8 = det*rho;
+        const auto x9 = x8*(x6 - x7);
+        const auto x10 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x11 = -adj7;
+        const auto x12 = adj1 + x11;
+        const auto x13 = adj4 + x11;
+        const auto x14 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x15 = -adj8;
+        const auto x16 = scalar_t(2)*adj5;
+        const auto x17 = adj5 + x15;
+        const auto x18 = x13*(uy2 + uy3) + x17*(uz2 + uz3) + x4*(ux2 + ux3);
+        const auto b0 = -x10*(x1*x3 + x3*x4 - x3*x5 - x4*x9);
+        const auto b1 = -x10*(x12*x3 + x13*x3 - x13*x9 - x14*x3);
+        const auto b2 = x10*(-x2*(adj3*x1 + adj4*x12 + x16*(adj2 + x15)) - x2*(adj3*x4 + adj4*x13 + x16*x17) + x2*(adj3*x5 + adj4*x14 + x16*(adj2 + adj5 + scalar_t(2)*adj8)) + x8*(sgn5*x18 + x17*x6 - x17*x7 + x18));
+        const auto b3 = (scalar_t(1) / scalar_t(48))*x17;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 14] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(48))*rho;
+        const auto b0 = x0*(adj3 - adj6);
+        const auto b1 = x0*(adj4 - adj7);
+        const auto b2 = x0*(adj5 - adj8);
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 14] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+    {
+        const auto x0 = -adj7;
+        const auto x1 = adj1 + x0;
+        const auto x2 = -adj8;
+        const auto x3 = adj2 + x2;
+        const auto x4 = -adj6;
+        const auto x5 = adj0 + x4;
+        const auto x6 = scalar_t(2)*adj6;
+        const auto x7 = scalar_t(4)*mu;
+        const auto x8 = adj4 + x0;
+        const auto x9 = adj5 + x2;
+        const auto x10 = adj3 + x4;
+        const auto x11 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x12 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x13 = adj0 + adj3 + x6;
+        const auto x14 = x13*(ux0 + ux3);
+        const auto x15 = x11*(uy0 + uy3);
+        const auto x16 = x12*(uz0 + uz3);
+        const auto x17 = x1*(uy1 + uy3) + x3*(uz1 + uz3) + x5*(ux1 + ux3);
+        const auto x18 = x10*(ux2 + ux3) + x8*(uy2 + uy3) + x9*(uz2 + uz3);
+        const auto x19 = ux1*(sgn4 + scalar_t(1));
+        const auto x20 = ux2*(sgn5 + scalar_t(1));
+        const auto x21 = ux3*(sgn2 + scalar_t(-1));
+        const auto x22 = ux0*(sgn2 + scalar_t(1));
+        const auto x23 = ux3*(sgn4 + scalar_t(-1));
+        const auto x24 = ux3*(sgn5 + scalar_t(-1));
+        const auto x25 = det*rho;
+        const auto x26 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x27 = adj6*x7;
+        const auto b0 = x26*(x25*(sgn2*(x14 + x15 + x16) - sgn4*x17 - sgn5*x18 + x10*x20 - x10*x24 + x13*x21 - x13*x22 - x14 - x15 - x16 + x17 + x18 + x19*x5 - x23*x5) - x7*(adj7*x1 + adj8*x3 + x5*x6) + x7*(adj7*x11 + adj8*x12 + x13*x6) - x7*(adj7*x8 + adj8*x9 + x10*x6));
+        const auto b1 = -x26*(x1*x27 - x11*x27 + x25*(-x1*x19 + x1*x23 - x11*x21 + x11*x22 - x20*x8 + x24*x8) + x27*x8);
+        const auto b2 = -x26*(-x12*x27 + x25*(-x12*x21 + x12*x22 - x19*x3 - x20*x9 + x23*x3 + x24*x9) + x27*x3 + x27*x9);
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj6;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 15] * 16 + 0;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = -adj6;
+        const auto x1 = adj0 + x0;
+        const auto x2 = scalar_t(4)*mu;
+        const auto x3 = adj7*x2;
+        const auto x4 = adj3 + x0;
+        const auto x5 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x6 = uy3*(sgn4 + scalar_t(-1));
+        const auto x7 = uy3*(sgn5 + scalar_t(-1));
+        const auto x8 = uy0*(sgn2 + scalar_t(1));
+        const auto x9 = uy1*(sgn4 + scalar_t(1));
+        const auto x10 = uy2*(sgn5 + scalar_t(1));
+        const auto x11 = uy3*(sgn2 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = -adj8;
+        const auto x15 = adj2 + x14;
+        const auto x16 = -adj7;
+        const auto x17 = adj1 + x16;
+        const auto x18 = scalar_t(2)*adj7;
+        const auto x19 = adj5 + x14;
+        const auto x20 = adj4 + x16;
+        const auto x21 = adj2 + adj5 + scalar_t(2)*adj8;
+        const auto x22 = adj1 + adj4 + x18;
+        const auto x23 = x5*(ux0 + ux3);
+        const auto x24 = x22*(uy0 + uy3);
+        const auto x25 = x21*(uz0 + uz3);
+        const auto x26 = x1*(ux1 + ux3) + x15*(uz1 + uz3) + x17*(uy1 + uy3);
+        const auto x27 = x19*(uz2 + uz3) + x20*(uy2 + uy3) + x4*(ux2 + ux3);
+        const auto b0 = -x13*(x1*x3 + x12*(x1*x6 - x1*x9 - x10*x4 - x11*x5 + x4*x7 + x5*x8) + x3*x4 - x3*x5);
+        const auto b1 = x13*(x12*(sgn2*(x23 + x24 + x25) - sgn4*x26 - sgn5*x27 + x10*x20 + x11*x22 - x17*x6 + x17*x9 - x20*x7 - x22*x8 - x23 - x24 - x25 + x26 + x27) - x2*(adj6*x1 + adj8*x15 + x17*x18) - x2*(adj6*x4 + adj8*x19 + x18*x20) + x2*(adj6*x5 + adj8*x21 + x18*x22));
+        const auto b2 = -x13*(x12*(-x10*x19 - x11*x21 + x15*x6 - x15*x9 + x19*x7 + x21*x8) + x15*x3 + x19*x3 - x21*x3);
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj7;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 15] * 16 + 4;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = -adj6;
+        const auto x1 = adj0 + x0;
+        const auto x2 = scalar_t(4)*mu;
+        const auto x3 = adj8*x2;
+        const auto x4 = adj3 + x0;
+        const auto x5 = adj0 + adj3 + scalar_t(2)*adj6;
+        const auto x6 = uz3*(sgn4 + scalar_t(-1));
+        const auto x7 = uz3*(sgn5 + scalar_t(-1));
+        const auto x8 = uz0*(sgn2 + scalar_t(1));
+        const auto x9 = uz1*(sgn4 + scalar_t(1));
+        const auto x10 = uz2*(sgn5 + scalar_t(1));
+        const auto x11 = uz3*(sgn2 + scalar_t(-1));
+        const auto x12 = det*rho;
+        const auto x13 = (scalar_t(1) / scalar_t(96))/det;
+        const auto x14 = -adj7;
+        const auto x15 = adj1 + x14;
+        const auto x16 = adj4 + x14;
+        const auto x17 = adj1 + adj4 + scalar_t(2)*adj7;
+        const auto x18 = -adj8;
+        const auto x19 = adj2 + x18;
+        const auto x20 = scalar_t(2)*adj8;
+        const auto x21 = adj5 + x18;
+        const auto x22 = adj2 + adj5 + x20;
+        const auto x23 = x5*(ux0 + ux3);
+        const auto x24 = x17*(uy0 + uy3);
+        const auto x25 = x22*(uz0 + uz3);
+        const auto x26 = x1*(ux1 + ux3) + x15*(uy1 + uy3) + x19*(uz1 + uz3);
+        const auto x27 = x16*(uy2 + uy3) + x21*(uz2 + uz3) + x4*(ux2 + ux3);
+        const auto b0 = -x13*(x1*x3 + x12*(x1*x6 - x1*x9 - x10*x4 - x11*x5 + x4*x7 + x5*x8) + x3*x4 - x3*x5);
+        const auto b1 = -x13*(x12*(-x10*x16 - x11*x17 + x15*x6 - x15*x9 + x16*x7 + x17*x8) + x15*x3 + x16*x3 - x17*x3);
+        const auto b2 = x13*(x12*(sgn2*(x23 + x24 + x25) - sgn4*x26 - sgn5*x27 + x10*x21 + x11*x22 - x19*x6 + x19*x9 - x21*x7 - x22*x8 - x23 - x24 - x25 + x26 + x27) - x2*(adj6*x1 + adj7*x15 + x19*x20) - x2*(adj6*x4 + adj7*x16 + x20*x21) + x2*(adj6*x5 + adj7*x17 + x20*x22));
+        const auto b3 = -scalar_t(1) / scalar_t(12)*adj8;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 15] * 16 + 8;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+            row[3] += b3[lane];
+        }
+    }
+    {
+        const auto x0 = (scalar_t(1) / scalar_t(12))*rho;
+        const auto b0 = -adj6*x0;
+        const auto b1 = -adj7*x0;
+        const auto b2 = -adj8*x0;
+        for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+            scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + 15] * 16 + 12;
+            row[0] += b0[lane];
+            row[1] += b1[lane];
+            row[2] += b2[lane];
+        }
+    }
+}
+
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
                                                                           const scalar_t mu,
                                                                           const scalar_t adj0,
