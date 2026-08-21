@@ -597,6 +597,14 @@ static SFEM_INLINE void cvfem_bsr4_add16(scalar_t *const SFEM_RESTRICT       dst
     for (int t = 0; t < 16; ++t) dst[t] += src[t];
 }
 
+static SFEM_INLINE void cvfem_bsr4_add16_vec(scalar_t *const SFEM_RESTRICT       dst,
+                                             const scalar_t *const SFEM_RESTRICT src) {
+#pragma unroll
+    for (int t = 0; t < 16; t += SIMD_SIZE) {
+        cvfem_store_scalar_v(dst + t, cvfem_load_scalar_v(dst + t) + cvfem_load_scalar_v(src + t));
+    }
+}
+
 template <bool Atomic, typename Count, typename Idx>
 static SFEM_INLINE void tet4_local_to_global_bsr4(const Idx *const SFEM_RESTRICT           ev,
                                                   const scalar_t *const SFEM_RESTRICT      element_matrix,

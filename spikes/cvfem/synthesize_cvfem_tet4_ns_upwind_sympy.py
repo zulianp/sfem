@@ -463,6 +463,35 @@ def cse_add_vector_blocks_to_slots_code(jac: list[sp.Expr], indent: str = "    "
     return "\n".join(lines)
 
 
+def cse_add_vector_rows_to_slots_code(jac: list[sp.Expr], indent: str = "    ") -> str:
+    printer = ScalarPrinter()
+    lines: list[str] = []
+    for row_node in range(N_NODE):
+        for col_node in range(N_NODE):
+            block = row_node * N_NODE + col_node
+            raw_exprs = jac_block_exprs(jac, row_node, col_node)
+            for row_field in range(N_FIELD):
+                row_exprs = raw_exprs[row_field * N_FIELD:(row_field + 1) * N_FIELD]
+                entries = [(i, sp.simplify(expr)) for i, expr in enumerate(row_exprs) if expr != 0]
+                if not entries:
+                    continue
+                replacements, reduced = sp.cse([expr for _i, expr in entries],
+                                               symbols=sp.numbered_symbols("x"),
+                                               optimizations="basic")
+                lines.append(f"{indent}{{")
+                for var, expr in replacements:
+                    lines.append(f"{indent}    const auto {var} = {printer.doprint(expr)};")
+                for k, expr in enumerate(reduced):
+                    lines.append(f"{indent}    const auto b{k} = {printer.doprint(expr)};")
+                lines.append(f"{indent}    for (int lane = 0; lane < SIMD_SIZE; ++lane) {{")
+                lines.append(f"{indent}        scalar_t *const SFEM_RESTRICT row = values + (ptrdiff_t)slots_base[lane * 16 + {block}] * 16 + {row_field * N_FIELD};")
+                for k, (col_field, _expr) in enumerate(entries):
+                    lines.append(f"{indent}        row[{col_field}] += b{k}[lane];")
+                lines.append(f"{indent}    }}")
+                lines.append(f"{indent}}}")
+    return "\n".join(lines)
+
+
 def generate() -> str:
     sym = build_symbols()
     residual, _ = residual_exprs(sym, semismooth_abs=False)
@@ -658,6 +687,16 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_blockw
 {vector_input_locals()}
 {sign_vector_locals(mdots)}
 {cse_add_vector_blocks_to_slots_code(jac)}
+}}
+
+static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise_vector_values(
+        const scalar_t                        rho,
+        const scalar_t                        mu,
+{vector_value_args(indent="        ")}
+        const int *const SFEM_RESTRICT        slots_base,
+        scalar_t *const SFEM_RESTRICT         values) {{
+{sign_vector_locals(mdots)}
+{cse_add_vector_rows_to_slots_code(jac)}
 }}
 
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
