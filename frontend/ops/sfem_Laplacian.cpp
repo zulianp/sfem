@@ -7,6 +7,7 @@
 #include "sfem_Parameters.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
+#include "sstet4_laplacian.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -20,6 +21,16 @@
 namespace sfem {
 
     namespace {
+
+        struct LaplacianDomainData {
+            std::shared_ptr<smesh::FFF>                    fff;
+            std::shared_ptr<sstet4_laplacian_stencil_t>    sstet4_stencil;
+        };
+
+        bool use_sstet4_stencil_default() {
+            const char *const env = getenv("SFEM_SSTET4_LAPLACIAN_USE_STENCIL");
+            return !env || atoi(env) != 0;
+        }
 
         smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh, const smesh::Mesh::Block &block) {
             for (size_t i = 0; i < mesh.n_blocks(); i++) {
@@ -78,7 +89,7 @@ namespace sfem {
 
         static bool laplacian_domain_uses_fff(const smesh::ElemType element_type) {
             if (smesh::is_semistructured_type(element_type)) {
-                return smesh::is_hex_ss_family(element_type);
+                return smesh::is_hex_ss_family(element_type) || smesh::is_tet_ss_family(element_type);
             }
 
             return element_type == smesh::TET4 || element_type == smesh::TET10 || element_type == smesh::HEX8;
@@ -125,7 +136,29 @@ namespace sfem {
             const real_t            k     = domain_diffusion(domain);
 
             if (domain.user_data) {
-                auto                fff      = std::static_pointer_cast<smesh::FFF>(domain.user_data);
+                auto                data     = std::static_pointer_cast<LaplacianDomainData>(domain.user_data);
+                if (data->sstet4_stencil && k == real_t(1) && use_sstet4_stencil_default()) {
+                    return sstet4_laplacian_apply_stencil_global_range(
+                            data->sstet4_stencil.get(), range.begin, ne, view, u, out);
+                }
+
+                if (!data->fff) {
+                    if (k == real_t(1)) {
+                        return laplacian_apply(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), u, out);
+                    }
+
+                    const ptrdiff_t n   = mesh.n_nodes();
+                    real_t         *tmp = (real_t *)calloc((size_t)n, sizeof(real_t));
+                    const int       err =
+                            laplacian_apply(domain.element_type, ne, n, view, mesh.points()->data(), u, tmp);
+                    for (ptrdiff_t i = 0; i < n; ++i) {
+                        out[i] += k * tmp[i];
+                    }
+                    free(tmp);
+                    return err;
+                }
+
+                auto                fff      = data->fff;
                 constexpr ptrdiff_t fff_size = 6;
                 const jacobian_t   *fff_in   = fff->fff_AoS()->data() + range.begin * fff_size;
                 if (k == real_t(1)) {
@@ -225,12 +258,30 @@ namespace sfem {
             }
 
             const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *block);
+            auto data = std::make_shared<LaplacianDomainData>();
+
+            if (smesh::is_semistructured_type(domain.element_type) && smesh::is_tet_ss_family(domain.element_type)) {
+                sstet4_laplacian_stencil_t *stencil = nullptr;
+                const int level = smesh::semistructured_level(domain.element_type);
+                const int err = sstet4_laplacian_stencil_create_from_points(
+                        level, block->n_elements(), block->elements()->data(), mesh->points()->data(), &stencil);
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+
+                data->sstet4_stencil =
+                        std::shared_ptr<sstet4_laplacian_stencil_t>(stencil, sstet4_laplacian_stencil_destroy);
+                domain.user_data = std::static_pointer_cast<void>(data);
+                continue;
+            }
+
             auto                     fff      = smesh::FFF::create_AoS(mesh, smesh::MEMORY_SPACE_HOST, block_id);
             if (!fff) {
                 return SFEM_FAILURE;
             }
 
-            domain.user_data = std::static_pointer_cast<void>(fff);
+            data->fff = fff;
+            domain.user_data = std::static_pointer_cast<void>(data);
         }
 
         return SFEM_SUCCESS;

@@ -23,6 +23,8 @@ DEFAULT_KERNELS = (
     "sympy_block",
     "sympy_face",
     "sympy_simd",
+    "sympy_simd_clean",
+    "sympy_block_simd",
     "sympy_face_simd",
 )
 

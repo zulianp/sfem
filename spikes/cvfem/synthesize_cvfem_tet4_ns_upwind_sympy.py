@@ -266,6 +266,16 @@ def vector_input_locals() -> str:
     return "\n".join(lines)
 
 
+def vector_value_args(indent: str = "                                                                         ") -> str:
+    args: list[str] = []
+    for name in ("adj0", "adj1", "adj2", "adj3", "adj4", "adj5", "adj6", "adj7", "adj8", "det"):
+        args.append(f"{indent}const scalar_v {name},")
+    for name in ("ux", "uy", "uz"):
+        for i in range(4):
+            args.append(f"{indent}const scalar_v {name}{i},")
+    return "\n".join(args)
+
+
 def simd_input_locals() -> str:
     lines = [
         "        const scalar_t adj0 = scalar_t(adj0_ptr[lane]);",
@@ -428,6 +438,31 @@ def cse_face_vector_lane_scatter_code(entries: list[tuple[int, int, sp.Expr]], i
     return "\n".join(lines)
 
 
+def cse_add_vector_blocks_to_slots_code(jac: list[sp.Expr], indent: str = "    ") -> str:
+    printer = ScalarPrinter()
+    lines: list[str] = []
+    for row_node in range(N_NODE):
+        for col_node in range(N_NODE):
+            block = row_node * N_NODE + col_node
+            raw_exprs = jac_block_exprs(jac, row_node, col_node)
+            entries = [(i, sp.simplify(expr)) for i, expr in enumerate(raw_exprs) if expr != 0]
+            if not entries:
+                continue
+            replacements, reduced = sp.cse([expr for _i, expr in entries], symbols=sp.numbered_symbols("x"), optimizations="basic")
+            lines.append(f"{indent}{{")
+            for var, expr in replacements:
+                lines.append(f"{indent}    const auto {var} = {printer.doprint(expr)};")
+            for k, expr in enumerate(reduced):
+                lines.append(f"{indent}    const auto b{k} = {printer.doprint(expr)};")
+            lines.append(f"{indent}    for (int lane = 0; lane < SIMD_SIZE; ++lane) {{")
+            lines.append(f"{indent}        scalar_t *const SFEM_RESTRICT block{block} = values + (ptrdiff_t)slots_base[lane * 16 + {block}] * 16;")
+            for k, (offset, _expr) in enumerate(entries):
+                lines.append(f"{indent}        block{block}[{offset}] += b{k}[lane];")
+            lines.append(f"{indent}    }}")
+            lines.append(f"{indent}}}")
+    return "\n".join(lines)
+
+
 def generate() -> str:
     sym = build_symbols()
     residual, _ = residual_exprs(sym, semismooth_abs=False)
@@ -583,6 +618,46 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_dense_vector(const s
 {vector_input_locals()}
 {sign_vector_locals(mdots)}
 {cse_vector_store_code(jac, jac_vector_outputs())}
+}}
+
+static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_dense_vector_values(const scalar_t rho,
+                                                                                const scalar_t mu,
+{vector_value_args(indent="                                                                                ")}
+                                                                                scalar_t *const SFEM_RESTRICT ke) {{
+{sign_vector_locals(mdots)}
+{cse_vector_store_code(jac, jac_vector_outputs())}
+}}
+
+static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise_vector(
+        const scalar_t                        rho,
+        const scalar_t                        mu,
+        const scalar_t *const SFEM_RESTRICT   adj0_ptr,
+        const scalar_t *const SFEM_RESTRICT   adj1_ptr,
+        const scalar_t *const SFEM_RESTRICT   adj2_ptr,
+        const scalar_t *const SFEM_RESTRICT   adj3_ptr,
+        const scalar_t *const SFEM_RESTRICT   adj4_ptr,
+        const scalar_t *const SFEM_RESTRICT   adj5_ptr,
+        const scalar_t *const SFEM_RESTRICT   adj6_ptr,
+        const scalar_t *const SFEM_RESTRICT   adj7_ptr,
+        const scalar_t *const SFEM_RESTRICT   adj8_ptr,
+        const scalar_t *const SFEM_RESTRICT   det_ptr,
+        const scalar_t *const SFEM_RESTRICT   ux0_ptr,
+        const scalar_t *const SFEM_RESTRICT   ux1_ptr,
+        const scalar_t *const SFEM_RESTRICT   ux2_ptr,
+        const scalar_t *const SFEM_RESTRICT   ux3_ptr,
+        const scalar_t *const SFEM_RESTRICT   uy0_ptr,
+        const scalar_t *const SFEM_RESTRICT   uy1_ptr,
+        const scalar_t *const SFEM_RESTRICT   uy2_ptr,
+        const scalar_t *const SFEM_RESTRICT   uy3_ptr,
+        const scalar_t *const SFEM_RESTRICT   uz0_ptr,
+        const scalar_t *const SFEM_RESTRICT   uz1_ptr,
+        const scalar_t *const SFEM_RESTRICT   uz2_ptr,
+        const scalar_t *const SFEM_RESTRICT   uz3_ptr,
+        const int *const SFEM_RESTRICT        slots_base,
+        scalar_t *const SFEM_RESTRICT         values) {{
+{vector_input_locals()}
+{sign_vector_locals(mdots)}
+{cse_add_vector_blocks_to_slots_code(jac)}
 }}
 
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
