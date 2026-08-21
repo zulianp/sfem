@@ -238,6 +238,17 @@ int laplacian_apply_opt(smesh::ElemType                       element_type,
         if (smesh::is_hex_ss_family(element_type)) {
             return affine_sshex8_laplacian_stencil_apply_fff(level, nelements, elements, fff, u, values);
         }
+        if (smesh::is_tet_ss_family(element_type)) {
+            sstet4_laplacian_stencil_t *stencil = nullptr;
+            int err = sstet4_laplacian_stencil_create(level, nelements, fff, &stencil);
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
+
+            err = sstet4_laplacian_apply_stencil_global(stencil, nelements, elements, u, values);
+            sstet4_laplacian_stencil_destroy(stencil);
+            return err;
+        }
 
         SFEM_ERROR("laplacian_apply_opt not implemented for semi-structured element type %s\n",
                    sfem::type_to_string(element_type));

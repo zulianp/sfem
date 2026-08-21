@@ -53,7 +53,19 @@ static constexpr int ALIGN_BYTES = 64;
 
 #include "cvfem_tet4_ns_upwind_kernels.hpp"
 
-enum class KernelKind { Current, Sympy, CurrentSlots, SympySlots, SympyDirect, SympyBlock, SympyFace, SympySimd, SympyFaceSimd };
+enum class KernelKind {
+    Current,
+    Sympy,
+    CurrentSlots,
+    SympySlots,
+    SympyDirect,
+    SympyBlock,
+    SympyFace,
+    SympySimd,
+    SympySimdClean,
+    SympyBlockSimd,
+    SympyFaceSimd
+};
 
 static KernelKind parse_kernel(const std::string &name) {
     if (name == "sympy") return KernelKind::Sympy;
@@ -63,13 +75,16 @@ static KernelKind parse_kernel(const std::string &name) {
     if (name == "sympy_block") return KernelKind::SympyBlock;
     if (name == "sympy_face") return KernelKind::SympyFace;
     if (name == "sympy_simd") return KernelKind::SympySimd;
+    if (name == "sympy_simd_clean") return KernelKind::SympySimdClean;
+    if (name == "sympy_block_simd") return KernelKind::SympyBlockSimd;
     if (name == "sympy_face_simd") return KernelKind::SympyFaceSimd;
     return KernelKind::Current;
 }
 
 static bool kernel_is_sympy_residual(const KernelKind k) {
     return k == KernelKind::Sympy || k == KernelKind::SympySlots || k == KernelKind::SympyDirect || k == KernelKind::SympyBlock ||
-           k == KernelKind::SympyFace || k == KernelKind::SympySimd || k == KernelKind::SympyFaceSimd;
+           k == KernelKind::SympyFace || k == KernelKind::SympySimd || k == KernelKind::SympySimdClean || k == KernelKind::SympyBlockSimd ||
+           k == KernelKind::SympyFaceSimd;
 }
 
 template <typename T>
@@ -1617,6 +1632,365 @@ static SFEM_NOINLINE void assemble_bsr4_packed_sympy_simd(MeshData &d, PackedDat
     }
 }
 
+static SFEM_NOINLINE void assemble_bsr4_packed_sympy_simd_clean(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+    zero_bsr4(b);
+    if (!p.ghost_mat_val.empty())
+        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
+
+    const size_t u_n   = packed_scratch_n(p);
+    const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_u     = thread_scratch<scalar_t>(0, u_n);
+        scalar_t *const SFEM_RESTRICT local_vals = thread_scratch<scalar_t>(2, bsr_n);
+        alignas(ALIGN_BYTES) scalar_t Ke_vec[CVFEM_N_DOF * CVFEM_N_DOF * SIMD_SIZE];
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+            const ptrdiff_t           e_start      = pack * p.n_elements_per_pack;
+            const ptrdiff_t           e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+            const ptrdiff_t           owned        = p.owned_nodes_ptr[pack];
+            const ptrdiff_t           n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t           n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const smesh::idx_t *const ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const auto               &lrowptr      = p.local_rowptr[(size_t)pack];
+            const auto               &lslots       = p.local_global_slot[(size_t)pack];
+            const int                 local_nnz    = lrowptr.empty() ? 0 : lrowptr.back();
+
+            std::memset(local_vals, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
+
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                scalar_t *const SFEM_RESTRICT dst = pack_u + k * N_FIELDS;
+                const ptrdiff_t               g   = owned + k;
+                dst[0]                            = d.ux[g];
+                dst[1]                            = d.uy[g];
+                dst[2]                            = d.uz[g];
+            }
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                scalar_t *const SFEM_RESTRICT dst = pack_u + (n_contiguous + k) * N_FIELDS;
+                const smesh::idx_t            g   = ghosts[k];
+                dst[0]                            = d.ux[g];
+                dst[1]                            = d.uy[g];
+                dst[2]                            = d.uz[g];
+            }
+
+            ptrdiff_t e = e_start;
+            for (; e + SIMD_SIZE <= e_end; e += SIMD_SIZE) {
+#if CVFEM_SIMD_BYTES == 64
+#define CVFEM_VEC8(X) scalar_v{X(0), X(1), X(2), X(3), X(4), X(5), X(6), X(7)}
+#define CVFEM_VEC(X)  CVFEM_VEC8(X)
+#elif CVFEM_SIMD_BYTES == 32
+#define CVFEM_VEC4(X) scalar_v{X(0), X(1), X(2), X(3)}
+#define CVFEM_VEC(X)  CVFEM_VEC4(X)
+#elif CVFEM_SIMD_BYTES == 16
+#define CVFEM_VEC2(X) scalar_v{X(0), X(1)}
+#define CVFEM_VEC(X)  CVFEM_VEC2(X)
+#else
+#error "assemble_bsr4_packed_sympy_simd_clean supports 16, 32, or 64 byte SIMD vectors"
+#endif
+#define CVFEM_ADJ_LANE(K, L) scalar_t(d.adj[K][e + (L)])
+#define CVFEM_DET_LANE(L)    scalar_t(d.det[e + (L)])
+#define CVFEM_U_LANE(N, F, L) pack_u[(ptrdiff_t)p.elems[N][e + (L)] * N_FIELDS + (F)]
+#define CVFEM_ADJ0(L) CVFEM_ADJ_LANE(0, L)
+#define CVFEM_ADJ1(L) CVFEM_ADJ_LANE(1, L)
+#define CVFEM_ADJ2(L) CVFEM_ADJ_LANE(2, L)
+#define CVFEM_ADJ3(L) CVFEM_ADJ_LANE(3, L)
+#define CVFEM_ADJ4(L) CVFEM_ADJ_LANE(4, L)
+#define CVFEM_ADJ5(L) CVFEM_ADJ_LANE(5, L)
+#define CVFEM_ADJ6(L) CVFEM_ADJ_LANE(6, L)
+#define CVFEM_ADJ7(L) CVFEM_ADJ_LANE(7, L)
+#define CVFEM_ADJ8(L) CVFEM_ADJ_LANE(8, L)
+#define CVFEM_DET(L)  CVFEM_DET_LANE(L)
+#define CVFEM_UX0(L)  CVFEM_U_LANE(0, 0, L)
+#define CVFEM_UX1(L)  CVFEM_U_LANE(1, 0, L)
+#define CVFEM_UX2(L)  CVFEM_U_LANE(2, 0, L)
+#define CVFEM_UX3(L)  CVFEM_U_LANE(3, 0, L)
+#define CVFEM_UY0(L)  CVFEM_U_LANE(0, 1, L)
+#define CVFEM_UY1(L)  CVFEM_U_LANE(1, 1, L)
+#define CVFEM_UY2(L)  CVFEM_U_LANE(2, 1, L)
+#define CVFEM_UY3(L)  CVFEM_U_LANE(3, 1, L)
+#define CVFEM_UZ0(L)  CVFEM_U_LANE(0, 2, L)
+#define CVFEM_UZ1(L)  CVFEM_U_LANE(1, 2, L)
+#define CVFEM_UZ2(L)  CVFEM_U_LANE(2, 2, L)
+#define CVFEM_UZ3(L)  CVFEM_U_LANE(3, 2, L)
+                const scalar_v a0   = CVFEM_VEC(CVFEM_ADJ0);
+                const scalar_v a1   = CVFEM_VEC(CVFEM_ADJ1);
+                const scalar_v a2   = CVFEM_VEC(CVFEM_ADJ2);
+                const scalar_v a3   = CVFEM_VEC(CVFEM_ADJ3);
+                const scalar_v a4   = CVFEM_VEC(CVFEM_ADJ4);
+                const scalar_v a5   = CVFEM_VEC(CVFEM_ADJ5);
+                const scalar_v a6   = CVFEM_VEC(CVFEM_ADJ6);
+                const scalar_v a7   = CVFEM_VEC(CVFEM_ADJ7);
+                const scalar_v a8   = CVFEM_VEC(CVFEM_ADJ8);
+                const scalar_v detv = CVFEM_VEC(CVFEM_DET);
+                const scalar_v ux0  = CVFEM_VEC(CVFEM_UX0);
+                const scalar_v ux1  = CVFEM_VEC(CVFEM_UX1);
+                const scalar_v ux2  = CVFEM_VEC(CVFEM_UX2);
+                const scalar_v ux3  = CVFEM_VEC(CVFEM_UX3);
+                const scalar_v uy0  = CVFEM_VEC(CVFEM_UY0);
+                const scalar_v uy1  = CVFEM_VEC(CVFEM_UY1);
+                const scalar_v uy2  = CVFEM_VEC(CVFEM_UY2);
+                const scalar_v uy3  = CVFEM_VEC(CVFEM_UY3);
+                const scalar_v uz0  = CVFEM_VEC(CVFEM_UZ0);
+                const scalar_v uz1  = CVFEM_VEC(CVFEM_UZ1);
+                const scalar_v uz2  = CVFEM_VEC(CVFEM_UZ2);
+                const scalar_v uz3  = CVFEM_VEC(CVFEM_UZ3);
+#undef CVFEM_UZ3
+#undef CVFEM_UZ2
+#undef CVFEM_UZ1
+#undef CVFEM_UZ0
+#undef CVFEM_UY3
+#undef CVFEM_UY2
+#undef CVFEM_UY1
+#undef CVFEM_UY0
+#undef CVFEM_UX3
+#undef CVFEM_UX2
+#undef CVFEM_UX1
+#undef CVFEM_UX0
+#undef CVFEM_DET
+#undef CVFEM_ADJ8
+#undef CVFEM_ADJ7
+#undef CVFEM_ADJ6
+#undef CVFEM_ADJ5
+#undef CVFEM_ADJ4
+#undef CVFEM_ADJ3
+#undef CVFEM_ADJ2
+#undef CVFEM_ADJ1
+#undef CVFEM_ADJ0
+#undef CVFEM_U_LANE
+#undef CVFEM_DET_LANE
+#undef CVFEM_ADJ_LANE
+#undef CVFEM_VEC
+#if CVFEM_SIMD_BYTES == 64
+#undef CVFEM_VEC8
+#elif CVFEM_SIMD_BYTES == 32
+#undef CVFEM_VEC4
+#elif CVFEM_SIMD_BYTES == 16
+#undef CVFEM_VEC2
+#endif
+                cvfem_tet4_ns_upwind_sympy_jacobian_dense_vector_values(rho,
+                                                                         mu,
+                                                                         a0,
+                                                                         a1,
+                                                                         a2,
+                                                                         a3,
+                                                                         a4,
+                                                                         a5,
+                                                                         a6,
+                                                                         a7,
+                                                                         a8,
+                                                                         detv,
+                                                                         ux0,
+                                                                         ux1,
+                                                                         ux2,
+                                                                         ux3,
+                                                                         uy0,
+                                                                         uy1,
+                                                                         uy2,
+                                                                         uy3,
+                                                                         uz0,
+                                                                         uz1,
+                                                                         uz2,
+                                                                         uz3,
+                                                                         Ke_vec);
+                for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+                    tet4_local_slots_to_bsr4_vec_lane(p.local_element_slot.data() + (size_t)(e + lane) * 16, Ke_vec, lane, local_vals);
+                }
+            }
+            for (; e < e_end; ++e) {
+                const pack_idx_t ev[4] = {p.elems[0][e], p.elems[1][e], p.elems[2][e], p.elems[3][e]};
+                alignas(ALIGN_BYTES) scalar_t Ke[CVFEM_N_DOF * CVFEM_N_DOF];
+                jacobian_element_packed_sympy(d, e, ev, pack_u, rho, mu, Ke);
+                tet4_local_slots_to_bsr4(p.local_element_slot.data() + (size_t)e * 16, Ke, local_vals);
+            }
+
+            scalar_t *const SFEM_RESTRICT gvalues   = b.values->data();
+            const int                     owned_nnz = n_contiguous > 0 ? lrowptr[(size_t)n_contiguous] : 0;
+            for (int t = 0; t < owned_nnz; ++t) {
+                cvfem_bsr4_add16(&gvalues[(ptrdiff_t)lslots[(size_t)t] * 16], local_vals + (ptrdiff_t)t * 16);
+            }
+
+            const ptrdiff_t ghost_off = p.ghost_ptr[pack];
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                const ptrdiff_t local_i = n_contiguous + k;
+                const int       begin   = lrowptr[(size_t)local_i];
+                const int       end     = lrowptr[(size_t)local_i + 1];
+                const ptrdiff_t dest    = p.ghost_mat_ptr[(size_t)ghost_off + (size_t)k];
+                std::memcpy(p.ghost_mat_val.data() + dest * 16,
+                            local_vals + (ptrdiff_t)begin * 16,
+                            (size_t)(end - begin) * 16 * sizeof(scalar_t));
+            }
+        }
+    }
+
+    scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const ptrdiff_t begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t end   = p.ghost_reduce_ptr[row + 1];
+        for (ptrdiff_t j = begin; j < end; ++j) {
+            const ptrdiff_t ghost_entry = p.ghost_reduce_idx[j];
+            const ptrdiff_t k0          = p.ghost_mat_ptr[(size_t)ghost_entry];
+            const ptrdiff_t k1          = p.ghost_mat_ptr[(size_t)ghost_entry + 1];
+            for (ptrdiff_t t = k0; t < k1; ++t) {
+                cvfem_bsr4_add16(&gvalues[(ptrdiff_t)p.ghost_mat_slot[(size_t)t] * 16],
+                                 p.ghost_mat_val.data() + t * 16);
+            }
+        }
+    }
+}
+
+static SFEM_NOINLINE void assemble_bsr4_packed_sympy_block_simd(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+    zero_bsr4(b);
+    if (!p.ghost_mat_val.empty())
+        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
+
+    const size_t u_n   = packed_scratch_n(p);
+    const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_u     = thread_scratch<scalar_t>(0, u_n);
+        scalar_t *const SFEM_RESTRICT local_vals = thread_scratch<scalar_t>(2, bsr_n);
+        alignas(ALIGN_BYTES) scalar_t a0[SIMD_SIZE], a1[SIMD_SIZE], a2[SIMD_SIZE], a3[SIMD_SIZE], a4[SIMD_SIZE];
+        alignas(ALIGN_BYTES) scalar_t a5[SIMD_SIZE], a6[SIMD_SIZE], a7[SIMD_SIZE], a8[SIMD_SIZE], detv[SIMD_SIZE];
+        alignas(ALIGN_BYTES) scalar_t ux0[SIMD_SIZE], ux1[SIMD_SIZE], ux2[SIMD_SIZE], ux3[SIMD_SIZE];
+        alignas(ALIGN_BYTES) scalar_t uy0[SIMD_SIZE], uy1[SIMD_SIZE], uy2[SIMD_SIZE], uy3[SIMD_SIZE];
+        alignas(ALIGN_BYTES) scalar_t uz0[SIMD_SIZE], uz1[SIMD_SIZE], uz2[SIMD_SIZE], uz3[SIMD_SIZE];
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+            const ptrdiff_t           e_start      = pack * p.n_elements_per_pack;
+            const ptrdiff_t           e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+            const ptrdiff_t           owned        = p.owned_nodes_ptr[pack];
+            const ptrdiff_t           n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t           n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const smesh::idx_t *const ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const auto               &lrowptr      = p.local_rowptr[(size_t)pack];
+            const auto               &lslots       = p.local_global_slot[(size_t)pack];
+            const int                 local_nnz    = lrowptr.empty() ? 0 : lrowptr.back();
+
+            std::memset(local_vals, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
+
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                scalar_t *const SFEM_RESTRICT dst = pack_u + k * N_FIELDS;
+                const ptrdiff_t               g   = owned + k;
+                dst[0]                            = d.ux[g];
+                dst[1]                            = d.uy[g];
+                dst[2]                            = d.uz[g];
+                dst[3]                            = d.p[g];
+            }
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                scalar_t *const SFEM_RESTRICT dst = pack_u + (n_contiguous + k) * N_FIELDS;
+                const smesh::idx_t            g   = ghosts[k];
+                dst[0]                            = d.ux[g];
+                dst[1]                            = d.uy[g];
+                dst[2]                            = d.uz[g];
+                dst[3]                            = d.p[g];
+            }
+
+            ptrdiff_t e = e_start;
+            for (; e + SIMD_SIZE <= e_end; e += SIMD_SIZE) {
+                for (int lane = 0; lane < SIMD_SIZE; ++lane) {
+                    const ptrdiff_t  ee    = e + lane;
+                    const pack_idx_t ev[4] = {p.elems[0][ee], p.elems[1][ee], p.elems[2][ee], p.elems[3][ee]};
+                    const scalar_t *const u0 = pack_u + (ptrdiff_t)ev[0] * N_FIELDS;
+                    const scalar_t *const u1 = pack_u + (ptrdiff_t)ev[1] * N_FIELDS;
+                    const scalar_t *const u2 = pack_u + (ptrdiff_t)ev[2] * N_FIELDS;
+                    const scalar_t *const u3 = pack_u + (ptrdiff_t)ev[3] * N_FIELDS;
+                    a0[lane]                 = scalar_t(d.adj[0][ee]);
+                    a1[lane]                 = scalar_t(d.adj[1][ee]);
+                    a2[lane]                 = scalar_t(d.adj[2][ee]);
+                    a3[lane]                 = scalar_t(d.adj[3][ee]);
+                    a4[lane]                 = scalar_t(d.adj[4][ee]);
+                    a5[lane]                 = scalar_t(d.adj[5][ee]);
+                    a6[lane]                 = scalar_t(d.adj[6][ee]);
+                    a7[lane]                 = scalar_t(d.adj[7][ee]);
+                    a8[lane]                 = scalar_t(d.adj[8][ee]);
+                    detv[lane]               = scalar_t(d.det[ee]);
+                    ux0[lane]                = u0[0];
+                    ux1[lane]                = u1[0];
+                    ux2[lane]                = u2[0];
+                    ux3[lane]                = u3[0];
+                    uy0[lane]                = u0[1];
+                    uy1[lane]                = u1[1];
+                    uy2[lane]                = u2[1];
+                    uy3[lane]                = u3[1];
+                    uz0[lane]                = u0[2];
+                    uz1[lane]                = u1[2];
+                    uz2[lane]                = u2[2];
+                    uz3[lane]                = u3[2];
+                }
+                cvfem_tet4_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise_vector(rho,
+                                                                                   mu,
+                                                                                   a0,
+                                                                                   a1,
+                                                                                   a2,
+                                                                                   a3,
+                                                                                   a4,
+                                                                                   a5,
+                                                                                   a6,
+                                                                                   a7,
+                                                                                   a8,
+                                                                                   detv,
+                                                                                   ux0,
+                                                                                   ux1,
+                                                                                   ux2,
+                                                                                   ux3,
+                                                                                   uy0,
+                                                                                   uy1,
+                                                                                   uy2,
+                                                                                   uy3,
+                                                                                   uz0,
+                                                                                   uz1,
+                                                                                   uz2,
+                                                                                   uz3,
+                                                                                   p.local_element_slot.data() + (size_t)e * 16,
+                                                                                   local_vals);
+            }
+            for (; e < e_end; ++e) {
+                const pack_idx_t ev[4] = {p.elems[0][e], p.elems[1][e], p.elems[2][e], p.elems[3][e]};
+                jacobian_element_packed_sympy_add_slots_blockwise(
+                        d, e, ev, pack_u, rho, mu, p.local_element_slot.data() + (size_t)e * 16, local_vals);
+            }
+
+            scalar_t *const SFEM_RESTRICT gvalues   = b.values->data();
+            const int                     owned_nnz = n_contiguous > 0 ? lrowptr[(size_t)n_contiguous] : 0;
+            for (int t = 0; t < owned_nnz; ++t) {
+                cvfem_bsr4_add16(&gvalues[(ptrdiff_t)lslots[(size_t)t] * 16], local_vals + (ptrdiff_t)t * 16);
+            }
+
+            const ptrdiff_t ghost_off = p.ghost_ptr[pack];
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                const ptrdiff_t local_i = n_contiguous + k;
+                const int       begin   = lrowptr[(size_t)local_i];
+                const int       end     = lrowptr[(size_t)local_i + 1];
+                const ptrdiff_t dest    = p.ghost_mat_ptr[(size_t)ghost_off + (size_t)k];
+                std::memcpy(p.ghost_mat_val.data() + dest * 16,
+                            local_vals + (ptrdiff_t)begin * 16,
+                            (size_t)(end - begin) * 16 * sizeof(scalar_t));
+            }
+        }
+    }
+
+    scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const ptrdiff_t begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t end   = p.ghost_reduce_ptr[row + 1];
+        for (ptrdiff_t j = begin; j < end; ++j) {
+            const ptrdiff_t ghost_entry = p.ghost_reduce_idx[j];
+            const ptrdiff_t k0          = p.ghost_mat_ptr[(size_t)ghost_entry];
+            const ptrdiff_t k1          = p.ghost_mat_ptr[(size_t)ghost_entry + 1];
+            for (ptrdiff_t t = k0; t < k1; ++t) {
+                cvfem_bsr4_add16(&gvalues[(ptrdiff_t)p.ghost_mat_slot[(size_t)t] * 16],
+                                 p.ghost_mat_val.data() + t * 16);
+            }
+        }
+    }
+}
+
 static SFEM_NOINLINE void assemble_bsr4_packed_sympy_face_simd(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     if (!p.ghost_mat_val.empty())
@@ -1972,7 +2346,7 @@ int main(int argc, char **argv) {
     scalar_t    rho       = 1.0;
     scalar_t    mu        = 0.01;
     std::string layout    = "packed";
-    std::string kernel    = "sympy_simd";
+    std::string kernel    = "sympy_block_simd";
     int         verify    = 0;
     int         verify_jac = 0;
     int         assemble  = 0;
@@ -2008,10 +2382,10 @@ int main(int argc, char **argv) {
         else if (arg == "--help") {
             std::printf(
                     "usage: %s [--n cube_cells_per_dim] [--repeat N] [--warmup N]\n"
-                    "          [--layout packed|atomic] [--kernel current|sympy|current_slots|sympy_slots|sympy_direct|sympy_block|sympy_face|sympy_simd|sympy_face_simd]\n"
+                    "          [--layout packed|atomic] [--kernel current|sympy|current_slots|sympy_slots|sympy_direct|sympy_block|sympy_face|sympy_simd|sympy_simd_clean|sympy_block_simd|sympy_face_simd]\n"
                     "          [--pack-size N] [--no-sfc]\n"
                     "          [--verify] [--verify-jac] [--assemble]\n"
-                    "  --kernel NAME  micro-kernel variant (default sympy_simd)\n"
+                    "  --kernel NAME  micro-kernel variant (default sympy_block_simd)\n"
                     "  --pack-size N   elements per pack (0 = fill uint16; default 2048)\n",
                     argv[0]);
             if (own_mpi) MPI_Finalize();
@@ -2021,9 +2395,10 @@ int main(int argc, char **argv) {
 
     if (kernel != "current" && kernel != "sympy" && kernel != "current_slots" && kernel != "sympy_slots" &&
         kernel != "sympy_direct" && kernel != "sympy_block" && kernel != "sympy_face" && kernel != "sympy_simd" &&
-        kernel != "sympy_face_simd") {
+        kernel != "sympy_simd_clean" &&
+        kernel != "sympy_block_simd" && kernel != "sympy_face_simd") {
         std::fprintf(stderr,
-                     "invalid --kernel '%s' (expected current, sympy, current_slots, sympy_slots, sympy_direct, sympy_block, sympy_face, sympy_simd, or sympy_face_simd)\n",
+                     "invalid --kernel '%s' (expected current, sympy, current_slots, sympy_slots, sympy_direct, sympy_block, sympy_face, sympy_simd, sympy_simd_clean, sympy_block_simd, or sympy_face_simd)\n",
                      kernel.c_str());
         if (own_mpi) MPI_Finalize();
         return 1;
@@ -2034,7 +2409,7 @@ int main(int argc, char **argv) {
     if (assemble && layout == "atomic" &&
         (kernel_kind == KernelKind::CurrentSlots || kernel_kind == KernelKind::SympySlots || kernel_kind == KernelKind::SympyDirect ||
          kernel_kind == KernelKind::SympyBlock || kernel_kind == KernelKind::SympyFace || kernel_kind == KernelKind::SympySimd ||
-         kernel_kind == KernelKind::SympyFaceSimd)) {
+         kernel_kind == KernelKind::SympyBlockSimd || kernel_kind == KernelKind::SympyFaceSimd)) {
         std::fprintf(stderr, "--kernel %s is a packed Jacobian assembly variant; use --layout packed\n", kernel.c_str());
         if (own_mpi) MPI_Finalize();
         return 1;
@@ -2142,12 +2517,19 @@ int main(int argc, char **argv) {
         assemble_bsr4_packed_sympy_simd(d, packed, bsr, rho, mu);
         const scalar_t sympy_simd_err = max_abs_diff_ptr(current_vals.data(), bsr.values->data(), bsr.nnz * 16);
         std::printf("verify_sympy_simd_jac_packed_mesh_vs_current_abs: %.6e\n", sympy_simd_err);
+        assemble_bsr4_packed_sympy_simd_clean(d, packed, bsr, rho, mu);
+        const scalar_t sympy_simd_clean_err = max_abs_diff_ptr(current_vals.data(), bsr.values->data(), bsr.nnz * 16);
+        std::printf("verify_sympy_simd_clean_jac_packed_mesh_vs_current_abs: %.6e\n", sympy_simd_clean_err);
+        assemble_bsr4_packed_sympy_block_simd(d, packed, bsr, rho, mu);
+        const scalar_t sympy_block_simd_err = max_abs_diff_ptr(current_vals.data(), bsr.values->data(), bsr.nnz * 16);
+        std::printf("verify_sympy_block_simd_jac_packed_mesh_vs_current_abs: %.6e\n", sympy_block_simd_err);
         assemble_bsr4_packed_sympy_face_simd(d, packed, bsr, rho, mu);
         const scalar_t sympy_face_simd_err = max_abs_diff_ptr(current_vals.data(), bsr.values->data(), bsr.nnz * 16);
         std::printf("verify_sympy_face_simd_jac_packed_mesh_vs_current_abs: %.6e\n", sympy_face_simd_err);
         if (sympy_jac_atomic_err > 1.0e-12 || sympy_jac_packed_err > 1.0e-12 || current_slots_err > 1.0e-12 ||
             sympy_slots_err > 1.0e-12 || sympy_direct_err > 1.0e-12 || sympy_block_err > 1.0e-12 ||
-            sympy_face_err > 1.0e-12 || sympy_simd_err > 1.0e-12 || sympy_face_simd_err > 1.0e-12) {
+            sympy_face_err > 1.0e-12 || sympy_simd_err > 1.0e-12 || sympy_simd_clean_err > 1.0e-12 || sympy_block_simd_err > 1.0e-12 ||
+            sympy_face_simd_err > 1.0e-12) {
             std::fprintf(stderr, "SymPy BSR Jacobian mismatch\n");
             d.mesh.reset();
             if (own_mpi) MPI_Finalize();
@@ -2221,6 +2603,10 @@ int main(int argc, char **argv) {
             assemble_bsr4_packed_sympy_face(d, packed, bsr, rho, mu);
         } else if (kernel_kind == KernelKind::SympySimd) {
             assemble_bsr4_packed_sympy_simd(d, packed, bsr, rho, mu);
+        } else if (kernel_kind == KernelKind::SympySimdClean) {
+            assemble_bsr4_packed_sympy_simd_clean(d, packed, bsr, rho, mu);
+        } else if (kernel_kind == KernelKind::SympyBlockSimd) {
+            assemble_bsr4_packed_sympy_block_simd(d, packed, bsr, rho, mu);
         } else if (kernel_kind == KernelKind::SympyFaceSimd) {
             assemble_bsr4_packed_sympy_face_simd(d, packed, bsr, rho, mu);
         } else {
