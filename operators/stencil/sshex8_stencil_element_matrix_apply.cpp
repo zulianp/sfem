@@ -78,6 +78,140 @@ int sshex8_stencil_element_matrix_apply(const int                           leve
     return SFEM_SUCCESS;
 }
 
+int sshex8_stencil_element_matrix_apply_hyteg(const int                           level,
+                                              const ptrdiff_t                     nelements,
+                                              idx_t **const SFEM_RESTRICT         elements,
+                                              const scalar_t *const SFEM_RESTRICT g_element_matrix,
+                                              const scalar_t *const SFEM_RESTRICT g_stencil,
+                                              const real_t *const SFEM_RESTRICT   u,
+                                              real_t *const SFEM_RESTRICT         values) {
+    const int nxe = sshex8_nxe(level);
+
+#pragma omp parallel
+    {
+        scalar_t      *eu = (scalar_t *)malloc(nxe * sizeof(scalar_t));
+        idx_t         *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
+        accumulator_t *v  = (accumulator_t *)malloc(nxe * sizeof(accumulator_t));
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            for (int d = 0; d < nxe; d++) {
+                ev[d] = elements[d][e];
+            }
+
+            for (int d = 0; d < nxe; d++) {
+                eu[d] = u[ev[d]];
+                assert(eu[d] == eu[d]);
+            }
+
+            memset(v, 0, nxe * sizeof(accumulator_t));
+
+            const scalar_t *const element_matrix = &g_element_matrix[e * 64];
+            const scalar_t *const stencil        = &g_stencil[e * 27];
+            scalar_t             laplacian_stencil[3 * 3 * 3];
+            for (int d = 0; d < 3 * 3 * 3; ++d) {
+                laplacian_stencil[d] = stencil[d];
+            }
+
+            sshex8_stencil(
+                    level + 1,
+                    level + 1,
+                    level + 1,
+                    laplacian_stencil,
+                    eu,
+                    v);
+
+            sshex8_surface_stencil(
+                    level + 1,
+                    level + 1,
+                    level + 1,
+                    1,
+                    level + 1,
+                    (level + 1) * (level + 1),
+                    element_matrix,
+                    eu,
+                    v);
+
+            for (int d = 0; d < nxe; d++) {
+                assert(v[d] == v[d]);
+#pragma omp atomic update
+                values[ev[d]] += v[d];
+            }
+        }
+
+        free(ev);
+        free(eu);
+        free(v);
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int sshex8_stencil_element_matrix_apply_hyteg_vectorized(const int                           level,
+                                                         const ptrdiff_t                     nelements,
+                                                         idx_t **const SFEM_RESTRICT         elements,
+                                                         const scalar_t *const SFEM_RESTRICT g_element_matrix,
+                                                         const scalar_t *const SFEM_RESTRICT g_stencil,
+                                                         const real_t *const SFEM_RESTRICT   u,
+                                                         real_t *const SFEM_RESTRICT         values) {
+    const int nxe = sshex8_nxe(level);
+
+#pragma omp parallel
+    {
+        scalar_t      *eu = (scalar_t *)malloc(nxe * sizeof(scalar_t));
+        idx_t         *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
+        accumulator_t *v  = (accumulator_t *)malloc(nxe * sizeof(accumulator_t));
+
+#pragma omp for
+        for (ptrdiff_t e = 0; e < nelements; ++e) {
+            for (int d = 0; d < nxe; d++) {
+                ev[d] = elements[d][e];
+            }
+
+            for (int d = 0; d < nxe; d++) {
+                eu[d] = u[ev[d]];
+                assert(eu[d] == eu[d]);
+            }
+
+            memset(v, 0, nxe * sizeof(accumulator_t));
+
+            const scalar_t *const element_matrix    = &g_element_matrix[e * 64];
+            const scalar_t *const laplacian_stencil = &g_stencil[e * 27];
+
+            sshex8_stencil_fused_vectorized(
+                    level + 1,
+                    level + 1,
+                    level + 1,
+                    laplacian_stencil,
+                    eu,
+                    v);
+
+            sshex8_surface_stencil(
+                    level + 1,
+                    level + 1,
+                    level + 1,
+                    1,
+                    level + 1,
+                    (level + 1) * (level + 1),
+                    element_matrix,
+                    eu,
+                    v);
+
+            for (int d = 0; d < nxe; d++) {
+                assert(v[d] == v[d]);
+#pragma omp atomic update
+                values[ev[d]] += v[d];
+            }
+        }
+
+        free(ev);
+        free(eu);
+        free(v);
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int sshex8_stencil_element_matrix_apply3(const int                           level,
                                          const ptrdiff_t                     nelements,
                                          idx_t **const SFEM_RESTRICT         elements,

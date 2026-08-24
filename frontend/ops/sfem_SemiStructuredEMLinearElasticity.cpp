@@ -2,6 +2,7 @@
 
 #include "sshex8_linear_elasticity.hpp"
 #include "sshex8_stencil_element_matrix_apply.hpp"
+#include "sstet4_linear_elasticity.hpp"
 
 #include "sfem_LinearElasticity.hpp"
 #include "smesh_mesh.hpp"
@@ -18,14 +19,42 @@ namespace sfem {
             return block_names.empty() || std::find(block_names.begin(), block_names.end(), name) != block_names.end();
         }
 
-        static int require_sshex8_block(const char *const op_name, const smesh::Mesh &mesh, const size_t block_id) {
+        static int require_supported_block(const char *const op_name, const smesh::Mesh &mesh, const size_t block_id) {
             const auto element_type = mesh.element_type(static_cast<smesh::block_idx_t>(block_id));
-            if (!is_semistructured_type(element_type) || macro_base_elem(element_type) != smesh::PROTEUS_HEX8) {
-                SFEM_ERROR("%s supports homogeneous SSHEX8 blocks\n", op_name);
+            if (!is_semistructured_type(element_type)) {
+                SFEM_ERROR("%s supports semistructured blocks\n", op_name);
+                return SFEM_FAILURE;
+            }
+
+            const auto family = smesh::ss_source_family(element_type);
+            if (family != smesh::HEX8 && family != smesh::TET4) {
+                SFEM_ERROR("%s supports SSHEX8 and SSTET4 blocks\n", op_name);
                 return SFEM_FAILURE;
             }
 
             return SFEM_SUCCESS;
+        }
+
+        static smesh::ElemType standard_base_elem(const smesh::ElemType element_type) {
+            const auto family = smesh::ss_source_family(element_type);
+            return family == smesh::TET4 ? smesh::TET4 : macro_base_elem(element_type);
+        }
+
+        static std::shared_ptr<sstet4_linear_elasticity_stencil_t> make_sstet4_stencil(
+                const int                         level,
+                const ptrdiff_t                   nelements,
+                idx_t **const SFEM_RESTRICT       elements,
+                geom_t **const SFEM_RESTRICT      points,
+                const real_t                      mu,
+                const real_t                      lambda) {
+            sstet4_linear_elasticity_stencil_t *stencil = nullptr;
+            if (sstet4_linear_elasticity_stencil_create_from_points(level, nelements, elements, points, mu, lambda, &stencil) !=
+                SFEM_SUCCESS) {
+                return nullptr;
+            }
+
+            return std::shared_ptr<sstet4_linear_elasticity_stencil_t>(
+                    stencil, [](sstet4_linear_elasticity_stencil_t *s) { sstet4_linear_elasticity_stencil_destroy(s); });
         }
 
         static std::shared_ptr<smesh::Mesh> element_matrix_mesh(const std::shared_ptr<FunctionSpace> &space) {
@@ -90,7 +119,7 @@ namespace sfem {
         ret->initialize();
         ret->set_value_in_block("", "mu", mu);
         ret->set_value_in_block("", "lambda", lambda);
-        std::vector<smesh::ElemType> element_types(space->n_blocks(), macro_base_elem(element_type));
+        std::vector<smesh::ElemType> element_types(space->n_blocks(), standard_base_elem(element_type));
         ret->override_element_types(element_types);
         return ret;
     }
@@ -116,6 +145,7 @@ namespace sfem {
 
         const auto n_blocks = ssm.n_blocks();
         element_matrices.assign(n_blocks, nullptr);
+        sstet4_stencils.assign(n_blocks, nullptr);
         element_matrix = nullptr;
 
         int err = SFEM_SUCCESS;
@@ -125,27 +155,42 @@ namespace sfem {
                 continue;
             }
 
-            err = require_sshex8_block(name(), ssm, b);
+            err = require_supported_block(name(), ssm, b);
             if (err != SFEM_SUCCESS) {
                 return err;
             }
 
-            auto matrix = sfem::create_host_buffer<scalar_t>(mesh->n_elements(block_id) * 24 * 24);
-            err         = sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
-                                                                    mesh->n_elements(block_id),
-                                                                    mesh->n_nodes(),
-                                                                    mesh->elements(block_id)->data(),
-                                                                    mesh->points()->data(),
-                                                                    mu,
-                                                                    lambda,
-                                                                    matrix->data());
-            if (err != SFEM_SUCCESS) {
-                return err;
-            }
+            const auto family = smesh::ss_source_family(ssm.element_type(block_id));
+            if (family == smesh::HEX8) {
+                auto matrix = sfem::create_host_buffer<scalar_t>(mesh->n_elements(block_id) * 24 * 24);
+                err         = sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
+                                                                        mesh->n_elements(block_id),
+                                                                        mesh->n_nodes(),
+                                                                        mesh->elements(block_id)->data(),
+                                                                        mesh->points()->data(),
+                                                                        mu,
+                                                                        lambda,
+                                                                        matrix->data());
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
 
-            element_matrices[b] = matrix;
-            if (!element_matrix) {
-                element_matrix = matrix;
+                element_matrices[b] = matrix;
+                if (!element_matrix) {
+                    element_matrix = matrix;
+                }
+            } else {
+                auto stencil = make_sstet4_stencil(smesh::semistructured_level(ssm),
+                                                   ssm.n_elements(block_id),
+                                                   ssm.elements(block_id)->data(),
+                                                   ssm.points()->data(),
+                                                   mu,
+                                                   lambda);
+                if (!stencil) {
+                    return SFEM_FAILURE;
+                }
+
+                sstet4_stencils[b] = stencil;
             }
         }
 
@@ -171,7 +216,8 @@ namespace sfem {
             }
 
             const auto block_id = static_cast<smesh::block_idx_t>(b);
-            err                 = affine_sshex8_linear_elasticity_diag(smesh::semistructured_level(ssm),
+            if (element_matrices[b]) {
+                err = affine_sshex8_linear_elasticity_diag(smesh::semistructured_level(ssm),
                                                        ssm.n_elements(block_id),
                                                        ssm.n_nodes(),
                                                        ssm.elements(block_id)->data(),
@@ -182,6 +228,58 @@ namespace sfem {
                                                        &out[0],
                                                        &out[1],
                                                        &out[2]);
+            } else if (sstet4_stencils[b]) {
+                err = sstet4_linear_elasticity_diag_stencil(sstet4_stencils[b].get(),
+                                                            ssm.n_elements(block_id),
+                                                            ssm.elements(block_id)->data(),
+                                                            3,
+                                                            &out[0],
+                                                            &out[1],
+                                                            &out[2]);
+            }
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int SemiStructuredEMLinearElasticity::hessian_block_diag_sym(const real_t *const, real_t *const values) {
+        SFEM_TRACE_SCOPE("SemiStructuredEMLinearElasticity::hessian_block_diag_sym");
+
+        auto &ssm = space->mesh();
+        int   err = SFEM_SUCCESS;
+        for (size_t b = 0; b < element_matrices.size(); ++b) {
+            const auto block_id = static_cast<smesh::block_idx_t>(b);
+            if (element_matrices[b]) {
+                err = affine_sshex8_linear_elasticity_block_diag_sym(smesh::semistructured_level(ssm),
+                                                                     ssm.n_elements(block_id),
+                                                                     ssm.n_nodes(),
+                                                                     ssm.elements(block_id)->data(),
+                                                                     ssm.points()->data(),
+                                                                     mu,
+                                                                     lambda,
+                                                                     6,
+                                                                     &values[0],
+                                                                     &values[1],
+                                                                     &values[2],
+                                                                     &values[3],
+                                                                     &values[4],
+                                                                     &values[5]);
+            } else if (sstet4_stencils[b]) {
+                err = sstet4_linear_elasticity_block_diag_sym_stencil(sstet4_stencils[b].get(),
+                                                                       ssm.n_elements(block_id),
+                                                                       ssm.elements(block_id)->data(),
+                                                                       6,
+                                                                       &values[0],
+                                                                       &values[1],
+                                                                       &values[2],
+                                                                       &values[3],
+                                                                       &values[4],
+                                                                       &values[5]);
+            }
+
             if (err != SFEM_SUCCESS) {
                 return err;
             }
@@ -205,12 +303,9 @@ namespace sfem {
         int    err  = SFEM_SUCCESS;
         for (size_t b = 0; b < element_matrices.size(); ++b) {
             auto &matrix = element_matrices[b];
-            if (!matrix) {
-                continue;
-            }
-
             const auto block_id = static_cast<smesh::block_idx_t>(b);
-            err                 = sshex8_stencil_element_matrix_apply3(smesh::semistructured_level(ssm),
+            if (matrix) {
+                err = sshex8_stencil_element_matrix_apply3(smesh::semistructured_level(ssm),
                                                        ssm.n_elements(block_id),
                                                        ssm.elements(block_id)->data(),
                                                        matrix->data(),
@@ -222,6 +317,15 @@ namespace sfem {
                                                        &out[0],
                                                        &out[1],
                                                        &out[2]);
+            } else if (sstet4_stencils[b]) {
+                err = sstet4_linear_elasticity_apply_stencil_global_vectorized(sstet4_stencils[b].get(),
+                                                                               ssm.n_elements(block_id),
+                                                                               ssm.elements(block_id)->data(),
+                                                                               h,
+                                                                               out);
+            } else {
+                continue;
+            }
             if (err != SFEM_SUCCESS) {
                 return err;
             }
@@ -258,7 +362,7 @@ namespace sfem {
             changed = true;
         }
 
-        if (changed && element_matrix) {
+        if (changed && (element_matrix || !sstet4_stencils.empty())) {
             auto &ssm  = space->mesh();
             auto  mesh = element_matrix_mesh(space);
             if (!mesh) {
@@ -266,24 +370,31 @@ namespace sfem {
             }
 
             for (size_t b = 0; b < element_matrices.size(); ++b) {
-                auto &matrix = element_matrices[b];
-                if (!matrix) {
-                    continue;
-                }
-
                 if (!block_name.empty() && block_name != ssm.block(b)->name()) {
                     continue;
                 }
 
                 const auto block_id = static_cast<smesh::block_idx_t>(b);
-                sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
-                                                                  mesh->n_elements(block_id),
-                                                                  mesh->n_nodes(),
-                                                                  mesh->elements(block_id)->data(),
-                                                                  mesh->points()->data(),
-                                                                  mu,
-                                                                  lambda,
-                                                                  matrix->data());
+                if (element_matrices[b]) {
+                    sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
+                                                                      mesh->n_elements(block_id),
+                                                                      mesh->n_nodes(),
+                                                                      mesh->elements(block_id)->data(),
+                                                                      mesh->points()->data(),
+                                                                      mu,
+                                                                      lambda,
+                                                                      element_matrices[b]->data());
+                } else if (sstet4_stencils[b]) {
+                    sstet4_stencils[b] = make_sstet4_stencil(smesh::semistructured_level(ssm),
+                                                             ssm.n_elements(block_id),
+                                                             ssm.elements(block_id)->data(),
+                                                             ssm.points()->data(),
+                                                             mu,
+                                                             lambda);
+                    if (!sstet4_stencils[b]) {
+                        SFEM_ERROR("Failed to rebuild SSTET4 linear elasticity stencil\n");
+                    }
+                }
             }
         }
     }

@@ -3,6 +3,7 @@
 // C includes
 #include "sshex8_laplacian.hpp"
 #include "sshex8_stencil_element_matrix_apply.hpp"
+#include "stencil3.hpp"
 
 // C++ includes
 #include "sfem_Laplacian.hpp"
@@ -109,6 +110,7 @@ namespace sfem {
 
         const auto n_blocks = ssm.n_blocks();
         element_matrices.assign(n_blocks, nullptr);
+        element_stencils.assign(n_blocks, nullptr);
         element_matrix = nullptr;
 
         int err = SFEM_SUCCESS;
@@ -138,6 +140,14 @@ namespace sfem {
             if (!element_matrix) {
                 element_matrix = matrix;
             }
+
+            auto stencil = sfem::create_host_buffer<scalar_t>(mesh->n_elements(block_id) * 27);
+#pragma omp parallel for
+            for (ptrdiff_t e = 0; e < mesh->n_elements(block_id); ++e) {
+                hex8_matrix_to_stencil(&matrix->data()[e * 64], &stencil->data()[e * 27]);
+            }
+
+            element_stencils[b] = stencil;
         }
 
         return SFEM_SUCCESS;
@@ -197,12 +207,22 @@ namespace sfem {
             }
 
             const auto block_id = static_cast<smesh::block_idx_t>(b);
-            err                 = sshex8_stencil_element_matrix_apply(smesh::semistructured_level(ssm),
-                                                      ssm.n_elements(block_id),
-                                                      ssm.elements(block_id)->data(),
-                                                      matrix->data(),
-                                                      h,
-                                                      out);
+            if (element_stencils[b]) {
+                err = sshex8_stencil_element_matrix_apply_hyteg(smesh::semistructured_level(ssm),
+                                                                ssm.n_elements(block_id),
+                                                                ssm.elements(block_id)->data(),
+                                                                matrix->data(),
+                                                                element_stencils[b]->data(),
+                                                                h,
+                                                                out);
+            } else {
+                err = sshex8_stencil_element_matrix_apply(smesh::semistructured_level(ssm),
+                                                          ssm.n_elements(block_id),
+                                                          ssm.elements(block_id)->data(),
+                                                          matrix->data(),
+                                                          h,
+                                                          out);
+            }
             if (err != SFEM_SUCCESS) {
                 return err;
             }

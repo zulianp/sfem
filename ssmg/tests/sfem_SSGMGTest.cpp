@@ -172,11 +172,69 @@ int test_ssgmg_linear_elasticity_cube() {
     return test_linear_problem(f, smesh::Path("test_ssgmg_linear_elasticity_cube"));
 }
 
+int test_ssgmg_sstet4_em_linear_elasticity_cube() {
+    auto es = sfem::EXECUTION_SPACE_HOST;
+
+    const char *SFEM_EXECUTION_SPACE{nullptr};
+    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
+
+    if (SFEM_EXECUTION_SPACE) {
+        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
+    }
+
+    const char *SFEM_OPERATOR = "em:LinearElasticity";
+
+    int SFEM_ELEMENT_REFINE_LEVEL = 4;
+    SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
+
+    int SFEM_BASE_RESOLUTION = 2;
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+
+    geom_t Lx = 1;
+    auto   m  = sfem::Mesh::create_tet4_cube(sfem::Communicator::world(),
+                                           SFEM_BASE_RESOLUTION,
+                                           SFEM_BASE_RESOLUTION,
+                                           SFEM_BASE_RESOLUTION,
+                                           0,
+                                           0,
+                                           0,
+                                           Lx,
+                                           1,
+                                           1);
+
+    auto left_ss = sfem::Sideset::create_from_selector(
+            m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > -1e-5 && x < 1e-5; });
+
+    auto right_ss = sfem::Sideset::create_from_selector(
+            m, [=](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool { return x > (Lx - 1e-5) && x < (Lx + 1e-5); });
+
+    m = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
+
+    int  block_size = 3;
+    auto fs         = sfem::FunctionSpace::create(m, block_size);
+
+    auto f  = sfem::Function::create(fs);
+    auto op = sfem::create_op(fs, SFEM_OPERATOR, es);
+    op->initialize();
+    f->add_operator(op);
+
+    sfem::DirichletConditions::Condition left{.sidesets = left_ss, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right0{.sidesets = right_ss, .value = 1, .component = 0};
+    sfem::DirichletConditions::Condition right1{.sidesets = right_ss, .value = 0, .component = 1};
+    sfem::DirichletConditions::Condition right2{.sidesets = right_ss, .value = 0, .component = 2};
+
+    auto conds = sfem::create_dirichlet_conditions(fs, {left, right0, right1, right2}, es);
+    f->add_constraint(conds);
+
+    return test_linear_problem(f, smesh::Path("test_ssgmg_sstet4_em_linear_elasticity_cube"));
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
     SFEM_RUN_TEST(test_ssgmg_poisson_cube);
     SFEM_RUN_TEST(test_ssgmg_linear_elasticity_cube);
+    SFEM_RUN_TEST(test_ssgmg_sstet4_em_linear_elasticity_cube);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

@@ -897,7 +897,7 @@ def parse_args(argv=None):
     p.add_argument("--mg-pre", type=int, default=8)
     p.add_argument("--mg-post", type=int, default=8)
     p.add_argument("--mg-omega", type=float, default=0.4)
-    p.add_argument("--smoother", choices=("sgs", "gs", "block", "scalar"), default="sgs")
+    p.add_argument("--smoother", choices=("jacobi", "sgs", "gs", "block", "scalar"), default="jacobi")
     p.add_argument("--stagnation-threshold", type=float, default=0.999)
     p.add_argument("--skip-coarse", action="store_true")
     p.add_argument("--mu-f", type=float, default=0.3)
