@@ -122,32 +122,81 @@ def compare_visco_validation(baseline_dir, per_elem_dir, out_dir):
     return summary
 
 
-def find_last_step_for_comp(output_dir, comp):
-    files = sorted(output_dir.glob(f"disp.{comp}.*.raw"))
-    if not files:
-        return None
-    best = None
-    best_step = -1
-    for p in files:
-        parts = p.name.split(".")
-        if len(parts) >= 4:
-            try:
-                step = int(parts[2])
-            except Exception:
-                step = -1
-            if step > best_step:
-                best_step = step
-                best = parts[2]
-    if best is None:
-        best = files[-1].name.split(".")[2]
-    return best
+def find_displacement_files(output_dir):
+    for extension in ("float64", "raw"):
+        component_files = []
+        for comp in range(3):
+            files = []
+            for path in output_dir.glob(f"disp.{comp}.*.{extension}"):
+                try:
+                    files.append((int(path.name.split(".")[2]), path))
+                except (IndexError, ValueError):
+                    continue
+            component_files.append(sorted(files))
+
+        if any(component_files):
+            counts = [len(files) for files in component_files]
+            if not all(counts) or any(count != counts[0] for count in counts[1:]):
+                raise RuntimeError(f"displacement component frame counts differ in {output_dir}: {counts}")
+            return extension, component_files
+
+    raise FileNotFoundError(f"no displacement files found in {output_dir}")
 
 
-def load_comp(output_dir, comp, step_str):
-    path = output_dir / f"disp.{comp}.{step_str}.raw"
+def read_times(output_dir, expected_count):
+    path = output_dir / "time.txt"
     if not path.exists():
-        return None
-    return np.fromfile(path, dtype=np.float64)
+        raise FileNotFoundError(f"missing physical time file: {path}")
+
+    times = np.atleast_1d(np.loadtxt(path, dtype=np.float64))
+    if len(times) != expected_count:
+        raise RuntimeError(
+            f"{path} contains {len(times)} times but there are {expected_count} displacement frames; "
+            "the output directory may contain stale files"
+        )
+    return times
+
+
+def load_displacement(component_files, frame):
+    components = [np.fromfile(files[frame][1], dtype=np.float64) for files in component_files]
+    if any(comp.shape != components[0].shape for comp in components[1:]):
+        raise RuntimeError(f"displacement component sizes differ at frame {frame}")
+    return components
+
+
+def plot_spatial_error(diffs, out_dir):
+    fig, ax = plt.subplots(figsize=(12, 5))
+    for diff, color, label in zip(diffs, ("blue", "green", "red"), ("X", "Y", "Z")):
+        ax.plot(np.abs(diff), color=color, linewidth=0.8, label=f"|diff| {label}")
+    ax.set_title("Spatial: Final Step Node-wise Error Distribution", fontweight="bold")
+    ax.set_xlabel("Node Index")
+    ax.set_ylabel("|diff|")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_dir / "spatial_error_distribution.png", dpi=150)
+    plt.close(fig)
+
+
+def plot_temporal_error(temporal, out_dir):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    axes[0].plot(temporal["time"], temporal["max_abs_diff"], "r-o", markersize=2)
+    axes[0].set_title("Maximum Absolute Difference Over Time")
+    axes[0].set_xlabel("Time [s]")
+    axes[0].set_ylabel("max |diff|")
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].plot(temporal["time"], temporal["relative_l2_percent"], "g-o", markersize=2)
+    axes[1].set_title("Relative Error Over Time (||diff|| / ||baseline||)")
+    axes[1].set_xlabel("Time [s]")
+    axes[1].set_ylabel("Relative L2 Error (%)")
+    axes[1].grid(True, alpha=0.3)
+
+    fig.suptitle("Error Summary: per_elem vs baseline", fontweight="bold")
+    fig.tight_layout()
+    fig.savefig(out_dir / "error_summary_simple.png", dpi=150)
+    plt.close(fig)
 
 
 def compare_gravity(baseline_dir, per_elem_dir, out_dir):
@@ -156,31 +205,56 @@ def compare_gravity(baseline_dir, per_elem_dir, out_dir):
     if not base_out.exists() or not elem_out.exists():
         return None
 
-    diffs = []
-    comp_summaries = []
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for comp in range(3):
-        base_step = find_last_step_for_comp(base_out, comp)
-        elem_step = find_last_step_for_comp(elem_out, comp)
-        if base_step is None or elem_step is None:
-            return None
+    base_extension, base_files = find_displacement_files(base_out)
+    elem_extension, elem_files = find_displacement_files(elem_out)
+    base_step_ids = [[step for step, _ in files] for files in base_files]
+    elem_step_ids = [[step for step, _ in files] for files in elem_files]
+    if base_step_ids != elem_step_ids:
+        raise RuntimeError("baseline and per-element displacement field IDs are not aligned")
 
-        base_comp = load_comp(base_out, comp, base_step)
-        elem_comp = load_comp(elem_out, comp, elem_step)
-        if base_comp is None or elem_comp is None:
-            return None
-        if base_comp.shape != elem_comp.shape:
-            return None
+    n_frames = len(base_files[0])
+    base_times = read_times(base_out, n_frames)
+    elem_times = read_times(elem_out, n_frames)
+    if not np.allclose(base_times, elem_times, rtol=0.0, atol=1e-14):
+        raise RuntimeError("baseline and per-element physical times are not aligned")
 
-        diff = elem_comp - base_comp
-        diffs.append(diff)
+    temporal_rows = []
+    final_diffs = None
+    for frame, time in enumerate(base_times):
+        base_components = load_displacement(base_files, frame)
+        elem_components = load_displacement(elem_files, frame)
+        if any(base.shape != elem.shape for base, elem in zip(base_components, elem_components)):
+            raise RuntimeError(f"baseline and per-element displacement sizes differ at frame {frame}")
 
+        diffs = [elem - base for base, elem in zip(base_components, elem_components)]
+        diff_all = np.concatenate(diffs)
+        base_all = np.concatenate(base_components)
+        baseline_norm = np.linalg.norm(base_all)
+        temporal_rows.append(
+            {
+                "time": float(time),
+                "disp0_output_field": base_step_ids[0][frame],
+                "max_abs_diff": float(np.max(np.abs(diff_all))),
+                "rmse": float(np.sqrt(np.mean(diff_all**2))),
+                "relative_l2_percent": float(np.linalg.norm(diff_all) / baseline_norm * 100)
+                if baseline_norm > 0
+                else 0.0,
+            }
+        )
+        final_diffs = diffs
+
+    temporal = pd.DataFrame(temporal_rows)
+    temporal.to_csv(out_dir / "temporal_error_analysis.csv", index=False)
+
+    comp_summaries = []
+    for comp, diff in enumerate(final_diffs):
         comp_summary = {
             "component": comp,
-            "n_nodes": base_comp.shape[0],
-            "base_step": base_step,
-            "per_elem_step": elem_step,
+            "n_nodes": diff.shape[0],
+            "output_field": base_step_ids[comp][-1],
+            "time": float(base_times[-1]),
             "max_abs_diff": float(np.max(np.abs(diff))),
             "rmse": float(np.sqrt(np.mean(diff**2))),
         }
@@ -197,14 +271,27 @@ def compare_gravity(baseline_dir, per_elem_dir, out_dir):
         fig.savefig(out_dir / f"gravity_diff_nodes_comp{comp}.png", dpi=150)
         plt.close(fig)
 
-    diff_all = np.concatenate(diffs)
+    final_diff_all = np.concatenate(final_diffs)
+    peak_max_idx = temporal["max_abs_diff"].idxmax()
+    peak_relative_idx = temporal["relative_l2_percent"].idxmax()
     summary = {
-        "n_nodes": diffs[0].shape[0],
-        "max_abs_diff": float(np.max(np.abs(diff_all))),
-        "rmse": float(np.sqrt(np.mean(diff_all**2))),
+        "n_nodes": final_diffs[0].shape[0],
+        "n_frames": len(temporal),
+        "final_time": float(base_times[-1]),
+        "baseline_format": base_extension,
+        "per_elem_format": elem_extension,
+        "max_abs_diff": float(np.max(np.abs(final_diff_all))),
+        "rmse": float(np.sqrt(np.mean(final_diff_all**2))),
+        "relative_l2_percent": float(temporal.iloc[-1]["relative_l2_percent"]),
+        "peak_max_abs_diff": float(temporal.loc[peak_max_idx, "max_abs_diff"]),
+        "peak_max_abs_time": float(temporal.loc[peak_max_idx, "time"]),
+        "peak_relative_l2_percent": float(temporal.loc[peak_relative_idx, "relative_l2_percent"]),
+        "peak_relative_l2_time": float(temporal.loc[peak_relative_idx, "time"]),
     }
     pd.DataFrame(comp_summaries).to_csv(out_dir / "gravity_diff_summary_by_comp.csv", index=False)
     pd.DataFrame([summary]).to_csv(out_dir / "gravity_diff_summary.csv", index=False)
+    plot_spatial_error(final_diffs, out_dir)
+    plot_temporal_error(temporal, out_dir)
     return summary
 
 
@@ -256,7 +343,7 @@ def main():
             f.write("Gravity Test (final displacement):\n")
             for k, v in gravity_summary.items():
                 if isinstance(v, float):
-                    f.write(f"{k}: {v:.8f}\n")
+                    f.write(f"{k}: {v:.8e}\n")
                 else:
                     f.write(f"{k}: {v}\n")
             f.write("\n")
