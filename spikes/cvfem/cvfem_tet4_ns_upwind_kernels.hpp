@@ -276,6 +276,198 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(const scalar_t    
 #undef GEOM_SIMD_PRAGMA
 }
 
+static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(
+        const scalar_t                        rho_s,
+        const scalar_t                        mu_s,
+        const jacobian_t *const SFEM_RESTRICT adj0_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj1_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj2_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj3_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj4_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj5_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj6_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj7_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj8_ptr,
+        const jacobian_t *const SFEM_RESTRICT det_ptr,
+        const Tet4InputPack                  &u,
+        const Tet4InputPack                  &du,
+        Tet4ResidualPack                     &out) {
+    const scalar_t half = 0.5;
+    const scalar_t two  = 2.0;
+    const scalar_t one  = 1.0;
+    const scalar_t rho  = rho_s;
+    const scalar_t mu   = mu_s;
+
+    const scalar_t c12 = 1.0 / 12.0;
+    const scalar_t c24 = 1.0 / 24.0;
+
+    alignas(ALIGN_BYTES) scalar_t dg00v[VEC_SIZE], dg01v[VEC_SIZE], dg02v[VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t dg10v[VEC_SIZE], dg11v[VEC_SIZE], dg12v[VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t dg20v[VEC_SIZE], dg21v[VEC_SIZE], dg22v[VEC_SIZE];
+
+#pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < VEC_SIZE; ++lane) {
+        const scalar_t adj0    = scalar_t(adj0_ptr[lane]);
+        const scalar_t adj1    = scalar_t(adj1_ptr[lane]);
+        const scalar_t adj2    = scalar_t(adj2_ptr[lane]);
+        const scalar_t adj3    = scalar_t(adj3_ptr[lane]);
+        const scalar_t adj4    = scalar_t(adj4_ptr[lane]);
+        const scalar_t adj5    = scalar_t(adj5_ptr[lane]);
+        const scalar_t adj6    = scalar_t(adj6_ptr[lane]);
+        const scalar_t adj7    = scalar_t(adj7_ptr[lane]);
+        const scalar_t adj8    = scalar_t(adj8_ptr[lane]);
+        const scalar_t inv_det = 1.0 / scalar_t(det_ptr[lane]);
+        const scalar_t vx0     = du.ux[0][lane];
+        const scalar_t dvx0    = du.ux[1][lane] - vx0;
+        const scalar_t dvx1    = du.ux[2][lane] - vx0;
+        const scalar_t dvx2    = du.ux[3][lane] - vx0;
+        const scalar_t vy0     = du.uy[0][lane];
+        const scalar_t dvy0    = du.uy[1][lane] - vy0;
+        const scalar_t dvy1    = du.uy[2][lane] - vy0;
+        const scalar_t dvy2    = du.uy[3][lane] - vy0;
+        const scalar_t vz0     = du.uz[0][lane];
+        const scalar_t dvz0    = du.uz[1][lane] - vz0;
+        const scalar_t dvz1    = du.uz[2][lane] - vz0;
+        const scalar_t dvz2    = du.uz[3][lane] - vz0;
+        dg00v[lane]            = (dvx0 * adj0 + dvx1 * adj3 + dvx2 * adj6) * inv_det;
+        dg01v[lane]            = (dvx0 * adj1 + dvx1 * adj4 + dvx2 * adj7) * inv_det;
+        dg02v[lane]            = (dvx0 * adj2 + dvx1 * adj5 + dvx2 * adj8) * inv_det;
+        dg10v[lane]            = (dvy0 * adj0 + dvy1 * adj3 + dvy2 * adj6) * inv_det;
+        dg11v[lane]            = (dvy0 * adj1 + dvy1 * adj4 + dvy2 * adj7) * inv_det;
+        dg12v[lane]            = (dvy0 * adj2 + dvy1 * adj5 + dvy2 * adj8) * inv_det;
+        dg20v[lane]            = (dvz0 * adj0 + dvz1 * adj3 + dvz2 * adj6) * inv_det;
+        dg21v[lane]            = (dvz0 * adj1 + dvz1 * adj4 + dvz2 * adj7) * inv_det;
+        dg22v[lane]            = (dvz0 * adj2 + dvz1 * adj5 + dvz2 * adj8) * inv_det;
+        for (int a = 0; a < 4; ++a) {
+            out.rx[a][lane] = 0.0;
+            out.ry[a][lane] = 0.0;
+            out.rz[a][lane] = 0.0;
+            out.rc[a][lane] = 0.0;
+        }
+    }
+
+#define GEOM_SIMD_PRAGMA                                                                             \
+    _Pragma(                                                                                         \
+            "omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr: 64)")
+
+#define ACTION_AREA3(AR0, AR1, AR2)                                                                  \
+    const scalar_t adj0 = scalar_t(adj0_ptr[lane]);                                                  \
+    const scalar_t adj1 = scalar_t(adj1_ptr[lane]);                                                  \
+    const scalar_t adj2 = scalar_t(adj2_ptr[lane]);                                                  \
+    const scalar_t adj3 = scalar_t(adj3_ptr[lane]);                                                  \
+    const scalar_t adj4 = scalar_t(adj4_ptr[lane]);                                                  \
+    const scalar_t adj5 = scalar_t(adj5_ptr[lane]);                                                  \
+    const scalar_t adj6 = scalar_t(adj6_ptr[lane]);                                                  \
+    const scalar_t adj7 = scalar_t(adj7_ptr[lane]);                                                  \
+    const scalar_t adj8 = scalar_t(adj8_ptr[lane]);                                                  \
+    const scalar_t ax   = adj0 * (AR0) + adj3 * (AR1) + adj6 * (AR2);                                 \
+    const scalar_t ay   = adj1 * (AR0) + adj4 * (AR1) + adj7 * (AR2);                                 \
+    const scalar_t az   = adj2 * (AR0) + adj5 * (AR1) + adj8 * (AR2)
+
+#define ACTION_AREA_AR2_0(AR0, AR1)                                                                  \
+    const scalar_t adj0 = scalar_t(adj0_ptr[lane]);                                                  \
+    const scalar_t adj1 = scalar_t(adj1_ptr[lane]);                                                  \
+    const scalar_t adj2 = scalar_t(adj2_ptr[lane]);                                                  \
+    const scalar_t adj3 = scalar_t(adj3_ptr[lane]);                                                  \
+    const scalar_t adj4 = scalar_t(adj4_ptr[lane]);                                                  \
+    const scalar_t adj5 = scalar_t(adj5_ptr[lane]);                                                  \
+    const scalar_t ax   = adj0 * (AR0) + adj3 * (AR1);                                                \
+    const scalar_t ay   = adj1 * (AR0) + adj4 * (AR1);                                                \
+    const scalar_t az   = adj2 * (AR0) + adj5 * (AR1)
+
+#define ACTION_AREA_AR1_0(AR0, AR2)                                                                  \
+    const scalar_t adj0 = scalar_t(adj0_ptr[lane]);                                                  \
+    const scalar_t adj1 = scalar_t(adj1_ptr[lane]);                                                  \
+    const scalar_t adj2 = scalar_t(adj2_ptr[lane]);                                                  \
+    const scalar_t adj6 = scalar_t(adj6_ptr[lane]);                                                  \
+    const scalar_t adj7 = scalar_t(adj7_ptr[lane]);                                                  \
+    const scalar_t adj8 = scalar_t(adj8_ptr[lane]);                                                  \
+    const scalar_t ax   = adj0 * (AR0) + adj6 * (AR2);                                                \
+    const scalar_t ay   = adj1 * (AR0) + adj7 * (AR2);                                                \
+    const scalar_t az   = adj2 * (AR0) + adj8 * (AR2)
+
+#define ACTION_AREA_AR0_0(AR1, AR2)                                                                  \
+    const scalar_t adj3 = scalar_t(adj3_ptr[lane]);                                                  \
+    const scalar_t adj4 = scalar_t(adj4_ptr[lane]);                                                  \
+    const scalar_t adj5 = scalar_t(adj5_ptr[lane]);                                                  \
+    const scalar_t adj6 = scalar_t(adj6_ptr[lane]);                                                  \
+    const scalar_t adj7 = scalar_t(adj7_ptr[lane]);                                                  \
+    const scalar_t adj8 = scalar_t(adj8_ptr[lane]);                                                  \
+    const scalar_t ax   = adj3 * (AR1) + adj6 * (AR2);                                                \
+    const scalar_t ay   = adj4 * (AR1) + adj7 * (AR2);                                                \
+    const scalar_t az   = adj5 * (AR1) + adj8 * (AR2)
+
+#define SCS_ACTION_LANES(I, J, AREA)                                                                 \
+    do {                                                                                             \
+        GEOM_SIMD_PRAGMA for (int lane = 0; lane < VEC_SIZE; ++lane) {                               \
+            AREA;                                                                                    \
+            const scalar_t uxI      = u.ux[I][lane];                                                 \
+            const scalar_t uxJ      = u.ux[J][lane];                                                 \
+            const scalar_t uyI      = u.uy[I][lane];                                                 \
+            const scalar_t uyJ      = u.uy[J][lane];                                                 \
+            const scalar_t uzI      = u.uz[I][lane];                                                 \
+            const scalar_t uzJ      = u.uz[J][lane];                                                 \
+            const scalar_t vxI      = du.ux[I][lane];                                                \
+            const scalar_t vxJ      = du.ux[J][lane];                                                \
+            const scalar_t vyI      = du.uy[I][lane];                                                \
+            const scalar_t vyJ      = du.uy[J][lane];                                                \
+            const scalar_t vzI      = du.uz[I][lane];                                                \
+            const scalar_t vzJ      = du.uz[J][lane];                                                \
+            const scalar_t adv_x    = half * (uxI + uxJ);                                            \
+            const scalar_t adv_y    = half * (uyI + uyJ);                                            \
+            const scalar_t adv_z    = half * (uzI + uzJ);                                            \
+            const scalar_t mdot     = rho * (adv_x * ax + adv_y * ay + adv_z * az);                  \
+            const scalar_t mdot_abs = mdot < scalar_t(0) ? -mdot : mdot;                             \
+            const scalar_t mdot_pos = half * (mdot + mdot_abs);                                      \
+            const scalar_t mdot_neg = half * (mdot - mdot_abs);                                      \
+            const scalar_t sgn      = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : 0.0);  \
+            const scalar_t d_pos    = half * (one + sgn);                                            \
+            const scalar_t d_neg    = half * (one - sgn);                                            \
+            const scalar_t dmdot    = rho * half * ((vxI + vxJ) * ax + (vyI + vyJ) * ay + (vzI + vzJ) * az); \
+            const scalar_t dpos     = d_pos * dmdot;                                                 \
+            const scalar_t dneg     = d_neg * dmdot;                                                 \
+            const scalar_t q_mid    = half * (du.p[I][lane] + du.p[J][lane]);                        \
+            const scalar_t dg00     = dg00v[lane];                                                   \
+            const scalar_t dg01     = dg01v[lane];                                                   \
+            const scalar_t dg02     = dg02v[lane];                                                   \
+            const scalar_t dg10     = dg10v[lane];                                                   \
+            const scalar_t dg11     = dg11v[lane];                                                   \
+            const scalar_t dg12     = dg12v[lane];                                                   \
+            const scalar_t dg20     = dg20v[lane];                                                   \
+            const scalar_t dg21     = dg21v[lane];                                                   \
+            const scalar_t dg22     = dg22v[lane];                                                   \
+            const scalar_t tau_x    = mu * ((two * dg00) * ax + (dg01 + dg10) * ay + (dg02 + dg20) * az); \
+            const scalar_t tau_y    = mu * ((dg10 + dg01) * ax + (two * dg11) * ay + (dg12 + dg21) * az); \
+            const scalar_t tau_z    = mu * ((dg20 + dg02) * ax + (dg21 + dg12) * ay + (two * dg22) * az); \
+            const scalar_t fx       = dpos * uxI + mdot_pos * vxI + dneg * uxJ + mdot_neg * vxJ + q_mid * ax - tau_x; \
+            const scalar_t fy       = dpos * uyI + mdot_pos * vyI + dneg * uyJ + mdot_neg * vyJ + q_mid * ay - tau_y; \
+            const scalar_t fz       = dpos * uzI + mdot_pos * vzI + dneg * uzJ + mdot_neg * vzJ + q_mid * az - tau_z; \
+            out.rx[I][lane] += fx;                                                                   \
+            out.ry[I][lane] += fy;                                                                   \
+            out.rz[I][lane] += fz;                                                                   \
+            out.rc[I][lane] += dmdot;                                                                \
+            out.rx[J][lane] -= fx;                                                                   \
+            out.ry[J][lane] -= fy;                                                                   \
+            out.rz[J][lane] -= fz;                                                                   \
+            out.rc[J][lane] -= dmdot;                                                                \
+        }                                                                                            \
+    } while (0)
+
+    SCS_ACTION_LANES(0, 1, ACTION_AREA3(c12, c24, c24));
+    SCS_ACTION_LANES(0, 2, ACTION_AREA3(c24, c12, c24));
+    SCS_ACTION_LANES(0, 3, ACTION_AREA3(c24, c24, c12));
+    SCS_ACTION_LANES(1, 2, ACTION_AREA_AR2_0(-c24, c24));
+    SCS_ACTION_LANES(1, 3, ACTION_AREA_AR1_0(-c24, c24));
+    SCS_ACTION_LANES(2, 3, ACTION_AREA_AR0_0(-c24, c24));
+
+#undef SCS_ACTION_LANES
+#undef ACTION_AREA3
+#undef ACTION_AREA_AR2_0
+#undef ACTION_AREA_AR1_0
+#undef ACTION_AREA_AR0_0
+#undef GEOM_SIMD_PRAGMA
+}
+
 static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_dense(const scalar_t                rho,
                                                             const scalar_t                mu,
                                                             const scalar_t                adj0,
@@ -526,6 +718,46 @@ static SFEM_INLINE void cvfem_run_residual_kernel(const scalar_t                
     alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE], a8[VEC_SIZE], detp[VEC_SIZE];
     cvfem_pad_geom_lanes(adj0, adj1, adj2, adj3, adj4, adj5, adj6, adj7, adj8, det, nlanes, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp);
     cvfem_tet4_ns_upwind_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, in, out);
+}
+
+static SFEM_INLINE void cvfem_run_jacobian_action_kernel(const scalar_t                        rho,
+                                                         const scalar_t                        mu,
+                                                         const jacobian_t *const SFEM_RESTRICT adj0,
+                                                         const jacobian_t *const SFEM_RESTRICT adj1,
+                                                         const jacobian_t *const SFEM_RESTRICT adj2,
+                                                         const jacobian_t *const SFEM_RESTRICT adj3,
+                                                         const jacobian_t *const SFEM_RESTRICT adj4,
+                                                         const jacobian_t *const SFEM_RESTRICT adj5,
+                                                         const jacobian_t *const SFEM_RESTRICT adj6,
+                                                         const jacobian_t *const SFEM_RESTRICT adj7,
+                                                         const jacobian_t *const SFEM_RESTRICT adj8,
+                                                         const jacobian_t *const SFEM_RESTRICT det,
+                                                         const int                             nlanes,
+                                                         const Tet4InputPack                  &u,
+                                                         const Tet4InputPack                  &du,
+                                                         Tet4ResidualPack                     &out) {
+    if (nlanes == VEC_SIZE) {
+        cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(rho,
+                                                              mu,
+                                                              cvfem_aligned_geom(adj0),
+                                                              cvfem_aligned_geom(adj1),
+                                                              cvfem_aligned_geom(adj2),
+                                                              cvfem_aligned_geom(adj3),
+                                                              cvfem_aligned_geom(adj4),
+                                                              cvfem_aligned_geom(adj5),
+                                                              cvfem_aligned_geom(adj6),
+                                                              cvfem_aligned_geom(adj7),
+                                                              cvfem_aligned_geom(adj8),
+                                                              cvfem_aligned_geom(det),
+                                                              u,
+                                                              du,
+                                                              out);
+        return;
+    }
+    alignas(ALIGN_BYTES) jacobian_t a0[VEC_SIZE], a1[VEC_SIZE], a2[VEC_SIZE], a3[VEC_SIZE], a4[VEC_SIZE];
+    alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE], a8[VEC_SIZE], detp[VEC_SIZE];
+    cvfem_pad_geom_lanes(adj0, adj1, adj2, adj3, adj4, adj5, adj6, adj7, adj8, det, nlanes, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp);
+    cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, u, du, out);
 }
 
 template <typename Idx>

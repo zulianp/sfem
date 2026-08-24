@@ -55,6 +55,10 @@ def build_symbols() -> dict[str, object]:
         "uy": sp.symbols("uy0:4"),
         "uz": sp.symbols("uz0:4"),
         "p": sp.symbols("p0:4"),
+        "vx": sp.symbols("vx0:4"),
+        "vy": sp.symbols("vy0:4"),
+        "vz": sp.symbols("vz0:4"),
+        "dp": sp.symbols("dp0:4"),
         "sgn": sp.symbols("sgn0:6"),
     }
 
@@ -295,17 +299,43 @@ def simd_input_locals() -> str:
     return "\n".join(lines)
 
 
-def sign_locals(mdots: list[sp.Expr]) -> str:
+def simd_action_input_locals() -> str:
+    lines = [
+        "        const scalar_t adj0 = scalar_t(adj0_ptr[lane]);",
+        "        const scalar_t adj1 = scalar_t(adj1_ptr[lane]);",
+        "        const scalar_t adj2 = scalar_t(adj2_ptr[lane]);",
+        "        const scalar_t adj3 = scalar_t(adj3_ptr[lane]);",
+        "        const scalar_t adj4 = scalar_t(adj4_ptr[lane]);",
+        "        const scalar_t adj5 = scalar_t(adj5_ptr[lane]);",
+        "        const scalar_t adj6 = scalar_t(adj6_ptr[lane]);",
+        "        const scalar_t adj7 = scalar_t(adj7_ptr[lane]);",
+        "        const scalar_t adj8 = scalar_t(adj8_ptr[lane]);",
+        "        const scalar_t det = scalar_t(det_ptr[lane]);",
+    ]
+    for name in ("ux", "uy", "uz"):
+        for i in range(4):
+            lines.append(f"        const scalar_t {name}{i} = u.{name}[{i}][lane];")
+    for src, dst in (("ux", "vx"), ("uy", "vy"), ("uz", "vz"), ("p", "dp")):
+        for i in range(4):
+            lines.append(f"        const scalar_t {dst}{i} = du.{src}[{i}][lane];")
+    return "\n".join(lines)
+
+
+def sign_locals_with_indent(mdots: list[sp.Expr], indent: str) -> str:
     printer = ScalarPrinter()
     lines: list[str] = []
     for s, mdot in enumerate(mdots):
         expr = printer.doprint(mdot)
-        lines.append(f"    const scalar_t mdot{s} = {expr};")
+        lines.append(f"{indent}const scalar_t mdot{s} = {expr};")
         lines.append(
-            f"    const scalar_t sgn{s} = mdot{s} > scalar_t(0) ? scalar_t(1) : "
+            f"{indent}const scalar_t sgn{s} = mdot{s} > scalar_t(0) ? scalar_t(1) : "
             f"(mdot{s} < scalar_t(0) ? scalar_t(-1) : scalar_t(0));"
         )
     return "\n".join(lines)
+
+
+def sign_locals(mdots: list[sp.Expr]) -> str:
+    return sign_locals_with_indent(mdots, "    ")
 
 
 def sign_vector_locals(mdots: list[sp.Expr]) -> str:
@@ -500,6 +530,15 @@ def generate() -> str:
     for a in range(4):
         q.extend((sym["ux"][a], sym["uy"][a], sym["uz"][a], sym["p"][a]))
     jac = [sp.diff(row, col) for row in jac_residual for col in q]
+    v = []
+    for a in range(4):
+        v.extend((sym["vx"][a], sym["vy"][a], sym["vz"][a], sym["dp"][a]))
+    action = []
+    for row in range(N_DOF):
+        acc = sp.Integer(0)
+        for col in range(N_DOF):
+            acc += jac[row * N_DOF + col] * v[col]
+        action.append(sp.simplify(acc))
     face_jacs: list[list[sp.Expr]] = []
     face_mdots: list[sp.Expr] = []
     for s in range(len(SCS)):
@@ -558,6 +597,70 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_residual_simd_microkernel(
 {simd_input_locals()}
 {cse_code(residual, residual_pack_outputs(), indent="        ")}
     }}
+}}
+
+static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microkernel(
+        const scalar_t                        rho,
+        const scalar_t                        mu,
+        const jacobian_t *const SFEM_RESTRICT adj0_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj1_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj2_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj3_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj4_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj5_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj6_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj7_ptr,
+        const jacobian_t *const SFEM_RESTRICT adj8_ptr,
+        const jacobian_t *const SFEM_RESTRICT det_ptr,
+        const Tet4InputPack                  &u,
+        const Tet4InputPack                  &du,
+        Tet4ResidualPack                     &out) {{
+#pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < VEC_SIZE; ++lane) {{
+{simd_action_input_locals()}
+{sign_locals_with_indent(mdots, "        ")}
+{cse_code(action, residual_pack_outputs(), indent="        ")}
+    }}
+}}
+
+static SFEM_INLINE void cvfem_run_jacobian_action_sympy_kernel(const scalar_t                        rho,
+                                                               const scalar_t                        mu,
+                                                               const jacobian_t *const SFEM_RESTRICT adj0,
+                                                               const jacobian_t *const SFEM_RESTRICT adj1,
+                                                               const jacobian_t *const SFEM_RESTRICT adj2,
+                                                               const jacobian_t *const SFEM_RESTRICT adj3,
+                                                               const jacobian_t *const SFEM_RESTRICT adj4,
+                                                               const jacobian_t *const SFEM_RESTRICT adj5,
+                                                               const jacobian_t *const SFEM_RESTRICT adj6,
+                                                               const jacobian_t *const SFEM_RESTRICT adj7,
+                                                               const jacobian_t *const SFEM_RESTRICT adj8,
+                                                               const jacobian_t *const SFEM_RESTRICT det,
+                                                               const int                             nlanes,
+                                                               const Tet4InputPack                  &u,
+                                                               const Tet4InputPack                  &du,
+                                                               Tet4ResidualPack                     &out) {{
+    if (nlanes == VEC_SIZE) {{
+        cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microkernel(rho,
+                                                                    mu,
+                                                                    cvfem_aligned_geom(adj0),
+                                                                    cvfem_aligned_geom(adj1),
+                                                                    cvfem_aligned_geom(adj2),
+                                                                    cvfem_aligned_geom(adj3),
+                                                                    cvfem_aligned_geom(adj4),
+                                                                    cvfem_aligned_geom(adj5),
+                                                                    cvfem_aligned_geom(adj6),
+                                                                    cvfem_aligned_geom(adj7),
+                                                                    cvfem_aligned_geom(adj8),
+                                                                    cvfem_aligned_geom(det),
+                                                                    u,
+                                                                    du,
+                                                                    out);
+        return;
+    }}
+    alignas(ALIGN_BYTES) jacobian_t a0[VEC_SIZE], a1[VEC_SIZE], a2[VEC_SIZE], a3[VEC_SIZE], a4[VEC_SIZE];
+    alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE], a8[VEC_SIZE], detp[VEC_SIZE];
+    cvfem_pad_geom_lanes(adj0, adj1, adj2, adj3, adj4, adj5, adj6, adj7, adj8, det, nlanes, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp);
+    cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, u, du, out);
 }}
 
 static SFEM_INLINE void cvfem_run_residual_sympy_kernel(const scalar_t                        rho,

@@ -49,6 +49,7 @@ using pack_idx_t = uint16_t;
 static constexpr int VEC_SIZE = VEC_BYTES / int(sizeof(scalar_t));
 static_assert(VEC_SIZE >= 1, "invalid vector size");
 static constexpr int N_FIELDS    = 4;
+static constexpr int N_ACTION_BASE_FIELDS = 4;
 static constexpr int ALIGN_BYTES = 64;
 
 #include "cvfem_tet4_ns_upwind_kernels.hpp"
@@ -175,6 +176,8 @@ struct PackedData {
     std::vector<smesh::idx_t>                      ghost_mat_col;
     std::vector<smesh::count_t>                    ghost_mat_slot;
     std::vector<scalar_t>                          ghost_mat_val;
+    ptrdiff_t                                      action_base_stride{0};
+    std::vector<scalar_t>                          action_base_velocity;
 };
 
 static ptrdiff_t parse_size(const char *s) {
@@ -574,6 +577,74 @@ static SFEM_INLINE void gather_tet4_pack_local(pack_idx_t **const SFEM_RESTRICT 
     }
 }
 
+static SFEM_INLINE void gather_tet4_action_pack_local(pack_idx_t **const SFEM_RESTRICT    elems,
+                                                      const scalar_t *const SFEM_RESTRICT pack_velocity,
+                                                      const scalar_t *const SFEM_RESTRICT pack_dir,
+                                                      const ptrdiff_t                     begin,
+                                                      const int                           nlanes,
+                                                      Tet4InputPack                      &u_pack,
+                                                      Tet4InputPack                      &du_pack) {
+    const pack_idx_t *const SFEM_RESTRICT e0 = elems[0] + begin;
+    const pack_idx_t *const SFEM_RESTRICT e1 = elems[1] + begin;
+    const pack_idx_t *const SFEM_RESTRICT e2 = elems[2] + begin;
+    const pack_idx_t *const SFEM_RESTRICT e3 = elems[3] + begin;
+
+#pragma omp simd
+    for (int lane = 0; lane < nlanes; ++lane) {
+        const scalar_t *const SFEM_RESTRICT u0 = pack_velocity + (ptrdiff_t)e0[lane] * N_ACTION_BASE_FIELDS;
+        const scalar_t *const SFEM_RESTRICT u1 = pack_velocity + (ptrdiff_t)e1[lane] * N_ACTION_BASE_FIELDS;
+        const scalar_t *const SFEM_RESTRICT u2 = pack_velocity + (ptrdiff_t)e2[lane] * N_ACTION_BASE_FIELDS;
+        const scalar_t *const SFEM_RESTRICT u3 = pack_velocity + (ptrdiff_t)e3[lane] * N_ACTION_BASE_FIELDS;
+        const scalar_t *const SFEM_RESTRICT d0 = pack_dir + (ptrdiff_t)e0[lane] * N_FIELDS;
+        const scalar_t *const SFEM_RESTRICT d1 = pack_dir + (ptrdiff_t)e1[lane] * N_FIELDS;
+        const scalar_t *const SFEM_RESTRICT d2 = pack_dir + (ptrdiff_t)e2[lane] * N_FIELDS;
+        const scalar_t *const SFEM_RESTRICT d3 = pack_dir + (ptrdiff_t)e3[lane] * N_FIELDS;
+        u_pack.ux[0][lane]                     = u0[0];
+        u_pack.uy[0][lane]                     = u0[1];
+        u_pack.uz[0][lane]                     = u0[2];
+        u_pack.ux[1][lane]                     = u1[0];
+        u_pack.uy[1][lane]                     = u1[1];
+        u_pack.uz[1][lane]                     = u1[2];
+        u_pack.ux[2][lane]                     = u2[0];
+        u_pack.uy[2][lane]                     = u2[1];
+        u_pack.uz[2][lane]                     = u2[2];
+        u_pack.ux[3][lane]                     = u3[0];
+        u_pack.uy[3][lane]                     = u3[1];
+        u_pack.uz[3][lane]                     = u3[2];
+        du_pack.ux[0][lane]                    = d0[0];
+        du_pack.uy[0][lane]                    = d0[1];
+        du_pack.uz[0][lane]                    = d0[2];
+        du_pack.p[0][lane]                     = d0[3];
+        du_pack.ux[1][lane]                    = d1[0];
+        du_pack.uy[1][lane]                    = d1[1];
+        du_pack.uz[1][lane]                    = d1[2];
+        du_pack.p[1][lane]                     = d1[3];
+        du_pack.ux[2][lane]                    = d2[0];
+        du_pack.uy[2][lane]                    = d2[1];
+        du_pack.uz[2][lane]                    = d2[2];
+        du_pack.p[2][lane]                     = d2[3];
+        du_pack.ux[3][lane]                    = d3[0];
+        du_pack.uy[3][lane]                    = d3[1];
+        du_pack.uz[3][lane]                    = d3[2];
+        du_pack.p[3][lane]                     = d3[3];
+    }
+
+    if (nlanes < VEC_SIZE) {
+        const int last = nlanes - 1;
+        for (int lane = nlanes; lane < VEC_SIZE; ++lane) {
+            for (int a = 0; a < 4; ++a) {
+                u_pack.ux[a][lane]  = u_pack.ux[a][last];
+                u_pack.uy[a][lane]  = u_pack.uy[a][last];
+                u_pack.uz[a][lane]  = u_pack.uz[a][last];
+                du_pack.ux[a][lane] = du_pack.ux[a][last];
+                du_pack.uy[a][lane] = du_pack.uy[a][last];
+                du_pack.uz[a][lane] = du_pack.uz[a][last];
+                du_pack.p[a][lane]  = du_pack.p[a][last];
+            }
+        }
+    }
+}
+
 static SFEM_INLINE void run_microkernel(const MeshData      &d,
                                         const scalar_t       rho,
                                         const scalar_t       mu,
@@ -620,6 +691,58 @@ static SFEM_INLINE void run_microkernel_sympy(const MeshData      &d,
                                     nlanes,
                                     in,
                                     out);
+}
+
+static SFEM_INLINE void run_jacobian_action_microkernel(const MeshData      &d,
+                                                        const scalar_t       rho,
+                                                        const scalar_t       mu,
+                                                        const ptrdiff_t      begin,
+                                                        const int            nlanes,
+                                                        const Tet4InputPack &u,
+                                                        const Tet4InputPack &du,
+                                                        Tet4ResidualPack    &out) {
+    cvfem_run_jacobian_action_kernel(rho,
+                                     mu,
+                                     d.adj[0].data() + begin,
+                                     d.adj[1].data() + begin,
+                                     d.adj[2].data() + begin,
+                                     d.adj[3].data() + begin,
+                                     d.adj[4].data() + begin,
+                                     d.adj[5].data() + begin,
+                                     d.adj[6].data() + begin,
+                                     d.adj[7].data() + begin,
+                                     d.adj[8].data() + begin,
+                                     d.det.data() + begin,
+                                     nlanes,
+                                     u,
+                                     du,
+                                     out);
+}
+
+static SFEM_INLINE void run_jacobian_action_microkernel_sympy(const MeshData      &d,
+                                                              const scalar_t       rho,
+                                                              const scalar_t       mu,
+                                                              const ptrdiff_t      begin,
+                                                              const int            nlanes,
+                                                              const Tet4InputPack &u,
+                                                              const Tet4InputPack &du,
+                                                              Tet4ResidualPack    &out) {
+    cvfem_run_jacobian_action_sympy_kernel(rho,
+                                           mu,
+                                           d.adj[0].data() + begin,
+                                           d.adj[1].data() + begin,
+                                           d.adj[2].data() + begin,
+                                           d.adj[3].data() + begin,
+                                           d.adj[4].data() + begin,
+                                           d.adj[5].data() + begin,
+                                           d.adj[6].data() + begin,
+                                           d.adj[7].data() + begin,
+                                           d.adj[8].data() + begin,
+                                           d.det.data() + begin,
+                                           nlanes,
+                                           u,
+                                           du,
+                                           out);
 }
 
 static SFEM_INLINE void jacobian_element_global(const MeshData                 &d,
@@ -1129,6 +1252,126 @@ static SFEM_NOINLINE void cvfem_tet4_ns_upwind_apply_sympy_packed(MeshData &d,
             scalar_t                            sum   = 0.0;
             for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
             out_fields[f][dest] += sum;
+        }
+    }
+}
+
+static void cvfem_tet4_ns_upwind_prepack_action_base_velocity(MeshData &d, PackedData &p) {
+    p.action_base_stride = std::max<ptrdiff_t>(p.max_actual_nodes_per_pack, 1);
+    p.action_base_velocity.assign(
+            (size_t)p.n_packs * (size_t)p.action_base_stride * (size_t)N_ACTION_BASE_FIELDS, scalar_t(0));
+
+    const scalar_t *const SFEM_RESTRICT ux = d.ux.data();
+    const scalar_t *const SFEM_RESTRICT uy = d.uy.data();
+    const scalar_t *const SFEM_RESTRICT uz = d.uz.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+        scalar_t *const SFEM_RESTRICT base =
+                p.action_base_velocity.data() + (size_t)pack * (size_t)p.action_base_stride * (size_t)N_ACTION_BASE_FIELDS;
+        const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
+        const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+        const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+        const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+            scalar_t *const SFEM_RESTRICT dst = base + k * N_ACTION_BASE_FIELDS;
+            const ptrdiff_t               g   = owned + k;
+            dst[0]                            = ux[g];
+            dst[1]                            = uy[g];
+            dst[2]                            = uz[g];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+            scalar_t *const SFEM_RESTRICT dst = base + (n_contiguous + k) * N_ACTION_BASE_FIELDS;
+            const smesh::idx_t            g   = ghosts[k];
+            dst[0]                            = ux[g];
+            dst[1]                            = uy[g];
+            dst[2]                            = uz[g];
+        }
+    }
+}
+
+static SFEM_NOINLINE void cvfem_tet4_ns_upwind_jacobian_action_packed(MeshData              &d,
+                                                                      PackedData            &p,
+                                                                      const scalar_t         rho,
+                                                                      const scalar_t         mu,
+                                                                      const scalar_t *const  dir,
+                                                                      scalar_t *const        jv,
+                                                                      const bool             use_sympy_action) {
+    const size_t                        scratch_n = packed_scratch_n(p);
+    if (p.action_base_velocity.empty()) cvfem_tet4_ns_upwind_prepack_action_base_velocity(d, p);
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+            const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
+            const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+            const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
+            const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
+            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
+            const scalar_t *const SFEM_RESTRICT      pack_u       =
+                    p.action_base_velocity.data() + (size_t)pack * (size_t)p.action_base_stride * (size_t)N_ACTION_BASE_FIELDS;
+
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+
+            std::memcpy(pack_dir, dir + owned * N_FIELDS, (size_t)n_contiguous * (size_t)N_FIELDS * sizeof(scalar_t));
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                scalar_t *const SFEM_RESTRICT       dst_d = pack_dir + (n_contiguous + k) * N_FIELDS;
+                const smesh::idx_t                  g     = ghosts[k];
+                const scalar_t *const SFEM_RESTRICT src_d = dir + (ptrdiff_t)g * N_FIELDS;
+                dst_d[0]                                  = src_d[0];
+                dst_d[1]                                  = src_d[1];
+                dst_d[2]                                  = src_d[2];
+                dst_d[3]                                  = src_d[3];
+            }
+
+            for (ptrdiff_t begin = e_start; begin < e_end; begin += VEC_SIZE) {
+                const int        nlanes = int(MIN((ptrdiff_t)VEC_SIZE, e_end - begin));
+                Tet4InputPack    u_pack;
+                Tet4InputPack    du_pack;
+                Tet4ResidualPack out;
+                gather_tet4_action_pack_local(p.elems, pack_u, pack_dir, begin, nlanes, u_pack, du_pack);
+                if (use_sympy_action)
+                    run_jacobian_action_microkernel_sympy(d, rho, mu, begin, nlanes, u_pack, du_pack, out);
+                else
+                    run_jacobian_action_microkernel(d, rho, mu, begin, nlanes, u_pack, du_pack, out);
+                scatter_tet4_pack_local(p.elems, pack_out, begin, nlanes, out);
+            }
+
+            std::memcpy(jv + owned * N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)N_FIELDS * sizeof(scalar_t));
+
+            scalar_t *const SFEM_RESTRICT gx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gy = p.ghost_buf.data() + 1 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gc = p.ghost_buf.data() + 3 * p.n_ghost_entries;
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT po = pack_out + (n_contiguous + k) * N_FIELDS;
+                gx[ghost_off + k]                      = po[0];
+                gy[ghost_off + k]                      = po[1];
+                gz[ghost_off + k]                      = po[2];
+                gc[ghost_off + k]                      = po[3];
+            }
+        }
+    }
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        scalar_t *const    out   = jv + (ptrdiff_t)dest * N_FIELDS;
+        for (int f = 0; f < N_FIELDS; ++f) {
+            const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + f * p.n_ghost_entries;
+            scalar_t                            sum   = 0.0;
+            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
+            out[f] += sum;
         }
     }
 }
@@ -2553,6 +2796,17 @@ static scalar_t checksum(const MeshData &d) {
     return sum;
 }
 
+static scalar_t checksum_vec(const scalar_t *const x, const ptrdiff_t nnodes) {
+    scalar_t        sum    = 0.0;
+    const ptrdiff_t stride = std::max<ptrdiff_t>(1, nnodes / 4096);
+    for (ptrdiff_t i = 0; i < nnodes; i += stride) {
+        const scalar_t *const xi = x + i * N_FIELDS;
+        const scalar_t        w  = 1.0 + scalar_t(i % 17) * 0.01;
+        sum += w * (xi[0] + 1.3 * xi[1] + 1.7 * xi[2] + 2.1 * xi[3]);
+    }
+    return sum;
+}
+
 static scalar_t max_abs_diff(const std::vector<scalar_t> &a, const std::vector<scalar_t> &b) {
     scalar_t        m = 0.0;
     const ptrdiff_t n = ptrdiff_t(a.size());
@@ -2576,6 +2830,8 @@ int main(int argc, char **argv) {
     int         verify    = 0;
     int         verify_jac = 0;
     int         assemble  = 0;
+    int         jac_action = 0;
+    int         bsr_apply  = 0;
     int         pack_size = 2048;
     int         use_sfc   = 1;
 
@@ -2605,13 +2861,19 @@ int main(int argc, char **argv) {
             verify_jac = 1;
         else if (arg == "--assemble")
             assemble = 1;
+        else if (arg == "--jac-action")
+            jac_action = 1;
+        else if (arg == "--bsr-apply")
+            bsr_apply = 1;
         else if (arg == "--help") {
             std::printf(
                     "usage: %s [--n cube_cells_per_dim] [--repeat N] [--warmup N]\n"
                     "          [--layout packed|atomic] [--kernel current|sympy|current_slots|sympy_slots|sympy_direct|sympy_block|sympy_face|sympy_simd|sympy_simd_clean|sympy_block_simd|sympy_row_simd|sympy_row_simd_fused|sympy_face_simd]\n"
                     "          [--pack-size N] [--no-sfc]\n"
-                    "          [--verify] [--verify-jac] [--assemble]\n"
+                    "          [--verify] [--verify-jac] [--assemble] [--jac-action] [--bsr-apply]\n"
                     "  --kernel NAME  micro-kernel variant (default sympy_row_simd)\n"
+                    "  --jac-action   apply the matrix-free TET4 Jacobian action J(u) v\n"
+                    "  --bsr-apply    assemble once, then time BSR SpMV y = J(u) v\n"
                     "  --pack-size N   elements per pack (0 = fill uint16; default 2048)\n",
                     argv[0]);
             if (own_mpi) MPI_Finalize();
@@ -2629,8 +2891,18 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
+    if ((assemble ? 1 : 0) + (jac_action ? 1 : 0) + (bsr_apply ? 1 : 0) > 1) {
+        std::fprintf(stderr, "--assemble, --jac-action, and --bsr-apply are separate benchmark modes\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    if ((jac_action || bsr_apply) && layout != "packed") {
+        std::fprintf(stderr, "--jac-action and --bsr-apply currently support --layout packed\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
 
-    const int use_packed = (layout == "packed") || verify || verify_jac;
+    const int use_packed = (layout == "packed") || verify || verify_jac || jac_action || bsr_apply;
     const KernelKind kernel_kind = parse_kernel(kernel);
     if (assemble && layout == "atomic" &&
         (kernel_kind == KernelKind::CurrentSlots || kernel_kind == KernelKind::SympySlots || kernel_kind == KernelKind::SympyDirect ||
@@ -2668,17 +2940,18 @@ int main(int argc, char **argv) {
     precompute_affine_geometry(d);
 
     BSR4 bsr;
-    if (assemble || verify_jac) bsr = make_bsr4(d.mesh);
-    if (use_packed && (assemble || verify_jac)) build_pack_local_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
+    if (assemble || verify_jac || bsr_apply) bsr = make_bsr4(d.mesh);
+    if (use_packed && (assemble || verify_jac || bsr_apply)) build_pack_local_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
 
     if (use_packed) {
         const size_t scratch_n = packed_scratch_n(packed);
         const size_t bsr_n     = 16 * (size_t)std::max<ptrdiff_t>(packed.max_local_nnz, 1);
+        const size_t slot2_n   = (jac_action || bsr_apply) ? std::max(scratch_n, bsr_n) : bsr_n;
 #pragma omp parallel
         {
             (void)thread_scratch<scalar_t>(0, scratch_n);
             (void)thread_scratch<scalar_t>(1, scratch_n);
-            if (assemble || verify_jac) (void)thread_scratch<scalar_t>(2, bsr_n);
+            if (assemble || verify_jac || jac_action || bsr_apply) (void)thread_scratch<scalar_t>(2, slot2_n);
         }
     }
 
@@ -2772,14 +3045,21 @@ int main(int argc, char **argv) {
 
         const scalar_t elem_rel = verify_element_kernel_jac(d, rho, mu);
 
-        std::vector<scalar_t> dir((size_t)d.nnodes * 4), jv((size_t)d.nnodes * 4, 0.0), jv_e((size_t)d.nnodes * 4, 0.0);
+        std::vector<scalar_t> dir((size_t)d.nnodes * 4), jv((size_t)d.nnodes * 4, 0.0), jv_e((size_t)d.nnodes * 4, 0.0),
+                jv_mf((size_t)d.nnodes * 4, 0.0), jv_mf_sympy((size_t)d.nnodes * 4, 0.0);
         for (ptrdiff_t i = 0; i < d.nnodes * 4; ++i) dir[(size_t)i] = 1.0 + 0.01 * scalar_t(i % 7);
         apply_ke_to_dir(d, rho, mu, dir.data(), jv_e.data());
+        cvfem_tet4_ns_upwind_jacobian_action_packed(d, packed, rho, mu, dir.data(), jv_mf.data(), false);
+        cvfem_tet4_ns_upwind_jacobian_action_packed(d, packed, rho, mu, dir.data(), jv_mf_sympy.data(), true);
         auto spmv = sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, scalar_t>(
                 d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(), bsr.values, scalar_t(0));
         spmv->apply(dir.data(), jv.data());
         const scalar_t spmv_elem_err = max_abs_diff_ptr(jv.data(), jv_e.data(), d.nnodes * 4);
+        const scalar_t mf_spmv_err   = max_abs_diff_ptr(jv.data(), jv_mf.data(), d.nnodes * 4);
+        const scalar_t mf_sympy_err  = max_abs_diff_ptr(jv_mf.data(), jv_mf_sympy.data(), d.nnodes * 4);
         std::printf("verify_jac_spmv_vs_elem_abs: %.6e\n", spmv_elem_err);
+        std::printf("verify_jac_mf_action_vs_spmv_abs: %.6e\n", mf_spmv_err);
+        std::printf("verify_jac_mf_sympy_action_vs_hand_abs: %.6e\n", mf_sympy_err);
 
         // Global residual FD uses a pressure direction: momentum convection is
         // non-differentiable at mdot == 0, so a mixed velocity probe hits kinks.
@@ -2796,13 +3076,24 @@ int main(int argc, char **argv) {
                 fd_abs);
         std::printf("verify_jac_spmv_vs_fd_rel: %.6e\n", rel);
         std::printf("verify_jac_spmv_vs_fd_abs: %.6e\n", fd_abs);
-        if (elem_rel > 1.0e-6 || spmv_elem_err > 1.0e-12 || rel > 1.0e-6) {
+        if (elem_rel > 1.0e-6 || spmv_elem_err > 1.0e-12 || mf_spmv_err > 1.0e-12 || mf_sympy_err > 1.0e-12 || rel > 1.0e-6) {
             std::fprintf(stderr, "SpMV J d vs FD residual mismatch\n");
             d.mesh.reset();
             if (own_mpi) MPI_Finalize();
             return 1;
         }
     }
+
+    std::vector<scalar_t> jac_dir, jac_out;
+    if (jac_action || bsr_apply) {
+        jac_dir.resize((size_t)d.nnodes * N_FIELDS);
+        jac_out.assign((size_t)d.nnodes * N_FIELDS, 0.0);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes * N_FIELDS; ++i) {
+            jac_dir[(size_t)i] = 1.0 + 0.01 * scalar_t(i % 7);
+        }
+    }
+    if (jac_action) cvfem_tet4_ns_upwind_prepack_action_base_velocity(d, packed);
 
     auto apply = [&]() {
         if (kernel_is_sympy_residual(kernel_kind)) {
@@ -2816,6 +3107,10 @@ int main(int argc, char **argv) {
             else
                 cvfem_tet4_ns_upwind_apply_packed(d, packed, rho, mu);
         }
+    };
+
+    auto jac_action_fn = [&]() {
+        cvfem_tet4_ns_upwind_jacobian_action_packed(d, packed, rho, mu, jac_dir.data(), jac_out.data(), false);
     };
 
     auto assemble_fn = [&]() {
@@ -2854,14 +3149,33 @@ int main(int argc, char **argv) {
         }
     };
 
-    if (!assemble) {
+    if (bsr_apply) assemble_fn();
+    decltype(sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, scalar_t>(
+            d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(), bsr.values, scalar_t(0))) bsr_apply_op;
+    if (bsr_apply) {
+        bsr_apply_op = sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, scalar_t>(
+                d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(), bsr.values, scalar_t(0));
+    }
+    auto bsr_apply_fn = [&]() {
+        bsr_apply_op->apply(jac_dir.data(), jac_out.data());
+    };
+
+    if (jac_action) {
+        for (int i = 0; i < warmup; ++i) jac_action_fn();
+    } else if (bsr_apply) {
+        for (int i = 0; i < warmup; ++i) bsr_apply_fn();
+    } else if (!assemble) {
         for (int i = 0; i < warmup; ++i) apply();
     } else {
         for (int i = 0; i < warmup; ++i) assemble_fn();
     }
 
     const double t0 = wall_time();
-    if (!assemble) {
+    if (jac_action) {
+        for (int i = 0; i < repeat; ++i) jac_action_fn();
+    } else if (bsr_apply) {
+        for (int i = 0; i < repeat; ++i) bsr_apply_fn();
+    } else if (!assemble) {
         for (int i = 0; i < repeat; ++i) apply();
     } else {
         for (int i = 0; i < repeat; ++i) assemble_fn();
@@ -2897,6 +3211,7 @@ int main(int argc, char **argv) {
     else
         std::printf("cvfem_tet4_ns_upwind_smesh_packed_two_pass\n");
     std::printf("  mesh_manager: smesh::Mesh::create_tet4_cube\n");
+    std::printf("  operation: %s\n", bsr_apply ? "bsr_apply" : (jac_action ? "jacobian_action" : (assemble ? "jacobian_assemble" : "residual")));
     std::printf("  kernel: %s\n", kernel.c_str());
     std::printf("  OpenMP_threads: %d\n", threads_active());
     std::printf("  LANE_PACK_BYTES: %d\n", VEC_BYTES);
@@ -2920,7 +3235,8 @@ int main(int argc, char **argv) {
     std::printf("  nodes: %td\n", d.nnodes);
     std::printf("  elements: %td\n", d.nelements);
     std::printf("  repeat: %d\n", repeat);
-    std::printf("  seconds_per_apply: %.6e\n", seconds_per_call);
+    std::printf("  seconds_per_call: %.6e\n", seconds_per_call);
+    if (!assemble && !jac_action && !bsr_apply) std::printf("  seconds_per_apply: %.6e\n", seconds_per_call);
     std::printf("  MELEM/s: %.3f\n", melems);
     std::printf("  MDOF/s_element_visits: %.3f\n", mdofs);
     std::printf("  MDOF/s_unique_mesh_dofs: %.3f\n", unique_mdofs);
@@ -2928,8 +3244,8 @@ int main(int argc, char **argv) {
     std::printf("  GB/s_gather_scatter_model: %.3f\n", gbps);
     std::printf("  flops_per_element_model: %.1f\n", flops_per_element);
     std::printf("  bytes_per_element_model: %.1f\n", bytes_per_element);
-    std::printf("  checksum: %.16e\n", checksum(d));
-    if (assemble || verify_jac) {
+    std::printf("  checksum: %.16e\n", (jac_action || bsr_apply) ? checksum_vec(jac_out.data(), d.nnodes) : checksum(d));
+    if (assemble || verify_jac || bsr_apply) {
         std::printf("  bsr_nnz: %td\n", bsr.nnz);
         std::printf("  flops_per_element_jacobian_model: %.1f\n", CVFEM_JACOBIAN_FLOPS_PER_ELEMENT);
         if (use_packed) std::printf("  max_local_nnz: %td\n", packed.max_local_nnz);
@@ -2943,6 +3259,28 @@ int main(int argc, char **argv) {
         std::printf("  GB/s_assemble_model: %.3f\n", double(repeat) * bytes_assemble / seconds / 1.0e9);
         std::printf("  GFLOP/s_assemble_model: %.3f\n",
                     elem_apps * CVFEM_JACOBIAN_FLOPS_PER_ELEMENT / seconds / 1.0e9);
+    }
+    if (jac_action) {
+        constexpr double jac_action_flops_per_element = CVFEM_RESIDUAL_FLOPS_PER_ELEMENT + 4.0 * 6.0 * 8.0;
+        const double     bytes_jac_action =
+                8.0 * double(sizeof(smesh::idx_t)) + 10.0 * double(sizeof(jacobian_t)) + (32.0 + 32.0) * double(sizeof(scalar_t));
+        std::printf("  seconds_per_jac_action: %.6e\n", seconds_per_call);
+        std::printf("  MELEM/s_jac_action: %.3f\n", melems);
+        std::printf("  GB/s_jac_action_model: %.3f\n", elem_apps * bytes_jac_action / seconds / 1.0e9);
+        std::printf("  GFLOP/s_jac_action_model: %.3f\n", elem_apps * jac_action_flops_per_element / seconds / 1.0e9);
+        std::printf("  flops_per_element_jac_action_model: %.1f\n", jac_action_flops_per_element);
+        std::printf("  bytes_per_element_jac_action_model: %.1f\n", bytes_jac_action);
+    }
+    if (bsr_apply) {
+        const double bsr_apply_flops = double(bsr.nnz) * 2.0 * 16.0;
+        const double bsr_apply_bytes = double(bsr.nnz) * 16.0 * double(sizeof(scalar_t)) +
+                                       double(bsr.nnz) * double(sizeof(smesh::idx_t)) +
+                                       2.0 * double(d.nnodes) * N_FIELDS * double(sizeof(scalar_t));
+        std::printf("  seconds_per_bsr_apply: %.6e\n", seconds_per_call);
+        std::printf("  GFLOP/s_bsr_apply_model: %.3f\n", double(repeat) * bsr_apply_flops / seconds / 1.0e9);
+        std::printf("  GB/s_bsr_apply_model: %.3f\n", double(repeat) * bsr_apply_bytes / seconds / 1.0e9);
+        std::printf("  flops_per_bsr_apply_model: %.1f\n", bsr_apply_flops);
+        std::printf("  bytes_per_bsr_apply_model: %.1f\n", bsr_apply_bytes);
     }
 
     d.mesh.reset();
