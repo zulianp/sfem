@@ -72,15 +72,12 @@ def scs_area(adj: tuple[sp.Symbol, ...], area_ref: tuple[sp.Rational, sp.Rationa
     )
 
 
-def velocity_gradient(sym: dict[str, object]) -> tuple[sp.Expr, ...]:
-    adj = sym["adj"]
-    det = sym["det"]
-    ux = sym["ux"]
-    uy = sym["uy"]
-    uz = sym["uz"]
+def velocity_gradient_from(adj: tuple[sp.Symbol, ...],
+                           det: sp.Symbol,
+                           comps: tuple[tuple[sp.Symbol, ...], tuple[sp.Symbol, ...], tuple[sp.Symbol, ...]]) -> tuple[sp.Expr, ...]:
     inv_det = 1 / det
     out: list[sp.Expr] = []
-    for comp in (ux, uy, uz):
+    for comp in comps:
         d0 = comp[1] - comp[0]
         d1 = comp[2] - comp[0]
         d2 = comp[3] - comp[0]
@@ -92,6 +89,10 @@ def velocity_gradient(sym: dict[str, object]) -> tuple[sp.Expr, ...]:
             )
         )
     return tuple(out)
+
+
+def velocity_gradient(sym: dict[str, object]) -> tuple[sp.Expr, ...]:
+    return velocity_gradient_from(sym["adj"], sym["det"], (sym["ux"], sym["uy"], sym["uz"]))
 
 
 def face_residual_expr(sym: dict[str, object],
@@ -139,6 +140,58 @@ def face_residual_expr(sym: dict[str, object],
     return r, mdot
 
 
+def face_action_direct_expr(sym: dict[str, object], scs_index: int) -> list[sp.Expr]:
+    rho = sym["rho"]
+    mu = sym["mu"]
+    adj = sym["adj"]
+    det = sym["det"]
+    ux = sym["ux"]
+    uy = sym["uy"]
+    uz = sym["uz"]
+    vx = sym["vx"]
+    vy = sym["vy"]
+    vz = sym["vz"]
+    dp = sym["dp"]
+
+    i, j, _area_ref = SCS[scs_index]
+    ax = sp.Symbol(f"ax{scs_index}")
+    ay = sp.Symbol(f"ay{scs_index}")
+    az = sp.Symbol(f"az{scs_index}")
+    mdot = sp.Symbol(f"mdot{scs_index}")
+    sgn = sp.Symbol(f"sgn{scs_index}")
+
+    r = [sp.Integer(0)] * N_DOF
+    del adj, det
+    dg00, dg01, dg02, dg10, dg11, dg12, dg20, dg21, dg22 = sp.symbols(
+        "dg00 dg01 dg02 dg10 dg11 dg12 dg20 dg21 dg22"
+    )
+
+    mdot_pos = sp.Rational(1, 2) * mdot * (1 + sgn)
+    mdot_neg = sp.Rational(1, 2) * mdot * (1 - sgn)
+    dmdot = rho * sp.Rational(1, 2) * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay + (vz[i] + vz[j]) * az)
+    dpos = sp.Rational(1, 2) * (1 + sgn) * dmdot
+    dneg = sp.Rational(1, 2) * (1 - sgn) * dmdot
+    q_mid = sp.Rational(1, 2) * (dp[i] + dp[j])
+
+    tau_x = mu * ((2 * dg00) * ax + (dg01 + dg10) * ay + (dg02 + dg20) * az)
+    tau_y = mu * ((dg10 + dg01) * ax + (2 * dg11) * ay + (dg12 + dg21) * az)
+    tau_z = mu * ((dg20 + dg02) * ax + (dg21 + dg12) * ay + (2 * dg22) * az)
+
+    fx = dpos * ux[i] + mdot_pos * vx[i] + dneg * ux[j] + mdot_neg * vx[j] + q_mid * ax - tau_x
+    fy = dpos * uy[i] + mdot_pos * vy[i] + dneg * uy[j] + mdot_neg * vy[j] + q_mid * ay - tau_y
+    fz = dpos * uz[i] + mdot_pos * vz[i] + dneg * uz[j] + mdot_neg * vz[j] + q_mid * az - tau_z
+
+    r[dof(i, 0)] += fx
+    r[dof(i, 1)] += fy
+    r[dof(i, 2)] += fz
+    r[dof(i, 3)] += dmdot
+    r[dof(j, 0)] -= fx
+    r[dof(j, 1)] -= fy
+    r[dof(j, 2)] -= fz
+    r[dof(j, 3)] -= dmdot
+    return r
+
+
 def residual_exprs(sym: dict[str, object], semismooth_abs: bool) -> tuple[list[sp.Expr], list[sp.Expr]]:
     r = [sp.Integer(0)] * N_DOF
     mdots: list[sp.Expr] = []
@@ -173,7 +226,7 @@ def cse_vector_store_code(exprs: list[sp.Expr], outputs: list[str], indent: str 
 
 
 def cse_add_code(exprs: list[sp.Expr], outputs: list[str], indent: str = "    ") -> str:
-    nonzero = [(sp.simplify(expr), out) for expr, out in zip(exprs, outputs) if expr != 0]
+    nonzero = [(expr, out) for expr, out in zip(exprs, outputs) if expr != 0]
     printer = ScalarPrinter()
     replacements, reduced = sp.cse([expr for expr, _out in nonzero], symbols=sp.numbered_symbols("x"), optimizations="basic")
     lines: list[str] = []
@@ -182,6 +235,65 @@ def cse_add_code(exprs: list[sp.Expr], outputs: list[str], indent: str = "    ")
     for (_expr, out), expr in zip(nonzero, reduced):
         lines.append(f"{indent}{out} += {printer.doprint(expr)};")
     return "\n".join(lines)
+
+
+def cse_decl_code(exprs: list[sp.Expr], names: list[str], indent: str = "        ") -> str:
+    printer = ScalarPrinter()
+    replacements, reduced = sp.cse(exprs, symbols=sp.numbered_symbols("x"), optimizations="basic")
+    lines: list[str] = []
+    for var, expr in replacements:
+        lines.append(f"{indent}const scalar_t {var} = {printer.doprint(expr)};")
+    for name, expr in zip(names, reduced):
+        lines.append(f"{indent}const scalar_t {name} = {printer.doprint(expr)};")
+    return "\n".join(lines)
+
+
+def action_direction_gradient_code(indent: str = "        ") -> str:
+    adj = tuple(sp.symbols("adj0:9"))
+    det = sp.Symbol("det")
+    vx = sp.symbols("vx0:4")
+    vy = sp.symbols("vy0:4")
+    vz = sp.symbols("vz0:4")
+    exprs = list(velocity_gradient_from(adj, det, (vx, vy, vz)))
+    names = ["dg00", "dg01", "dg02", "dg10", "dg11", "dg12", "dg20", "dg21", "dg22"]
+    return cse_decl_code(exprs, names, indent)
+
+
+def cse_action_face_adds_code(face_actions: list[list[sp.Expr]], indent: str = "        ") -> str:
+    lines: list[str] = []
+    outputs = residual_pack_outputs()
+    for s, action in enumerate(face_actions):
+        lines.append(f"{indent}{{")
+        lines.append(action_face_geom_sign_local(s, indent + "    "))
+        code = cse_add_code(action, outputs, indent + "    ")
+        if code:
+            lines.append(code)
+        lines.append(f"{indent}}}")
+    return "\n".join(lines)
+
+
+def action_face_geom_sign_local(s: int, indent: str = "    ") -> str:
+    printer = ScalarPrinter()
+    i, j, area_ref = SCS[s]
+    ax, ay, az = scs_area(tuple(sp.symbols("adj0:9")), area_ref)
+    rho = sp.Symbol("rho")
+    ux = sp.symbols("ux0:4")
+    uy = sp.symbols("uy0:4")
+    uz = sp.symbols("uz0:4")
+    ax_sym = sp.Symbol(f"ax{s}")
+    ay_sym = sp.Symbol(f"ay{s}")
+    az_sym = sp.Symbol(f"az{s}")
+    mdot_expr = rho * sp.Rational(1, 2) * ((ux[i] + ux[j]) * ax_sym + (uy[i] + uy[j]) * ay_sym + (uz[i] + uz[j]) * az_sym)
+    return "\n".join(
+        (
+            f"{indent}const scalar_t ax{s} = {printer.doprint(ax)};",
+            f"{indent}const scalar_t ay{s} = {printer.doprint(ay)};",
+            f"{indent}const scalar_t az{s} = {printer.doprint(az)};",
+            f"{indent}const scalar_t mdot{s} = {printer.doprint(mdot_expr)};",
+            f"{indent}const scalar_t sgn{s} = mdot{s} > scalar_t(0) ? scalar_t(1) : "
+            f"(mdot{s} < scalar_t(0) ? scalar_t(-1) : scalar_t(0));",
+        )
+    )
 
 
 def jac_block_exprs(jac: list[sp.Expr], row_node: int, col_node: int) -> list[sp.Expr]:
@@ -395,7 +507,7 @@ def jac_compact_entries(jac: list[sp.Expr]) -> list[tuple[int, int, sp.Expr]]:
             for col_node in range(N_NODE):
                 for col_field in range(N_FIELD):
                     col = dof(col_node, col_field)
-                    expr = sp.simplify(jac[row * N_DOF + col])
+                    expr = jac[row * N_DOF + col]
                     if expr != 0:
                         block = row_node * N_NODE + col_node
                         offset = row_field * N_FIELD + col_field
@@ -475,7 +587,7 @@ def cse_add_vector_blocks_to_slots_code(jac: list[sp.Expr], indent: str = "    "
         for col_node in range(N_NODE):
             block = row_node * N_NODE + col_node
             raw_exprs = jac_block_exprs(jac, row_node, col_node)
-            entries = [(i, sp.simplify(expr)) for i, expr in enumerate(raw_exprs) if expr != 0]
+            entries = [(i, expr) for i, expr in enumerate(raw_exprs) if expr != 0]
             if not entries:
                 continue
             replacements, reduced = sp.cse([expr for _i, expr in entries], symbols=sp.numbered_symbols("x"), optimizations="basic")
@@ -502,7 +614,7 @@ def cse_add_vector_rows_to_slots_code(jac: list[sp.Expr], indent: str = "    ") 
             raw_exprs = jac_block_exprs(jac, row_node, col_node)
             for row_field in range(N_FIELD):
                 row_exprs = raw_exprs[row_field * N_FIELD:(row_field + 1) * N_FIELD]
-                entries = [(i, sp.simplify(expr)) for i, expr in enumerate(row_exprs) if expr != 0]
+                entries = [(i, expr) for i, expr in enumerate(row_exprs) if expr != 0]
                 if not entries:
                     continue
                 replacements, reduced = sp.cse([expr for _i, expr in entries],
@@ -530,21 +642,15 @@ def generate() -> str:
     for a in range(4):
         q.extend((sym["ux"][a], sym["uy"][a], sym["uz"][a], sym["p"][a]))
     jac = [sp.diff(row, col) for row in jac_residual for col in q]
-    v = []
-    for a in range(4):
-        v.extend((sym["vx"][a], sym["vy"][a], sym["vz"][a], sym["dp"][a]))
-    action = []
-    for row in range(N_DOF):
-        acc = sp.Integer(0)
-        for col in range(N_DOF):
-            acc += jac[row * N_DOF + col] * v[col]
-        action.append(sp.simplify(acc))
     face_jacs: list[list[sp.Expr]] = []
+    face_actions: list[list[sp.Expr]] = []
     face_mdots: list[sp.Expr] = []
     for s in range(len(SCS)):
         face_residual, face_mdot = face_residual_expr(sym, s, semismooth_abs=True)
         face_mdots.append(face_mdot)
-        face_jacs.append([sp.diff(row, col) for row in face_residual for col in q])
+        face_jac = [sp.diff(row, col) for row in face_residual for col in q]
+        face_jacs.append(face_jac)
+        face_actions.append(face_action_direct_expr(sym, s))
 
     residual_outputs = [f"r[{i}]" for i in range(N_DOF)]
     jac_outputs = [f"ke[{i}]" for i in range(N_DOF * N_DOF)]
@@ -618,8 +724,14 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microker
 #pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr : 64)
     for (int lane = 0; lane < VEC_SIZE; ++lane) {{
 {simd_action_input_locals()}
-{sign_locals_with_indent(mdots, "        ")}
-{cse_code(action, residual_pack_outputs(), indent="        ")}
+{action_direction_gradient_code()}
+        for (int a = 0; a < 4; ++a) {{
+            out.rx[a][lane] = scalar_t(0);
+            out.ry[a][lane] = scalar_t(0);
+            out.rz[a][lane] = scalar_t(0);
+            out.rc[a][lane] = scalar_t(0);
+        }}
+{cse_action_face_adds_code(face_actions)}
     }}
 }}
 

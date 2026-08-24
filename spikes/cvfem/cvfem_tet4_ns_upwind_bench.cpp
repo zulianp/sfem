@@ -3109,8 +3109,9 @@ int main(int argc, char **argv) {
         }
     };
 
-    auto jac_action_fn = [&]() {
-        cvfem_tet4_ns_upwind_jacobian_action_packed(d, packed, rho, mu, jac_dir.data(), jac_out.data(), false);
+    const bool use_sympy_action = kernel_is_sympy_residual(kernel_kind);
+    auto       jac_action_fn    = [&]() {
+        cvfem_tet4_ns_upwind_jacobian_action_packed(d, packed, rho, mu, jac_dir.data(), jac_out.data(), use_sympy_action);
     };
 
     auto assemble_fn = [&]() {
@@ -3213,6 +3214,7 @@ int main(int argc, char **argv) {
     std::printf("  mesh_manager: smesh::Mesh::create_tet4_cube\n");
     std::printf("  operation: %s\n", bsr_apply ? "bsr_apply" : (jac_action ? "jacobian_action" : (assemble ? "jacobian_assemble" : "residual")));
     std::printf("  kernel: %s\n", kernel.c_str());
+    if (jac_action) std::printf("  jac_action_kernel: %s\n", use_sympy_action ? "sympy_face_cse" : "hand");
     std::printf("  OpenMP_threads: %d\n", threads_active());
     std::printf("  LANE_PACK_BYTES: %d\n", VEC_BYTES);
     std::printf("  LANES_PER_PACK: %d\n", VEC_SIZE);
