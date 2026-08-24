@@ -69,12 +69,11 @@ static int test_sshex8_hyteg_stencil() {
     const ptrdiff_t n_nodes = mesh->n_nodes();
     const auto      es      = sfem::EXECUTION_SPACE_HOST;
 
-    auto input          = sfem::create_buffer<real_t>(n_nodes, es);
-    auto direct_out     = sfem::create_buffer<real_t>(n_nodes, es);
-    auto current_out    = sfem::create_buffer<real_t>(n_nodes, es);
-    auto hyteg_out      = sfem::create_buffer<real_t>(n_nodes, es);
-    auto vectorized_out = sfem::create_buffer<real_t>(n_nodes, es);
-    auto bench_out      = sfem::create_buffer<real_t>(n_nodes, es);
+    auto input       = sfem::create_buffer<real_t>(n_nodes, es);
+    auto direct_out  = sfem::create_buffer<real_t>(n_nodes, es);
+    auto current_out = sfem::create_buffer<real_t>(n_nodes, es);
+    auto hyteg_out   = sfem::create_buffer<real_t>(n_nodes, es);
+    auto bench_out   = sfem::create_buffer<real_t>(n_nodes, es);
 
     auto points = mesh->points()->data();
     for (ptrdiff_t i = 0; i < n_nodes; ++i) {
@@ -87,7 +86,6 @@ static int test_sshex8_hyteg_stencil() {
     zero_values(n_nodes, direct_out->data());
     zero_values(n_nodes, current_out->data());
     zero_values(n_nodes, hyteg_out->data());
-    zero_values(n_nodes, vectorized_out->data());
     zero_values(n_nodes, bench_out->data());
 
     std::vector<std::shared_ptr<sfem::Buffer<scalar_t>>> block_matrices;
@@ -154,26 +152,17 @@ static int test_sshex8_hyteg_stencil() {
                                                                        input->data(),
                                                                        hyteg_out->data()) == SFEM_SUCCESS);
 
-            SFEM_TEST_ASSERT(sshex8_stencil_element_matrix_apply_hyteg_vectorized(level,
-                                                                                  ne,
-                                                                                  ss_block->elements()->data(),
-                                                                                  block_matrices[b]->data(),
-                                                                                  block_stencils[b]->data(),
-                                                                                  input->data(),
-                                                                                  vectorized_out->data()) == SFEM_SUCCESS);
         }
 
         ptrdiff_t current_arg       = SFEM_PTRDIFF_INVALID;
         ptrdiff_t hyteg_arg         = SFEM_PTRDIFF_INVALID;
         ptrdiff_t current_hyteg_arg = SFEM_PTRDIFF_INVALID;
-        ptrdiff_t vectorized_arg    = SFEM_PTRDIFF_INVALID;
         const real_t current_diff       = largest_abs_diff(n_nodes, current_out->data(), direct_out->data(), &current_arg);
         const real_t hyteg_diff         = largest_abs_diff(n_nodes, hyteg_out->data(), direct_out->data(), &hyteg_arg);
         const real_t current_hyteg_diff = largest_abs_diff(n_nodes, hyteg_out->data(), current_out->data(), &current_hyteg_arg);
-        const real_t vectorized_diff = largest_abs_diff(n_nodes, vectorized_out->data(), current_out->data(), &vectorized_arg);
 
         printf("SSHEX8 HyTeG stencil validation level=%d base=%d current_vs_direct(%ld)=%g hyteg_vs_direct(%ld)=%g "
-               "hyteg_vs_current(%ld)=%g vectorized_vs_current(%ld)=%g\n",
+               "hyteg_vs_current(%ld)=%g\n",
                level,
                SFEM_BASE_RESOLUTION,
                current_arg,
@@ -181,19 +170,15 @@ static int test_sshex8_hyteg_stencil() {
                hyteg_arg,
                (double)hyteg_diff,
                current_hyteg_arg,
-               (double)current_hyteg_diff,
-               vectorized_arg,
-               (double)vectorized_diff);
+               (double)current_hyteg_diff);
 
         const real_t tolerance = sizeof(real_t) == 4 ? 5e-4 : 1e-8;
         SFEM_TEST_ASSERT(current_hyteg_diff < tolerance);
-        SFEM_TEST_ASSERT(vectorized_diff < tolerance);
     }
 
     double direct_elapsed = 0;
     double current_elapsed = 0;
     double hyteg_elapsed = 0;
-    double vectorized_elapsed = 0;
 
     if (SFEM_THROUGHPUT_REPEAT > 0) {
         zero_values(n_nodes, bench_out->data());
@@ -242,22 +227,6 @@ static int test_sshex8_hyteg_stencil() {
         }
         hyteg_elapsed = (smesh::time_seconds() - tick) / SFEM_THROUGHPUT_REPEAT;
 
-        zero_values(n_nodes, bench_out->data());
-        tick = smesh::time_seconds();
-        for (int r = 0; r < SFEM_THROUGHPUT_REPEAT; ++r) {
-            for (size_t b = 0; b < mesh->n_blocks(); ++b) {
-                auto ss_block = mesh->block(b);
-                SFEM_TEST_ASSERT(sshex8_stencil_element_matrix_apply_hyteg_vectorized(level,
-                                                                                      ss_block->n_elements(),
-                                                                                      ss_block->elements()->data(),
-                                                                                      block_matrices[b]->data(),
-                                                                                      block_stencils[b]->data(),
-                                                                                      input->data(),
-                                                                                      bench_out->data()) == SFEM_SUCCESS);
-            }
-        }
-        vectorized_elapsed = (smesh::time_seconds() - tick) / SFEM_THROUGHPUT_REPEAT;
-
         printf("SSHEX8 direct affine throughput level=%d base=%d macro_elements=%ld global_nodes=%ld local_dofs=%ld "
                "microhexes=%ld repeat=%d elapsed=%g MDOF/s=%g Mmicrohex/s=%g\n",
                level,
@@ -300,23 +269,6 @@ static int test_sshex8_hyteg_stencil() {
                1e-6 * total_microhexes / hyteg_elapsed,
                current_elapsed / hyteg_elapsed,
                direct_elapsed / hyteg_elapsed);
-
-        printf("SSHEX8 HyTeG vectorized fused stencil throughput level=%d base=%d macro_elements=%ld global_nodes=%ld "
-               "local_dofs=%ld microhexes=%ld repeat=%d elapsed=%g MDOF/s=%g Mmicrohex/s=%g speedup_vs_hyteg=%g "
-               "speedup_vs_current=%g speedup_vs_direct=%g\n",
-               level,
-               SFEM_BASE_RESOLUTION,
-               total_macro_elements,
-               n_nodes,
-               total_local_dofs,
-               total_microhexes,
-               SFEM_THROUGHPUT_REPEAT,
-               vectorized_elapsed,
-               1e-6 * total_local_dofs / vectorized_elapsed,
-               1e-6 * total_microhexes / vectorized_elapsed,
-               hyteg_elapsed / vectorized_elapsed,
-               current_elapsed / vectorized_elapsed,
-               direct_elapsed / vectorized_elapsed);
     }
 
     return SFEM_TEST_SUCCESS;

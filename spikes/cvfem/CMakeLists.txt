@@ -56,7 +56,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     message(STATUS "cvfem performance flags: ${_cvfem_perf_opts}")
 endif()
 
-foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baseline)
+foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baseline cvfem_hex8_ns_upwind_bench)
     add_executable(${_cvfem_tgt} ${_cvfem_tgt}.cpp)
     target_link_libraries(${_cvfem_tgt}
         PRIVATE

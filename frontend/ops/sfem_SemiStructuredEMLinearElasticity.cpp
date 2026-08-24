@@ -211,10 +211,6 @@ namespace sfem {
         auto &ssm = space->mesh();
         int   err = SFEM_SUCCESS;
         for (size_t b = 0; b < element_matrices.size(); ++b) {
-            if (!element_matrices[b]) {
-                continue;
-            }
-
             const auto block_id = static_cast<smesh::block_idx_t>(b);
             if (element_matrices[b]) {
                 err = affine_sshex8_linear_elasticity_diag(smesh::semistructured_level(ssm),
@@ -306,17 +302,17 @@ namespace sfem {
             const auto block_id = static_cast<smesh::block_idx_t>(b);
             if (matrix) {
                 err = sshex8_stencil_element_matrix_apply3(smesh::semistructured_level(ssm),
-                                                       ssm.n_elements(block_id),
-                                                       ssm.elements(block_id)->data(),
-                                                       matrix->data(),
-                                                       3,
-                                                       &h[0],
-                                                       &h[1],
-                                                       &h[2],
-                                                       3,
-                                                       &out[0],
-                                                       &out[1],
-                                                       &out[2]);
+                                                           ssm.n_elements(block_id),
+                                                           ssm.elements(block_id)->data(),
+                                                           matrix->data(),
+                                                           3,
+                                                           &h[0],
+                                                           &h[1],
+                                                           &h[2],
+                                                           3,
+                                                           &out[0],
+                                                           &out[1],
+                                                           &out[2]);
             } else if (sstet4_stencils[b]) {
                 err = sstet4_linear_elasticity_apply_stencil_global_vectorized(sstet4_stencils[b].get(),
                                                                                ssm.n_elements(block_id),
