@@ -389,6 +389,8 @@ int test_mooney_rivlin_visco_relaxation() {
         }
 
         // Newton Loop with Inertia
+        bool converged = false;
+
         for (int iter = 0; iter < 20; ++iter) {
             // Residual: R = M*a + F_int(u) - F_ext
             // where a = c0*(u - u_pred) from Newmark relation
@@ -424,7 +426,10 @@ int test_mooney_rivlin_visco_relaxation() {
             real_t r_norm = blas->norm2(ndofs, rhs->data());
 
             printf("  Iter %d: |R| = %e\n", iter, r_norm);
-            if (r_norm < 1e-8) break;
+            if (r_norm < 1e-8) {
+                converged = true;
+                break;
+            }
 
             // ===== Tangent Stiffness: K_eff = K_tan + c0*M =====
             blas->zeros(values->size(), values->data());
@@ -483,6 +488,8 @@ int test_mooney_rivlin_visco_relaxation() {
                 blas->axpy(ndofs, -1, delta_x->data(), lower_bound->data());
             }
         }
+
+        if (!converged) return SFEM_TEST_FAILURE;
 
         for (ptrdiff_t i = 0; i < ndofs; ++i) {
             a->data()[i] = c0 * (x->data()[i] - u_pred->data()[i]);
