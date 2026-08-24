@@ -15,6 +15,22 @@ int sshex8_stencil_element_matrix_apply(const int                           leve
                                         const real_t *const SFEM_RESTRICT   u,
                                         real_t *const SFEM_RESTRICT         values);
 
+int sshex8_stencil_element_matrix_apply_hyteg(const int                           level,
+                                              const ptrdiff_t                     nelements,
+                                              idx_t **const SFEM_RESTRICT         elements,
+                                              const scalar_t *const SFEM_RESTRICT g_element_matrix,
+                                              const scalar_t *const SFEM_RESTRICT g_stencil,
+                                              const real_t *const SFEM_RESTRICT   u,
+                                              real_t *const SFEM_RESTRICT         values);
+
+int sshex8_stencil_element_matrix_apply_hyteg_vectorized(const int                           level,
+                                                         const ptrdiff_t                     nelements,
+                                                         idx_t **const SFEM_RESTRICT         elements,
+                                                         const scalar_t *const SFEM_RESTRICT g_element_matrix,
+                                                         const scalar_t *const SFEM_RESTRICT g_stencil,
+                                                         const real_t *const SFEM_RESTRICT   u,
+                                                         real_t *const SFEM_RESTRICT         values);
+
 int sshex8_stencil_element_matrix_apply3(const int                           level,
                                          const ptrdiff_t                     nelements,
                                          idx_t **const SFEM_RESTRICT         elements,

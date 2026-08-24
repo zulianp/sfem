@@ -440,6 +440,7 @@ static int test_sstet4_cached_fff_laplacian() {
     auto transfer_point_out = sfem::create_buffer<real_t>(n_nodes, es);
     auto cached_out = sfem::create_buffer<real_t>(n_nodes, es);
     auto global_stencil_out = sfem::create_buffer<real_t>(n_nodes, es);
+    auto global_stencil_vectorized_out = sfem::create_buffer<real_t>(n_nodes, es);
     auto points_stencil_out = sfem::create_buffer<real_t>(n_nodes, es);
     auto frontend_stencil_out = sfem::create_buffer<real_t>(n_nodes, es);
     auto frontend_point_out   = sfem::create_buffer<real_t>(n_nodes, es);
@@ -455,6 +456,7 @@ static int test_sstet4_cached_fff_laplacian() {
         transfer_point_out->data()[i] = 0;
         cached_out->data()[i] = 0;
         global_stencil_out->data()[i] = 0;
+        global_stencil_vectorized_out->data()[i] = 0;
         points_stencil_out->data()[i] = 0;
         frontend_stencil_out->data()[i] = 0;
         frontend_point_out->data()[i]   = 0;
@@ -471,6 +473,7 @@ static int test_sstet4_cached_fff_laplacian() {
     std::vector<sfem::SharedBuffer<real_t>>     block_out;
     std::vector<sfem::SharedBuffer<real_t>>     block_hyteg_out;
     std::vector<sfem::SharedBuffer<real_t>>     block_stencil_out;
+    std::vector<sfem::SharedBuffer<real_t>>     block_stencil_vectorized_out;
     std::vector<sstet4_laplacian_stencil_t *>   block_stencils;
 
     ptrdiff_t total_macro_elements = 0;
@@ -481,6 +484,8 @@ static int test_sstet4_cached_fff_laplacian() {
     ptrdiff_t hyteg_arg            = SFEM_PTRDIFF_INVALID;
     real_t    stencil_largest_diff = 0;
     ptrdiff_t stencil_arg          = SFEM_PTRDIFF_INVALID;
+    real_t    stencil_vectorized_largest_diff = 0;
+    ptrdiff_t stencil_vectorized_arg          = SFEM_PTRDIFF_INVALID;
 
     for (size_t b = 0; b < mesh->n_blocks(); ++b) {
         auto            block    = mesh->block(b);
@@ -501,6 +506,7 @@ static int test_sstet4_cached_fff_laplacian() {
         auto local_out = sfem::create_buffer<real_t>(ne * nxe, es);
         auto hyteg_out = sfem::create_buffer<real_t>(ne * nxe, es);
         auto stencil_out = sfem::create_buffer<real_t>(ne * nxe, es);
+        auto stencil_vectorized_out = sfem::create_buffer<real_t>(ne * nxe, es);
         sstet4_laplacian_stencil_t *stencil = nullptr;
 
         for (ptrdiff_t e = 0; e < ne; ++e) {
@@ -527,6 +533,7 @@ static int test_sstet4_cached_fff_laplacian() {
                 local_out->data()[e * nxe + v] = 0;
                 hyteg_out->data()[e * nxe + v] = 0;
                 stencil_out->data()[e * nxe + v] = 0;
+                stencil_vectorized_out->data()[e * nxe + v] = 0;
             }
         }
 
@@ -552,8 +559,13 @@ static int test_sstet4_cached_fff_laplacian() {
         if (SFEM_COMPARE_HYTEG_STENCIL) {
             SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil(stencil, ne, local_u->data(), stencil_out->data()) ==
                              SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_vectorized(
+                                     stencil, ne, local_u->data(), stencil_vectorized_out->data()) == SFEM_SUCCESS);
             SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_global(
                                      stencil, ne, elements, input->data(), global_stencil_out->data()) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_global_vectorized(
+                                     stencil, ne, elements, input->data(), global_stencil_vectorized_out->data()) ==
+                             SFEM_SUCCESS);
         }
 
         if (SFEM_VALIDATE) {
@@ -573,6 +585,12 @@ static int test_sstet4_cached_fff_laplacian() {
                         stencil_largest_diff = diff;
                         stencil_arg          = i;
                     }
+
+                    const real_t vectorized_diff = fabs(stencil_vectorized_out->data()[i] - stencil_out->data()[i]);
+                    if (vectorized_diff > stencil_vectorized_largest_diff || vectorized_diff != vectorized_diff) {
+                        stencil_vectorized_largest_diff = vectorized_diff;
+                        stencil_vectorized_arg          = i;
+                    }
                 }
             }
 
@@ -589,6 +607,7 @@ static int test_sstet4_cached_fff_laplacian() {
         block_out.push_back(local_out);
         block_hyteg_out.push_back(hyteg_out);
         block_stencil_out.push_back(stencil_out);
+        block_stencil_vectorized_out.push_back(stencil_vectorized_out);
         block_stencils.push_back(stencil);
 
         total_macro_elements += ne;
@@ -622,13 +641,26 @@ static int test_sstet4_cached_fff_laplacian() {
                    stencil_arg,
                    (double)stencil_largest_diff);
             SFEM_TEST_ASSERT(stencil_largest_diff < 1e-7);
+            printf("vectorized prebuilt stencil check level=%d largest_diff(%ld) = %g\n",
+                   level,
+                   stencil_vectorized_arg,
+                   (double)stencil_vectorized_largest_diff);
+            SFEM_TEST_ASSERT(stencil_vectorized_largest_diff < 1e-7);
             real_t    global_stencil_largest_diff = 0;
             ptrdiff_t global_stencil_arg          = SFEM_PTRDIFF_INVALID;
+            real_t    global_stencil_vectorized_largest_diff = 0;
+            ptrdiff_t global_stencil_vectorized_arg          = SFEM_PTRDIFF_INVALID;
             for (ptrdiff_t i = 0; i < n_nodes; ++i) {
                 const real_t diff = fabs(global_stencil_out->data()[i] - point_out->data()[i]);
                 if (diff > global_stencil_largest_diff || diff != diff) {
                     global_stencil_largest_diff = diff;
                     global_stencil_arg          = i;
+                }
+
+                const real_t vectorized_diff = fabs(global_stencil_vectorized_out->data()[i] - global_stencil_out->data()[i]);
+                if (vectorized_diff > global_stencil_vectorized_largest_diff || vectorized_diff != vectorized_diff) {
+                    global_stencil_vectorized_largest_diff = vectorized_diff;
+                    global_stencil_vectorized_arg          = i;
                 }
             }
 
@@ -637,6 +669,11 @@ static int test_sstet4_cached_fff_laplacian() {
                    global_stencil_arg,
                    (double)global_stencil_largest_diff);
             SFEM_TEST_ASSERT(global_stencil_largest_diff < 1e-7);
+            printf("global vectorized prebuilt stencil check level=%d largest_diff(%ld) = %g\n",
+                   level,
+                   global_stencil_vectorized_arg,
+                   (double)global_stencil_vectorized_largest_diff);
+            SFEM_TEST_ASSERT(global_stencil_vectorized_largest_diff < 1e-7);
             printf("prebuilt stencil variants level=%d total_unique_stencils=%ld\n", level, total_unique_stencils);
 
             for (size_t b = 0; b < mesh->n_blocks(); ++b) {
@@ -810,6 +847,128 @@ static int test_sstet4_cached_fff_laplacian() {
                    1e-6 * total_local_dofs / stencil_elapsed,
                    1e-6 * total_microtets / stencil_elapsed,
                    elapsed / stencil_elapsed);
+            fflush(stdout);
+
+            if (SFEM_THROUGHPUT_REPEAT > 1) {
+                for (size_t b = 0; b < block_ne.size(); ++b) {
+                    SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_vectorized(
+                                             block_stencils[b],
+                                             block_ne[b],
+                                             block_u[b]->data(),
+                                             block_stencil_vectorized_out[b]->data()) == SFEM_SUCCESS);
+                }
+            }
+
+            const double stencil_vectorized_tick = smesh::time_seconds();
+            for (int r = 0; r < SFEM_THROUGHPUT_REPEAT; ++r) {
+                for (size_t b = 0; b < block_ne.size(); ++b) {
+                    SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_vectorized(
+                                             block_stencils[b],
+                                             block_ne[b],
+                                             block_u[b]->data(),
+                                             block_stencil_vectorized_out[b]->data()) == SFEM_SUCCESS);
+                }
+            }
+
+            const double stencil_vectorized_elapsed =
+                    (smesh::time_seconds() - stencil_vectorized_tick) / SFEM_THROUGHPUT_REPEAT;
+            printf("vectorized prebuilt stencil SSTET4 FFF throughput level=%d base=%d macro_elements=%ld global_nodes=%ld "
+                   "local_dofs=%ld microtets=%ld repeat=%d elapsed=%g MDOF/s=%g Mmicrotet/s=%g "
+                   "speedup_vs_prebuilt_scalar=%g speedup_vs_default=%g\n",
+                   level,
+                   SFEM_BASE_RESOLUTION,
+                   total_macro_elements,
+                   n_nodes,
+                   total_local_dofs,
+                   total_microtets,
+                   SFEM_THROUGHPUT_REPEAT,
+                   stencil_vectorized_elapsed,
+                   1e-6 * total_local_dofs / stencil_vectorized_elapsed,
+                   1e-6 * total_microtets / stencil_vectorized_elapsed,
+                   stencil_elapsed / stencil_vectorized_elapsed,
+                   elapsed / stencil_vectorized_elapsed);
+            fflush(stdout);
+
+            if (SFEM_THROUGHPUT_REPEAT > 1) {
+                for (size_t b = 0; b < block_ne.size(); ++b) {
+                    auto block = mesh->block(b);
+                    SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_global(block_stencils[b],
+                                                                            block_ne[b],
+                                                                            block->elements()->data(),
+                                                                            input->data(),
+                                                                            global_stencil_out->data()) == SFEM_SUCCESS);
+                }
+            }
+
+            const double global_stencil_tick = smesh::time_seconds();
+            for (int r = 0; r < SFEM_THROUGHPUT_REPEAT; ++r) {
+                for (size_t b = 0; b < block_ne.size(); ++b) {
+                    auto block = mesh->block(b);
+                    SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_global(block_stencils[b],
+                                                                            block_ne[b],
+                                                                            block->elements()->data(),
+                                                                            input->data(),
+                                                                            global_stencil_out->data()) == SFEM_SUCCESS);
+                }
+            }
+
+            const double global_stencil_elapsed =
+                    (smesh::time_seconds() - global_stencil_tick) / SFEM_THROUGHPUT_REPEAT;
+            printf("global prebuilt stencil SSTET4 FFF throughput level=%d base=%d macro_elements=%ld global_nodes=%ld "
+                   "local_dofs=%ld microtets=%ld repeat=%d elapsed=%g MDOF/s=%g Mmicrotet/s=%g\n",
+                   level,
+                   SFEM_BASE_RESOLUTION,
+                   total_macro_elements,
+                   n_nodes,
+                   total_local_dofs,
+                   total_microtets,
+                   SFEM_THROUGHPUT_REPEAT,
+                   global_stencil_elapsed,
+                   1e-6 * total_local_dofs / global_stencil_elapsed,
+                   1e-6 * total_microtets / global_stencil_elapsed);
+            fflush(stdout);
+
+            if (SFEM_THROUGHPUT_REPEAT > 1) {
+                for (size_t b = 0; b < block_ne.size(); ++b) {
+                    auto block = mesh->block(b);
+                    SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_global_vectorized(
+                                             block_stencils[b],
+                                             block_ne[b],
+                                             block->elements()->data(),
+                                             input->data(),
+                                             global_stencil_vectorized_out->data()) == SFEM_SUCCESS);
+                }
+            }
+
+            const double global_stencil_vectorized_tick = smesh::time_seconds();
+            for (int r = 0; r < SFEM_THROUGHPUT_REPEAT; ++r) {
+                for (size_t b = 0; b < block_ne.size(); ++b) {
+                    auto block = mesh->block(b);
+                    SFEM_TEST_ASSERT(sstet4_laplacian_apply_stencil_global_vectorized(
+                                             block_stencils[b],
+                                             block_ne[b],
+                                             block->elements()->data(),
+                                             input->data(),
+                                             global_stencil_vectorized_out->data()) == SFEM_SUCCESS);
+                }
+            }
+
+            const double global_stencil_vectorized_elapsed =
+                    (smesh::time_seconds() - global_stencil_vectorized_tick) / SFEM_THROUGHPUT_REPEAT;
+            printf("global vectorized prebuilt stencil SSTET4 FFF throughput level=%d base=%d macro_elements=%ld "
+                   "global_nodes=%ld local_dofs=%ld microtets=%ld repeat=%d elapsed=%g MDOF/s=%g Mmicrotet/s=%g "
+                   "speedup_vs_global_scalar=%g\n",
+                   level,
+                   SFEM_BASE_RESOLUTION,
+                   total_macro_elements,
+                   n_nodes,
+                   total_local_dofs,
+                   total_microtets,
+                   SFEM_THROUGHPUT_REPEAT,
+                   global_stencil_vectorized_elapsed,
+                   1e-6 * total_local_dofs / global_stencil_vectorized_elapsed,
+                   1e-6 * total_microtets / global_stencil_vectorized_elapsed,
+                   global_stencil_elapsed / global_stencil_vectorized_elapsed);
             fflush(stdout);
         }
     }

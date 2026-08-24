@@ -10,6 +10,7 @@ namespace sfem {
         smesh::ElemType                                element_type{smesh::INVALID};
         std::shared_ptr<Buffer<scalar_t>>              element_matrix;
         std::vector<std::shared_ptr<Buffer<scalar_t>>> element_matrices;
+        std::vector<std::shared_ptr<Buffer<scalar_t>>> element_stencils;
         long                                           calls{0};
         double                                         total_time{0};
         ~SemiStructuredEMLaplacian();

@@ -9,9 +9,9 @@
 #include <vector>
 
 #include "sfem_API.hpp"
+#include "sfem_BSR.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_BSR.hpp"
 #include "sfem_test.hpp"
 #include "smesh_sideset.hpp"
 
@@ -650,9 +650,9 @@ void export_hemisphere_obstacle_mesh(const smesh::Path& output_dir,
 }
 
 int test_mooney_rivlin_gravity() {
-    auto     es   = sfem::EXECUTION_SPACE_HOST;
+    auto es = sfem::EXECUTION_SPACE_HOST;
 
-    int SFEM_BASE_RESOLUTION = 4;
+    int SFEM_BASE_RESOLUTION = 2;
     SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
 
     std::shared_ptr<sfem::Mesh> mesh;
@@ -1095,7 +1095,7 @@ int test_mooney_rivlin_gravity() {
     }
 
     // 5. Time Loop with Full Newmark Integration
-    real_t SFEM_T = 1.0;
+    real_t SFEM_T = 0.2;
     SFEM_READ_ENV(SFEM_T, atof);
     real_t t     = 0;
     size_t steps = 0;

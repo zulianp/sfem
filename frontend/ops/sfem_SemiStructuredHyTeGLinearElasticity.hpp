@@ -1,25 +1,22 @@
 #pragma once
 
 #include "sfem_Op.hpp"
-#include "sstet4_linear_elasticity.hpp"
 
 #include <memory>
 #include <vector>
 
 namespace sfem {
-    class SemiStructuredEMLinearElasticity : public Op {
+    class SemiStructuredHyTeGLinearElasticity : public Op {
     public:
         std::shared_ptr<FunctionSpace>                 space;
         smesh::ElemType                                element_type{smesh::INVALID};
-        std::shared_ptr<Buffer<scalar_t>>              element_matrix;
-        std::vector<std::shared_ptr<Buffer<scalar_t>>> element_matrices;
-        std::vector<std::shared_ptr<sstet4_linear_elasticity_stencil_t>> sstet4_stencils;
+        std::vector<std::shared_ptr<Buffer<scalar_t>>> category_stencils;
         real_t                                         mu{1};
         real_t                                         lambda{1};
         long                                           calls{0};
         double                                         total_time{0};
 
-        ~SemiStructuredEMLinearElasticity();
+        ~SemiStructuredHyTeGLinearElasticity();
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
@@ -33,7 +30,7 @@ namespace sfem {
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
-        SemiStructuredEMLinearElasticity(const std::shared_ptr<FunctionSpace> &space);
+        SemiStructuredHyTeGLinearElasticity(const std::shared_ptr<FunctionSpace> &space);
 
         int hessian_crs(const real_t *const  x,
                         const count_t *const rowptr,

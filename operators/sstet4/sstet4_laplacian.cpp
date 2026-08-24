@@ -1105,12 +1105,55 @@ int sstet4_laplacian_apply_stencil(const sstet4_laplacian_stencil_t *const stenc
     return SFEM_SUCCESS;
 }
 
+int sstet4_laplacian_apply_stencil_vectorized(const sstet4_laplacian_stencil_t *const stencil,
+                                              const ptrdiff_t                         nelements,
+                                              const real_t *const SFEM_RESTRICT       u,
+                                              real_t *const SFEM_RESTRICT             values) {
+    if (!stencil || !u || !values || nelements != stencil->nelements) {
+        return SFEM_FAILURE;
+    }
+
+    const int nxe          = stencil->nrows;
+    const int stencil_size = nxe * SSTET4_LAPLACIAN_MAX_STENCIL;
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
+        const real_t *const SFEM_RESTRICT  element_u       = &u[e * nxe];
+        real_t *const SFEM_RESTRICT        element_vector  = &values[e * nxe];
+        const scalar_t *const SFEM_RESTRICT stencil_weights = &stencil->weights[stencil->element_stencil[e] * stencil_size];
+
+        for (int row = 0; row < nxe; ++row) {
+            accumulator_t acc        = 0;
+            const int     row_offset = row * SSTET4_LAPLACIAN_MAX_STENCIL;
+            const int     row_len    = stencil->row_len[row];
+
+#pragma omp simd reduction(+ : acc)
+            for (int s = 0; s < row_len; ++s) {
+                const int entry = row_offset + s;
+                acc += stencil_weights[entry] * element_u[stencil->cols[entry]];
+            }
+
+            element_vector[row] += acc;
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int sstet4_laplacian_apply_stencil_global(const sstet4_laplacian_stencil_t *const stencil,
                                           const ptrdiff_t                         nelements,
                                           idx_t **const SFEM_RESTRICT             elements,
                                           const real_t *const SFEM_RESTRICT       u,
                                           real_t *const SFEM_RESTRICT             values) {
     return sstet4_laplacian_apply_stencil_global_range(stencil, 0, nelements, elements, u, values);
+}
+
+int sstet4_laplacian_apply_stencil_global_vectorized(const sstet4_laplacian_stencil_t *const stencil,
+                                                     const ptrdiff_t                         nelements,
+                                                     idx_t **const SFEM_RESTRICT             elements,
+                                                     const real_t *const SFEM_RESTRICT       u,
+                                                     real_t *const SFEM_RESTRICT             values) {
+    return sstet4_laplacian_apply_stencil_global_range_vectorized(stencil, 0, nelements, elements, u, values);
 }
 
 int sstet4_laplacian_apply_stencil_global_range(const sstet4_laplacian_stencil_t *const stencil,
@@ -1143,6 +1186,104 @@ int sstet4_laplacian_apply_stencil_global_range(const sstet4_laplacian_stencil_t
 
 #pragma omp atomic update
             values[elements[row][e]] += acc;
+        }
+    }
+
+    return SFEM_SUCCESS;
+}
+
+int sstet4_laplacian_apply_stencil_global_range_vectorized(const sstet4_laplacian_stencil_t *const stencil,
+                                                           const ptrdiff_t                         element_offset,
+                                                           const ptrdiff_t                         nelements,
+                                                           idx_t **const SFEM_RESTRICT             elements,
+                                                           const real_t *const SFEM_RESTRICT       u,
+                                                           real_t *const SFEM_RESTRICT             values) {
+    if (!stencil || !elements || !u || !values || element_offset < 0 || nelements < 0 ||
+        element_offset + nelements > stencil->nelements) {
+        return SFEM_FAILURE;
+    }
+
+    static const int VECTOR_SIZE = 16;
+
+    const int nxe          = stencil->nrows;
+    const int stencil_size = nxe * SSTET4_LAPLACIAN_MAX_STENCIL;
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
+        const int nelems = (int)((nelements - evbegin) < VECTOR_SIZE ? (nelements - evbegin) : VECTOR_SIZE);
+
+        int stencil_id[VECTOR_SIZE];
+
+        const int first_stencil_id = stencil->element_stencil[element_offset + evbegin];
+        int       same_stencil     = 1;
+
+#pragma omp simd
+        for (int lane = 0; lane < nelems; ++lane) {
+            stencil_id[lane] = stencil->element_stencil[element_offset + evbegin + lane];
+        }
+
+        for (int lane = 0; lane < nelems; ++lane) {
+            same_stencil &= stencil_id[lane] == first_stencil_id;
+        }
+
+        if (same_stencil) {
+            const scalar_t *const SFEM_RESTRICT stencil_weights = &stencil->weights[first_stencil_id * stencil_size];
+
+            for (int row = 0; row < nxe; ++row) {
+                accumulator_t acc[VECTOR_SIZE];
+                const int     row_offset = row * SSTET4_LAPLACIAN_MAX_STENCIL;
+                const int     row_len    = stencil->row_len[row];
+
+#pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    acc[lane] = 0;
+                }
+
+                for (int s = 0; s < row_len; ++s) {
+                    const int          entry       = row_offset + s;
+                    const scalar_t     w           = stencil_weights[entry];
+                    const idx_t *const element_col = elements[stencil->cols[entry]];
+
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        acc[lane] += w * u[element_col[evbegin + lane]];
+                    }
+                }
+
+                const idx_t *const element_row = elements[row];
+                for (int lane = 0; lane < nelems; ++lane) {
+#pragma omp atomic update
+                    values[element_row[evbegin + lane]] += acc[lane];
+                }
+            }
+        } else {
+            for (int row = 0; row < nxe; ++row) {
+                accumulator_t acc[VECTOR_SIZE];
+                const int     row_offset = row * SSTET4_LAPLACIAN_MAX_STENCIL;
+                const int     row_len    = stencil->row_len[row];
+
+#pragma omp simd
+                for (int lane = 0; lane < nelems; ++lane) {
+                    acc[lane] = 0;
+                }
+
+                for (int s = 0; s < row_len; ++s) {
+                    const int          entry       = row_offset + s;
+                    const idx_t *const element_col = elements[stencil->cols[entry]];
+
+#pragma omp simd
+                    for (int lane = 0; lane < nelems; ++lane) {
+                        acc[lane] += stencil->weights[stencil_id[lane] * stencil_size + entry] *
+                                     u[element_col[evbegin + lane]];
+                    }
+                }
+
+                const idx_t *const element_row = elements[row];
+                for (int lane = 0; lane < nelems; ++lane) {
+#pragma omp atomic update
+                    values[element_row[evbegin + lane]] += acc[lane];
+                }
+            }
         }
     }
 

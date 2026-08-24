@@ -50,11 +50,22 @@ int sstet4_laplacian_apply_stencil(const sstet4_laplacian_stencil_t *const stenc
                                    const real_t *const SFEM_RESTRICT       u,
                                    real_t *const SFEM_RESTRICT             values);
 
+int sstet4_laplacian_apply_stencil_vectorized(const sstet4_laplacian_stencil_t *const stencil,
+                                              const ptrdiff_t                         nelements,
+                                              const real_t *const SFEM_RESTRICT       u,
+                                              real_t *const SFEM_RESTRICT             values);
+
 int sstet4_laplacian_apply_stencil_global(const sstet4_laplacian_stencil_t *const stencil,
                                           const ptrdiff_t                         nelements,
                                           idx_t **const SFEM_RESTRICT             elements,
                                           const real_t *const SFEM_RESTRICT       u,
                                           real_t *const SFEM_RESTRICT             values);
+
+int sstet4_laplacian_apply_stencil_global_vectorized(const sstet4_laplacian_stencil_t *const stencil,
+                                                     const ptrdiff_t                         nelements,
+                                                     idx_t **const SFEM_RESTRICT             elements,
+                                                     const real_t *const SFEM_RESTRICT       u,
+                                                     real_t *const SFEM_RESTRICT             values);
 
 int sstet4_laplacian_apply_stencil_global_range(const sstet4_laplacian_stencil_t *const stencil,
                                                 const ptrdiff_t                         element_offset,
@@ -62,6 +73,13 @@ int sstet4_laplacian_apply_stencil_global_range(const sstet4_laplacian_stencil_t
                                                 idx_t **const SFEM_RESTRICT             elements,
                                                 const real_t *const SFEM_RESTRICT       u,
                                                 real_t *const SFEM_RESTRICT             values);
+
+int sstet4_laplacian_apply_stencil_global_range_vectorized(const sstet4_laplacian_stencil_t *const stencil,
+                                                           const ptrdiff_t                         element_offset,
+                                                           const ptrdiff_t                         nelements,
+                                                           idx_t **const SFEM_RESTRICT             elements,
+                                                           const real_t *const SFEM_RESTRICT       u,
+                                                           real_t *const SFEM_RESTRICT             values);
 
 int sstet4_laplacian_apply_points(const int                         level,
                                   const ptrdiff_t                   nelements,
