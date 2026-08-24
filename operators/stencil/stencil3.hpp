@@ -164,69 +164,6 @@ static void hex8_side_stencil(const ptrdiff_t                     xc,
     }
 }
 
-static void sshex8_stencil_fused_vectorized(const ptrdiff_t                     xc,
-                                            const ptrdiff_t                     yc,
-                                            const ptrdiff_t                     zc,
-                                            const scalar_t *const SFEM_RESTRICT s,
-                                            const scalar_t *const SFEM_RESTRICT input,
-                                            scalar_t *const SFEM_RESTRICT       output) {
-    const ptrdiff_t ystride = xc;
-    const ptrdiff_t zstride = xc * yc;
-
-    const scalar_t s0  = s[0];
-    const scalar_t s1  = s[1];
-    const scalar_t s2  = s[2];
-    const scalar_t s3  = s[3];
-    const scalar_t s4  = s[4];
-    const scalar_t s5  = s[5];
-    const scalar_t s6  = s[6];
-    const scalar_t s7  = s[7];
-    const scalar_t s8  = s[8];
-    const scalar_t s9  = s[9];
-    const scalar_t s10 = s[10];
-    const scalar_t s11 = s[11];
-    const scalar_t s12 = s[12];
-    const scalar_t s13 = s[13];
-    const scalar_t s14 = s[14];
-    const scalar_t s15 = s[15];
-    const scalar_t s16 = s[16];
-    const scalar_t s17 = s[17];
-    const scalar_t s18 = s[18];
-    const scalar_t s19 = s[19];
-    const scalar_t s20 = s[20];
-    const scalar_t s21 = s[21];
-    const scalar_t s22 = s[22];
-    const scalar_t s23 = s[23];
-    const scalar_t s24 = s[24];
-    const scalar_t s25 = s[25];
-    const scalar_t s26 = s[26];
-
-    for (ptrdiff_t zi = 1; zi < zc - 1; ++zi) {
-        for (ptrdiff_t yi = 1; yi < yc - 1; ++yi) {
-            const ptrdiff_t idx0 = zi * zstride + yi * ystride + 1;
-#pragma omp simd
-            for (ptrdiff_t xi = 0; xi < xc - 2; ++xi) {
-                const ptrdiff_t idx = idx0 + xi;
-
-                output[idx] +=
-                        s0 * input[idx - zstride - ystride - 1] + s1 * input[idx - zstride - ystride] +
-                        s2 * input[idx - zstride - ystride + 1] + s3 * input[idx - zstride - 1] +
-                        s4 * input[idx - zstride] + s5 * input[idx - zstride + 1] +
-                        s6 * input[idx - zstride + ystride - 1] + s7 * input[idx - zstride + ystride] +
-                        s8 * input[idx - zstride + ystride + 1] + s9 * input[idx - ystride - 1] +
-                        s10 * input[idx - ystride] + s11 * input[idx - ystride + 1] +
-                        s12 * input[idx - 1] + s13 * input[idx] + s14 * input[idx + 1] +
-                        s15 * input[idx + ystride - 1] + s16 * input[idx + ystride] +
-                        s17 * input[idx + ystride + 1] + s18 * input[idx + zstride - ystride - 1] +
-                        s19 * input[idx + zstride - ystride] + s20 * input[idx + zstride - ystride + 1] +
-                        s21 * input[idx + zstride - 1] + s22 * input[idx + zstride] +
-                        s23 * input[idx + zstride + 1] + s24 * input[idx + zstride + ystride - 1] +
-                        s25 * input[idx + zstride + ystride] + s26 * input[idx + zstride + ystride + 1];
-            }
-        }
-    }
-}
-
 static void sshex8_stencil(const ptrdiff_t                     xc,
                            const ptrdiff_t                     yc,
                            const ptrdiff_t                     zc,

@@ -24,6 +24,7 @@
 #include "sfem_PlugInOp.hpp"
 #include "sfem_SemiStructuredEMLaplacian.hpp"
 #include "sfem_SemiStructuredEMLinearElasticity.hpp"
+#include "sfem_SemiStructuredHyTeGLinearElasticity.hpp"
 #include "sfem_SpectralElementLaplacian.hpp"
 #include "sfem_VectorLaplacian.hpp"
 
@@ -54,6 +55,7 @@ namespace sfem {
             instance_.private_register_op("VectorLaplacian", VectorLaplacian::create);
             instance_.private_register_op("em:Laplacian", SemiStructuredEMLaplacian::create);
             instance_.private_register_op("em:LinearElasticity", SemiStructuredEMLinearElasticity::create);
+            instance_.private_register_op("LinearElasticityHyTeG", SemiStructuredHyTeGLinearElasticity::create);
             instance_.private_register_op("SpectralElementLaplacian", SpectralElementLaplacian::create);
             instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
