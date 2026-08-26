@@ -1,0 +1,341 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=27mm]{geometry}
+\usepackage{amsmath,amssymb,bm,mathtools}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\F}{\bm F}
+\newcommand{\C}{\bm C}
+\newcommand{\B}{\bm B}
+\newcommand{\I}{\bm I}
+\newcommand{\Pola}{\bm P}
+\newcommand{\tauK}{\bm\tau}
+\newcommand{\sig}{\bm\sigma}
+\newcommand{\cof}{\operatorname{cof}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\dev}{\operatorname{dev}}
+
+\title{An Inversion-Tolerant Nearly Incompressible\\
+Mooney--Rivlin Formulation}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe an inversion-tolerant continuation of the standard nearly
+incompressible Mooney--Rivlin material. The admissible physical branch is left
+unchanged for $J=\det\F\ge J_c>0$. Below $J_c$, the singular unimodular powers
+$J^{-2/3}$ and $J^{-4/3}$ are replaced by smooth polynomial continuations.
+The resulting strain-energy density is finite and twice differentiable through
+collapsed and inverted states, so Newton-type optimization can evaluate and
+cross configurations with $J\le0$ without imposing an inversion barrier. The
+continuation is a numerical extension only; material calibration and the exact
+unimodular Mooney--Rivlin response are preserved on the physical branch.
+\end{abstract}
+
+\section{Objective}
+
+For finite-strain soft materials, a common nearly incompressible
+Mooney--Rivlin model uses the unimodular invariants
+\begin{equation}
+  \bar I_1 = J^{-2/3} I_1,
+  \qquad
+  \bar I_2 = J^{-4/3} I_2,
+  \qquad
+  J=\det\F,
+\end{equation}
+where
+\begin{equation}
+  I_1=\tr\C,\qquad
+  I_2=\frac{1}{2}\left((\tr\C)^2-\tr(\C^2)\right),
+  \qquad
+  \C=\F^T\F.
+\end{equation}
+The standard physical energy is
+\begin{equation}
+  W_{\mathrm{MR}}(\F)
+  =
+  C_{10}(\bar I_1-3)
+  +
+  C_{01}(\bar I_2-3)
+  +
+  U(J),
+  \label{eq:physical_mr}
+\end{equation}
+with a volumetric penalty such as
+\begin{equation}
+  U(J)=\frac{\kappa}{2}(J-1)^2.
+  \label{eq:volumetric}
+\end{equation}
+For large $\kappa$, this is nearly incompressible.
+
+The difficulty is that $J^{-2/3}$ and $J^{-4/3}$ are singular at $J=0$ and
+undefined as real-valued functions for $J<0$. A line search or continuation
+method that starts from a tangled mesh therefore cannot evaluate the physical
+energy along paths that pass through collapsed or inverted elements.
+
+The goal is to keep \eqref{eq:physical_mr} exactly unchanged for
+$J\ge J_c>0$, while replacing only the singular scalar powers below $J_c$ by a
+finite $C^2$ extension.
+
+\section{Modified Strain-Energy Function}
+
+Let $m\in\{2/3,4/3\}$ and define $h_m(J)$ as a continuation of $J^{-m}$:
+\begin{equation}
+  h_m(J)=
+  \begin{cases}
+    J^{-m}, & J\ge J_c,\\
+    p_m(J), & J_{\min}<J<J_c,\\
+    p_m(J_{\min}), & J\le J_{\min},
+  \end{cases}
+  \qquad J_{\min}<0<J_c.
+  \label{eq:hm_def}
+\end{equation}
+The modified Mooney--Rivlin strain-energy density is then
+\begin{equation}
+  \boxed{
+  W_c(\F)
+  =
+  C_{10}\left(h_{2/3}(J) I_1 - 3\right)
+  +
+  C_{01}\left(h_{4/3}(J) I_2 - 3\right)
+  +
+  \frac{\kappa}{2}(J-1)^2.
+  }
+  \label{eq:continued_mr}
+\end{equation}
+For $J\ge J_c$, $h_{2/3}(J)=J^{-2/3}$ and
+$h_{4/3}(J)=J^{-4/3}$, so \eqref{eq:continued_mr} is exactly the calibrated
+unimodular Mooney--Rivlin model \eqref{eq:physical_mr}. For $J<J_c$, it is an
+artificial continuation used only to make the nonlinear optimization problem
+evaluable through inversion.
+
+\section{\texorpdfstring{Quartic $C^2$ Continuation}{Quartic C2 Continuation}}
+
+For each exponent $m$, write
+\begin{equation}
+  z=\frac{J-J_c}{\Delta},
+  \qquad
+  \Delta=J_c-J_{\min}>0,
+\end{equation}
+so that $z=0$ at $J_c$ and $z=-1$ at $J_{\min}$. Use
+\begin{equation}
+  p_m(J)=a_0+a_1z+a_2z^2+a_3z^3+a_4z^4.
+\end{equation}
+At $J_c$, match the physical power and its first two derivatives:
+\begin{align}
+  p_m(J_c) &= J_c^{-m},\\
+  p_m'(J_c) &= -mJ_c^{-m-1},\\
+  p_m''(J_c) &= m(m+1)J_c^{-m-2}.
+\end{align}
+At $J_{\min}$, impose flattening,
+\begin{equation}
+  p_m'(J_{\min})=0,
+  \qquad
+  p_m''(J_{\min})=0,
+\end{equation}
+so the constant branch for $J\le J_{\min}$ is also $C^2$.
+
+The first coefficients are
+\begin{align}
+  a_0 &= J_c^{-m},\\
+  a_1 &= -m\Delta J_c^{-m-1},\\
+  a_2 &= \frac{1}{2}m(m+1)\Delta^2J_c^{-m-2}.
+\end{align}
+The two flattening conditions give
+\begin{equation}
+  \boxed{
+  a_3=\frac{4}{3}a_2-a_1,
+  \qquad
+  a_4=\frac{1}{2}(a_2-a_1).
+  }
+  \label{eq:quartic_coefficients}
+\end{equation}
+Thus $h_m$, $h_m'$, and $h_m''$ are continuous at both $J_c$ and $J_{\min}$.
+
+\section{Stress of the Continued Model}
+
+The first Piola stress of \eqref{eq:continued_mr} is
+\begin{equation}
+  \Pola_c
+  =
+  C_{10}\left(h_1\frac{\partial I_1}{\partial\F}
+  +h_1'I_1\frac{\partial J}{\partial\F}\right)
+  +
+  C_{01}\left(h_2\frac{\partial I_2}{\partial\F}
+  +h_2'I_2\frac{\partial J}{\partial\F}\right)
+  +
+  \kappa(J-1)\frac{\partial J}{\partial\F},
+  \label{eq:general_piola}
+\end{equation}
+where, for compactness,
+\begin{equation}
+  h_1=h_{2/3}(J),\qquad h_2=h_{4/3}(J).
+\end{equation}
+In three dimensions,
+\begin{equation}
+  \frac{\partial I_1}{\partial\F}=2\F,
+  \qquad
+  \frac{\partial I_2}{\partial\F}
+  =
+  2(I_1\F-\F\C),
+  \qquad
+  \frac{\partial J}{\partial\F}=\cof\F.
+\end{equation}
+Substitution gives
+\begin{equation}
+  \boxed{
+  \Pola_c
+  =
+  2C_{10}h_1\F
+  +
+  2C_{01}h_2(I_1\F-\F\C)
+  +
+  \left(C_{10}h_1'I_1+C_{01}h_2'I_2+\kappa(J-1)\right)\cof\F.
+  }
+  \label{eq:continued_piola_3d}
+\end{equation}
+On $J\ge J_c$, this reduces exactly to the usual unimodular
+Mooney--Rivlin stress because the continued powers and their derivatives match
+the physical powers.
+
+\section{Plane-Strain Prototype}
+
+The accompanying prototype uses a two-dimensional triangular mesh with the
+plane-strain embedding
+\begin{equation}
+  \F_3=
+  \begin{bmatrix}
+    F_{11} & F_{12} & 0\\
+    F_{21} & F_{22} & 0\\
+    0 & 0 & 1
+  \end{bmatrix}.
+\end{equation}
+For this embedding,
+\begin{equation}
+  J=\det\F,\qquad
+  I_1=\F:\F+1,\qquad
+  I_2=\F:\F+J^2,
+  \label{eq:plane_strain_invariants}
+\end{equation}
+where $\F$ is the in-plane $2\times2$ deformation gradient. With
+$G=\cof\F$, the in-plane stress can be written
+\begin{equation}
+  \Pola_c
+  =
+  2(C_{10}h_1+C_{01}h_2)\F
+  +
+  \left[
+    C_{10}h_1'I_1
+    +
+    C_{01}(2Jh_2+h_2'I_2)
+    +
+    \kappa(J-1)
+  \right]G.
+  \label{eq:plane_strain_piola}
+\end{equation}
+The consistent material tangent follows by differentiating
+\eqref{eq:plane_strain_piola}; it requires $h_m$, $h_m'$, and $h_m''$ at each
+quadrature point.
+
+\section{Physical-Branch Consistency}
+
+For $J\ge J_c$, the modified energy is identical to the physical energy:
+\begin{equation}
+  W_c(\F)=W_{\mathrm{MR}}(\F).
+\end{equation}
+Its gradient and Hessian also agree because the scalar continuations match the
+first and second derivatives of the singular powers at $J_c$ and equal the
+physical powers for all larger $J$. Consequently, any calibrated parameters
+$C_{10}$, $C_{01}$, and $\kappa$ remain valid for converged states whose
+determinants stay above $J_c$.
+
+The isochoric part of the physical branch is scale invariant:
+\begin{equation}
+  W_{\mathrm{iso}}(a\F)=W_{\mathrm{iso}}(\F),\qquad a>0.
+\end{equation}
+Differentiating with respect to $a$ at $a=1$ gives
+\begin{equation}
+  \Pola_{\mathrm{iso}}:\F=0,
+\end{equation}
+and therefore the isochoric Kirchhoff stress is deviatoric:
+\begin{equation}
+  \tr(\tauK_{\mathrm{iso}})=0.
+\end{equation}
+The volumetric branch contributes
+\begin{equation}
+  \tauK_{\mathrm{vol}}=J U'(J)\I,
+\end{equation}
+so the standard deviatoric--volumetric split is preserved exactly on the
+admissible physical branch.
+
+\section{Optimization Use}
+
+The continuation is intended for nonlinear solution from tangled initial
+states. The prototype uses:
+\begin{enumerate}
+  \item continuation in $J_c$ from a less singular model to the target cutoff;
+  \item an absolute-eigenvalue projected Newton Hessian;
+  \item Armijo backtracking without an inversion barrier;
+  \item no positional tether or reference-state penalty.
+\end{enumerate}
+The continuation removes the evaluability obstruction at $J=0$, but it does
+not make the finite-element energy globally convex. Inverted configurations
+can still converge to non-reference local minima, so the choice of $J_c$,
+$J_{\min}$, and the continuation shape should be tested statistically over
+many distorted initial states.
+
+\section{Implementation Notes}
+
+For production kernels, the continuation is local to each quadrature point:
+\begin{enumerate}
+  \item evaluate $J$ once;
+  \item evaluate both continued powers and their derivatives together;
+  \item use the physical branch for $J\ge J_c$ and polynomial arithmetic below
+        $J_c$;
+  \item avoid sign-based branches on $J$ other than the cutoff comparison;
+  \item keep $h_m$, $h_m'$, and $h_m''$ available for the tangent.
+\end{enumerate}
+In vectorized CPU kernels, the continuation branch should be implemented with
+straight-line polynomial evaluation on masked lanes or by grouping quadrature
+points by branch when the cost of masking is significant.
+
+\section{Conclusion}
+
+The modified energy \eqref{eq:continued_mr} applies the same
+inversion-tolerant idea to nearly incompressible Mooney--Rivlin elasticity:
+the physical material is untouched for $J\ge J_c$, while a finite $C^2$
+extension is supplied for collapsed and inverted states. This separates
+material modeling from nonlinear-solver globalization. The continuation is
+not a new physical law for $J<0$; it is a numerical mechanism that allows
+Newton iterations and line searches to move through otherwise unevaluable
+states.
+
+\begin{thebibliography}{9}
+
+\bibitem{Ogden1997}
+R.~W. Ogden,
+\newblock \emph{Non-Linear Elastic Deformations},
+\newblock Dover, 1997.
+
+\bibitem{Smith2018}
+B.~Smith, F.~de Goes, and T.~Kim,
+\newblock ``Stable Neo-Hookean Flesh Simulation,''
+\newblock \emph{ACM Transactions on Graphics}, 37(2), Article 12, 2018.
+\newblock DOI: \href{https://doi.org/10.1145/3180491}{10.1145/3180491}.
+
+\bibitem{Chen2024}
+H.~Chen, H.-T.~D. Liu, D.~I.~W. Levin, C.~Zheng, and A.~Jacobson,
+\newblock ``Stabler Neo-Hookean Simulation: Absolute Eigenvalue Filtering for
+Projected Newton,''
+\newblock \emph{SIGGRAPH Conference Papers 2024}, 2024.
+\newblock DOI: \href{https://doi.org/10.1145/3641519.3657433}
+{10.1145/3641519.3657433}.
+
+\end{thebibliography}
+
+\end{document}

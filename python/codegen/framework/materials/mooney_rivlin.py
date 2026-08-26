@@ -18,8 +18,12 @@ def _mooney_rivlin_energy(F, dim):
     J = gen.det(F_value)
     I1 = gen.inner(F_value, F_value)
     I2 = sp.Rational(1, 2) * (I1 * I1 - gen.inner(C, C))
-    I2_reference = sp.Rational(dim * (dim - 1), 2)
-    return mu * (I1 - dim + I2 - I2_reference) + lmbda * (J - 1) ** 2 / 2
+    if dim == 2:
+        # Plane-strain 3D embedding (F_zz = 1): I1 += F_zz^2, I2 from block structure of C
+        I2 = I2 + I1
+        I1 = I1 + 1
+    # Same 3D Mooney-Rivlin form (reference invariants of Identity_3)
+    return mu * (I1 - 3 + I2 - 3) + lmbda * (J - 1) ** 2 / 2
 
 
 def _build_system(dim):
