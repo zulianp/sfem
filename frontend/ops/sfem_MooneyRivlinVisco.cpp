@@ -27,7 +27,8 @@
 namespace sfem {
 
     static smesh::PrimitiveType supported_history_storage(const smesh::PrimitiveType storage) {
-        if (storage == smesh::SMESH_FLOAT32 || storage == smesh::TypeToEnum<real_t>::value()) {
+        if (storage == smesh::SMESH_FLOAT16 || storage == smesh::SMESH_FLOAT32 ||
+            storage == smesh::TypeToEnum<real_t>::value()) {
             return storage;
         }
 
@@ -198,7 +199,10 @@ namespace sfem {
 
             const ptrdiff_t total_size = total_elements * history_n_qp * history_per_qp();
             
-            if (history_storage == smesh::SMESH_FLOAT32) {
+            if (history_storage == smesh::SMESH_FLOAT16) {
+                history_buffer = smesh::create_buffer<smesh::f16>(total_size, sfem::EXECUTION_SPACE_HOST);
+                new_history_buffer = smesh::create_buffer<smesh::f16>(total_size, sfem::EXECUTION_SPACE_HOST);
+            } else if (history_storage == smesh::SMESH_FLOAT32) {
                 history_buffer = smesh::create_buffer<float>(total_size, sfem::EXECUTION_SPACE_HOST);
                 new_history_buffer = smesh::create_buffer<float>(total_size, sfem::EXECUTION_SPACE_HOST);
             } else {

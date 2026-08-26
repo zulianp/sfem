@@ -20,6 +20,10 @@
 
 template <class Run>
 static int dispatch_history_read(const smesh::PrimitiveType storage, const void *const history, const Run &run) {
+    if (storage == smesh::SMESH_FLOAT16) {
+        return run(static_cast<const smesh::f16 *>(history));
+    }
+
     if (storage == smesh::SMESH_FLOAT32) {
         return run(static_cast<const float *>(history));
     }
@@ -37,6 +41,10 @@ static int dispatch_history_update(const smesh::PrimitiveType storage,
                                    const void *const          history,
                                    void *const                new_history,
                                    const Run                 &run) {
+    if (storage == smesh::SMESH_FLOAT16) {
+        return run(static_cast<const smesh::f16 *>(history), static_cast<smesh::f16 *>(new_history));
+    }
+
     if (storage == smesh::SMESH_FLOAT32) {
         return run(static_cast<const float *>(history), static_cast<float *>(new_history));
     }

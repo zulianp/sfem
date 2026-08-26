@@ -76,11 +76,16 @@ run_case per_qp float64
 run_case per_elem float64
 run_case per_qp float32
 run_case per_elem float32
+run_case per_qp float16
+run_case per_elem float16
 
 compare_case per_qp_float64 per_elem_float64 per_element_fp64
 compare_case per_qp_float64 per_qp_float32 mixed_precision_per_qp
 compare_case per_elem_float64 per_elem_float32 mixed_precision_per_elem
 compare_case per_qp_float64 per_elem_float32 per_element_and_fp32
+compare_case per_qp_float64 per_qp_float16 fp16_per_qp
+compare_case per_elem_float64 per_elem_float16 fp16_per_elem
+compare_case per_qp_float64 per_elem_float16 per_element_and_fp16
 
 echo "[info] Cases: $OUT_BASE/cases"
 echo "[info] Comparisons: $OUT_BASE/compare"
