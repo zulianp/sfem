@@ -104,8 +104,9 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     // 4. History variables
     const ptrdiff_t                   history_stride,
     const int                         history_n_qp,
-    const real_t *const SFEM_RESTRICT history,
-    real_t *const SFEM_RESTRICT       new_history,
+    const smesh::PrimitiveType        history_storage,
+    const void *const SFEM_RESTRICT   history,
+    void *const SFEM_RESTRICT         new_history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -137,7 +138,8 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     // 4. History variables
     const ptrdiff_t                   history_stride,
     const int                         history_n_qp,
-    const real_t *const SFEM_RESTRICT history,
+    const smesh::PrimitiveType        history_storage,
+    const void *const SFEM_RESTRICT   history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -174,7 +176,8 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     // 4. History variables
     const ptrdiff_t                   history_stride,
     const int                         history_n_qp,
-    const real_t *const SFEM_RESTRICT history,
+    const smesh::PrimitiveType        history_storage,
+    const void *const SFEM_RESTRICT   history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -211,7 +214,8 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     // 4. History variables
     const ptrdiff_t                   history_stride,
     const int                         history_n_qp,
-    const real_t *const SFEM_RESTRICT history,
+    const smesh::PrimitiveType        history_storage,
+    const void *const SFEM_RESTRICT   history,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,

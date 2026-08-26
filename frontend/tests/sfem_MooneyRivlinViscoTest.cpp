@@ -88,6 +88,10 @@ int test_mooney_rivlin_visco_relaxation() {
            history_mode.c_str(),
            op->get_history_n_qp(),
            op->get_history_n_qp() == 1 ? "" : "s");
+    const auto history_storage = op->get_history_storage();
+    printf("History storage: %s (%zu bytes)\n",
+           smesh::to_string(history_storage).data(),
+           smesh::num_bytes(history_storage));
 
     // LumpedMass
     auto mass_op = sfem::create_op(fs, "LumpedMass", es);

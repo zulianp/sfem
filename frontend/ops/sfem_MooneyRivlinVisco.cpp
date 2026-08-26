@@ -26,6 +26,15 @@
 
 namespace sfem {
 
+    static smesh::PrimitiveType supported_history_storage(const smesh::PrimitiveType storage) {
+        if (storage == smesh::SMESH_FLOAT32 || storage == smesh::TypeToEnum<real_t>::value()) {
+            return storage;
+        }
+
+        SFEM_ERROR("Unsupported Mooney-Rivlin history storage: %s\n", smesh::to_string(storage).data());
+        return smesh::TypeToEnum<real_t>::value();
+    }
+
     // Helper function to parse comma-separated values from string
     static std::vector<real_t> parse_csv_values(const std::string& str) {
         std::vector<real_t> values;
@@ -73,9 +82,10 @@ namespace sfem {
         int num_active_terms{0};          // Number of active Prony terms
         
         // History buffer
-        std::shared_ptr<Buffer<real_t>> history_buffer;
-        std::shared_ptr<Buffer<real_t>> new_history_buffer;
+        std::shared_ptr<smesh::BaseBuffer> history_buffer;
+        std::shared_ptr<smesh::BaseBuffer> new_history_buffer;
         int history_n_qp{8};
+        smesh::PrimitiveType history_storage{smesh::TypeToEnum<real_t>::value()};
         
         // Previous displacement
         std::shared_ptr<Buffer<real_t>> prev_u_buffer;
@@ -83,6 +93,9 @@ namespace sfem {
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {
             const std::string history_mode = smesh::Env::read("SFEM_HISTORY_MODE", std::string("per_qp"));
             history_n_qp = history_mode == "per_elem" || history_mode == "per_element" || history_mode == "1" ? 1 : 8;
+            const std::string storage_name = smesh::Env::read(
+                "SFEM_HISTORY_STORAGE", std::string(smesh::TypeToString<real_t>::value()));
+            history_storage = supported_history_storage(smesh::to_real_type(storage_name));
         }
         ~Impl();
         
@@ -185,13 +198,19 @@ namespace sfem {
 
             const ptrdiff_t total_size = total_elements * history_n_qp * history_per_qp();
             
-            history_buffer = smesh::create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
-            new_history_buffer = smesh::create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
-            
+            if (history_storage == smesh::SMESH_FLOAT32) {
+                history_buffer = smesh::create_buffer<float>(total_size, sfem::EXECUTION_SPACE_HOST);
+                new_history_buffer = smesh::create_buffer<float>(total_size, sfem::EXECUTION_SPACE_HOST);
+            } else {
+                history_buffer = smesh::create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
+                new_history_buffer = smesh::create_buffer<real_t>(total_size, sfem::EXECUTION_SPACE_HOST);
+            }
+
+            memset(history_buffer->void_data(), 0, history_buffer->nbytes());
+            memset(new_history_buffer->void_data(), 0, new_history_buffer->nbytes());
+
             auto blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
-            blas->zeros(total_size, history_buffer->data());
-            blas->zeros(total_size, new_history_buffer->data());
-            
+
             // Allocate prev_u buffer
             ptrdiff_t ndofs = space->mesh_ptr()->n_nodes() * 3;
             prev_u_buffer = smesh::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
@@ -200,6 +219,14 @@ namespace sfem {
         
         void swap_history_buffers() {
             std::swap(history_buffer, new_history_buffer);
+        }
+
+        const void *history_data(const ptrdiff_t offset) const {
+            return static_cast<const char *>(history_buffer->void_data()) + offset * smesh::num_bytes(history_storage);
+        }
+
+        void *new_history_data(const ptrdiff_t offset) {
+            return static_cast<char *>(new_history_buffer->void_data()) + offset * smesh::num_bytes(history_storage);
         }
         
         void save_prev_u(const real_t *x) {
@@ -318,7 +345,8 @@ namespace sfem {
                 impl_->prony_gamma,
                 history_stride,
                 impl_->history_n_qp,
-                impl_->history_buffer->data() + history_offset,
+                impl_->history_storage,
+                impl_->history_data(history_offset),
                 3, 
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -360,7 +388,8 @@ namespace sfem {
                 impl_->prony_gamma,
                 history_stride,
                 impl_->history_n_qp,
-                impl_->history_buffer->data() + history_offset,
+                impl_->history_storage,
+                impl_->history_data(history_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -402,7 +431,8 @@ namespace sfem {
                 impl_->prony_gamma,
                 history_stride,
                 impl_->history_n_qp,
-                impl_->history_buffer->data() + history_offset,
+                impl_->history_storage,
+                impl_->history_data(history_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -443,8 +473,9 @@ namespace sfem {
                 impl_->prony_beta.data(),
                 history_stride,
                 impl_->history_n_qp,
-                impl_->history_buffer->data() + history_offset,
-                impl_->new_history_buffer->data() + history_offset,
+                impl_->history_storage,
+                impl_->history_data(history_offset),
+                impl_->new_history_data(history_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -475,6 +506,10 @@ namespace sfem {
         impl_->prony_g.assign(g, g + n);
         impl_->prony_tau.assign(tau, tau + n);
     }
+
+    void MooneyRivlinVisco::set_history_storage(const smesh::PrimitiveType storage) {
+        impl_->history_storage = supported_history_storage(storage);
+    }
     
     void MooneyRivlinVisco::set_wlf_params(real_t C1, real_t C2, real_t T_ref) {
         impl_->wlf_C1 = C1;
@@ -500,6 +535,10 @@ namespace sfem {
 
     int MooneyRivlinVisco::get_history_n_qp() const {
         return impl_->history_n_qp;
+    }
+
+    smesh::PrimitiveType MooneyRivlinVisco::get_history_storage() const {
+        return impl_->history_storage;
     }
     
     void MooneyRivlinVisco::set_prony_coefficients(int n_active, const real_t* alpha, const real_t* beta, real_t gamma) {
