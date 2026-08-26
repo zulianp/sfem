@@ -12,7 +12,7 @@ HISTORY_STORAGE=""
 OUT_DIR=""
 
 usage() {
-    echo "Usage: $0 --history-mode per_qp|per_elem --history-storage float64|float32 --out DIR"
+    echo "Usage: $0 --history-mode per_qp|per_elem --history-storage float64|float32|float16 --out DIR"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -53,8 +53,9 @@ esac
 case "$HISTORY_STORAGE" in
     float64) ;;
     float32) ;;
+    float16) ;;
     *)
-        echo "[error] --history-storage must be float64 or float32" >&2
+        echo "[error] --history-storage must be float64, float32, or float16" >&2
         exit 2
         ;;
 esac
