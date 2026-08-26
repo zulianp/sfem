@@ -1,0 +1,1114 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_apply_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "modified_mooney_rivlin_apply_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_apply_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "modified_mooney_rivlin_apply_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_packed_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_packed_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_packed_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_packed_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_packed_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_packed_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_packed_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_packed_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_two_pass_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        double *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_packed_two_pass_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_two_pass_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        float *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_packed_two_pass_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_two_pass_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        double *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_packed_two_pass_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_two_pass_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        float *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_apply_packed_two_pass_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_two_pass_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        double *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_packed_two_pass_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_two_pass_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        float *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_packed_two_pass_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_two_pass_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        double *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_packed_two_pass_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_apply_packed_two_pass_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        float *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_apply_packed_two_pass_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_gradient_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "modified_mooney_rivlin_gradient_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_gradient_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "modified_mooney_rivlin_gradient_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_two_pass_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        double *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_two_pass_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_two_pass_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        float *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_two_pass_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_two_pass_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        double *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_two_pass_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_two_pass_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        float *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_two_pass_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_two_pass_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        double *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_two_pass_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_two_pass_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        float *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_two_pass_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_two_pass_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        double *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        double *const SFEM_RESTRICT outx,\n        double *const SFEM_RESTRICT outy,\n        double *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_two_pass_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_gradient_packed_two_pass_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,\n        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,\n        float *const SFEM_RESTRICT ghost_buf,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t out_stride,\n        float *const SFEM_RESTRICT outx,\n        float *const SFEM_RESTRICT outy,\n        float *const SFEM_RESTRICT outz\n);",
+      "name": "modified_mooney_rivlin_gradient_packed_two_pass_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const count_t *const SFEM_RESTRICT rowptr,\n        const idx_t *const SFEM_RESTRICT colidx,\n        double *const SFEM_RESTRICT values\n);",
+      "name": "modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const count_t *const SFEM_RESTRICT rowptr,\n        const idx_t *const SFEM_RESTRICT colidx,\n        float *const SFEM_RESTRICT values\n);",
+      "name": "modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const count_t *const SFEM_RESTRICT rowptr,\n        const idx_t *const SFEM_RESTRICT colidx,\n        double *const SFEM_RESTRICT values\n);",
+      "name": "modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const count_t *const SFEM_RESTRICT rowptr,\n        const idx_t *const SFEM_RESTRICT colidx,\n        float *const SFEM_RESTRICT values\n);",
+      "name": "modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_hex27_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_hex27_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_hex27_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_hex27_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_hex27_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_hex8_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_hex8_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_objective_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "modified_mooney_rivlin_objective_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_objective_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "modified_mooney_rivlin_objective_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const int nsteps,\n        const double *const SFEM_RESTRICT steps,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const int nsteps,\n        const float *const SFEM_RESTRICT steps,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const int nsteps,\n        const double *const SFEM_RESTRICT steps,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const int nsteps,\n        const float *const SFEM_RESTRICT steps,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const int nsteps,\n        const double *const SFEM_RESTRICT steps,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const int nsteps,\n        const float *const SFEM_RESTRICT steps,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const int nsteps,\n        const double *const SFEM_RESTRICT steps,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const int nsteps,\n        const float *const SFEM_RESTRICT steps,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_packed_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const int nsteps,\n        const double *const SFEM_RESTRICT steps,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_packed_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_packed_2d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const int nsteps,\n        const float *const SFEM_RESTRICT steps,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_packed_2d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_packed_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const int nsteps,\n        const double *const SFEM_RESTRICT steps,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_packed_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_packed_2d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const int nsteps,\n        const float *const SFEM_RESTRICT steps,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_packed_2d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_packed_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const int nsteps,\n        const double *const SFEM_RESTRICT steps,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_packed_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_packed_3d_affine_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const int nsteps,\n        const float *const SFEM_RESTRICT steps,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_packed_3d_affine_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const double c1,\n        const double c2,\n        const double kappa,\n        const ptrdiff_t u_stride,\n        const double *const SFEM_RESTRICT ux,\n        const double *const SFEM_RESTRICT uy,\n        const double *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const double *const SFEM_RESTRICT hx,\n        const double *const SFEM_RESTRICT hy,\n        const double *const SFEM_RESTRICT hz,\n        const int nsteps,\n        const double *const SFEM_RESTRICT steps,\n        double *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_packed_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_objective_steps_packed_3d_isoparametric_mesh_soa_float(\n        const smesh::ElemType element_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const float c1,\n        const float c2,\n        const float kappa,\n        const ptrdiff_t u_stride,\n        const float *const SFEM_RESTRICT ux,\n        const float *const SFEM_RESTRICT uy,\n        const float *const SFEM_RESTRICT uz,\n        const ptrdiff_t h_stride,\n        const float *const SFEM_RESTRICT hx,\n        const float *const SFEM_RESTRICT hy,\n        const float *const SFEM_RESTRICT hz,\n        const int nsteps,\n        const float *const SFEM_RESTRICT steps,\n        float *const SFEM_RESTRICT value\n);",
+      "name": "modified_mooney_rivlin_objective_steps_packed_3d_isoparametric_mesh_soa_float"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_proteus_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_proteus_hex27_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_proteus_hex27_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_proteus_hex27_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_proteus_hex27_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_proteus_hex27_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_proteus_hex64_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_proteus_hex64_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_proteus_hex64_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_proteus_hex64_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_proteus_hex64_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_proteus_hex64_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_proteus_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_proteus_hex8_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_proteus_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_proteus_hex8_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_proteus_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_proteus_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_proteus_quad4_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_proteus_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_proteus_quad4_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_proteus_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_quad4_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_quad4_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_tet10_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_tet10_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_tet10_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_tet10_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_tet10_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_tet4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_tet4_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_tet4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_tet4_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_tet4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_tri3_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_tri3_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_tri3_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_tri3_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_tri3_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void modified_mooney_rivlin_tri6_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "modified_mooney_rivlin_tri6_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *modified_mooney_rivlin_tri6_matrix_assembly_variant(const int variant);",
+      "name": "modified_mooney_rivlin_tri6_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_tri6_matrix_assembly_variant_count();",
+      "name": "modified_mooney_rivlin_tri6_matrix_assembly_variant_count"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GeneratedModifiedMooneyRivlin",
+    "create": "sfem::GeneratedModifiedMooneyRivlin::create",
+    "create_from_yaml": "sfem::GeneratedModifiedMooneyRivlin::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "d2",
+    "d2/proteus_quad4",
+    "d2/quad4",
+    "d2/tri3",
+    "d2/tri6",
+    "d3",
+    "d3/hex27",
+    "d3/hex8",
+    "d3/proteus_hex27",
+    "d3/proteus_hex64",
+    "d3/proteus_hex8",
+    "d3/tet10",
+    "d3/tet4",
+    "op"
+  ],
+  "header_api": [
+    {
+      "gather_scatter": "external",
+      "header": "d2/proteus_quad4/modified_mooney_rivlin_proteus_quad4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/quad4/modified_mooney_rivlin_quad4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/tri3/modified_mooney_rivlin_tri3_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/tri6/modified_mooney_rivlin_tri6_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/hex27/modified_mooney_rivlin_hex27_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/hex8/modified_mooney_rivlin_hex8_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/proteus_hex27/modified_mooney_rivlin_proteus_hex27_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/proteus_hex64/modified_mooney_rivlin_proteus_hex64_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/proteus_hex8/modified_mooney_rivlin_proteus_hex8_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/tet10/modified_mooney_rivlin_tet10_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/tet4/modified_mooney_rivlin_tet4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "op/sfem_GeneratedModifiedMooneyRivlin_element_api.hpp",
+      "kind": "dense_element_dispatch",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    }
+  ],
+  "material": "modified_mooney_rivlin",
+  "matrix_formats": [
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/proteus_quad4/modified_mooney_rivlin_proteus_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/quad4/modified_mooney_rivlin_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/tri3/modified_mooney_rivlin_tri3_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/tri6/modified_mooney_rivlin_tri6_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/hex27/modified_mooney_rivlin_hex27_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/hex8/modified_mooney_rivlin_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex27/modified_mooney_rivlin_proteus_hex27_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex64/modified_mooney_rivlin_proteus_hex64_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex8/modified_mooney_rivlin_proteus_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet10/modified_mooney_rivlin_tet10_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet4/modified_mooney_rivlin_tet4_matrix_format_operator.cpp"
+    }
+  ],
+  "op_name": "GeneratedModifiedMooneyRivlin",
+  "registration": {
+    "function": "sfem::register_GeneratedModifiedMooneyRivlin_generated_op",
+    "operator_name": "GeneratedModifiedMooneyRivlin",
+    "source": "op/sfem_GeneratedModifiedMooneyRivlin_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "apply",
+      "variants": [
+        {
+          "function": "modified_mooney_rivlin_apply_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_two_pass_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_two_pass_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_two_pass_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_two_pass_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_two_pass_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_two_pass_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_two_pass_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_apply_packed_two_pass_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "gradient",
+      "variants": [
+        {
+          "function": "modified_mooney_rivlin_gradient_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_two_pass_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_two_pass_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_two_pass_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_two_pass_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_two_pass_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_two_pass_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_two_pass_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_gradient_packed_two_pass_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "hessian_bsr",
+      "variants": [
+        {
+          "function": "modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "objective",
+      "variants": [
+        {
+          "function": "modified_mooney_rivlin_objective_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "objective_steps",
+      "variants": [
+        {
+          "function": "modified_mooney_rivlin_objective_steps_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_packed_2d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_packed_3d_affine_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_packed_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_packed_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_packed_2d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_packed_3d_isoparametric_mesh_soa_float",
+          "scalar_type": "float",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_packed_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "modified_mooney_rivlin_objective_steps_packed_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "wrapper": {
+    "c_abi_header": "op/sfem_GeneratedModifiedMooneyRivlin_c_abi.hpp",
+    "header": "op/sfem_GeneratedModifiedMooneyRivlin.hpp",
+    "source": "op/sfem_GeneratedModifiedMooneyRivlin.cpp"
+  }
+}

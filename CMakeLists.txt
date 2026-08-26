@@ -136,6 +136,8 @@ list(APPEND SFEM_MODULES
     frontend/ops/generated/linear_elasticity/op
     frontend/ops/generated/neohookean_ogden
     frontend/ops/generated/neohookean_ogden/op
+    frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark
+    frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark/op
     frontend/ops/generated/two_phase_flow
     frontend/ops/generated/two_phase_flow/op
     frontend/mesh

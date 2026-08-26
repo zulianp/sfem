@@ -229,7 +229,16 @@ class EquationSystem:
             diagnostics=diagnostics,
         )
 
-    def add_residual(self, name, define, *, fields=(), measure="dx"):
+    def add_residual(
+        self,
+        name,
+        define,
+        *,
+        fields=(),
+        kernels=("gradient", "apply"),
+        diagnostics=True,
+        measure="dx",
+    ):
         detected_measure = integral_measure(define)
         define = integral_integrand(define)
         measure = detected_measure if measure == "dx" else measure
@@ -238,6 +247,8 @@ class EquationSystem:
             EquationForm.RESIDUAL,
             define,
             fields=fields,
+            kernels=kernels,
+            diagnostics=diagnostics,
             measure=measure,
         )
 
@@ -421,7 +432,15 @@ class EquationSystemBuilder:
             diagnostics=diagnostics,
         )
 
-    def add_residual(self, name, define, *, fields=()):
+    def add_residual(
+        self,
+        name,
+        define,
+        *,
+        fields=(),
+        kernels=("gradient", "apply"),
+        diagnostics=True,
+    ):
         measure = integral_measure(define)
         define = integral_integrand(define)
         symbolic_fields = tuple(fields)
@@ -429,6 +448,8 @@ class EquationSystemBuilder:
             name,
             _residual_define(define, symbolic_fields, self.dim),
             fields=self._resolve_fields(fields),
+            kernels=kernels,
+            diagnostics=diagnostics,
             measure=measure,
         )
 

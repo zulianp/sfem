@@ -1816,6 +1816,7 @@ def generate_coupled_residual_sfem_files(
         basis_family=family,
         geometry_family=geometry_family,
         matrix_format_plan=matrix_format_plan,
+        emit_diagnostics=diagnostics_plan is not None,
     )
     diagnostics_name = "kernel_diagnostics.hpp"
     return (
@@ -3683,6 +3684,7 @@ def _operator_source(
     basis_family=None,
     geometry_family=None,
     matrix_format_plan=None,
+    emit_diagnostics=True,
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -3750,8 +3752,9 @@ def _operator_source(
         )
     )
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
-    lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
-    lines.append("")
+    if emit_diagnostics:
+        lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
+        lines.append("")
     form_dependencies = {
         "residual": _codegen_dependencies(
             system,

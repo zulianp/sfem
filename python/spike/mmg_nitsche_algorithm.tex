@@ -1,0 +1,669 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  citecolor=blue!55!black,
+  urlcolor=blue!55!black
+}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\ud}{\boldsymbol{u}}
+\newcommand{\du}{\boldsymbol{\delta u}}
+\newcommand{\vv}{\boldsymbol{v}}
+\newcommand{\ww}{\boldsymbol{w}}
+\newcommand{\rr}{\boldsymbol{r}}
+\newcommand{\HH}{\boldsymbol{H}}
+\newcommand{\KK}{\boldsymbol{K}}
+\newcommand{\PP}{\boldsymbol{P}}
+\newcommand{\II}{\boldsymbol{I}}
+\newcommand{\RR}{\boldsymbol{R}}
+\newcommand{\ZZ}{\boldsymbol{Z}}
+\newcommand{\MM}{\boldsymbol{M}}
+\newcommand{\nn}{\boldsymbol{n}}
+\newcommand{\xx}{\boldsymbol{x}}
+\newcommand{\qq}{\boldsymbol{q}}
+\newcommand{\dd}{\boldsymbol{d}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\supp}{\operatorname{supp}}
+\newcommand{\jump}[1]{[\![#1]\!]}
+\newcommand{\negpart}[1]{\left[#1\right]_-}
+
+\title{Filtered Nonlinear Multigrid for Nitsche Contact}
+\author{Implementation note for \texttt{python/spike/mmg\_nitsche.py}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note describes the nonlinear multigrid algorithm used in
+\texttt{mmg\_nitsche.py} for a two-dimensional Nitsche contact problem.
+The method follows the algorithmic skeleton of
+\texttt{sfem\_ShiftedPenaltyMultigrid.hpp}: an outer nonlinear iteration
+contains a bounded number of inner nonlinear multigrid cycles; each nonlinear
+cycle performs fine-level nonlinear smoothing, residual restriction, a recursive
+coarse correction, prolongation, and post-smoothing.  The current coarse space
+is the jump-free active space: every Cartesian displacement component at nodes
+touched by active contact rows is removed from coarse corrections.  This is the
+topological, unbiased coarse active-space construction.  It is more restrictive
+than a normal-jump filter because it also removes tangential components, but it
+does not require normals or contact interpolation weights during the coarse
+solve; only the active contact adjacency is required.
+\end{abstract}
+
+\section{Problem and notation}
+
+Let level $\ell=0$ denote the finest mesh and let increasing $\ell$ denote
+coarser levels.  The discrete displacement on level $\ell$ is
+\[
+    \ud_\ell \in \R^{d n_\ell},
+    \qquad d=2,
+\]
+with prescribed Dirichlet values imposed strongly.  The finest-level nonlinear
+equilibrium equation is written
+\[
+    \rr_0(\ud_0)
+    =
+    \rr_{e,0}(\ud_0)
+    +
+    \rr_{c,0}(\ud_0)
+    =
+    \boldsymbol{0},
+\]
+where $\rr_e$ is the elastic residual and $\rr_c$ is the Nitsche contact
+residual.  The implementation uses a linear elastic tangent on the current
+configuration and a semismooth active-set linearization of the contact term.
+For one frozen contact geometry, the tangent is
+\[
+    \HH_0(\ud_0)
+    =
+    \HH_{e,0}
+    +
+    \HH_{c,0}(\ud_0).
+\]
+The phrase ``frozen contact geometry'' means that the contact pairing, the
+surface quadrature, the closest-point interpolation, and the normal vectors are
+held fixed while one residual/tangent pair is assembled.  They are recomputed
+whenever the nonlinear smoother or nonlinear cycle relinearizes the contact
+problem.
+
+\section{Nitsche contact discretization}
+
+For a potential contact row $c$, let $a(c)$ be the side-1 point and let
+$\PP^c$ be the scalar interpolation row for the side-2 point.  If
+$\nn^c$ is the contact normal and $\ud_1^c,\ud_2^c$ are the two traces of the
+displacement, the scalar normal gap used by the code is
+\[
+    g^c(\ud)
+    =
+    \nn^{c\,T}
+    \left(
+        \xx_2^c + \ud_2^c
+        -
+        \xx_1^c - \ud_1^c
+    \right).
+\]
+On an edge, the implementation stores a quadrature-weighted edge mean
+$\bar g^c$.  With edge length $h_c$, shear modulus $\mu$, and user parameter
+$\gamma_0$, the local penalty scale is
+\[
+    \gamma_c = \gamma_0 \frac{\mu}{h_c}.
+\]
+The normal elastic traction is denoted by
+\[
+    \sigma_n^c(\ud)
+    =
+    \nn^{c\,T}\boldsymbol{\sigma}(\ud)\nn^c.
+\]
+For the symmetric or unbiased Nitsche form, the active-set indicator is based
+on the augmented normal quantity
+\[
+    P_n^c(\ud)
+    =
+    \theta_c\,\sigma_n^c(\ud)
+    +
+    \gamma_c\,\bar g^c(\ud),
+    \qquad
+    \alpha_c(\ud)
+    =
+    \begin{cases}
+    1, & P_n^c(\ud)<0,\\
+    0, & P_n^c(\ud)\ge 0.
+    \end{cases}
+\]
+Only active rows contribute to the contact residual and tangent.  Inactive
+rows are skipped.  Therefore, outside the active contact region the boundary is
+natural Neumann in the discrete weak sense: no Nitsche contact force is
+assembled there.  A raw plotted Cauchy value $-\sigma_n$ may still be nonzero
+outside contact because it is an element stress diagnostic, not the active
+contact pressure.  The active pressure diagnostic is instead
+\[
+    p_c(\ud)
+    =
+    \alpha_c(\ud)\,
+    \max\!\left(-\frac{P_n^c(\ud)}{\theta_c},0\right).
+\]
+
+For a frozen active set and frozen geometry, the contact energy contribution
+has the local form
+\[
+    \Pi_c(\ud)
+    =
+    \sum_{c}
+    \frac{m_c}{2\,\theta_c\,\gamma_c}
+    \negpart{P_n^c(\ud)}^2,
+\]
+where $m_c$ is the lumped contact quadrature weight.  On active rows the first
+variation is
+\[
+    \delta \Pi_c
+    =
+    \sum_{c:\alpha_c=1}
+    \frac{m_c}{\theta_c\gamma_c}
+    P_n^c(\ud)\,
+    \delta P_n^c(\ud),
+\]
+and the tangent contribution is
+\[
+    \HH_{c}
+    =
+    \sum_{c:\alpha_c=1}
+    \frac{m_c}{\theta_c\gamma_c}
+    \boldsymbol{p}_c\boldsymbol{p}_c^T,
+    \qquad
+    \boldsymbol{p}_c
+    =
+    \nabla_{\ud}P_n^c.
+\]
+This is exactly the structure assembled in the Python code: the derivative of
+$P_n^c$ contains the gap derivative and, when enabled, the derivative of
+$\sigma_n^c$.
+
+\section{Multigrid hierarchy}
+
+The level hierarchy consists of standard nested displacement spaces.  Let
+\[
+    \II_{\ell+1}^{\ell}
+    :
+    \R^{d n_{\ell+1}}
+    \to
+    \R^{d n_{\ell}}
+\]
+be the geometric prolongation from level $\ell+1$ to level $\ell$, and let
+\[
+    \RR_{\ell}^{\ell+1}
+    =
+    \left(\II_{\ell+1}^{\ell}\right)^T
+\]
+be the corresponding variational restriction.  The current Python prototype
+uses inherited Galerkin coarse operators for the tangent available at the
+current fine iterate:
+\[
+    \HH_{\ell+1}
+    =
+    \left(\II_{\ell+1}^{\ell}\right)^T
+    \HH_{\ell}
+    \II_{\ell+1}^{\ell}.
+\]
+This is a convenient prototype choice.  The important point for the current
+experiment is not rediscretization versus inherited Galerkin elasticity, but
+the filtered coarse correction space.  Once the fine tangent is fixed, the
+coarse hierarchy is used as a linear correction hierarchy inside one nonlinear
+cycle.
+
+\section{Jump-free active coarse space}
+
+\subsection{Active adjacency mask}
+
+The implemented coarse space is the jump-free active space.  Let
+$\mathcal{C}_\ell$ be the potential contact rows represented on level $\ell$,
+and let $\alpha_c\in\{0,1\}$ be the frozen active indicator.  Define
+$\mathcal{A}_{1,\ell}$ as the set of side-1 displacement nodes touched by
+active rows, and $\mathcal{A}_{2,\ell}$ as the set of side-2 displacement nodes
+touched by the interpolation stencils of active rows:
+\[
+    \mathcal{A}_{1,\ell}
+    =
+    \{a(c): c\in\mathcal{C}_\ell,\ \alpha_c=1\},
+\]
+\[
+    \mathcal{A}_{2,\ell}
+    =
+    \{j: j\in\supp \PP_\ell^c,\ c\in\mathcal{C}_\ell,\ \alpha_c=1\}.
+\]
+For an unbiased directed contact description the side labels are local to a
+row, not global labels of the physical surface.  The active displacement nodes
+are therefore the union
+\[
+    \mathcal{A}_\ell
+    =
+    \mathcal{A}_{1,\ell}
+    \cup
+    \mathcal{A}_{2,\ell}.
+\]
+The inactive nodal indicator is
+\[
+    d_\ell^a
+    =
+    \begin{cases}
+    0, & a\in \mathcal{A}_\ell,\\
+    1, & a\notin \mathcal{A}_\ell,
+    \end{cases}
+\]
+and the displacement filter is
+\[
+    \ZZ_\ell
+    =
+    \diag(\dd_\ell)\otimes \II_d.
+\]
+Applying $\ZZ_\ell$ sets both Cartesian components of active contact-adjacent
+nodes to zero.  In the current implementation this is the intended starting
+point: both $x$ and $y$ components are filtered.  This differs from a
+normal-tangential filter, which would remove only the active normal jump and
+would preserve tangential motion.
+
+\subsection{Why the contact Hessian vanishes on the filtered space}
+
+For an active row $c$, every displacement degree of freedom participating in
+the row is masked by $\ZZ_\ell$.  Hence, for any vector $\vv_\ell$,
+\[
+    \left(\ZZ_\ell\vv_\ell\right)_{1}^{c}
+    =
+    \boldsymbol{0},
+    \qquad
+    \left(\ZZ_\ell\vv_\ell\right)_{2}^{j}
+    =
+    \boldsymbol{0}
+    \quad
+    \forall j\in\supp \PP_\ell^c.
+\]
+Therefore the active normal jump induced by the filtered vector is zero:
+\[
+    \nn^{c\,T}
+    \left[
+        \left(\ZZ_\ell\vv_\ell\right)_1^c
+        -
+        \sum_{j\in\supp \PP_\ell^c}
+        P_{\ell,cj}
+        \left(\ZZ_\ell\vv_\ell\right)_2^j
+    \right]
+    =
+    0.
+\]
+It follows that the active contact tangent has no action on the filtered
+coarse correction space:
+\[
+    \ZZ_\ell^T
+    \HH_{c,\ell}
+    \ZZ_\ell
+    =
+    \boldsymbol{0},
+\]
+provided the active set and contact geometry are frozen during the correction.
+Consequently, the coarse correction can be driven by the elastic part of the
+operator restricted to the jump-free space.  In the current prototype, because
+the whole fine tangent is inherited by Galerkin projection, the same effect is
+enforced algebraically by zeroing filtered degrees of freedom in the coarse
+right-hand side, coarse solve, and prolongated correction.
+
+\subsection{Coarse mask transfer}
+
+The fine active mask is built from the current fine active contact rows.  On
+coarser levels, the current implementation restricts the active nodal mask
+through the variational support of the geometric transfer and thresholds the
+result:
+\[
+    s_{\ell+1}
+    =
+    \chi
+    \left(
+        \left(\II_{\ell+1}^{\ell}\right)^T s_{\ell}
+    \right),
+    \qquad
+    d_{\ell+1}=1-s_{\ell+1}.
+\]
+Here $\chi(z)=1$ for positive entries and $\chi(z)=0$ otherwise.  Dirichlet
+degrees of freedom are always included in the constrained mask.  The complete
+mask on level $\ell$ is therefore
+\[
+    \mathcal{M}_\ell
+    =
+    \mathcal{D}_\ell
+    \cup
+    \{(a,i): a\in\mathcal{A}_\ell,\ i=1,\ldots,d\}.
+\]
+
+\section{Recursive linear correction cycle}
+
+Inside one nonlinear cycle, after the fine tangent and masks have been built,
+the coarse solve is a linear multigrid correction.  Given a level $\ell$,
+right-hand side $\boldsymbol{b}_\ell$, operator $\HH_\ell$, and mask
+$\mathcal{M}_\ell$, the masked right-hand side is
+\[
+    \widehat{\boldsymbol{b}}_\ell
+    =
+    \ZZ_\ell^T\boldsymbol{b}_\ell,
+\]
+with all masked entries set to zero.  The correction is constrained by
+\[
+    \du_\ell\big|_{\mathcal{M}_\ell}=0.
+\]
+On the coarsest level the implementation solves the masked system directly on
+the unmasked degrees of freedom.  On intermediate levels the recursive cycle is
+\[
+    \du_\ell^{(0)} = \boldsymbol{0},
+\]
+\[
+    \du_\ell^{(1)}
+    =
+    S_\ell^{\nu_1}
+    \left(
+        \widehat{\boldsymbol{b}}_\ell,
+        \du_\ell^{(0)}
+    \right),
+\]
+\[
+    \boldsymbol{\rho}_\ell
+    =
+    \widehat{\boldsymbol{b}}_\ell
+    -
+    \HH_\ell\du_\ell^{(1)},
+    \qquad
+    \boldsymbol{\rho}_\ell\big|_{\mathcal{M}_\ell}=0,
+\]
+\[
+    \boldsymbol{b}_{\ell+1}
+    =
+    \left(\II_{\ell+1}^{\ell}\right)^T
+    \boldsymbol{\rho}_\ell,
+\]
+\[
+    \du_{\ell+1}
+    =
+    \operatorname{cycle}_{\ell+1}
+    \left(
+        \boldsymbol{b}_{\ell+1}
+    \right),
+\]
+\[
+    \du_\ell^{(2)}
+    =
+    \du_\ell^{(1)}
+    +
+    \II_{\ell+1}^{\ell}\du_{\ell+1},
+    \qquad
+    \du_\ell^{(2)}\big|_{\mathcal{M}_\ell}=0,
+\]
+\[
+    \du_\ell
+    =
+    S_\ell^{\nu_2}
+    \left(
+        \widehat{\boldsymbol{b}}_\ell,
+        \du_\ell^{(2)}
+    \right).
+\]
+The parameter \texttt{cycle\_type} repeats the coarse-correction part once for
+a V-cycle and twice for a W-cycle, matching the structure of
+\texttt{ShiftedPenaltyMultigrid::cycle}.  The default Python smoother is
+Jacobi; Gauss--Seidel, symmetric Gauss--Seidel, and block Jacobi are also
+available for experiments.
+
+\section{Fine nonlinear smoothing}
+
+Fine smoothing is nonlinear because each smoothing step reassembles the
+current contact residual and tangent.  Let $S_0$ denote one linear smoother
+application to the current tangent.  One nonlinear smoothing step is
+\[
+    \rr_0^k = \rr_0(\ud_0^k),
+    \qquad
+    \HH_0^k = \HH_0(\ud_0^k),
+\]
+\[
+    \HH_0^k \boldsymbol{s}^k
+    \approx
+    -\rr_0^k,
+    \qquad
+    \ud_0^{k+1}
+    =
+    \ud_0^k + \boldsymbol{s}^k,
+\]
+where the approximate solve is a fixed number of masked smoother sweeps.  Only
+Dirichlet degrees of freedom are fixed during fine smoothing.  Active contact
+nodes are allowed to move on the fine level; the jump-free active mask is used
+for coarse corrections, not for suppressing fine-level nonlinear relaxation.
+
+\section{Nonlinear multigrid cycle}
+
+One nonlinear multigrid cycle at the finest level has the following structure.
+The active set, masks, residual, and tangent are refreshed before the cycle and
+again after each nonlinear smoothing phase.
+
+\begin{enumerate}[label=\textbf{Step \arabic*.},leftmargin=2.2cm]
+\item \textbf{Refresh contact state.}
+Compute $\rr_0(\ud_0)$, $\HH_0(\ud_0)$, the active contact set
+$\mathcal{A}_0$, and the hierarchy masks $\mathcal{M}_\ell$.
+
+\item \textbf{Pre-smooth.}
+Apply $\nu_{\mathrm{nl}}$ nonlinear smoothing steps on the fine level, each
+using $\nu_1$ linear smoother sweeps.
+
+\item \textbf{Restrict residual.}
+Recompute the fine residual and tangent.  Form
+\[
+    \boldsymbol{b}_1
+    =
+    -\left(\II_1^0\right)^T\rr_0(\ud_0),
+\]
+with fine Dirichlet rows zeroed before restriction.
+
+\item \textbf{Coarse correction.}
+Build the inherited Galerkin hierarchy from the current fine tangent and solve
+approximately
+\[
+    \HH_1 \du_1
+    =
+    \boldsymbol{b}_1
+\]
+with the recursive masked linear cycle.
+
+\item \textbf{Prolong and filter.}
+Apply the correction
+\[
+    \du_0
+    =
+    \II_1^0 \du_1,
+    \qquad
+    \du_0\big|_{\mathcal{M}_0}=0,
+\]
+and update
+\[
+    \ud_0 \leftarrow \ud_0 + \du_0.
+\]
+
+\item \textbf{Post-smooth.}
+Apply $\nu_{\mathrm{nl}}$ nonlinear smoothing steps on the fine level, each
+using $\nu_2$ linear smoother sweeps.
+\end{enumerate}
+
+If \texttt{--skip-coarse} is enabled, Step 4 and Step 5 are omitted.  This is
+useful for isolating whether the smoother alone reduces the residual.
+
+\section{Outer and inner iteration}
+
+The top-level nonlinear solve follows the same outer/inner structure as the
+shifted-penalty multigrid implementation.  Let $m_{\max}$ be the maximum
+number of outer iterations and $q_{\max}$ the maximum number of inner
+nonlinear cycles per outer iteration.  Starting from the Dirichlet displacement
+field, the solver computes
+\[
+    r_0 = \|\rr_0(\ud_0^0)\|_2
+\]
+and then performs
+\[
+    \text{for } k=0,\ldots,m_{\max}-1:
+    \qquad
+    \text{for } q=0,\ldots,q_{\max}-1:
+    \qquad
+    \ud_0 \leftarrow \operatorname{NMG}(\ud_0).
+\]
+After each inner nonlinear cycle, the residual norm
+\[
+    r_{k,q} = \|\rr_0(\ud_0)\|_2
+\]
+and relative residual $r_{k,q}/r_0$ are checked.  The default residual target
+is
+\[
+    r_{k,q}<10^{-10}
+    \quad\text{or}\quad
+    \frac{r_{k,q}}{r_0}<10^{-10}.
+\]
+The implementation also monitors the active penetration norm
+\[
+    \|g_-\|_2
+    =
+    \left\|
+    \min(g(\ud_0),0)
+    \right\|_2,
+\]
+and reports active rows, contact quadrature points, filtered degrees of
+freedom, and contact tangent sparsity.  A stagnation guard terminates an inner
+loop when the residual reduction within an outer iteration becomes too small.
+
+\section{Algorithm summary}
+
+\begin{center}
+\begin{minipage}{0.94\linewidth}
+\hrule
+\vspace{0.5em}
+\textbf{Algorithm: filtered nonlinear multigrid for Nitsche contact}
+\begin{enumerate}[leftmargin=1.7em]
+\item Build the geometric hierarchy and prolongation operators.
+\item Initialize the fine displacement with the prescribed Dirichlet values.
+\item Compute the initial residual norm $r_0$.
+\item For each outer iteration:
+  \begin{enumerate}[leftmargin=1.7em]
+  \item For each inner nonlinear cycle:
+    \begin{enumerate}[leftmargin=1.7em]
+    \item Assemble the fine Nitsche residual and tangent with frozen geometry.
+    \item Build the active contact adjacency mask and restrict it through the
+    hierarchy.
+    \item Apply fine nonlinear pre-smoothing.
+    \item Reassemble and restrict the current residual.
+    \item Compute a masked recursive coarse correction.
+    \item Prolong the correction, zero the fine active-mask entries, and update
+    the fine displacement.
+    \item Apply fine nonlinear post-smoothing.
+    \item Check residual convergence or stagnation.
+    \end{enumerate}
+  \item Report residual, penetration, active set size, and filtering
+  diagnostics.
+  \end{enumerate}
+\item Stop when the residual and penetration criteria are satisfied or when the
+maximum iteration count is reached.
+\end{enumerate}
+\vspace{0.5em}
+\hrule
+\end{minipage}
+\end{center}
+
+\section{Relation to the normal-jump filter}
+
+The jump-free filter $\ZZ_\ell$ is intentionally more restrictive than the
+active normal-jump filter.  A normal-jump filter would work in
+normal--tangential coordinates and remove only
+\[
+    \nn^{c\,T}\jump{\du_\ell}^c
+\]
+for active contact rows, while leaving tangential corrections available.  Such
+a filter requires the coarse contact interpolation, coarse active rows, and
+coarse normals.  Its advantage is that it preserves more interface modes.  Its
+cost is that the multigrid transfer must correctly evaluate and remove the
+normal jump on every level.
+
+The current prototype deliberately starts with the simpler unbiased
+jump-free construction:
+\[
+    \ZZ_\ell=\diag(\dd_\ell)\otimes\II_d.
+\]
+This filter does not distinguish normal and tangential components; it removes
+both $x$ and $y$ displacement components at active-adjacent nodes.  It is
+therefore a robust first test of the multigrid skeleton and the smoother.  If
+the method later needs a less restrictive coarse space, the natural extension
+is to replace $\ZZ_\ell$ by a normal--tangential active-jump filter constructed
+from level-wise normals and contact interpolation rows.
+
+\section{Implementation status and diagnostics}
+
+The current Python implementation has the following important properties.
+
+\begin{itemize}[leftmargin=1.7em]
+\item The nonlinear-cycle structure matches the shifted-penalty multigrid
+skeleton: pre-smooth, restrict residual, recursive coarse solve, prolong,
+post-smooth.
+\item The coarse masks are refreshed from the current fine active set at each
+nonlinear cycle.  The Galerkin operator itself needs no independent contact
+refresh beyond the current residual/tangent linearization and the active-space
+mask.
+\item Fine smoothing moves active contact nodes; coarse correction does not.
+\item The default smoother is scalar Jacobi.  It was selected because, in the
+current test case, it had better late residual reduction than forward
+Gauss--Seidel.
+\item The active contact pressure is the masked Nitsche quantity
+$\alpha_c\max(-P_n^c/\theta_c,0)$, not the raw Cauchy stress diagnostic
+$-\sigma_n^c$.
+\end{itemize}
+
+\section{Expected failure modes}
+
+The residual can stagnate or decay slowly for several reasons.
+
+\begin{enumerate}[leftmargin=1.7em]
+\item \textbf{Overly restrictive coarse space.}
+The jump-free filter removes tangential as well as normal components at active
+nodes.  If the active union mask becomes large, the coarse correction may lose
+too much interface content.
+
+\item \textbf{Insufficient smoothing.}
+The contact tangent is localized and stiff.  Too few smoothing sweeps can leave
+high-frequency error that the coarse grid cannot represent.
+
+\item \textbf{Changing active set.}
+The coarse correction assumes frozen contact geometry and a frozen active set.
+If the active set changes significantly between nonlinear cycles, the inherited
+coarse correction may become a poor model of the next residual.
+
+\item \textbf{Diagnostic confusion.}
+Raw $-\sigma_n$ may be nonzero outside contact even when the inactive boundary
+is natural Neumann in the weak sense.  Solver convergence should be assessed
+with the residual norm, penetration, and active Nitsche pressure.
+
+\item \textbf{Coordinate-space mismatch in future filters.}
+If the method is changed from the jump-free filter to a normal-jump filter, the
+restriction and prolongation must be composed with the correct
+normal--tangential transformations.  Removing a Cartesian component is not the
+same as removing the active normal component.
+\end{enumerate}
+
+\section{Conclusion}
+
+The implemented method is a filtered nonlinear multigrid solver for Nitsche
+contact.  It currently uses a conservative jump-free coarse active space:
+coarse corrections are not allowed to move displacement nodes touched by active
+contact rows.  This makes the active contact Hessian vanish on the coarse
+correction space and leaves the recursive multigrid cycle to reduce the
+elastic bulk error away from the rapidly changing contact interface.  The
+algorithm is deliberately structured like the existing shifted-penalty
+multigrid solver, while using the contact-specific residual, active set, and
+filtered coarse-space construction needed for the Nitsche formulation.
+
+\end{document}
