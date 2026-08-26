@@ -18,6 +18,37 @@
 #include "hex8_mooney_rivlin_visco_unique_Hi_local.hpp"  // Unimodular form
 // #include "hex8_mooney_rivlin_visco_unique_Hi_standard.hpp"   // Standard form (has non-zero initial stress)
 
+template <class Run>
+static int dispatch_history_read(const smesh::PrimitiveType storage, const void *const history, const Run &run) {
+    if (storage == smesh::SMESH_FLOAT32) {
+        return run(static_cast<const float *>(history));
+    }
+
+    if (storage == smesh::TypeToEnum<real_t>::value()) {
+        return run(static_cast<const real_t *>(history));
+    }
+
+    SFEM_ERROR("Unsupported Mooney-Rivlin history storage: %s\n", smesh::to_string(storage).data());
+    return SFEM_FAILURE;
+}
+
+template <class Run>
+static int dispatch_history_update(const smesh::PrimitiveType storage,
+                                   const void *const          history,
+                                   void *const                new_history,
+                                   const Run                 &run) {
+    if (storage == smesh::SMESH_FLOAT32) {
+        return run(static_cast<const float *>(history), static_cast<float *>(new_history));
+    }
+
+    if (storage == smesh::TypeToEnum<real_t>::value()) {
+        return run(static_cast<const real_t *>(history), static_cast<real_t *>(new_history));
+    }
+
+    SFEM_ERROR("Unsupported Mooney-Rivlin history storage: %s\n", smesh::to_string(storage).data());
+    return SFEM_FAILURE;
+}
+
 // ============================================================================
 // HISTORY UPDATE
 // ============================================================================
@@ -40,8 +71,9 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     // 4. History variables
     const ptrdiff_t                   history_stride,
     const int                         history_n_qp,
-    const real_t *const SFEM_RESTRICT history,
-    real_t *const SFEM_RESTRICT       new_history,
+    const smesh::PrimitiveType        history_storage,
+    const void *const SFEM_RESTRICT   history_data,
+    void *const SFEM_RESTRICT         new_history_data,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -50,7 +82,7 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const real_t *const SFEM_RESTRICT ux,
     const real_t *const SFEM_RESTRICT uy,
     const real_t *const SFEM_RESTRICT uz) {
-    
+    auto run = [&](const auto *const history, auto *const new_history) -> int {
     SFEM_UNUSED(nnodes);
     
     const geom_t *const x = points[0];
@@ -126,8 +158,8 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
 
             const ptrdiff_t hist_offset = i * history_stride;
             for (int p = 0; p < num_prony_terms; ++p) {
-                const real_t *H_old = history + hist_offset + p * 6;
-                real_t *H_new = new_history + hist_offset + p * 6;
+                const auto *H_old = history + hist_offset + p * 6;
+                auto *H_new = new_history + hist_offset + p * 6;
                 for (int c = 0; c < 6; ++c) {
                     H_new[c] = alpha[p] * H_old[c] + beta[p] * (S_dev_curr_avg[c] - S_dev_prev_avg[c]);
                 }
@@ -160,8 +192,8 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
                             S_dev_curr);
 
                         for (int p = 0; p < num_prony_terms; ++p) {
-                            const real_t *H_old = history + hist_offset + p * 6;
-                            real_t *H_new = new_history + hist_offset + p * 6;
+                            const auto *H_old = history + hist_offset + p * 6;
+                            auto *H_new = new_history + hist_offset + p * 6;
 
                             for (int c = 0; c < 6; ++c) {
                                 H_new[c] = alpha[p] * H_old[c] + beta[p] * (S_dev_curr[c] - S_dev_prev[c]);
@@ -173,7 +205,10 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
         }
     }
 
-    return SFEM_SUCCESS;
+        return SFEM_SUCCESS;
+    };
+
+    return dispatch_history_update(history_storage, history_data, new_history_data, run);
 }
 
 // ============================================================================
@@ -199,7 +234,8 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     // 4. History variables
     const ptrdiff_t                   history_stride,
     const int                         history_n_qp,
-    const real_t *const SFEM_RESTRICT history,
+    const smesh::PrimitiveType        history_storage,
+    const void *const SFEM_RESTRICT   history_data,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -213,7 +249,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     real_t *const SFEM_RESTRICT       outx,
     real_t *const SFEM_RESTRICT       outy,
     real_t *const SFEM_RESTRICT       outz) {
-    
+    auto run = [&](const auto *const history) -> int {
     SFEM_UNUSED(nnodes);
     
     const geom_t *const x = points[0];
@@ -275,7 +311,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
                     // Pre-accumulate: S_hist = sum(alpha_i * H_i - beta_i * S_dev_prev)
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
-                        const real_t *H_i = history + hist_offset + p * 6;
+                        const auto *H_i = history + hist_offset + p * 6;
                         for (int c = 0; c < 6; ++c) {
                             S_hist[c] += alpha[p] * H_i[c] - beta[p] * S_dev_prev[c];
                         }
@@ -305,7 +341,10 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
         }
     }
 
-    return SFEM_SUCCESS;
+        return SFEM_SUCCESS;
+    };
+
+    return dispatch_history_read(history_storage, history_data, run);
 }
 
 // ============================================================================
@@ -331,7 +370,8 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     // 4. History variables
     const ptrdiff_t                   history_stride,
     const int                         history_n_qp,
-    const real_t *const SFEM_RESTRICT history,
+    const smesh::PrimitiveType        history_storage,
+    const void *const SFEM_RESTRICT   history_data,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -345,7 +385,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     real_t *const SFEM_RESTRICT       values,
     const idx_t *const SFEM_RESTRICT  rowptr,
     const idx_t *const SFEM_RESTRICT  colidx) {
-    
+    auto run = [&](const auto *const history) -> int {
     SFEM_UNUSED(nnodes);
     SFEM_UNUSED(out_stride);
     
@@ -408,7 +448,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
                     // Pre-accumulate: S_hist = sum(alpha_i * H_i - beta_i * S_dev_prev)
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
-                        const real_t *H_i = history + hist_offset + p * 6;
+                        const auto *H_i = history + hist_offset + p * 6;
                         for (int c = 0; c < 6; ++c) {
                             S_hist[c] += alpha[p] * H_i[c] - beta[p] * S_dev_prev[c];
                         }
@@ -429,7 +469,10 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
         hex8_local_to_global_bsr3(ev, element_matrix, rowptr, colidx, values);
     }
 
-    return SFEM_SUCCESS;
+        return SFEM_SUCCESS;
+    };
+
+    return dispatch_history_read(history_storage, history_data, run);
 }
 
 // ============================================================================
@@ -455,7 +498,8 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     // 4. History variables
     const ptrdiff_t                   history_stride,
     const int                         history_n_qp,
-    const real_t *const SFEM_RESTRICT history,
+    const smesh::PrimitiveType        history_storage,
+    const void *const SFEM_RESTRICT   history_data,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -469,7 +513,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     real_t *const SFEM_RESTRICT       outx,
     real_t *const SFEM_RESTRICT       outy,
     real_t *const SFEM_RESTRICT       outz) {
-    
+    auto run = [&](const auto *const history) -> int {
     SFEM_UNUSED(nnodes);
     
     const geom_t *const x = points[0];
@@ -531,7 +575,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
                     // Pre-accumulate: S_hist = sum(alpha_i * H_i - beta_i * S_dev_prev)
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
-                        const real_t *H_i = history + hist_offset + p * 6;
+                        const auto *H_i = history + hist_offset + p * 6;
                         for (int c = 0; c < 6; ++c) {
                             S_hist[c] += alpha[p] * H_i[c] - beta[p] * S_dev_prev[c];
                         }
@@ -567,5 +611,8 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
         }
     }
 
-    return SFEM_SUCCESS;
+        return SFEM_SUCCESS;
+    };
+
+    return dispatch_history_read(history_storage, history_data, run);
 }
