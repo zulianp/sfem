@@ -116,6 +116,35 @@ def tri3_neo_tangent_fd(px, py, u_elem, mu, lam, fd_eps):
     return k
 
 
+def tri3_neo_tangent_analytic(px, py, u_elem, mu, lam):
+    area, dNdx, dNdy, F = tri3_kinematics(px, py, u_elem)
+    J = float(np.linalg.det(F))
+    if J <= 1e-12:
+        raise FloatingPointError(f"inverted hyperelastic element J={J:.3e}")
+    G = np.linalg.inv(F).T
+    coeff = lam * np.log(J) - mu
+    k = np.empty((6, 6), dtype=np.float64)
+    grads = ((dNdx[0], dNdy[0]), (dNdx[1], dNdy[1]), (dNdx[2], dNdy[2]))
+    for a in range(3):
+        for i in range(2):
+            row = 2 * a + i
+            for b in range(3):
+                for m in range(2):
+                    col = 2 * b + m
+                    val = 0.0
+                    for Jidx in range(2):
+                        grad_a = grads[a][Jidx]
+                        for Lidx in range(2):
+                            A = (
+                                (mu if i == m and Jidx == Lidx else 0.0)
+                                + lam * G[m, Lidx] * G[i, Jidx]
+                                - coeff * G[m, Jidx] * G[i, Lidx]
+                            )
+                            val += grad_a * A * grads[b][Lidx]
+                    k[row, col] = area * val
+    return k
+
+
 def tri3_neo_sigma_n(px, py, u_elem, mu, lam, nx, ny):
     _, _, _, F = tri3_kinematics(px, py, u_elem)
     sigma = neo_cauchy(F, mu, lam)
@@ -155,7 +184,7 @@ def tri3_neo_sigma_n_fd(px, py, u_elem, mu, lam, nx, ny, fd_eps):
     return sn0, dsn
 
 
-def assemble_neo_elastic(level, u_vec):
+def assemble_neo_elastic(level, u_vec, assemble_tangent=True):
     ndofs = level.ndofs
     residual = np.zeros(ndofs, dtype=np.float64)
     rows, cols, data = [], [], []
@@ -174,17 +203,40 @@ def assemble_neo_elastic(level, u_vec):
                 dofs[2 * a + 1] = 2 * int(node) + 1
             ue = u_vec[dofs]
             re = tri3_neo_residual(px, py, ue, mu, lam)
-            ke = tri3_neo_tangent_fd(px, py, ue, mu, lam, level.fd_eps)
             residual[dofs] += re
-            for i in range(6):
-                for j in range(6):
-                    val = ke[i, j]
-                    if val != 0.0:
-                        rows.append(int(dofs[i]))
-                        cols.append(int(dofs[j]))
-                        data.append(float(val))
-    K = sparse.coo_matrix((data, (rows, cols)), shape=(ndofs, ndofs)).tocsr()
+            if assemble_tangent:
+                if getattr(level, "material_tangent", "analytic") == "fd":
+                    ke = tri3_neo_tangent_fd(px, py, ue, mu, lam, level.fd_eps)
+                else:
+                    ke = tri3_neo_tangent_analytic(px, py, ue, mu, lam)
+                for i in range(6):
+                    for j in range(6):
+                        val = ke[i, j]
+                        if val != 0.0:
+                            rows.append(int(dofs[i]))
+                            cols.append(int(dofs[j]))
+                            data.append(float(val))
+    if assemble_tangent:
+        K = sparse.coo_matrix((data, (rows, cols)), shape=(ndofs, ndofs)).tocsr()
+    else:
+        K = None
     return residual, K
+
+
+def min_neo_element_jacobian(level, u_vec):
+    j_min = np.inf
+    for tris in (level.tris_b, level.tris_o):
+        for nodes in tris:
+            nodes = np.asarray(nodes, dtype=np.int32)
+            px = level.X[nodes]
+            py = level.Y[nodes]
+            dofs = np.empty(6, dtype=np.int64)
+            for a, node in enumerate(nodes):
+                dofs[2 * a] = 2 * int(node)
+                dofs[2 * a + 1] = 2 * int(node) + 1
+            _, _, _, F = tri3_kinematics(px, py, u_vec[dofs])
+            j_min = min(j_min, float(np.linalg.det(F)))
+    return j_min
 
 
 def neo_surface_contrib(
@@ -385,12 +437,32 @@ def build_level(ps, args):
     level.tris_b = nc.block_triangles(ps, level.mesh, level.bid_b)
     level.tris_o = nc.block_triangles(ps, level.mesh, level.bid_o)
     level.fd_eps = float(args.fd_eps)
+    level.material_tangent = getattr(args, "material_tangent", "analytic")
+    level.material_linearization = getattr(args, "material_linearization", "every-call")
+    level.cached_K_elastic = None
 
-    def elastic_residual_tangent(u_vec):
-        return assemble_neo_elastic(level, u_vec)
+    def refresh_material_tangent(u_vec):
+        _, K_elastic = assemble_neo_elastic(level, u_vec, assemble_tangent=True)
+        level.cached_K_elastic = K_elastic.tocsr()
+        return level.cached_K_elastic
+
+    def begin_vcycle(u_vec):
+        if level.material_linearization == "every-vcycle":
+            refresh_material_tangent(u_vec)
+
+    def elastic_residual_tangent(u_vec, force_refresh=False):
+        if level.material_linearization == "every-call" or force_refresh:
+            return assemble_neo_elastic(level, u_vec, assemble_tangent=True)
+        r_elastic, _ = assemble_neo_elastic(level, u_vec, assemble_tangent=False)
+        if level.cached_K_elastic is None:
+            refresh_material_tangent(u_vec)
+        return r_elastic, level.cached_K_elastic
 
     def elastic_residual(u_vec):
-        return assemble_neo_elastic(level, u_vec)[0]
+        return assemble_neo_elastic(level, u_vec, assemble_tangent=False)[0]
+
+    def min_element_jacobian(u_vec):
+        return min_neo_element_jacobian(level, u_vec)
 
     def residual_tangent(u_vec, forced_active=None, frozen_geom=None):
         r_elastic, K_elastic = elastic_residual_tangent(u_vec)
@@ -428,10 +500,14 @@ def build_level(ps, args):
         )
         return residual, Ksys, g_contact, Kn, n_qp, new_active
 
-    _, K0 = elastic_residual_tangent(level.u_bc)
+    reference_u = np.zeros_like(level.u_bc)
+    _, K0 = elastic_residual_tangent(reference_u, force_refresh=True)
     level.Ke = K0.tocsr()
+    level.refresh_material_tangent = refresh_material_tangent
+    level.begin_vcycle = begin_vcycle
     level.elastic_residual = elastic_residual
     level.elastic_residual_tangent = elastic_residual_tangent
+    level.min_element_jacobian = min_element_jacobian
     level.residual_tangent = residual_tangent
     return level
 
@@ -480,6 +556,7 @@ def pack_result(fine, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist=Non
     th = fine.theta_b if fine.theta_b > 0.0 else 1.0
     p_applied = np.where(tr_on, np.maximum(-tr_pn / th, 0.0), 0.0)
     n_active = int(np.count_nonzero(tr_on))
+    min_J = min_neo_element_jacobian(fine, u)
     return {
         "mesh": fine.mesh,
         "X": X,
@@ -522,6 +599,7 @@ def pack_result(fine, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist=Non
         "theta_b": float(fine.theta_b),
         "theta_o": float(fine.theta_o),
         "indent": float(args.indent),
+        "min_J": float(min_J),
     }
 
 
@@ -644,6 +722,126 @@ def plot_result(result, path):
     print(f"saved {path}")
 
 
+def load_step_plot_path(path, step_index):
+    root, ext = os.path.splitext(path)
+    if not ext:
+        ext = ".png"
+    return f"{root}_load{step_index:03d}{ext}"
+
+
+def solve_incremental_load(ps, args):
+    target_indent = float(args.indent)
+    n_steps = max(1, int(args.load_steps))
+    max_accepted = max(n_steps, int(getattr(args, "load_max_accepted", 100)))
+    max_attempts = max(max_accepted, int(getattr(args, "load_max_attempts", 4 * max_accepted)))
+    min_delta = abs(target_indent) * float(args.load_min_fraction)
+    if target_indent == 0.0:
+        min_delta = float(args.load_min_fraction)
+    if min_delta <= 0.0:
+        raise ValueError("--load-min-fraction must be positive")
+
+    current_indent = 0.0
+    step_delta = target_indent / n_steps
+    previous_u = None
+    last_result = None
+    accepted = 0
+    attempts = 0
+    load_history = []
+
+    while abs(target_indent - current_indent) > 1e-15:
+        if accepted >= max_accepted:
+            raise RuntimeError(
+                f"incremental load stopped after {accepted} accepted steps at "
+                f"indent={current_indent:.6e}, target={target_indent:.6e}"
+            )
+        if attempts >= max_attempts:
+            raise RuntimeError(
+                f"incremental load stopped after {attempts} attempts at "
+                f"indent={current_indent:.6e}, target={target_indent:.6e}"
+            )
+        remaining = target_indent - current_indent
+        if abs(step_delta) > abs(remaining):
+            step_delta = remaining
+        trial_indent = current_indent + step_delta
+        trial_args = copy.copy(args)
+        trial_args.indent = trial_indent
+        trial_args.plot = False
+        attempts += 1
+        print(
+            f"load_step trial={attempts} accepted={accepted} indent={trial_indent:.6e} "
+            f"delta={step_delta:.6e}"
+        )
+        try:
+            result = mg.solve_mmg(ps, trial_args, initial_u=previous_u)
+            u = result["u"]
+            j_min = float(result.get("min_J", np.inf))
+            min_j = float(args.coarse_linesearch_min_j)
+            if not np.isfinite(j_min) or j_min <= min_j:
+                raise FloatingPointError(f"load step produced min J={j_min:.6e}")
+            r_hist = np.asarray(result.get("r_hist", []), dtype=np.float64)
+            final_residual = float(r_hist[-1]) if r_hist.size else float("inf")
+            if not np.isfinite(final_residual) or final_residual > float(args.atol):
+                raise RuntimeError(
+                    f"load step did not reach absolute residual tolerance: "
+                    f"||r||={final_residual:.6e}, atol={float(args.atol):.6e}"
+                )
+        except (FloatingPointError, RuntimeError, ValueError) as exc:
+            load_history.append(
+                {
+                    "accepted": False,
+                    "attempt": attempts,
+                    "from_indent": float(current_indent),
+                    "trial_indent": float(trial_indent),
+                    "delta": float(step_delta),
+                    "reason": str(exc),
+                }
+            )
+            if abs(step_delta) <= min_delta:
+                raise RuntimeError(
+                    f"load step failed at indent={trial_indent:.6e} "
+                    f"with minimum allowed delta={min_delta:.6e}"
+                ) from exc
+            step_delta *= float(args.load_reduction)
+            print(f"load_step rejected: {exc}; reducing delta to {step_delta:.6e}")
+            continue
+
+        accepted += 1
+        current_indent = trial_indent
+        previous_u = u.copy()
+        last_result = result
+        load_history.append(
+            {
+                "accepted": True,
+                "attempt": attempts,
+                "accepted_index": accepted,
+                "from_indent": float(current_indent - step_delta),
+                "trial_indent": float(current_indent),
+                "delta": float(step_delta),
+                "min_J": float(j_min),
+                "final_residual": float(result["r_hist"][-1]),
+                "n_active": int(result["n_active"]),
+                "penetration": float(result["penetration"]),
+            }
+        )
+        print(
+            f"load_step accepted={accepted} indent={current_indent:.6e} "
+            f"min_J={j_min:.6e} final ||r||={result['r_hist'][-1]:.3e}"
+        )
+        if args.plot_load_steps:
+            plot_result(result, load_step_plot_path(args.plot_output, accepted))
+        if abs(target_indent - current_indent) <= 1e-15:
+            break
+        remaining_steps = max(1, n_steps - accepted)
+        step_delta = (target_indent - current_indent) / remaining_steps
+
+    if last_result is None:
+        raise RuntimeError("incremental load did not accept any load step")
+    last_result["load_history"] = load_history
+    last_result["target_indent"] = float(target_indent)
+    last_result["reached_target"] = bool(abs(target_indent - current_indent) <= 1e-15)
+    return last_result
+
+
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--nx", type=int, default=8)
@@ -655,11 +853,58 @@ def parse_args(argv=None):
     p.add_argument("--height", type=float, default=0.4)
     p.add_argument("--gap", type=float, default=0.0)
     p.add_argument("--indent", type=float, default=0.02)
+    p.add_argument(
+        "--load-steps",
+        type=int,
+        default=1,
+        help="Apply indentation in this many external load steps.",
+    )
+    p.add_argument(
+        "--load-reduction",
+        type=float,
+        default=0.5,
+        help="Factor used to reduce a failed external load increment.",
+    )
+    p.add_argument(
+        "--load-min-fraction",
+        type=float,
+        default=1e-3,
+        help="Minimum external load increment as a fraction of the target indentation.",
+    )
+    p.add_argument(
+        "--plot-load-steps",
+        action="store_true",
+        help="Write one plot for every accepted external load step.",
+    )
+    p.add_argument(
+        "--load-max-accepted",
+        type=int,
+        default=100,
+        help="Maximum accepted external load steps after adaptive reductions.",
+    )
+    p.add_argument(
+        "--load-max-attempts",
+        type=int,
+        default=400,
+        help="Maximum attempted external load steps, including rejected steps.",
+    )
     p.add_argument("--E-block", type=float, default=1.0)
     p.add_argument("--E-obstacle", type=float, default=1.0)
     p.add_argument("--nu", type=float, default=0.3)
     p.add_argument("--gamma0", type=float, default=50.0)
     p.add_argument("--fd-eps", type=float, default=1e-7)
+    p.add_argument(
+        "--material-tangent",
+        choices=("analytic", "fd"),
+        default="analytic",
+        help="Use the closed-form Neo-Hookean element tangent or finite differences.",
+    )
+    p.add_argument(
+        "--material-linearization",
+        choices=("every-call", "every-vcycle"),
+        default="every-call",
+        help="Refresh the Neo-Hookean elastic tangent at every residual/tangent call or once at the start of each V-cycle.",
+    )
     p.add_argument("--max-iter", type=int, default=40)
     p.add_argument("--max-inner-it", type=int, default=3)
     p.add_argument("--nlsmooth-steps", type=int, default=3)
@@ -671,6 +916,33 @@ def parse_args(argv=None):
     p.add_argument("--mg-post", type=int, default=8)
     p.add_argument("--mg-omega", type=float, default=0.25)
     p.add_argument("--smoother", choices=("jacobi", "sgs", "gs", "block", "scalar"), default="jacobi")
+    p.add_argument(
+        "--coarse-tangent",
+        choices=("galerkin", "rediscretized"),
+        default="galerkin",
+        help="Use inherited Galerkin coarse operators or assemble each coarse tangent at projected displacement.",
+    )
+    p.add_argument(
+        "--coarse-displacement-projection",
+        choices=("injection", "l2"),
+        default="injection",
+        help="Projection used for rediscretized coarse tangents.",
+    )
+    p.add_argument("--coarse-linesearch", action="store_true")
+    p.add_argument(
+        "--coarse-linesearch-mode",
+        choices=("residual", "inversion"),
+        default="residual",
+        help="Backtrack coarse corrections by residual decrease or only by positive element Jacobian.",
+    )
+    p.add_argument("--coarse-linesearch-reduction", type=float, default=0.5)
+    p.add_argument("--coarse-linesearch-min-alpha", type=float, default=1e-3)
+    p.add_argument("--coarse-linesearch-c1", type=float, default=0.0)
+    p.add_argument("--coarse-linesearch-min-j", type=float, default=1e-10)
+    p.add_argument("--smooth-linesearch", action="store_true")
+    p.add_argument("--smooth-linesearch-reduction", type=float, default=0.5)
+    p.add_argument("--smooth-linesearch-min-alpha", type=float, default=1e-3)
+    p.add_argument("--smooth-linesearch-min-j", type=float, default=1e-10)
     p.add_argument("--stagnation-threshold", type=float, default=0.999)
     p.add_argument("--skip-coarse", action="store_true")
     p.add_argument("--mu-f", type=float, default=0.3)
@@ -711,7 +983,12 @@ def main(argv=None):
             mg.check_mmg(result, args)
             print(f"check ok  F={result['F']:.4e}  n_active={result['n_active']}")
         else:
-            result = mg.solve_mmg(ps, args)
+            if args.load_steps > 1:
+                if not (0.0 < args.load_reduction < 1.0):
+                    raise ValueError("--load-reduction must be in (0, 1)")
+                result = solve_incremental_load(ps, args)
+            else:
+                result = mg.solve_mmg(ps, args)
             if args.plot:
                 plot_result(result, args.plot_output)
     finally:

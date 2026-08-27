@@ -597,9 +597,55 @@ def linear_cycle(operators, prolong, ell, rhs, masks, pre, post, omega, cycle_ty
     return np.asarray(x, dtype=np.float64)
 
 
-def coarse_operators(levels, prolong, fine_A):
-    """Inherited coarse models: A_H = P^T A_h^N P. Contact is not rediscretized."""
+def inject_coarse_displacement(P, fine_u):
+    P_csc = P.tocsc()
+    u_coarse = np.empty(P.shape[1], dtype=np.float64)
+    for j in range(P.shape[1]):
+        start = P_csc.indptr[j]
+        end = P_csc.indptr[j + 1]
+        rows = P_csc.indices[start:end]
+        vals = P_csc.data[start:end]
+        unit = np.flatnonzero(np.abs(vals - 1.0) <= 1e-14)
+        if unit.size:
+            u_coarse[j] = fine_u[int(rows[int(unit[0])])]
+        else:
+            imax = int(np.argmax(np.abs(vals)))
+            u_coarse[j] = fine_u[int(rows[imax])]
+    return u_coarse
+
+
+def project_displacement_hierarchy(levels, prolong, fine_u, method="injection"):
+    """Project the current fine displacement to all coarse levels."""
+    u_levels = [np.asarray(fine_u, dtype=np.float64).copy()]
+    for k, P in enumerate(prolong):
+        if method == "l2":
+            rhs = np.asarray(P.T @ u_levels[-1]).ravel()
+            gram = (P.T @ P).tocsr()
+            u_coarse = np.asarray(spsolve(gram, rhs), dtype=np.float64)
+        elif method == "injection":
+            u_coarse = inject_coarse_displacement(P, u_levels[-1])
+        else:
+            raise ValueError(f"unknown coarse displacement projection '{method}'")
+        u_coarse[levels[k + 1].constrained] = levels[k + 1].u_bc[levels[k + 1].constrained]
+        u_levels.append(u_coarse)
+    return u_levels
+
+
+def coarse_operators(levels, prolong, fine_A, u=None, args=None):
+    """Build coarse models either by Galerkin inheritance or rediscretization."""
+    coarse_tangent = getattr(args, "coarse_tangent", "galerkin")
     ops = [fine_A.tocsr()]
+    if coarse_tangent == "rediscretized":
+        if u is None:
+            raise ValueError("rediscretized coarse tangents require the current displacement")
+        projection = getattr(args, "coarse_displacement_projection", "injection")
+        u_levels = project_displacement_hierarchy(levels, prolong, u, projection)
+        for ell in range(1, len(levels)):
+            if hasattr(levels[ell], "refresh_material_tangent"):
+                levels[ell].refresh_material_tangent(u_levels[ell])
+            _, A, _, _, _, _ = levels[ell].residual_tangent(u_levels[ell], forced_active=None)
+            ops.append(A.tocsr())
+        return ops
     for P in prolong:
         ops.append((P.T @ ops[-1] @ P).tocsr())
     return ops
@@ -613,7 +659,107 @@ def filtered_hierarchy(levels, prolong, fine, u):
     return residual, A, g_c, Kn, n_qp, active, contact_mask, masks
 
 
-def nonlinear_smooth(fine, u, contact_mask, nlsmooth_steps, smoother_steps, omega, smoother):
+def accept_coarse_correction(fine, u, correction, residual, args):
+    if not getattr(args, "coarse_linesearch", False):
+        u[:] = u + correction
+        u[fine.constrained] = fine.u_bc[fine.constrained]
+        return 1.0
+
+    u0 = u.copy()
+    r0 = max(float(np.linalg.norm(residual)), 1e-30)
+    alpha = 1.0
+    reduction = float(getattr(args, "coarse_linesearch_reduction", 0.5))
+    min_alpha = float(getattr(args, "coarse_linesearch_min_alpha", 1e-3))
+    c1 = float(getattr(args, "coarse_linesearch_c1", 0.0))
+    mode = getattr(args, "coarse_linesearch_mode", "residual")
+    if not (0.0 < reduction < 1.0):
+        raise ValueError("--coarse-linesearch-reduction must be in (0, 1)")
+    if min_alpha <= 0.0:
+        raise ValueError("--coarse-linesearch-min-alpha must be positive")
+    if mode not in ("residual", "inversion"):
+        raise ValueError("--coarse-linesearch-mode must be 'residual' or 'inversion'")
+
+    if mode == "inversion":
+        if not hasattr(fine, "min_element_jacobian"):
+            u[:] = u0 + correction
+            u[fine.constrained] = fine.u_bc[fine.constrained]
+            return 1.0
+        min_j = float(getattr(args, "coarse_linesearch_min_j", 1e-10))
+        if min_j <= 0.0:
+            raise ValueError("--coarse-linesearch-min-j must be positive")
+        while alpha >= min_alpha:
+            trial = u0 + alpha * correction
+            trial[fine.constrained] = fine.u_bc[fine.constrained]
+            try:
+                j_min = float(fine.min_element_jacobian(trial))
+            except (FloatingPointError, RuntimeError, ValueError):
+                j_min = -1.0
+            if np.isfinite(j_min) and j_min > min_j:
+                u[:] = trial
+                return alpha
+            alpha *= reduction
+        u[:] = u0
+        return 0.0
+
+    best_alpha = 0.0
+    best_norm = r0
+    while alpha >= min_alpha:
+        trial = u0 + alpha * correction
+        trial[fine.constrained] = fine.u_bc[fine.constrained]
+        try:
+            trial_residual = fine.residual_tangent(trial, forced_active=None)[0]
+            trial_norm = float(np.linalg.norm(trial_residual))
+        except (FloatingPointError, RuntimeError, ValueError):
+            trial_norm = float("inf")
+        if np.isfinite(trial_norm) and trial_norm < best_norm:
+            best_norm = trial_norm
+            best_alpha = alpha
+        if np.isfinite(trial_norm) and trial_norm <= (1.0 - c1 * alpha) * r0:
+            u[:] = trial
+            return alpha
+        alpha *= reduction
+
+    if best_alpha > 0.0:
+        u[:] = u0 + best_alpha * correction
+        u[fine.constrained] = fine.u_bc[fine.constrained]
+        return best_alpha
+
+    u[:] = u0
+    return 0.0
+
+
+def accept_inversion_safe_update(fine, u, correction, args, prefix):
+    if not hasattr(fine, "min_element_jacobian"):
+        u[:] = u + correction
+        u[fine.constrained] = fine.u_bc[fine.constrained]
+        return 1.0
+    u0 = u.copy()
+    alpha = 1.0
+    reduction = float(getattr(args, f"{prefix}_linesearch_reduction", 0.5))
+    min_alpha = float(getattr(args, f"{prefix}_linesearch_min_alpha", 1e-3))
+    min_j = float(getattr(args, f"{prefix}_linesearch_min_j", 1e-10))
+    if not (0.0 < reduction < 1.0):
+        raise ValueError(f"--{prefix.replace('_', '-')}-linesearch-reduction must be in (0, 1)")
+    if min_alpha <= 0.0:
+        raise ValueError(f"--{prefix.replace('_', '-')}-linesearch-min-alpha must be positive")
+    if min_j <= 0.0:
+        raise ValueError(f"--{prefix.replace('_', '-')}-linesearch-min-j must be positive")
+    while alpha >= min_alpha:
+        trial = u0 + alpha * correction
+        trial[fine.constrained] = fine.u_bc[fine.constrained]
+        try:
+            j_min = float(fine.min_element_jacobian(trial))
+        except (FloatingPointError, RuntimeError, ValueError):
+            j_min = -1.0
+        if np.isfinite(j_min) and j_min > min_j:
+            u[:] = trial
+            return alpha
+        alpha *= reduction
+    u[:] = u0
+    return 0.0
+
+
+def nonlinear_smooth(fine, u, contact_mask, nlsmooth_steps, smoother_steps, omega, smoother, args=None):
     # Fine smoothing is allowed to move active contact nodes; the jump-free
     # mask is for coarse corrections.
     mask = dirichlet_mask(fine)
@@ -628,8 +774,15 @@ def nonlinear_smooth(fine, u, contact_mask, nlsmooth_steps, smoother_steps, omeg
         )
         if not np.all(np.isfinite(du)):
             raise RuntimeError("nonlinear smoother increment is not finite")
-        u[:] = u + du
-        u[fine.constrained] = fine.u_bc[fine.constrained]
+        if args is not None and getattr(args, "smooth_linesearch", False):
+            alpha = accept_inversion_safe_update(fine, u, du, args, "smooth")
+            if alpha <= 0.0:
+                raise RuntimeError("nonlinear smoother line search failed to find an admissible update")
+            if alpha < 1.0:
+                print(f"          smooth_linesearch_alpha={alpha:.3e}")
+        else:
+            u[:] = u + du
+            u[fine.constrained] = fine.u_bc[fine.constrained]
         info = (residual, A, g_c, Kn, n_qp, active)
     if info is None:
         info = fine.residual_tangent(u, forced_active=None)
@@ -638,25 +791,27 @@ def nonlinear_smooth(fine, u, contact_mask, nlsmooth_steps, smoother_steps, omeg
 
 def nonlinear_cycle(levels, prolong, fine, u, args):
     """Fine nonlinear cycle: smooth, restrict residual, coarse correction, smooth."""
+    if hasattr(fine, "begin_vcycle"):
+        fine.begin_vcycle(u)
     residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
         levels, prolong, fine, u
     )
     nonlinear_smooth(
-        fine, u, contact_mask, args.nlsmooth_steps, args.mg_pre, args.mg_omega, args.smoother
+        fine, u, contact_mask, args.nlsmooth_steps, args.mg_pre, args.mg_omega, args.smoother, args
     )
     residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
         levels, prolong, fine, u
     )
     if args.skip_coarse:
         nonlinear_smooth(
-            fine, u, contact_mask, args.nlsmooth_steps, args.mg_post, args.mg_omega, args.smoother
+            fine, u, contact_mask, args.nlsmooth_steps, args.mg_post, args.mg_omega, args.smoother, args
         )
         residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
             levels, prolong, fine, u
         )
         return residual, A, g_c, Kn, n_qp, active, contact_mask, masks
 
-    operators = coarse_operators(levels, prolong, A)
+    operators = coarse_operators(levels, prolong, A, u, args)
     fine_mask = dirichlet_mask(fine)
     rhs = -residual
     rhs[fine_mask] = 0.0
@@ -675,13 +830,14 @@ def nonlinear_cycle(levels, prolong, fine, u, args):
     )
     correction = np.asarray(prolong[0] @ coarse_error).ravel()
     correction[masks[0]] = 0.0
-    u[:] = u + correction
-    u[fine.constrained] = fine.u_bc[fine.constrained]
+    alpha = accept_coarse_correction(fine, u, correction, residual, args)
+    if getattr(args, "coarse_linesearch", False) and alpha < 1.0:
+        print(f"          coarse_linesearch_alpha={alpha:.3e}")
     residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
         levels, prolong, fine, u
     )
     nonlinear_smooth(
-        fine, u, contact_mask, args.nlsmooth_steps, args.mg_post, args.mg_omega, args.smoother
+        fine, u, contact_mask, args.nlsmooth_steps, args.mg_post, args.mg_omega, args.smoother, args
     )
     residual, A, g_c, Kn, n_qp, active, contact_mask, masks = filtered_hierarchy(
         levels, prolong, fine, u
@@ -780,7 +936,7 @@ def pack_result(
     }
 
 
-def solve_mmg(ps, args):
+def solve_mmg(ps, args, initial_u=None):
     if args.max_inner_it < 1:
         raise ValueError("--max-inner-it must be positive")
     if args.nlsmooth_steps < 0 or args.mg_pre < 0 or args.mg_post < 0:
@@ -798,7 +954,15 @@ def solve_mmg(ps, args):
         )
     prolong = [hertz_prolongation(levels[k + 1], levels[k]) for k in range(len(levels) - 1)]
     fine = levels[0]
-    u = fine.u_bc.copy()
+    if initial_u is None:
+        u = fine.u_bc.copy()
+    else:
+        u = np.asarray(initial_u, dtype=np.float64).copy()
+        if u.size != fine.ndofs:
+            raise ValueError(
+                f"initial displacement has {u.size} dofs, expected {fine.ndofs}"
+            )
+        u[fine.constrained] = fine.u_bc[fine.constrained]
 
     r_hist = []
     n_active_hist = []
@@ -898,6 +1062,33 @@ def parse_args(argv=None):
     p.add_argument("--mg-post", type=int, default=8)
     p.add_argument("--mg-omega", type=float, default=0.4)
     p.add_argument("--smoother", choices=("jacobi", "sgs", "gs", "block", "scalar"), default="jacobi")
+    p.add_argument(
+        "--coarse-tangent",
+        choices=("galerkin", "rediscretized"),
+        default="galerkin",
+        help="Use inherited Galerkin coarse operators or assemble each coarse tangent at projected displacement.",
+    )
+    p.add_argument(
+        "--coarse-displacement-projection",
+        choices=("injection", "l2"),
+        default="injection",
+        help="Projection used for rediscretized coarse tangents.",
+    )
+    p.add_argument("--coarse-linesearch", action="store_true")
+    p.add_argument(
+        "--coarse-linesearch-mode",
+        choices=("residual", "inversion"),
+        default="residual",
+        help="Backtrack coarse corrections by residual decrease or only by positive element Jacobian.",
+    )
+    p.add_argument("--coarse-linesearch-reduction", type=float, default=0.5)
+    p.add_argument("--coarse-linesearch-min-alpha", type=float, default=1e-3)
+    p.add_argument("--coarse-linesearch-c1", type=float, default=0.0)
+    p.add_argument("--coarse-linesearch-min-j", type=float, default=1e-10)
+    p.add_argument("--smooth-linesearch", action="store_true")
+    p.add_argument("--smooth-linesearch-reduction", type=float, default=0.5)
+    p.add_argument("--smooth-linesearch-min-alpha", type=float, default=1e-3)
+    p.add_argument("--smooth-linesearch-min-j", type=float, default=1e-10)
     p.add_argument("--stagnation-threshold", type=float, default=0.999)
     p.add_argument("--skip-coarse", action="store_true")
     p.add_argument("--mu-f", type=float, default=0.3)

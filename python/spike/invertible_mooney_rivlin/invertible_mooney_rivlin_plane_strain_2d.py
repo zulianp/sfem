@@ -24,6 +24,19 @@ import tempfile
 
 import numpy as np
 
+try:
+    from numba import njit
+
+    NUMBA_AVAILABLE = True
+except Exception:
+    NUMBA_AVAILABLE = False
+
+    def njit(*args, **kwargs):
+        def wrap(func):
+            return func
+
+        return wrap
+
 _cache_root = os.path.join(tempfile.gettempdir(), "sfem_matplotlib_cache")
 _xdg_root = os.path.join(tempfile.gettempdir(), "sfem_xdg_cache")
 os.makedirs(_cache_root, exist_ok=True)
@@ -130,6 +143,186 @@ def element_B(inv_Dm):
     return B
 
 
+def prepare_mesh_data(X, triangles):
+    ne = len(triangles)
+    areas = np.empty(ne, dtype=np.float64)
+    Bs = np.empty((ne, 4, 6), dtype=np.float64)
+    dofs = np.empty((ne, 6), dtype=np.int64)
+
+    for e, tri in enumerate(triangles):
+        _, inv_Dm, A0 = element_kinematics(X[tri], X[tri])
+        areas[e] = A0
+        Bs[e] = element_B(inv_Dm)
+        dofs[e] = np.array([[2 * i, 2 * i + 1] for i in tri], dtype=np.int64).ravel()
+
+    return areas, Bs, dofs
+
+
+@njit
+def _continued_power_numba(J, Jc, Jmin, m):
+    if J >= Jc:
+        h = J ** (-m)
+        hp = -m * J ** (-m - 1.0)
+        hpp = m * (m + 1.0) * J ** (-m - 2.0)
+        return h, hp, hpp
+
+    delta = Jc - Jmin
+    sc = Jc ** (-m)
+    sp = -m * Jc ** (-m - 1.0)
+    spp = m * (m + 1.0) * Jc ** (-m - 2.0)
+    a0 = sc
+    a1 = delta * sp
+    a2 = 0.5 * delta * delta * spp
+    a3 = (4.0 / 3.0) * a2 - a1
+    a4 = 0.5 * (a2 - a1)
+
+    if J <= Jmin:
+        z = -1.0
+        h = a0 + z * (a1 + z * (a2 + z * (a3 + z * a4)))
+        return h, 0.0, 0.0
+
+    z = (J - Jc) / delta
+    h = a0 + z * (a1 + z * (a2 + z * (a3 + z * a4)))
+    hz = a1 + z * (2.0 * a2 + z * (3.0 * a3 + z * 4.0 * a4))
+    hzz = 2.0 * a2 + z * (6.0 * a3 + z * 12.0 * a4)
+    return h, hz / delta, hzz / (delta * delta)
+
+
+@njit
+def _mooney_rivlin_numba(Fv, C10, C01, kappa, Jc, Jmin):
+    F00 = Fv[0]
+    F01 = Fv[1]
+    F10 = Fv[2]
+    F11 = Fv[3]
+    J = F00 * F11 - F01 * F10
+    I = F00 * F00 + F01 * F01 + F10 * F10 + F11 * F11
+    I1 = I + 1.0
+    I2 = I + J * J
+
+    h1, h1p, h1pp = _continued_power_numba(J, Jc, Jmin, 2.0 / 3.0)
+    h2, h2p, h2pp = _continued_power_numba(J, Jc, Jmin, 4.0 / 3.0)
+
+    W = C10 * (h1 * I1 - 3.0) + C01 * (h2 * I2 - 3.0)
+    W += 0.5 * kappa * (J - 1.0) * (J - 1.0)
+
+    Gv = np.empty(4, dtype=np.float64)
+    Gv[0] = F11
+    Gv[1] = -F10
+    Gv[2] = -F01
+    Gv[3] = F00
+
+    a = 2.0 * (C10 * h1 + C01 * h2)
+    q = C10 * h1p * I1
+    q += C01 * (2.0 * J * h2 + h2p * I2)
+    q += kappa * (J - 1.0)
+
+    P = np.empty(4, dtype=np.float64)
+    for i in range(4):
+        P[i] = a * Fv[i] + q * Gv[i]
+
+    dq_dJ_coeff = C10 * h1pp * I1
+    dq_dJ_coeff += C01 * (2.0 * h2 + 4.0 * J * h2p + h2pp * I2)
+    dq_dJ_coeff += kappa
+    dq_dI_coeff = 2.0 * (C10 * h1p + C01 * h2p)
+    da_dJ_coeff = 2.0 * (C10 * h1p + C01 * h2p)
+
+    HF = np.empty((4, 4), dtype=np.float64)
+    for j in range(4):
+        dJ = Gv[j]
+        FdF = Fv[j]
+        da = da_dJ_coeff * dJ
+        dq = dq_dJ_coeff * dJ + dq_dI_coeff * FdF
+
+        for i in range(4):
+            dF = 1.0 if i == j else 0.0
+            dG = 0.0
+            if j == 0 and i == 3:
+                dG = 1.0
+            elif j == 1 and i == 2:
+                dG = -1.0
+            elif j == 2 and i == 1:
+                dG = -1.0
+            elif j == 3 and i == 0:
+                dG = 1.0
+            HF[i, j] = a * dF + da * Fv[i] + dq * Gv[i] + q * dG
+
+    for i in range(4):
+        for j in range(i + 1, 4):
+            hij = 0.5 * (HF[i, j] + HF[j, i])
+            HF[i, j] = hij
+            HF[j, i] = hij
+
+    return W, P, HF, J
+
+
+@njit
+def _projected_hessian_numba(He):
+    lam, Q = np.linalg.eigh(He)
+    Hp = np.zeros((6, 6), dtype=np.float64)
+    for k in range(6):
+        lk = abs(lam[k])
+        if lk < 1.0e-10:
+            lk = 1.0e-10
+        for i in range(6):
+            qik = Q[i, k]
+            for j in range(6):
+                Hp[i, j] += lk * qik * Q[j, k]
+    return Hp
+
+
+@njit
+def _assemble_numba(x_flat, areas, Bs, dofs, C10, C01, kappa, Jc, Jmin):
+    ndof = x_flat.shape[0]
+    ne = areas.shape[0]
+    E = 0.0
+    g = np.zeros(ndof, dtype=np.float64)
+    H = np.zeros((ndof, ndof), dtype=np.float64)
+    Js = np.empty(ne, dtype=np.float64)
+
+    for e in range(ne):
+        Fv = np.zeros(4, dtype=np.float64)
+        for a in range(4):
+            s = 0.0
+            for j in range(6):
+                s += Bs[e, a, j] * x_flat[dofs[e, j]]
+            Fv[a] = s
+
+        W, P, HF, J = _mooney_rivlin_numba(Fv, C10, C01, kappa, Jc, Jmin)
+        A0 = areas[e]
+        E += A0 * W
+        Js[e] = J
+
+        ge = np.zeros(6, dtype=np.float64)
+        He = np.zeros((6, 6), dtype=np.float64)
+        for i in range(6):
+            s = 0.0
+            for a in range(4):
+                s += Bs[e, a, i] * P[a]
+            ge[i] = A0 * s
+
+            for j in range(6):
+                hij = 0.0
+                for a in range(4):
+                    for b in range(4):
+                        hij += Bs[e, a, i] * HF[a, b] * Bs[e, b, j]
+                He[i, j] = A0 * hij
+
+        Hp = _projected_hessian_numba(He)
+        for i in range(6):
+            ii = dofs[e, i]
+            g[ii] += ge[i]
+            for j in range(6):
+                H[ii, dofs[e, j]] += Hp[i, j]
+
+    for i in range(ndof):
+        for j in range(i + 1, ndof):
+            hij = 0.5 * (H[i, j] + H[j, i])
+            H[i, j] = hij
+            H[j, i] = hij
+
+    return E, g, H, Js
+
+
 def mooney_rivlin_energy_gradient_hessian(F, C10, C01, kappa, Jc, Jmin):
     J = np.linalg.det(F)
     I = np.sum(F * F)
@@ -189,7 +382,13 @@ def projected_hessian(H, floor=1e-10):
     return (Q * lam_mod) @ Q.T
 
 
-def assemble(x, X, triangles, C10, C01, kappa, Jc, Jmin):
+def assemble(x, X, triangles, C10, C01, kappa, Jc, Jmin, mesh_data=None, use_numba=True):
+    if use_numba and NUMBA_AVAILABLE:
+        if mesh_data is None:
+            mesh_data = prepare_mesh_data(X, triangles)
+        areas, Bs, dofs = mesh_data
+        return _assemble_numba(np.ascontiguousarray(x.ravel()), areas, Bs, dofs, C10, C01, kappa, Jc, Jmin)
+
     ndof = 2 * len(X)
     E = 0.0
     g = np.zeros(ndof)
@@ -221,14 +420,29 @@ def solve_stage(
     Jmin,
     max_iter=140,
     grad_tol=1e-9,
+    mesh_data=None,
+    use_numba=True,
     verbose=True,
 ):
     ndof = 2 * len(X)
     free = np.setdiff1d(np.arange(ndof), fixed)
     history = []
+    if mesh_data is None and use_numba and NUMBA_AVAILABLE:
+        mesh_data = prepare_mesh_data(X, triangles)
 
     for it in range(max_iter):
-        E, g, H, Js = assemble(x, X, triangles, C10, C01, kappa, Jc, Jmin)
+        E, g, H, Js = assemble(
+            x,
+            X,
+            triangles,
+            C10,
+            C01,
+            kappa,
+            Jc,
+            Jmin,
+            mesh_data=mesh_data,
+            use_numba=use_numba,
+        )
         gf = g[free]
         Hf = H[np.ix_(free, free)]
         gn = np.linalg.norm(gf)
@@ -260,7 +474,18 @@ def solve_stage(
             tf = flat.copy()
             tf[free] += alpha * p
             xt = tf.reshape(x.shape)
-            Et, _, _, _ = assemble(xt, X, triangles, C10, C01, kappa, Jc, Jmin)
+            Et, _, _, _ = assemble(
+                xt,
+                X,
+                triangles,
+                C10,
+                C01,
+                kappa,
+                Jc,
+                Jmin,
+                mesh_data=mesh_data,
+                use_numba=use_numba,
+            )
             if np.isfinite(Et) and Et <= E + 1.0e-4 * alpha * gd:
                 x = xt
                 accepted = True
@@ -274,12 +499,25 @@ def solve_stage(
 
 
 def run_homotopy(
-    X, triangles, x0, anchor_right, C10, C01, kappa, Jc_target, Jmin, verbose=True
+    X,
+    triangles,
+    x0,
+    anchor_right,
+    C10,
+    C01,
+    kappa,
+    Jc_target,
+    Jmin,
+    use_numba=True,
+    verbose=True,
 ):
     fixed = np.array([0, 1, 2 * anchor_right + 1], dtype=int)
     x = x0.copy()
     stages = [0.50, 0.35, 0.25, max(Jc_target, 0.20), Jc_target]
     all_hist = []
+    mesh_data = None
+    if use_numba and NUMBA_AVAILABLE:
+        mesh_data = prepare_mesh_data(X, triangles)
 
     for s, Jc in enumerate(stages):
         if verbose:
@@ -296,6 +534,8 @@ def run_homotopy(
             Jmin,
             max_iter=180,
             grad_tol=1e-9,
+            mesh_data=mesh_data,
+            use_numba=use_numba,
             verbose=verbose,
         )
         all_hist.append((Jc, hist))
@@ -316,6 +556,8 @@ def run_homotopy(
         Jmin,
         max_iter=240,
         grad_tol=1e-11,
+        mesh_data=mesh_data,
+        use_numba=use_numba,
         verbose=verbose,
     )
     all_hist.append((Jc_target, hist))
@@ -484,7 +726,62 @@ def write_matplotlib_summary(path, x0, x, tris, hist):
     plt.close(fig)
 
 
-def random_deformed_initial_state(X, triangles, amplitude, seed):
+def initial_element_determinants(X, triangles, x):
+    Js = np.empty(len(triangles), dtype=float)
+    for e, tri in enumerate(triangles):
+        F, _, _ = element_kinematics(x[tri], X[tri])
+        Js[e] = np.linalg.det(F)
+    return Js
+
+
+def cap_initial_inversion(
+    X, triangles, x0, max_inversion_ratio, max_inverted_fraction=None
+):
+    def within_caps(Js):
+        if max_inversion_ratio is not None and Js.min() < -max_inversion_ratio:
+            return False
+        if (
+            max_inverted_fraction is not None
+            and np.mean(Js < 0.0) > max_inverted_fraction
+        ):
+            return False
+        return True
+
+    scale = 1.0
+    Js = initial_element_determinants(X, triangles, x0)
+    if not within_caps(Js):
+        displacement = x0 - X
+        high = scale
+        while not within_caps(Js):
+            scale *= 0.5
+            x0 = X + scale * displacement
+            Js = initial_element_determinants(X, triangles, x0)
+
+        low = scale
+        for _ in range(32):
+            scale = 0.5 * (low + high)
+            candidate = X + scale * displacement
+            candidate_Js = initial_element_determinants(X, triangles, candidate)
+            if within_caps(candidate_Js):
+                low = scale
+                x0 = candidate
+                Js = candidate_Js
+            else:
+                high = scale
+        scale = low
+
+    return x0, Js, scale
+
+
+def random_deformed_initial_state(
+    X,
+    triangles,
+    amplitude,
+    seed,
+    max_inversion_ratio=None,
+    max_inverted_fraction=None,
+    return_scale=False,
+):
     rng = np.random.default_rng(seed)
     ux = np.unique(X[:, 0])
     uy = np.unique(X[:, 1])
@@ -497,12 +794,72 @@ def random_deformed_initial_state(X, triangles, amplitude, seed):
     lower_right = np.argmax(X[:, 0] - 1000.0 * np.abs(X[:, 1]))
     x0[lower_left] = X[lower_left]
     x0[lower_right, 1] = X[lower_right, 1]
+    x0, Js, scale = cap_initial_inversion(
+        X, triangles, x0, max_inversion_ratio, max_inverted_fraction
+    )
 
-    Js = []
-    for tri in triangles:
-        F, _, _ = element_kinematics(x0[tri], X[tri])
-        Js.append(np.linalg.det(F))
-    return x0, np.asarray(Js)
+    if return_scale:
+        return x0, Js, scale
+    return x0, Js
+
+
+def folded_random_initial_state(
+    X,
+    triangles,
+    inverted_fraction,
+    inversion_amplitude,
+    noise_amplitude,
+    seed,
+    max_inversion_ratio=None,
+    max_inverted_fraction=None,
+    return_scale=False,
+):
+    rng = np.random.default_rng(seed)
+    width = float(np.clip(inverted_fraction, 0.0, 0.8))
+    angle = rng.uniform(-0.45, 0.45)
+    direction = np.array([np.cos(angle), np.sin(angle)])
+    projection = X @ direction
+    projection_min = projection.min()
+    projection_span = projection.max() - projection_min
+    normalized_projection = (projection - projection_min) / projection_span
+    center = 0.5 + rng.uniform(-0.12, 0.12)
+    center = float(np.clip(center, 0.5 * width, 1.0 - 0.5 * width))
+    left = center - 0.5 * width
+    right = center + 0.5 * width
+    outer_slope = (1.0 + inversion_amplitude * width) / (1.0 - width)
+    folded_projection = np.where(
+        normalized_projection < left,
+        outer_slope * normalized_projection,
+        np.where(
+            normalized_projection <= right,
+            outer_slope * left
+            - inversion_amplitude * (normalized_projection - left),
+            outer_slope * left
+            - inversion_amplitude * width
+            + outer_slope * (normalized_projection - right),
+        ),
+    )
+    x0 = X + (
+        (folded_projection - normalized_projection) * projection_span
+    )[:, None] * direction
+
+    ux = np.unique(X[:, 0])
+    uy = np.unique(X[:, 1])
+    hx = np.min(np.diff(ux)) if len(ux) > 1 else 1.0
+    hy = np.min(np.diff(uy)) if len(uy) > 1 else 1.0
+    x0 += noise_amplitude * min(hx, hy) * rng.standard_normal(X.shape)
+
+    lower_left = np.argmin(np.sum(X * X, axis=1))
+    lower_right = np.argmax(X[:, 0] - 1000.0 * np.abs(X[:, 1]))
+    x0[lower_left] = X[lower_left]
+    x0[lower_right, 1] = X[lower_right, 1]
+    x0, Js, scale = cap_initial_inversion(
+        X, triangles, x0, max_inversion_ratio, max_inverted_fraction
+    )
+
+    if return_scale:
+        return x0, Js, scale
+    return x0, Js
 
 
 def check_material_derivatives(C10, C01, kappa, Jc, Jmin):
@@ -540,8 +897,10 @@ def main():
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--amplitude", type=float, default=1.0)
     ap.add_argument("--plot", default="invertible_mooney_rivlin_plane_strain_2d.png")
+    ap.add_argument("--no-numba", action="store_true")
     ap.add_argument("--check-derivatives", action="store_true")
     args = ap.parse_args()
+    use_numba = (not args.no_numba) and NUMBA_AVAILABLE
 
     if args.check_derivatives:
         egrad, ehess = check_material_derivatives(
@@ -562,6 +921,7 @@ def main():
         f"C10={args.C10:g}, C01={args.C01:g}, kappa={args.kappa:g}, "
         f"Jc={args.Jc:g}, Jmin={args.Jmin:g}"
     )
+    print(f"Assembly backend: {'numba' if use_numba else 'python'}")
 
     x, hist, ok = run_homotopy(
         X,
@@ -573,10 +933,23 @@ def main():
         args.kappa,
         args.Jc,
         args.Jmin,
+        use_numba=use_numba,
         verbose=True,
     )
 
-    E, g, _, Js = assemble(x, X, tris, args.C10, args.C01, args.kappa, args.Jc, args.Jmin)
+    mesh_data = prepare_mesh_data(X, tris) if use_numba else None
+    E, g, _, Js = assemble(
+        x,
+        X,
+        tris,
+        args.C10,
+        args.C01,
+        args.kappa,
+        args.Jc,
+        args.Jmin,
+        mesh_data=mesh_data,
+        use_numba=use_numba,
+    )
     fixed = np.array([0, 1, 2 * anchor_right + 1], dtype=int)
     free = np.setdiff1d(np.arange(2 * len(X)), fixed)
 
