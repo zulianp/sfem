@@ -3357,17 +3357,25 @@ int main(int argc, char **argv) {
     std::printf("  repeat: %d\n", repeat);
     std::printf("  seconds_per_call: %.6e\n", seconds_per_call);
     if (!assemble && !jac_action && !bsr_apply) std::printf("  seconds_per_apply: %.6e\n", seconds_per_call);
-    std::printf("  MELEM/s: %.3f\n", melems);
-    std::printf("  MDOF/s_element_visits: %.3f\n", mdofs);
+    if (!bsr_apply) {
+        std::printf("  MELEM/s: %.3f\n", melems);
+        std::printf("  MDOF/s_element_visits: %.3f\n", mdofs);
+    }
     std::printf("  MDOF/s_unique_mesh_dofs: %.3f\n", unique_mdofs);
-    std::printf("  GFLOP/s_model: %.3f\n", gflops);
-    std::printf("  GB/s_gather_scatter_model: %.3f\n", gbps);
-    std::printf("  flops_per_element_model: %.1f\n", flops_per_element);
-    std::printf("  bytes_per_element_model: %.1f\n", bytes_per_element);
+    if (!bsr_apply) {
+        std::printf("  GFLOP/s_model: %.3f\n", gflops);
+        std::printf("  GB/s_gather_scatter_model: %.3f\n", gbps);
+        std::printf("  flops_per_element_model: %.1f\n", flops_per_element);
+        std::printf("  bytes_per_element_model: %.1f\n", bytes_per_element);
+    }
     std::printf("  checksum: %.16e\n", (jac_action || bsr_apply) ? checksum_vec(jac_out.data(), d.nnodes) : checksum(d));
-    if (assemble || verify_jac || bsr_apply) {
+    if (assemble || verify_jac) {
         std::printf("  bsr_nnz: %td\n", bsr.nnz);
         std::printf("  flops_per_element_jacobian_model: %.1f\n", CVFEM_JACOBIAN_FLOPS_PER_ELEMENT);
+        if (use_packed) std::printf("  max_local_nnz: %td\n", packed.max_local_nnz);
+    }
+    if (bsr_apply) {
+        std::printf("  bsr_nnz: %td\n", bsr.nnz);
         if (use_packed) std::printf("  max_local_nnz: %td\n", packed.max_local_nnz);
     }
     if (assemble) {

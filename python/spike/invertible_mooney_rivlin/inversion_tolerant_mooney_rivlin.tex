@@ -273,16 +273,140 @@ The volumetric branch contributes
 so the standard deviatoric--volumetric split is preserved exactly on the
 admissible physical branch.
 
+\section{Finite-Strain Kelvin--Voigt Damping}
+
+Damping should be added as a rate-dependent residual, not by modifying the
+elastic strain-energy density \eqref{eq:continued_mr}. Let $\F^n$ denote the
+previous pseudo-time state and let
+\begin{equation}
+  \dot{\F}^{n+1}
+  =
+  \frac{\F^{n+1}-\F^n}{\Delta t}.
+\end{equation}
+The spatial velocity gradient is
+\begin{equation}
+  \bm L = \dot{\F}^{n+1}(\F^{n+1})^{-1}.
+\end{equation}
+Since $(\F^{n+1})^{-1}$ contains $J^{-1}$, it must also be continued through
+inversion. Define
+\begin{equation}
+  \F^{-1}_c = h_1(J)\operatorname{adj}\F,
+  \qquad h_1(J)\approx J^{-1},
+  \label{eq:continued_inverse}
+\end{equation}
+where $h_1$ is constructed with the same $C^2$ quartic continuation as
+\eqref{eq:hm_def}. On $J\ge J_c$, $\F^{-1}_c=\F^{-1}$ exactly. The continued
+velocity gradient is then
+\begin{equation}
+  \bm L_c=\dot{\F}^{n+1}\F^{-1}_c,
+  \qquad
+  \bm D_c=\frac{1}{2}(\bm L_c+\bm L_c^T).
+\end{equation}
+The Kelvin--Voigt Cauchy stress is
+\begin{equation}
+  \sig_v
+  =
+  2\eta_s\dev(\bm D_c)
+  +
+  \eta_b\tr(\bm D_c)\I,
+  \label{eq:kv_cauchy}
+\end{equation}
+where $\eta_s$ and $\eta_b$ are shear and bulk viscosities. The corresponding
+first Piola stress is evaluated in cofactor form,
+\begin{equation}
+  \Pola_v
+  =
+  J\sig_v\F^{-T}
+  =
+  \sig_v\cof\F.
+  \label{eq:kv_piola}
+\end{equation}
+The cofactor expression remains polynomial in $\F$; only the inverse used in
+$\bm L_c$ needs the continued $J^{-1}$ factor.
+
+The backward-Euler pseudo-time problem is therefore
+\begin{equation}
+  \boxed{
+  \bm R(\bm x^{n+1})
+  =
+  \bm g_e(\bm x^{n+1})
+  +
+  \bm g_v(\bm x^{n+1},\bm x^n,\Delta t)
+  =
+  \bm0,
+  }
+  \label{eq:dynamic_residual}
+\end{equation}
+where $\bm g_e$ is assembled from $\Pola_c=\partial W_c/\partial\F$ and
+$\bm g_v$ is assembled from $\Pola_v$. As $\bm x^{n+1}\rightarrow \bm x^n$,
+the viscous contribution vanishes. As the pseudo-time trajectory approaches a
+static equilibrium, \eqref{eq:dynamic_residual} reduces to the elastic
+equilibrium equations.
+
+For the plane-strain prototype, $\bm L_c$ and $\bm D_c$ are formed from the
+in-plane $2\times2$ block, while the deviatoric projection in
+\eqref{eq:kv_cauchy} uses the three-dimensional trace:
+\begin{equation}
+  \dev(\bm D_c)_{\alpha\beta}
+  =
+  D_{\alpha\beta}
+  -
+  \frac{1}{3}\tr(\bm D_c)\delta_{\alpha\beta},
+  \qquad \alpha,\beta\in\{1,2\}.
+\end{equation}
+This is consistent with the same plane-strain embedding used for the elastic
+Mooney--Rivlin invariants.
+
 \section{Optimization Use}
 
 The continuation is intended for nonlinear solution from tangled initial
-states. The prototype uses:
+states. The static prototype uses:
 \begin{enumerate}
   \item continuation in $J_c$ from a less singular model to the target cutoff;
   \item an absolute-eigenvalue projected Newton Hessian;
   \item Armijo backtracking without an inversion barrier;
   \item no positional tether or reference-state penalty.
 \end{enumerate}
+The Kelvin--Voigt prototype uses the same continuation stages, but solves the
+rate-dependent residual \eqref{eq:dynamic_residual} over pseudo-time steps.
+This gives damping and a path-dependent relaxation trajectory while preserving
+the same final static elastic equilibrium.
+
+Because the Kelvin--Voigt tangent is generally nonsymmetric, globalization is
+based on the residual merit function rather than the elastic energy:
+\begin{equation}
+  \phi(\bm x)=\frac{1}{2}\|\bm R_f(\bm x)\|^2,
+  \label{eq:residual_merit}
+\end{equation}
+where $\bm R_f$ is restricted to unconstrained degrees of freedom. Given an
+algorithmic tangent $\bm K_{\mathrm{alg}}$ and a trial direction
+\begin{equation}
+  \bm K_{\mathrm{alg}}\bm p=-\bm R_f,
+\end{equation}
+the directional derivative predicted by the tangent is
+\begin{equation}
+  \phi'(0)\approx \bm R_f^T\bm K_{\mathrm{alg}}\bm p.
+\end{equation}
+The line search accepts $\alpha\in(0,1]$ when
+\begin{equation}
+  \phi(\bm x+\alpha\bm p)
+  \le
+  \phi(\bm x)+c\alpha\,\bm R_f^T\bm K_{\mathrm{alg}}\bm p,
+  \qquad c\ll1.
+  \label{eq:armijo_residual}
+\end{equation}
+If the computed direction is not a descent direction for this merit function,
+the prototype falls back to the negative merit gradient
+$-\bm K_{\mathrm{alg}}^T\bm R_f$. If no step satisfies
+\eqref{eq:armijo_residual}, the tangent solve is retried with diagonal
+regularization,
+\begin{equation}
+  \left(\bm K_{\mathrm{alg}}+\lambda\bm I\right)\bm p=-\bm R_f,
+\end{equation}
+increasing $\lambda$ geometrically. This does not turn the problem back into
+energy minimization; it is a nonlinear residual solve with a residual-based
+globalization strategy.
+
 The continuation removes the evaluability obstruction at $J=0$, but it does
 not make the finite-element energy globally convex. Inverted configurations
 can still converge to non-reference local minima, so the choice of $J_c$,
@@ -294,7 +418,9 @@ many distorted initial states.
 For production kernels, the continuation is local to each quadrature point:
 \begin{enumerate}
   \item evaluate $J$ once;
-  \item evaluate both continued powers and their derivatives together;
+  \item evaluate both elastic continued powers and their derivatives together;
+  \item evaluate the continued inverse determinant $h_1(J)$ for
+        Kelvin--Voigt damping;
   \item use the physical branch for $J\ge J_c$ and polynomial arithmetic below
         $J_c$;
   \item avoid sign-based branches on $J$ other than the cutoff comparison;

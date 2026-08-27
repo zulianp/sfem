@@ -780,6 +780,8 @@ namespace sfem {
             bsr_spmv_static<3, 6>(block_rows, rowptr, colidx, values, scale_output, x, y);
         } else if (row_block_size == 6 && col_block_size == 3) {
             bsr_spmv_static<6, 3>(block_rows, rowptr, colidx, values, scale_output, x, y);
+        } else if (row_block_size == 4 && col_block_size == 4) {
+            bsr_spmv_static<4, 4>(block_rows, rowptr, colidx, values, scale_output, x, y);
         } else {
             bsr_spmv_dynamic(block_rows, row_block_size, col_block_size, rowptr, colidx, values, scale_output, x, y);
         }
