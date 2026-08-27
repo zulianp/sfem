@@ -1508,8 +1508,6 @@ static SFEM_NOINLINE void assemble_bsr4_atomic(MeshData &d, BSR4 &b, const scala
 
 static SFEM_NOINLINE void assemble_bsr4_packed(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
-    if (!p.ghost_mat_val.empty())
-        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -1615,8 +1613,6 @@ static SFEM_NOINLINE void assemble_bsr4_atomic_sympy(MeshData &d, BSR4 &b, const
 
 static SFEM_NOINLINE void assemble_bsr4_packed_sympy(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
-    if (!p.ghost_mat_val.empty())
-        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -1711,8 +1707,6 @@ static SFEM_NOINLINE void assemble_bsr4_packed_slots_variant(MeshData       &d,
                                                              const scalar_t  rho,
                                                              const scalar_t  mu) {
     zero_bsr4(b);
-    if (!p.ghost_mat_val.empty())
-        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -1838,8 +1832,6 @@ static SFEM_NOINLINE void assemble_bsr4_packed_sympy_face(MeshData &d, PackedDat
 
 static SFEM_NOINLINE void assemble_bsr4_packed_sympy_simd(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
-    if (!p.ghost_mat_val.empty())
-        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -1992,8 +1984,6 @@ static SFEM_NOINLINE void assemble_bsr4_packed_sympy_simd(MeshData &d, PackedDat
 
 static SFEM_NOINLINE void assemble_bsr4_packed_sympy_simd_clean(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
-    if (!p.ghost_mat_val.empty())
-        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -2201,8 +2191,6 @@ static SFEM_NOINLINE void assemble_bsr4_packed_sympy_simd_clean(MeshData &d, Pac
 
 static SFEM_NOINLINE void assemble_bsr4_packed_sympy_block_simd(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
-    if (!p.ghost_mat_val.empty())
-        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -2483,8 +2471,6 @@ static SFEM_INLINE void assemble_bsr4_packed_sympy_row_simd_pack(MeshData &d,
 
 static SFEM_NOINLINE void assemble_bsr4_packed_sympy_row_simd(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
-    if (!p.ghost_mat_val.empty())
-        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -2573,8 +2559,6 @@ static SFEM_NOINLINE void assemble_bsr4_packed_sympy_row_simd_fused(MeshData &d,
 
 static SFEM_NOINLINE void assemble_bsr4_packed_sympy_face_simd(MeshData &d, PackedData &p, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
-    if (!p.ghost_mat_val.empty())
-        cvfem_zero_scalars(p.ghost_mat_val.data(), (ptrdiff_t)p.ghost_mat_val.size());
 
     const size_t u_n   = packed_scratch_n(p);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
@@ -3376,6 +3360,20 @@ int main(int argc, char **argv) {
     }
     if (bsr_apply) {
         std::printf("  bsr_nnz: %td\n", bsr.nnz);
+        std::printf("  bsr_nnz_per_node: %.3f\n", double(bsr.nnz) / double(d.nnodes));
+        {
+            smesh::count_t dmin = bsr.rowptr[1] - bsr.rowptr[0];
+            smesh::count_t dmax = dmin;
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                const smesh::count_t deg = bsr.rowptr[i + 1] - bsr.rowptr[i];
+                dmin                     = std::min(dmin, deg);
+                dmax                     = std::max(dmax, deg);
+            }
+            std::printf("  bsr_row_nnz_min: %d\n", (int)dmin);
+            std::printf("  bsr_row_nnz_max: %d\n", (int)dmax);
+            std::printf("  bsr_values_MiB: %.3f\n", double(bsr.nnz) * 16.0 * 8.0 / (1024.0 * 1024.0));
+            std::printf("  bsr_x_KiB: %.3f\n", double(d.nnodes) * 4.0 * 8.0 / 1024.0);
+        }
         if (use_packed) std::printf("  max_local_nnz: %td\n", packed.max_local_nnz);
     }
     if (assemble) {
@@ -3415,3 +3413,4 @@ int main(int argc, char **argv) {
     if (own_mpi) MPI_Finalize();
     return 0;
 }
+
