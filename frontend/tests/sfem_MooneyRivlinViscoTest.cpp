@@ -92,6 +92,12 @@ int test_mooney_rivlin_visco_relaxation() {
     printf("History storage: %s (%zu bytes)\n",
            smesh::to_string(history_storage).data(),
            smesh::num_bytes(history_storage));
+    const char *history_scaling_env = getenv("SFEM_HISTORY_SCALING");
+    const bool expected_history_scaling = history_storage == smesh::SMESH_FLOAT16 &&
+                                          history_scaling_env &&
+                                          std::string(history_scaling_env) == "tensor";
+    SFEM_TEST_ASSERT(op->get_history_scaling() == expected_history_scaling);
+    printf("History scaling: %s\n", op->get_history_scaling() ? "tensor" : "none");
 
     // LumpedMass
     auto mass_op = sfem::create_op(fs, "LumpedMass", es);

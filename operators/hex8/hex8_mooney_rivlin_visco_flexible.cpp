@@ -57,6 +57,19 @@ static int dispatch_history_update(const smesh::PrimitiveType storage,
     return SFEM_FAILURE;
 }
 
+static inline float fp16_history_tensor_scale(const scalar_t H[6]) {
+    scalar_t max_abs = 0;
+    for (int c = 0; c < 6; ++c) {
+        max_abs = fmax(max_abs, fabs(H[c]));
+    }
+
+    if (max_abs == 0) return 1;
+
+    int exponent;
+    frexp(max_abs, &exponent);
+    return (float)ldexp(1.0, exponent - 15);
+}
+
 // ============================================================================
 // HISTORY UPDATE
 // ============================================================================
@@ -82,6 +95,8 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history_data,
     void *const SFEM_RESTRICT         new_history_data,
+    const float *const SFEM_RESTRICT  history_scale_data,
+    float *const SFEM_RESTRICT        new_history_scale_data,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -102,6 +117,35 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     static const scalar_t *qw   = line_q2_w;
 
     const ptrdiff_t history_per_qp = num_prony_terms * 6;
+
+    auto update_tensor = [&](const ptrdiff_t hist_offset,
+                             const int p,
+                             const scalar_t S_dev_prev[6],
+                             const scalar_t S_dev_curr[6]) {
+        const auto *H_old = history + hist_offset + p * 6;
+        auto *H_new = new_history + hist_offset + p * 6;
+        const ptrdiff_t tensor_offset = hist_offset / 6 + p;
+        const scalar_t old_scale = history_scale_data ? history_scale_data[tensor_offset] : 1;
+        scalar_t updated[6];
+
+        for (int c = 0; c < 6; ++c) {
+            const scalar_t old_value = old_scale * static_cast<scalar_t>(H_old[c]);
+            updated[c] = alpha[p] * old_value + beta[p] * (S_dev_curr[c] - S_dev_prev[c]);
+        }
+
+        if (new_history_scale_data) {
+            const float new_scale = fp16_history_tensor_scale(updated);
+            const scalar_t inv_scale = 1.0 / new_scale;
+            new_history_scale_data[tensor_offset] = new_scale;
+            for (int c = 0; c < 6; ++c) {
+                H_new[c] = updated[c] * inv_scale;
+            }
+        } else {
+            for (int c = 0; c < 6; ++c) {
+                H_new[c] = updated[c];
+            }
+        }
+    };
 
 #pragma omp parallel for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -166,11 +210,7 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
 
             const ptrdiff_t hist_offset = i * history_stride;
             for (int p = 0; p < num_prony_terms; ++p) {
-                const auto *H_old = history + hist_offset + p * 6;
-                auto *H_new = new_history + hist_offset + p * 6;
-                for (int c = 0; c < 6; ++c) {
-                    H_new[c] = alpha[p] * H_old[c] + beta[p] * (S_dev_curr_avg[c] - S_dev_prev_avg[c]);
-                }
+                update_tensor(hist_offset, p, S_dev_prev_avg, S_dev_curr_avg);
             }
         } else {
             for (int kz = 0; kz < n_qp; kz++) {
@@ -200,12 +240,7 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
                             S_dev_curr);
 
                         for (int p = 0; p < num_prony_terms; ++p) {
-                            const auto *H_old = history + hist_offset + p * 6;
-                            auto *H_new = new_history + hist_offset + p * 6;
-
-                            for (int c = 0; c < 6; ++c) {
-                                H_new[c] = alpha[p] * H_old[c] + beta[p] * (S_dev_curr[c] - S_dev_prev[c]);
-                            }
+                            update_tensor(hist_offset, p, S_dev_prev, S_dev_curr);
                         }
                     }
                 }
@@ -244,6 +279,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history_data,
+    const float *const SFEM_RESTRICT  history_scale_data,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -320,8 +356,9 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
                         const auto *H_i = history + hist_offset + p * 6;
+                        const scalar_t H_scale = history_scale_data ? history_scale_data[hist_offset / 6 + p] : 1;
                         for (int c = 0; c < 6; ++c) {
-                            S_hist[c] += alpha[p] * H_i[c] - beta[p] * S_dev_prev[c];
+                            S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
                         }
                     }
 
@@ -380,6 +417,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history_data,
+    const float *const SFEM_RESTRICT  history_scale_data,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -457,8 +495,9 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
                         const auto *H_i = history + hist_offset + p * 6;
+                        const scalar_t H_scale = history_scale_data ? history_scale_data[hist_offset / 6 + p] : 1;
                         for (int c = 0; c < 6; ++c) {
-                            S_hist[c] += alpha[p] * H_i[c] - beta[p] * S_dev_prev[c];
+                            S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
                         }
                     }
 
@@ -508,6 +547,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history_data,
+    const float *const SFEM_RESTRICT  history_scale_data,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -584,8 +624,9 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
                         const auto *H_i = history + hist_offset + p * 6;
+                        const scalar_t H_scale = history_scale_data ? history_scale_data[hist_offset / 6 + p] : 1;
                         for (int c = 0; c < 6; ++c) {
-                            S_hist[c] += alpha[p] * H_i[c] - beta[p] * S_dev_prev[c];
+                            S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
                         }
                     }
 

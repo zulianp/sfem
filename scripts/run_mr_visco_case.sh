@@ -9,10 +9,11 @@ OUTPUT_SUBDIR="${SFEM_TEST_OUTPUT_SUBDIR:-test_mooney_rivlin_gravity}"
 BIN="$BUILD_DIR/$TEST_TARGET"
 HISTORY_MODE=""
 HISTORY_STORAGE=""
+HISTORY_SCALING="none"
 OUT_DIR=""
 
 usage() {
-    echo "Usage: $0 --history-mode per_qp|per_elem --history-storage float64|float32|float16 --out DIR"
+    echo "Usage: $0 --history-mode per_qp|per_elem --history-storage float64|float32|float16 [--history-scaling none|tensor] --out DIR"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -23,6 +24,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --history-storage)
             HISTORY_STORAGE="$2"
+            shift 2
+            ;;
+        --history-scaling)
+            HISTORY_SCALING="$2"
             shift 2
             ;;
         --out)
@@ -46,6 +51,14 @@ case "$HISTORY_MODE" in
     per_elem) ;;
     *)
         echo "[error] --history-mode must be per_qp or per_elem" >&2
+        exit 2
+        ;;
+esac
+
+case "$HISTORY_SCALING" in
+    none|tensor) ;;
+    *)
+        echo "[error] --history-scaling must be none or tensor" >&2
         exit 2
         ;;
 esac
@@ -76,9 +89,10 @@ rm -rf "$OUT_DIR/$OUTPUT_SUBDIR"
 
 (
     cd "$OUT_DIR"
-    echo "[info] test=$TEST_TARGET, history_mode=$HISTORY_MODE, history_storage=$HISTORY_STORAGE"
+    echo "[info] test=$TEST_TARGET, history_mode=$HISTORY_MODE, history_storage=$HISTORY_STORAGE, history_scaling=$HISTORY_SCALING"
     SFEM_HISTORY_MODE="$HISTORY_MODE" \
     SFEM_HISTORY_STORAGE="$HISTORY_STORAGE" \
+    SFEM_HISTORY_SCALING="$HISTORY_SCALING" \
     SFEM_ENABLE_CONTACT="${SFEM_ENABLE_CONTACT:-0}" \
     SFEM_ENABLE_OUTPUT=1 \
     OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}" \
