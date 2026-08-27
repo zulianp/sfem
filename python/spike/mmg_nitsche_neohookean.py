@@ -184,6 +184,41 @@ def tri3_neo_sigma_n_fd(px, py, u_elem, mu, lam, nx, ny, fd_eps):
     return sn0, dsn
 
 
+def neo_normal_penalty_modulus(px, py, u_elem, mu, lam, nx, ny, fd_eps):
+    _, _, _, F = tri3_kinematics(px, py, u_elem)
+    n = np.array((nx, ny), dtype=np.float64)
+    nn = float(np.linalg.norm(n))
+    if nn <= 1e-30:
+        return float(mu)
+    n *= 1.0 / nn
+    dF = np.outer(n, n)
+    eps = max(float(fd_eps), 1e-7)
+
+    def sigma_nn(F_eval):
+        sigma = neo_cauchy(F_eval, mu, lam)
+        return float(n @ sigma @ n)
+
+    s0 = sigma_nn(F)
+    try:
+        sp = sigma_nn(F + eps * dF)
+        sm = sigma_nn(F - eps * dF)
+        kn = (sp - sm) / (2.0 * eps)
+    except FloatingPointError:
+        sp = sigma_nn(F + eps * dF)
+        kn = (sp - s0) / eps
+    if not np.isfinite(kn):
+        return float(mu)
+    return float(max(abs(kn), mu))
+
+
+def contact_penalty_gamma(length, px, py, u_elem, mu, lam, gamma0, nx, ny, fd_eps, scaling):
+    if scaling == "normal-tangent":
+        modulus = neo_normal_penalty_modulus(px, py, u_elem, mu, lam, nx, ny, fd_eps)
+    else:
+        modulus = mu
+    return gamma0 * modulus / length
+
+
 def assemble_neo_elastic(level, u_vec, assemble_tangent=True):
     ndofs = level.ndofs
     residual = np.zeros(ndofs, dtype=np.float64)
@@ -270,6 +305,7 @@ def neo_surface_contrib(
     gap_rows_out=None,
     frozen_edges=None,
     fd_eps=1e-7,
+    penalty_scaling="shear",
 ):
     if friction:
         raise NotImplementedError("friction is not implemented in the Neo-Hookean spike")
@@ -281,7 +317,6 @@ def neo_surface_contrib(
         length, nx0, ny0 = nc.edge_geometry(X, Y, n0, n1)[:3]
         if length <= 1e-16:
             continue
-        gamma = gamma0 * mu / length
         parent_nodes = nc.tri3_parent_nodes(ps, mesh, parent_block, int(e_parent))
         px = np.array([X[i] for i in parent_nodes], dtype=np.float64)
         py = np.array([Y[i] for i in parent_nodes], dtype=np.float64)
@@ -324,6 +359,9 @@ def neo_surface_contrib(
         for dof in list(dg_bar.keys()):
             dg_bar[dof] *= inv_w
         sn, dsn = tri3_neo_sigma_n_fd(px, py, u_elem, mu, lam, mid[3], mid[4], fd_eps)
+        gamma = contact_penalty_gamma(
+            length, px, py, u_elem, mu, lam, gamma0, mid[3], mid[4], fd_eps, penalty_scaling
+        )
         Pn = (theta * sn if include_sigma else 0.0) + gamma * g_bar
         key = (surface_id, ie, 0)
         xref_mid = 0.5 * (X[n0] + X[n1])
@@ -382,6 +420,7 @@ def contact_trace_neo(
     snap_self_circle=False,
     g_open=0.0,
     fd_eps=1e-7,
+    penalty_scaling="shear",
 ):
     xs, gs, sns, pns, active, xis, ws = [], [], [], [], [], [], []
     for edge, e_parent in zip(edges, parent_elems):
@@ -389,7 +428,6 @@ def contact_trace_neo(
         length, nx0, ny0 = nc.edge_geometry(X, Y, n0, n1)[:3]
         if length <= 1e-16:
             continue
-        gamma = gamma0 * mu / length
         parent_nodes = nc.tri3_parent_nodes(ps, mesh, parent_block, int(e_parent))
         px = np.array([X[i] for i in parent_nodes], dtype=np.float64)
         py = np.array([Y[i] for i in parent_nodes], dtype=np.float64)
@@ -412,6 +450,9 @@ def contact_trace_neo(
                 mid = s
         g_bar = g_int / w_int
         sn = tri3_neo_sigma_n(px, py, u_elem, mu, lam, mid[3], mid[4])
+        gamma = contact_penalty_gamma(
+            length, px, py, u_elem, mu, lam, gamma0, mid[3], mid[4], fd_eps, penalty_scaling
+        )
         Pn = (theta * sn if include_sigma else 0.0) + gamma * g_bar
         on = Pn < 0.0
         xs.append(0.5 * (X[n0] + X[n1]))

@@ -56,6 +56,12 @@ struct Hex8ResidualPack {
     alignas(ALIGN_BYTES) scalar_t rc[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
 };
 
+struct Hex8CoordPack {
+    alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+};
+
 static constexpr Hex8Face CVFEM_HEX8_SCS[CVFEM_HEX8_N_SCS] = {
         {0, 1, {scalar_t(0.25), scalar_t(0), scalar_t(0)}},
         {3, 2, {scalar_t(0.25), scalar_t(0), scalar_t(0)}},
@@ -94,11 +100,33 @@ static constexpr scalar_t CVFEM_HEX8_DN_REF[CVFEM_HEX8_N_NODES][3] = {
         {scalar_t(0.25), scalar_t(0.25), scalar_t(0.25)},
         {-scalar_t(0.25), scalar_t(0.25), scalar_t(0.25)}};
 
+// Edge-associated SCS centroids in [0,1]^3, toward the element center.
+static constexpr scalar_t CVFEM_HEX8_SCS_XI[CVFEM_HEX8_N_SCS][3] = {
+        {scalar_t(0.5), scalar_t(0.25), scalar_t(0.25)},
+        {scalar_t(0.5), scalar_t(0.75), scalar_t(0.25)},
+        {scalar_t(0.5), scalar_t(0.25), scalar_t(0.75)},
+        {scalar_t(0.5), scalar_t(0.75), scalar_t(0.75)},
+        {scalar_t(0.25), scalar_t(0.5), scalar_t(0.25)},
+        {scalar_t(0.75), scalar_t(0.5), scalar_t(0.25)},
+        {scalar_t(0.25), scalar_t(0.5), scalar_t(0.75)},
+        {scalar_t(0.75), scalar_t(0.5), scalar_t(0.75)},
+        {scalar_t(0.25), scalar_t(0.25), scalar_t(0.5)},
+        {scalar_t(0.75), scalar_t(0.25), scalar_t(0.5)},
+        {scalar_t(0.75), scalar_t(0.75), scalar_t(0.5)},
+        {scalar_t(0.25), scalar_t(0.75), scalar_t(0.5)}};
+
 // Face-diff grad + 3-dir traction + 12-SCS convection (see kernel).
 static constexpr double CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT = 754.0;
 static constexpr double CVFEM_HEX8_JAC_ACTION_FLOPS_PER_ELEMENT =
         CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT + 12.0 * 8.0;
 static constexpr double CVFEM_HEX8_ASSEMBLE_FLOPS_PER_ELEMENT = 2304.0;
+
+// 12 SCS: dN (27) + J (144) + cof/det (33) + A (3) + ∇_ref u (144) + push (55)
+// + traction (24) + convection (36) + scatter (8) = 474 * 12.
+static constexpr double CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT = 5688.0;
+static constexpr double CVFEM_HEX8_ISOPARAM_JAC_ACTION_FLOPS_PER_ELEMENT =
+        CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT + 12.0 * (144.0 + 55.0 + 8.0);
+static constexpr double CVFEM_HEX8_ISOPARAM_ASSEMBLE_FLOPS_PER_ELEMENT = 9216.0;
 
 static SFEM_INLINE void cvfem_zero_scalars(scalar_t *const SFEM_RESTRICT p, const ptrdiff_t n) {
 #ifdef _OPENMP
@@ -127,6 +155,13 @@ static SFEM_INLINE void cvfem_hex8_area(const Hex8Geom &g,
     az = g.cof[2] * ar0 + g.cof[5] * ar1 + g.cof[8] * ar2;
 }
 
+static SFEM_INLINE void cvfem_hex8_area_dir(const Hex8Geom &g, const int d, scalar_t &ax, scalar_t &ay, scalar_t &az) {
+    const scalar_t qtr = scalar_t(0.25);
+    ax                 = qtr * g.cof[3 * d];
+    ay                 = qtr * g.cof[3 * d + 1];
+    az                 = qtr * g.cof[3 * d + 2];
+}
+
 static SFEM_INLINE void cvfem_hex8_face_diff(const scalar_t *const SFEM_RESTRICT u,
                                              scalar_t                           &dr,
                                              scalar_t                           &ds,
@@ -137,16 +172,132 @@ static SFEM_INLINE void cvfem_hex8_face_diff(const scalar_t *const SFEM_RESTRICT
 }
 
 static SFEM_INLINE void cvfem_hex8_pushforward(const Hex8Geom &g,
+                                               const scalar_t  inv_det,
                                                const scalar_t  dr,
                                                const scalar_t  ds,
                                                const scalar_t  dt,
                                                scalar_t       &gx,
                                                scalar_t       &gy,
                                                scalar_t       &gz) {
+    gx = (g.cof[0] * dr + g.cof[3] * ds + g.cof[6] * dt) * inv_det;
+    gy = (g.cof[1] * dr + g.cof[4] * ds + g.cof[7] * dt) * inv_det;
+    gz = (g.cof[2] * dr + g.cof[5] * ds + g.cof[8] * dt) * inv_det;
+}
+
+static SFEM_INLINE void cvfem_hex8_pushforward(const Hex8Geom &g,
+                                               const scalar_t  dr,
+                                               const scalar_t  ds,
+                                               const scalar_t  dt,
+                                               scalar_t       &gx,
+                                               scalar_t       &gy,
+                                               scalar_t       &gz) {
+    cvfem_hex8_pushforward(g, scalar_t(1) / g.det, dr, ds, dt, gx, gy, gz);
+}
+
+static SFEM_INLINE void cvfem_hex8_dn_ref(const scalar_t xi,
+                                          const scalar_t eta,
+                                          const scalar_t zeta,
+                                          scalar_t       dN[CVFEM_HEX8_N_NODES][3]) {
+    const scalar_t x0 = scalar_t(1) - xi;
+    const scalar_t y0 = scalar_t(1) - eta;
+    const scalar_t z0 = scalar_t(1) - zeta;
+    dN[0][0]          = -y0 * z0;
+    dN[0][1]          = -x0 * z0;
+    dN[0][2]          = -x0 * y0;
+    dN[1][0]          = y0 * z0;
+    dN[1][1]          = -xi * z0;
+    dN[1][2]          = -xi * y0;
+    dN[2][0]          = eta * z0;
+    dN[2][1]          = xi * z0;
+    dN[2][2]          = -xi * eta;
+    dN[3][0]          = -eta * z0;
+    dN[3][1]          = x0 * z0;
+    dN[3][2]          = -x0 * eta;
+    dN[4][0]          = -y0 * zeta;
+    dN[4][1]          = -x0 * zeta;
+    dN[4][2]          = x0 * y0;
+    dN[5][0]          = y0 * zeta;
+    dN[5][1]          = -xi * zeta;
+    dN[5][2]          = xi * y0;
+    dN[6][0]          = eta * zeta;
+    dN[6][1]          = xi * zeta;
+    dN[6][2]          = xi * eta;
+    dN[7][0]          = -eta * zeta;
+    dN[7][1]          = x0 * zeta;
+    dN[7][2]          = x0 * eta;
+}
+
+static SFEM_INLINE void cvfem_hex8_cof_det(const scalar_t jx0,
+                                           const scalar_t jx1,
+                                           const scalar_t jx2,
+                                           const scalar_t jy0,
+                                           const scalar_t jy1,
+                                           const scalar_t jy2,
+                                           const scalar_t jz0,
+                                           const scalar_t jz1,
+                                           const scalar_t jz2,
+                                           Hex8Geom      &g) {
+    g.cof[0] = jy1 * jz2 - jy2 * jz1;
+    g.cof[1] = jy2 * jz0 - jy0 * jz2;
+    g.cof[2] = jy0 * jz1 - jy1 * jz0;
+    g.cof[3] = jz1 * jx2 - jz2 * jx1;
+    g.cof[4] = jz2 * jx0 - jz0 * jx2;
+    g.cof[5] = jz0 * jx1 - jz1 * jx0;
+    g.cof[6] = jx1 * jy2 - jx2 * jy1;
+    g.cof[7] = jx2 * jy0 - jx0 * jy2;
+    g.cof[8] = jx0 * jy1 - jx1 * jy0;
+    g.det    = jx0 * g.cof[0] + jx1 * g.cof[1] + jx2 * g.cof[2];
+}
+
+static SFEM_INLINE void cvfem_hex8_jac_at(const scalar_t *const SFEM_RESTRICT x,
+                                          const scalar_t *const SFEM_RESTRICT y,
+                                          const scalar_t *const SFEM_RESTRICT z,
+                                          const scalar_t                      dN[CVFEM_HEX8_N_NODES][3],
+                                          Hex8Geom                           &g) {
+    scalar_t jx0 = 0, jx1 = 0, jx2 = 0;
+    scalar_t jy0 = 0, jy1 = 0, jy2 = 0;
+    scalar_t jz0 = 0, jz1 = 0, jz2 = 0;
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        jx0 += x[a] * dN[a][0];
+        jy0 += x[a] * dN[a][1];
+        jz0 += x[a] * dN[a][2];
+        jx1 += y[a] * dN[a][0];
+        jy1 += y[a] * dN[a][1];
+        jz1 += y[a] * dN[a][2];
+        jx2 += z[a] * dN[a][0];
+        jy2 += z[a] * dN[a][1];
+        jz2 += z[a] * dN[a][2];
+    }
+    cvfem_hex8_cof_det(jx0, jx1, jx2, jy0, jy1, jy2, jz0, jz1, jz2, g);
+}
+
+static SFEM_INLINE void cvfem_hex8_grad_at(const Hex8Geom                 &g,
+                                           const scalar_t                      dN[CVFEM_HEX8_N_NODES][3],
+                                           const scalar_t *const SFEM_RESTRICT ux,
+                                           const scalar_t *const SFEM_RESTRICT uy,
+                                           const scalar_t *const SFEM_RESTRICT uz,
+                                           scalar_t *const SFEM_RESTRICT       grad) {
+    scalar_t ur[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        ur[0] += ux[a] * dN[a][0];
+        ur[1] += ux[a] * dN[a][1];
+        ur[2] += ux[a] * dN[a][2];
+        ur[3] += uy[a] * dN[a][0];
+        ur[4] += uy[a] * dN[a][1];
+        ur[5] += uy[a] * dN[a][2];
+        ur[6] += uz[a] * dN[a][0];
+        ur[7] += uz[a] * dN[a][1];
+        ur[8] += uz[a] * dN[a][2];
+    }
     const scalar_t inv_det = scalar_t(1) / g.det;
-    gx                     = (g.cof[0] * dr + g.cof[3] * ds + g.cof[6] * dt) * inv_det;
-    gy                     = (g.cof[1] * dr + g.cof[4] * ds + g.cof[7] * dt) * inv_det;
-    gz                     = (g.cof[2] * dr + g.cof[5] * ds + g.cof[8] * dt) * inv_det;
+    for (int c = 0; c < 3; ++c) {
+        const scalar_t rx = ur[3 * c + 0];
+        const scalar_t ry = ur[3 * c + 1];
+        const scalar_t rz = ur[3 * c + 2];
+        grad[3 * c + 0]   = (g.cof[0] * rx + g.cof[3] * ry + g.cof[6] * rz) * inv_det;
+        grad[3 * c + 1]   = (g.cof[1] * rx + g.cof[4] * ry + g.cof[7] * rz) * inv_det;
+        grad[3 * c + 2]   = (g.cof[2] * rx + g.cof[5] * ry + g.cof[8] * rz) * inv_det;
+    }
 }
 
 static SFEM_INLINE void cvfem_hex8_dir_areas(const Hex8Geom &g, scalar_t A[3][3]) {
@@ -187,13 +338,14 @@ static SFEM_INLINE void cvfem_hex8_grad_sumfact(const Hex8Geom                 &
                                                 const scalar_t *const SFEM_RESTRICT uy,
                                                 const scalar_t *const SFEM_RESTRICT uz,
                                                 scalar_t *const SFEM_RESTRICT       grad) {
-    scalar_t dr, ds, dt;
+    const scalar_t inv_det = scalar_t(1) / g.det;
+    scalar_t       dr, ds, dt;
     cvfem_hex8_face_diff(ux, dr, ds, dt);
-    cvfem_hex8_pushforward(g, dr, ds, dt, grad[0], grad[1], grad[2]);
+    cvfem_hex8_pushforward(g, inv_det, dr, ds, dt, grad[0], grad[1], grad[2]);
     cvfem_hex8_face_diff(uy, dr, ds, dt);
-    cvfem_hex8_pushforward(g, dr, ds, dt, grad[3], grad[4], grad[5]);
+    cvfem_hex8_pushforward(g, inv_det, dr, ds, dt, grad[3], grad[4], grad[5]);
     cvfem_hex8_face_diff(uz, dr, ds, dt);
-    cvfem_hex8_pushforward(g, dr, ds, dt, grad[6], grad[7], grad[8]);
+    cvfem_hex8_pushforward(g, inv_det, dr, ds, dt, grad[6], grad[7], grad[8]);
 }
 
 static SFEM_INLINE void cvfem_hex8_grad(const Hex8Geom                 &g,
@@ -276,7 +428,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual(const scalar_t            
         const int j = CVFEM_HEX8_SCS[s].j;
 
         scalar_t ax, ay, az;
-        cvfem_hex8_area(geom, CVFEM_HEX8_SCS[s].ar[0], CVFEM_HEX8_SCS[s].ar[1], CVFEM_HEX8_SCS[s].ar[2], ax, ay, az);
+        cvfem_hex8_area_dir(geom, s >> 2, ax, ay, az);
 
         const scalar_t adv_x = scalar_t(0.5) * (ux[i] + ux[j]);
         const scalar_t adv_y = scalar_t(0.5) * (uy[i] + uy[j]);
@@ -490,6 +642,43 @@ static SFEM_INLINE void cvfem_hex8_bsr_acc(scalar_t *const SFEM_RESTRICT values,
 }
 
 template <bool Atomic, typename Slot>
+static SFEM_INLINE void cvfem_hex8_bsr_acc_mom(scalar_t *const SFEM_RESTRICT values,
+                                               const Slot                   slot,
+                                               const scalar_t               d00,
+                                               const scalar_t               d01,
+                                               const scalar_t               d02,
+                                               const scalar_t               d10,
+                                               const scalar_t               d11,
+                                               const scalar_t               d12,
+                                               const scalar_t               d20,
+                                               const scalar_t               d21,
+                                               const scalar_t               d22) {
+    scalar_t *const SFEM_RESTRICT blk = values + (ptrdiff_t)slot * 16;
+    cvfem_hex8_acc<Atomic>(blk[0], d00);
+    cvfem_hex8_acc<Atomic>(blk[1], d01);
+    cvfem_hex8_acc<Atomic>(blk[2], d02);
+    cvfem_hex8_acc<Atomic>(blk[4], d10);
+    cvfem_hex8_acc<Atomic>(blk[5], d11);
+    cvfem_hex8_acc<Atomic>(blk[6], d12);
+    cvfem_hex8_acc<Atomic>(blk[8], d20);
+    cvfem_hex8_acc<Atomic>(blk[9], d21);
+    cvfem_hex8_acc<Atomic>(blk[10], d22);
+}
+
+template <bool Atomic, typename Slot>
+static SFEM_INLINE void cvfem_hex8_jac_conv_face(const scalar_t                        rho,
+                                                 const scalar_t                        ax,
+                                                 const scalar_t                        ay,
+                                                 const scalar_t                        az,
+                                                 const int                             i,
+                                                 const int                             j,
+                                                 const scalar_t *const SFEM_RESTRICT   ux,
+                                                 const scalar_t *const SFEM_RESTRICT   uy,
+                                                 const scalar_t *const SFEM_RESTRICT   uz,
+                                                 const Slot *const SFEM_RESTRICT       slots,
+                                                 scalar_t *const SFEM_RESTRICT         values);
+
+template <bool Atomic, typename Slot>
 static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_add_slots(const scalar_t                        rho,
                                                                 const scalar_t                        mu,
                                                                 const Hex8Geom                       &geom,
@@ -502,8 +691,10 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_add_slots(const scalar_t  
     cvfem_hex8_dir_areas(geom, A);
 
     scalar_t w[CVFEM_HEX8_N_NODES][3];
+    const scalar_t inv_det = scalar_t(1) / geom.det;
     for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
         cvfem_hex8_pushforward(geom,
+                               inv_det,
                                CVFEM_HEX8_DN_REF[k][0],
                                CVFEM_HEX8_DN_REF[k][1],
                                CVFEM_HEX8_DN_REF[k][2],
@@ -540,78 +731,311 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_add_slots(const scalar_t  
             const scalar_t d21  = -(wz * Ay) * mu;
             const scalar_t d22  = -(wx * Ax + wy * Ay + scalar_t(2) * wz * Az) * mu;
             const Slot     slot = slots[i * 8 + k];
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 0, 0, d00);
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 0, 1, d01);
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 0, 2, d02);
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 1, 0, d10);
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 1, 1, d11);
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 1, 2, d12);
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 2, 0, d20);
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 2, 1, d21);
-            cvfem_hex8_bsr_acc<Atomic>(values, slot, 2, 2, d22);
+            cvfem_hex8_bsr_acc_mom<Atomic>(values, slot, d00, d01, d02, d10, d11, d12, d20, d21, d22);
         }
     }
 
-    const scalar_t half  = scalar_t(0.5);
-    const scalar_t one   = scalar_t(1);
-    const scalar_t alpha = rho * half;
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
-        const int      i     = CVFEM_HEX8_SCS[s].i;
-        const int      j     = CVFEM_HEX8_SCS[s].j;
-        const int      d     = s >> 2;
-        const scalar_t ax    = A[d][0];
-        const scalar_t ay    = A[d][1];
-        const scalar_t az    = A[d][2];
-        const scalar_t area[3] = {ax, ay, az};
-        const scalar_t adv_x = half * (ux[i] + ux[j]);
-        const scalar_t adv_y = half * (uy[i] + uy[j]);
-        const scalar_t adv_z = half * (uz[i] + uz[j]);
+        const int d = s >> 2;
+        cvfem_hex8_jac_conv_face<Atomic>(rho,
+                                         A[d][0],
+                                         A[d][1],
+                                         A[d][2],
+                                         CVFEM_HEX8_SCS[s].i,
+                                         CVFEM_HEX8_SCS[s].j,
+                                         ux,
+                                         uy,
+                                         uz,
+                                         slots,
+                                         values);
+    }
+}
+
+static SFEM_INLINE void cvfem_hex8_zero_residual_pack(Hex8ResidualPack &out) {
+    std::memset(&out, 0, sizeof(out));
+}
+
+template <int I0, int J0, int I1, int J1, int I2, int J2, int I3, int J3>
+static SFEM_INLINE void cvfem_hex8_visc_dir_simd(const scalar_t                      mu,
+                                                 const scalar_t *const SFEM_RESTRICT g00,
+                                                 const scalar_t *const SFEM_RESTRICT g01,
+                                                 const scalar_t *const SFEM_RESTRICT g02,
+                                                 const scalar_t *const SFEM_RESTRICT g10,
+                                                 const scalar_t *const SFEM_RESTRICT g11,
+                                                 const scalar_t *const SFEM_RESTRICT g12,
+                                                 const scalar_t *const SFEM_RESTRICT g20,
+                                                 const scalar_t *const SFEM_RESTRICT g21,
+                                                 const scalar_t *const SFEM_RESTRICT g22,
+                                                 const scalar_t *const SFEM_RESTRICT Ax,
+                                                 const scalar_t *const SFEM_RESTRICT Ay,
+                                                 const scalar_t *const SFEM_RESTRICT Az,
+                                                 Hex8ResidualPack                   &out) {
+#pragma omp simd
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t ax = Ax[lane];
+        const scalar_t ay = Ay[lane];
+        const scalar_t az = Az[lane];
+        const scalar_t tx = mu * ((scalar_t(2) * g00[lane]) * ax + (g01[lane] + g10[lane]) * ay +
+                                  (g02[lane] + g20[lane]) * az);
+        const scalar_t ty = mu * ((g10[lane] + g01[lane]) * ax + (scalar_t(2) * g11[lane]) * ay +
+                                  (g12[lane] + g21[lane]) * az);
+        const scalar_t tz = mu * ((g20[lane] + g02[lane]) * ax + (g21[lane] + g12[lane]) * ay +
+                                  (scalar_t(2) * g22[lane]) * az);
+        out.rx[I0][lane] -= tx;
+        out.ry[I0][lane] -= ty;
+        out.rz[I0][lane] -= tz;
+        out.rx[J0][lane] += tx;
+        out.ry[J0][lane] += ty;
+        out.rz[J0][lane] += tz;
+        out.rx[I1][lane] -= tx;
+        out.ry[I1][lane] -= ty;
+        out.rz[I1][lane] -= tz;
+        out.rx[J1][lane] += tx;
+        out.ry[J1][lane] += ty;
+        out.rz[J1][lane] += tz;
+        out.rx[I2][lane] -= tx;
+        out.ry[I2][lane] -= ty;
+        out.rz[I2][lane] -= tz;
+        out.rx[J2][lane] += tx;
+        out.ry[J2][lane] += ty;
+        out.rz[J2][lane] += tz;
+        out.rx[I3][lane] -= tx;
+        out.ry[I3][lane] -= ty;
+        out.rz[I3][lane] -= tz;
+        out.rx[J3][lane] += tx;
+        out.ry[J3][lane] += ty;
+        out.rz[J3][lane] += tz;
+    }
+}
+
+template <int I, int J>
+static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                      rho,
+                                                  const scalar_t                      half,
+                                                  const scalar_t *const SFEM_RESTRICT Ax,
+                                                  const scalar_t *const SFEM_RESTRICT Ay,
+                                                  const scalar_t *const SFEM_RESTRICT Az,
+                                                  const Hex8InputPack                &in,
+                                                  Hex8ResidualPack                   &out) {
+#pragma omp simd
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t ax    = Ax[lane];
+        const scalar_t ay    = Ay[lane];
+        const scalar_t az    = Az[lane];
+        const scalar_t adv_x = half * (in.ux[I][lane] + in.ux[J][lane]);
+        const scalar_t adv_y = half * (in.uy[I][lane] + in.uy[J][lane]);
+        const scalar_t adv_z = half * (in.uz[I][lane] + in.uz[J][lane]);
+        const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+        const scalar_t sgn   = mdot > scalar_t(0) ? scalar_t(1) : (mdot < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mpos  = half * (mdot + sgn * mdot);
+        const scalar_t mneg  = half * (mdot - sgn * mdot);
+        const scalar_t pmid  = half * (in.p[I][lane] + in.p[J][lane]);
+        const scalar_t fx    = mpos * in.ux[I][lane] + mneg * in.ux[J][lane] + pmid * ax;
+        const scalar_t fy    = mpos * in.uy[I][lane] + mneg * in.uy[J][lane] + pmid * ay;
+        const scalar_t fz    = mpos * in.uz[I][lane] + mneg * in.uz[J][lane] + pmid * az;
+        out.rx[I][lane] += fx;
+        out.ry[I][lane] += fy;
+        out.rz[I][lane] += fz;
+        out.rc[I][lane] += mdot;
+        out.rx[J][lane] -= fx;
+        out.ry[J][lane] -= fy;
+        out.rz[J][lane] -= fz;
+        out.rc[J][lane] -= mdot;
+    }
+}
+
+template <int I, int J>
+static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t                      rho,
+                                                     const scalar_t                      half,
+                                                     const scalar_t                      one,
+                                                     const scalar_t *const SFEM_RESTRICT Ax,
+                                                     const scalar_t *const SFEM_RESTRICT Ay,
+                                                     const scalar_t *const SFEM_RESTRICT Az,
+                                                     const Hex8InputPack                &u,
+                                                     const Hex8InputPack                &du,
+                                                     Hex8ResidualPack                   &out) {
+#pragma omp simd
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t ax    = Ax[lane];
+        const scalar_t ay    = Ay[lane];
+        const scalar_t az    = Az[lane];
+        const scalar_t adv_x = half * (u.ux[I][lane] + u.ux[J][lane]);
+        const scalar_t adv_y = half * (u.uy[I][lane] + u.uy[J][lane]);
+        const scalar_t adv_z = half * (u.uz[I][lane] + u.uz[J][lane]);
         const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
         const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
         const scalar_t mpos  = half * (mdot + sgn * mdot);
         const scalar_t mneg  = half * (mdot - sgn * mdot);
         const scalar_t d_pos = half * (one + sgn);
         const scalar_t d_neg = half * (one - sgn);
-        const int      nodes[2] = {i, j};
+        const scalar_t dmdot = rho * half *
+                               ((du.ux[I][lane] + du.ux[J][lane]) * ax + (du.uy[I][lane] + du.uy[J][lane]) * ay +
+                                (du.uz[I][lane] + du.uz[J][lane]) * az);
+        const scalar_t dpos = d_pos * dmdot;
+        const scalar_t dneg = d_neg * dmdot;
+        const scalar_t qmid = half * (du.p[I][lane] + du.p[J][lane]);
+        const scalar_t fx =
+                dpos * u.ux[I][lane] + mpos * du.ux[I][lane] + dneg * u.ux[J][lane] + mneg * du.ux[J][lane] + qmid * ax;
+        const scalar_t fy =
+                dpos * u.uy[I][lane] + mpos * du.uy[I][lane] + dneg * u.uy[J][lane] + mneg * du.uy[J][lane] + qmid * ay;
+        const scalar_t fz =
+                dpos * u.uz[I][lane] + mpos * du.uz[I][lane] + dneg * u.uz[J][lane] + mneg * du.uz[J][lane] + qmid * az;
+        out.rx[I][lane] += fx;
+        out.ry[I][lane] += fy;
+        out.rz[I][lane] += fz;
+        out.rc[I][lane] += dmdot;
+        out.rx[J][lane] -= fx;
+        out.ry[J][lane] -= fy;
+        out.rz[J][lane] -= fz;
+        out.rc[J][lane] -= dmdot;
+    }
+}
 
-        for (int nb = 0; nb < 2; ++nb) {
-            const int b = nodes[nb];
-            for (int c = 0; c < 3; ++c) {
-                const scalar_t dmdot = alpha * area[c];
-                const scalar_t dpos  = d_pos * dmdot;
-                const scalar_t dneg  = d_neg * dmdot;
-                scalar_t       dfx   = dpos * ux[i] + dneg * ux[j];
-                scalar_t       dfy   = dpos * uy[i] + dneg * uy[j];
-                scalar_t       dfz   = dpos * uz[i] + dneg * uz[j];
-                const scalar_t mass  = (b == i) ? mpos : mneg;
-                if (c == 0) dfx += mass;
-                if (c == 1) dfy += mass;
-                if (c == 2) dfz += mass;
+static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
+                                                 const scalar_t                      half,
+                                                 const scalar_t *const SFEM_RESTRICT Ax0,
+                                                 const scalar_t *const SFEM_RESTRICT Ay0,
+                                                 const scalar_t *const SFEM_RESTRICT Az0,
+                                                 const scalar_t *const SFEM_RESTRICT Ax1,
+                                                 const scalar_t *const SFEM_RESTRICT Ay1,
+                                                 const scalar_t *const SFEM_RESTRICT Az1,
+                                                 const scalar_t *const SFEM_RESTRICT Ax2,
+                                                 const scalar_t *const SFEM_RESTRICT Ay2,
+                                                 const scalar_t *const SFEM_RESTRICT Az2,
+                                                 const Hex8InputPack                &in,
+                                                 Hex8ResidualPack                   &out) {
+    cvfem_hex8_conv_face_simd<0, 1>(rho, half, Ax0, Ay0, Az0, in, out);
+    cvfem_hex8_conv_face_simd<3, 2>(rho, half, Ax0, Ay0, Az0, in, out);
+    cvfem_hex8_conv_face_simd<4, 5>(rho, half, Ax0, Ay0, Az0, in, out);
+    cvfem_hex8_conv_face_simd<7, 6>(rho, half, Ax0, Ay0, Az0, in, out);
+    cvfem_hex8_conv_face_simd<0, 3>(rho, half, Ax1, Ay1, Az1, in, out);
+    cvfem_hex8_conv_face_simd<1, 2>(rho, half, Ax1, Ay1, Az1, in, out);
+    cvfem_hex8_conv_face_simd<4, 7>(rho, half, Ax1, Ay1, Az1, in, out);
+    cvfem_hex8_conv_face_simd<5, 6>(rho, half, Ax1, Ay1, Az1, in, out);
+    cvfem_hex8_conv_face_simd<0, 4>(rho, half, Ax2, Ay2, Az2, in, out);
+    cvfem_hex8_conv_face_simd<1, 5>(rho, half, Ax2, Ay2, Az2, in, out);
+    cvfem_hex8_conv_face_simd<2, 6>(rho, half, Ax2, Ay2, Az2, in, out);
+    cvfem_hex8_conv_face_simd<3, 7>(rho, half, Ax2, Ay2, Az2, in, out);
+}
 
-                const Slot si = slots[i * 8 + b];
-                const Slot sj = slots[j * 8 + b];
-                cvfem_hex8_bsr_acc<Atomic>(values, si, 0, c, dfx);
-                cvfem_hex8_bsr_acc<Atomic>(values, si, 1, c, dfy);
-                cvfem_hex8_bsr_acc<Atomic>(values, si, 2, c, dfz);
-                cvfem_hex8_bsr_acc<Atomic>(values, si, 3, c, dmdot);
-                cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, c, -dfx);
-                cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, c, -dfy);
-                cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, c, -dfz);
-                cvfem_hex8_bsr_acc<Atomic>(values, sj, 3, c, -dmdot);
-            }
+static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
+                                                    const scalar_t                      half,
+                                                    const scalar_t                      one,
+                                                    const scalar_t *const SFEM_RESTRICT Ax0,
+                                                    const scalar_t *const SFEM_RESTRICT Ay0,
+                                                    const scalar_t *const SFEM_RESTRICT Az0,
+                                                    const scalar_t *const SFEM_RESTRICT Ax1,
+                                                    const scalar_t *const SFEM_RESTRICT Ay1,
+                                                    const scalar_t *const SFEM_RESTRICT Az1,
+                                                    const scalar_t *const SFEM_RESTRICT Ax2,
+                                                    const scalar_t *const SFEM_RESTRICT Ay2,
+                                                    const scalar_t *const SFEM_RESTRICT Az2,
+                                                    const Hex8InputPack                &u,
+                                                    const Hex8InputPack                &du,
+                                                    Hex8ResidualPack                   &out) {
+    cvfem_hex8_conv_face_jv_simd<0, 1>(rho, half, one, Ax0, Ay0, Az0, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<3, 2>(rho, half, one, Ax0, Ay0, Az0, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<4, 5>(rho, half, one, Ax0, Ay0, Az0, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<7, 6>(rho, half, one, Ax0, Ay0, Az0, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<0, 3>(rho, half, one, Ax1, Ay1, Az1, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<1, 2>(rho, half, one, Ax1, Ay1, Az1, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<4, 7>(rho, half, one, Ax1, Ay1, Az1, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<5, 6>(rho, half, one, Ax1, Ay1, Az1, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<0, 4>(rho, half, one, Ax2, Ay2, Az2, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<1, 5>(rho, half, one, Ax2, Ay2, Az2, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<2, 6>(rho, half, one, Ax2, Ay2, Az2, u, du, out);
+    cvfem_hex8_conv_face_jv_simd<3, 7>(rho, half, one, Ax2, Ay2, Az2, u, du, out);
+}
 
-            const scalar_t hax = half * ax;
-            const scalar_t hay = half * ay;
-            const scalar_t haz = half * az;
-            const Slot     si  = slots[i * 8 + b];
-            const Slot     sj  = slots[j * 8 + b];
-            cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 3, hax);
-            cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 3, hay);
-            cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 3, haz);
-            cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 3, -hax);
-            cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 3, -hay);
-            cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 3, -haz);
+template <bool Atomic, typename Slot>
+static SFEM_INLINE void cvfem_hex8_jac_conv_face(const scalar_t                        rho,
+                                                 const scalar_t                        ax,
+                                                 const scalar_t                        ay,
+                                                 const scalar_t                        az,
+                                                 const int                             i,
+                                                 const int                             j,
+                                                 const scalar_t *const SFEM_RESTRICT   ux,
+                                                 const scalar_t *const SFEM_RESTRICT   uy,
+                                                 const scalar_t *const SFEM_RESTRICT   uz,
+                                                 const Slot *const SFEM_RESTRICT       slots,
+                                                 scalar_t *const SFEM_RESTRICT         values) {
+    const scalar_t half  = scalar_t(0.5);
+    const scalar_t one   = scalar_t(1);
+    const scalar_t alpha = rho * half;
+    const scalar_t adv_x = half * (ux[i] + ux[j]);
+    const scalar_t adv_y = half * (uy[i] + uy[j]);
+    const scalar_t adv_z = half * (uz[i] + uz[j]);
+    const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+    const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
+    const scalar_t mpos  = half * (mdot + sgn * mdot);
+    const scalar_t mneg  = half * (mdot - sgn * mdot);
+    const scalar_t d_pos = half * (one + sgn);
+    const scalar_t d_neg = half * (one - sgn);
+    const scalar_t hax   = half * ax;
+    const scalar_t hay   = half * ay;
+    const scalar_t haz   = half * az;
+
+    const int bnodes[2] = {i, j};
+    const scalar_t mass[2] = {mpos, mneg};
+    for (int nb = 0; nb < 2; ++nb) {
+        const int      b  = bnodes[nb];
+        const scalar_t m  = mass[nb];
+        const Slot     si = slots[i * 8 + b];
+        const Slot     sj = slots[j * 8 + b];
+
+        {
+            const scalar_t dmdot = alpha * ax;
+            const scalar_t dpos  = d_pos * dmdot;
+            const scalar_t dneg  = d_neg * dmdot;
+            const scalar_t dfx   = dpos * ux[i] + dneg * ux[j] + m;
+            const scalar_t dfy   = dpos * uy[i] + dneg * uy[j];
+            const scalar_t dfz   = dpos * uz[i] + dneg * uz[j];
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 0, dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 0, dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 0, dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 3, 0, dmdot);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 0, -dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 0, -dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 0, -dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 3, 0, -dmdot);
         }
+        {
+            const scalar_t dmdot = alpha * ay;
+            const scalar_t dpos  = d_pos * dmdot;
+            const scalar_t dneg  = d_neg * dmdot;
+            const scalar_t dfx   = dpos * ux[i] + dneg * ux[j];
+            const scalar_t dfy   = dpos * uy[i] + dneg * uy[j] + m;
+            const scalar_t dfz   = dpos * uz[i] + dneg * uz[j];
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 1, dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 1, dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 1, dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 3, 1, dmdot);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 1, -dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 1, -dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 1, -dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 3, 1, -dmdot);
+        }
+        {
+            const scalar_t dmdot = alpha * az;
+            const scalar_t dpos  = d_pos * dmdot;
+            const scalar_t dneg  = d_neg * dmdot;
+            const scalar_t dfx   = dpos * ux[i] + dneg * ux[j];
+            const scalar_t dfy   = dpos * uy[i] + dneg * uy[j];
+            const scalar_t dfz   = dpos * uz[i] + dneg * uz[j] + m;
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 2, dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 2, dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 2, dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, si, 3, 2, dmdot);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 2, -dfx);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 2, -dfy);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 2, -dfz);
+            cvfem_hex8_bsr_acc<Atomic>(values, sj, 3, 2, -dmdot);
+        }
+        cvfem_hex8_bsr_acc<Atomic>(values, si, 0, 3, hax);
+        cvfem_hex8_bsr_acc<Atomic>(values, si, 1, 3, hay);
+        cvfem_hex8_bsr_acc<Atomic>(values, si, 2, 3, haz);
+        cvfem_hex8_bsr_acc<Atomic>(values, sj, 0, 3, -hax);
+        cvfem_hex8_bsr_acc<Atomic>(values, sj, 1, 3, -hay);
+        cvfem_hex8_bsr_acc<Atomic>(values, sj, 2, 3, -haz);
     }
 }
 
@@ -690,82 +1114,17 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
         g20v[lane] = (c0 * wr + c3 * ws + c6 * wt) * inv;
         g21v[lane] = (c1 * wr + c4 * ws + c7 * wt) * inv;
         g22v[lane] = (c2 * wr + c5 * ws + c8 * wt) * inv;
-
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            out.rx[a][lane] = scalar_t(0);
-            out.ry[a][lane] = scalar_t(0);
-            out.rz[a][lane] = scalar_t(0);
-            out.rc[a][lane] = scalar_t(0);
-        }
     }
 
-    const scalar_t *const Axv[3] = {Ax0, Ax1, Ax2};
-    const scalar_t *const Ayv[3] = {Ay0, Ay1, Ay2};
-    const scalar_t *const Azv[3] = {Az0, Az1, Az2};
+    cvfem_hex8_zero_residual_pack(out);
+    cvfem_hex8_visc_dir_simd<0, 1, 3, 2, 4, 5, 7, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax0, Ay0, Az0, out);
+    cvfem_hex8_visc_dir_simd<0, 3, 1, 2, 4, 7, 5, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax1, Ay1, Az1, out);
+    cvfem_hex8_visc_dir_simd<0, 4, 1, 5, 2, 6, 3, 7>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax2, Ay2, Az2, out);
 
-    for (int d = 0; d < 3; ++d) {
-#pragma omp simd
-        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-            scalar_t tx, ty, tz;
-            cvfem_hex8_traction(mu,
-                                g00v[lane],
-                                g01v[lane],
-                                g02v[lane],
-                                g10v[lane],
-                                g11v[lane],
-                                g12v[lane],
-                                g20v[lane],
-                                g21v[lane],
-                                g22v[lane],
-                                Axv[d][lane],
-                                Ayv[d][lane],
-                                Azv[d][lane],
-                                tx,
-                                ty,
-                                tz);
-            for (int e = 0; e < 4; ++e) {
-                const int i = CVFEM_HEX8_DIR_EDGES[d][e][0];
-                const int j = CVFEM_HEX8_DIR_EDGES[d][e][1];
-                out.rx[i][lane] -= tx;
-                out.ry[i][lane] -= ty;
-                out.rz[i][lane] -= tz;
-                out.rx[j][lane] += tx;
-                out.ry[j][lane] += ty;
-                out.rz[j][lane] += tz;
-            }
-        }
-    }
-
-    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
-        const int i = CVFEM_HEX8_SCS[s].i;
-        const int j = CVFEM_HEX8_SCS[s].j;
-        const int d = s >> 2;
-#pragma omp simd
-        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-            const scalar_t ax    = Axv[d][lane];
-            const scalar_t ay    = Ayv[d][lane];
-            const scalar_t az    = Azv[d][lane];
-            const scalar_t adv_x = half * (in.ux[i][lane] + in.ux[j][lane]);
-            const scalar_t adv_y = half * (in.uy[i][lane] + in.uy[j][lane]);
-            const scalar_t adv_z = half * (in.uz[i][lane] + in.uz[j][lane]);
-            const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
-            const scalar_t sgn   = mdot > scalar_t(0) ? scalar_t(1) : (mdot < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
-            const scalar_t mpos  = half * (mdot + sgn * mdot);
-            const scalar_t mneg  = half * (mdot - sgn * mdot);
-            const scalar_t pmid  = half * (in.p[i][lane] + in.p[j][lane]);
-            const scalar_t fx    = mpos * in.ux[i][lane] + mneg * in.ux[j][lane] + pmid * ax;
-            const scalar_t fy    = mpos * in.uy[i][lane] + mneg * in.uy[j][lane] + pmid * ay;
-            const scalar_t fz    = mpos * in.uz[i][lane] + mneg * in.uz[j][lane] + pmid * az;
-            out.rx[i][lane] += fx;
-            out.ry[i][lane] += fy;
-            out.rz[i][lane] += fz;
-            out.rc[i][lane] += mdot;
-            out.rx[j][lane] -= fx;
-            out.ry[j][lane] -= fy;
-            out.rz[j][lane] -= fz;
-            out.rc[j][lane] -= mdot;
-        }
-    }
+    cvfem_hex8_conv_all_simd(rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, out);
 }
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
@@ -845,61 +1204,434 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
         g20v[lane] = (c0 * wr + c3 * ws + c6 * wt) * inv;
         g21v[lane] = (c1 * wr + c4 * ws + c7 * wt) * inv;
         g22v[lane] = (c2 * wr + c5 * ws + c8 * wt) * inv;
-
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            out.rx[a][lane] = scalar_t(0);
-            out.ry[a][lane] = scalar_t(0);
-            out.rz[a][lane] = scalar_t(0);
-            out.rc[a][lane] = scalar_t(0);
-        }
     }
 
-    const scalar_t *const Axv[3] = {Ax0, Ax1, Ax2};
-    const scalar_t *const Ayv[3] = {Ay0, Ay1, Ay2};
-    const scalar_t *const Azv[3] = {Az0, Az1, Az2};
+    cvfem_hex8_zero_residual_pack(out);
+    cvfem_hex8_visc_dir_simd<0, 1, 3, 2, 4, 5, 7, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax0, Ay0, Az0, out);
+    cvfem_hex8_visc_dir_simd<0, 3, 1, 2, 4, 7, 5, 6>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax1, Ay1, Az1, out);
+    cvfem_hex8_visc_dir_simd<0, 4, 1, 5, 2, 6, 3, 7>(
+            mu, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v, Ax2, Ay2, Az2, out);
 
-    for (int d = 0; d < 3; ++d) {
-#pragma omp simd
-        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-            scalar_t tx, ty, tz;
-            cvfem_hex8_traction(mu,
-                                g00v[lane],
-                                g01v[lane],
-                                g02v[lane],
-                                g10v[lane],
-                                g11v[lane],
-                                g12v[lane],
-                                g20v[lane],
-                                g21v[lane],
-                                g22v[lane],
-                                Axv[d][lane],
-                                Ayv[d][lane],
-                                Azv[d][lane],
-                                tx,
-                                ty,
-                                tz);
-            for (int e = 0; e < 4; ++e) {
-                const int i = CVFEM_HEX8_DIR_EDGES[d][e][0];
-                const int j = CVFEM_HEX8_DIR_EDGES[d][e][1];
-                out.rx[i][lane] -= tx;
-                out.ry[i][lane] -= ty;
-                out.rz[i][lane] -= tz;
-                out.rx[j][lane] += tx;
-                out.ry[j][lane] += ty;
-                out.rz[j][lane] += tz;
-            }
-        }
-    }
+    cvfem_hex8_conv_all_jv_simd(rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, out);
+}
+
+static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam(const scalar_t                        rho,
+                                                              const scalar_t                        mu,
+                                                              const scalar_t *const SFEM_RESTRICT   x,
+                                                              const scalar_t *const SFEM_RESTRICT   y,
+                                                              const scalar_t *const SFEM_RESTRICT   z,
+                                                              const scalar_t *const SFEM_RESTRICT   ux,
+                                                              const scalar_t *const SFEM_RESTRICT   uy,
+                                                              const scalar_t *const SFEM_RESTRICT   uz,
+                                                              const scalar_t *const SFEM_RESTRICT   p,
+                                                              scalar_t *const SFEM_RESTRICT         r) {
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        scalar_t dN[CVFEM_HEX8_N_NODES][3];
+        cvfem_hex8_dn_ref(CVFEM_HEX8_SCS_XI[s][0], CVFEM_HEX8_SCS_XI[s][1], CVFEM_HEX8_SCS_XI[s][2], dN);
+
+        Hex8Geom geom;
+        cvfem_hex8_jac_at(x, y, z, dN, geom);
+
+        scalar_t ax, ay, az;
+        cvfem_hex8_area_dir(geom, s >> 2, ax, ay, az);
+
+        scalar_t grad[9];
+        cvfem_hex8_grad_at(geom, dN, ux, uy, uz, grad);
+
+        const int i = CVFEM_HEX8_SCS[s].i;
+        const int j = CVFEM_HEX8_SCS[s].j;
+
+        scalar_t tau_x, tau_y, tau_z;
+        cvfem_hex8_traction(mu,
+                            grad[0],
+                            grad[1],
+                            grad[2],
+                            grad[3],
+                            grad[4],
+                            grad[5],
+                            grad[6],
+                            grad[7],
+                            grad[8],
+                            ax,
+                            ay,
+                            az,
+                            tau_x,
+                            tau_y,
+                            tau_z);
+
+        scalar_t fx, fy, fz, mdot;
+        cvfem_hex8_scs_convection(rho, ux[i], ux[j], uy[i], uy[j], uz[i], uz[j], p[i], p[j], ax, ay, az, fx, fy, fz, mdot);
+        fx -= tau_x;
+        fy -= tau_y;
+        fz -= tau_z;
+
+        r[i * 4 + 0] += fx;
+        r[i * 4 + 1] += fy;
+        r[i * 4 + 2] += fz;
+        r[i * 4 + 3] += mdot;
+        r[j * 4 + 0] -= fx;
+        r[j * 4 + 1] -= fy;
+        r[j * 4 + 2] -= fz;
+        r[j * 4 + 3] -= mdot;
+    }
+}
+
+static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam(const scalar_t                        rho,
+                                                                     const scalar_t                        mu,
+                                                                     const scalar_t *const SFEM_RESTRICT   x,
+                                                                     const scalar_t *const SFEM_RESTRICT   y,
+                                                                     const scalar_t *const SFEM_RESTRICT   z,
+                                                                     const scalar_t *const SFEM_RESTRICT   ux,
+                                                                     const scalar_t *const SFEM_RESTRICT   uy,
+                                                                     const scalar_t *const SFEM_RESTRICT   uz,
+                                                                     const scalar_t *const SFEM_RESTRICT   vx,
+                                                                     const scalar_t *const SFEM_RESTRICT   vy,
+                                                                     const scalar_t *const SFEM_RESTRICT   vz,
+                                                                     const scalar_t *const SFEM_RESTRICT   q,
+                                                                     scalar_t *const SFEM_RESTRICT         r) {
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t one  = scalar_t(1);
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        scalar_t dN[CVFEM_HEX8_N_NODES][3];
+        cvfem_hex8_dn_ref(CVFEM_HEX8_SCS_XI[s][0], CVFEM_HEX8_SCS_XI[s][1], CVFEM_HEX8_SCS_XI[s][2], dN);
+
+        Hex8Geom geom;
+        cvfem_hex8_jac_at(x, y, z, dN, geom);
+
+        scalar_t ax, ay, az;
+        cvfem_hex8_area_dir(geom, s >> 2, ax, ay, az);
+
+        scalar_t dgrad[9];
+        cvfem_hex8_grad_at(geom, dN, vx, vy, vz, dgrad);
+
+        scalar_t tx, ty, tz;
+        cvfem_hex8_traction(mu,
+                            dgrad[0],
+                            dgrad[1],
+                            dgrad[2],
+                            dgrad[3],
+                            dgrad[4],
+                            dgrad[5],
+                            dgrad[6],
+                            dgrad[7],
+                            dgrad[8],
+                            ax,
+                            ay,
+                            az,
+                            tx,
+                            ty,
+                            tz);
+
+        const int i = CVFEM_HEX8_SCS[s].i;
+        const int j = CVFEM_HEX8_SCS[s].j;
+        r[i * 4 + 0] -= tx;
+        r[i * 4 + 1] -= ty;
+        r[i * 4 + 2] -= tz;
+        r[j * 4 + 0] += tx;
+        r[j * 4 + 1] += ty;
+        r[j * 4 + 2] += tz;
+
+        const scalar_t adv_x = half * (ux[i] + ux[j]);
+        const scalar_t adv_y = half * (uy[i] + uy[j]);
+        const scalar_t adv_z = half * (uz[i] + uz[j]);
+        const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+        const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
+        const scalar_t mpos  = half * (mdot + sgn * mdot);
+        const scalar_t mneg  = half * (mdot - sgn * mdot);
+        const scalar_t d_pos = half * (one + sgn);
+        const scalar_t d_neg = half * (one - sgn);
+        const scalar_t dmdot = rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay + (vz[i] + vz[j]) * az);
+        const scalar_t dpos  = d_pos * dmdot;
+        const scalar_t dneg  = d_neg * dmdot;
+        const scalar_t qmid  = half * (q[i] + q[j]);
+        const scalar_t fx    = dpos * ux[i] + mpos * vx[i] + dneg * ux[j] + mneg * vx[j] + qmid * ax;
+        const scalar_t fy    = dpos * uy[i] + mpos * vy[i] + dneg * uy[j] + mneg * vy[j] + qmid * ay;
+        const scalar_t fz    = dpos * uz[i] + mpos * vz[i] + dneg * uz[j] + mneg * vz[j] + qmid * az;
+        r[i * 4 + 0] += fx;
+        r[i * 4 + 1] += fy;
+        r[i * 4 + 2] += fz;
+        r[i * 4 + 3] += dmdot;
+        r[j * 4 + 0] -= fx;
+        r[j * 4 + 1] -= fy;
+        r[j * 4 + 2] -= fz;
+        r[j * 4 + 3] -= dmdot;
+    }
+}
+
+template <bool Atomic, typename Slot>
+static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam(const scalar_t                        rho,
+                                                                        const scalar_t                        mu,
+                                                                        const scalar_t *const SFEM_RESTRICT   x,
+                                                                        const scalar_t *const SFEM_RESTRICT   y,
+                                                                        const scalar_t *const SFEM_RESTRICT   z,
+                                                                        const scalar_t *const SFEM_RESTRICT   ux,
+                                                                        const scalar_t *const SFEM_RESTRICT   uy,
+                                                                        const scalar_t *const SFEM_RESTRICT   uz,
+                                                                        const Slot *const SFEM_RESTRICT       slots,
+                                                                        scalar_t *const SFEM_RESTRICT         values) {
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        scalar_t dN[CVFEM_HEX8_N_NODES][3];
+        cvfem_hex8_dn_ref(CVFEM_HEX8_SCS_XI[s][0], CVFEM_HEX8_SCS_XI[s][1], CVFEM_HEX8_SCS_XI[s][2], dN);
+
+        Hex8Geom geom;
+        cvfem_hex8_jac_at(x, y, z, dN, geom);
+
+        scalar_t ax, ay, az;
+        cvfem_hex8_area_dir(geom, s >> 2, ax, ay, az);
+
+        const scalar_t inv_det = scalar_t(1) / geom.det;
+        scalar_t       w[CVFEM_HEX8_N_NODES][3];
+        for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
+            cvfem_hex8_pushforward(geom, inv_det, dN[k][0], dN[k][1], dN[k][2], w[k][0], w[k][1], w[k][2]);
+        }
+
+        const int i = CVFEM_HEX8_SCS[s].i;
+        const int j = CVFEM_HEX8_SCS[s].j;
+        for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
+            const scalar_t wx  = w[k][0];
+            const scalar_t wy  = w[k][1];
+            const scalar_t wz  = w[k][2];
+            const scalar_t d00 = -(scalar_t(2) * wx * ax + wy * ay + wz * az) * mu;
+            const scalar_t d01 = -(wx * ay) * mu;
+            const scalar_t d02 = -(wx * az) * mu;
+            const scalar_t d10 = -(wy * ax) * mu;
+            const scalar_t d11 = -(wx * ax + scalar_t(2) * wy * ay + wz * az) * mu;
+            const scalar_t d12 = -(wy * az) * mu;
+            const scalar_t d20 = -(wz * ax) * mu;
+            const scalar_t d21 = -(wz * ay) * mu;
+            const scalar_t d22 = -(wx * ax + wy * ay + scalar_t(2) * wz * az) * mu;
+            cvfem_hex8_bsr_acc_mom<Atomic>(values, slots[i * 8 + k], d00, d01, d02, d10, d11, d12, d20, d21, d22);
+            cvfem_hex8_bsr_acc_mom<Atomic>(values,
+                                           slots[j * 8 + k],
+                                           -d00,
+                                           -d01,
+                                           -d02,
+                                           -d10,
+                                           -d11,
+                                           -d12,
+                                           -d20,
+                                           -d21,
+                                           -d22);
+        }
+
+        cvfem_hex8_jac_conv_face<Atomic>(rho, ax, ay, az, i, j, ux, uy, uz, slots, values);
+    }
+}
+
+#define CVFEM_HEX8_ISO_NODE(a, fld)                                                              \
+    do {                                                                                         \
+        const scalar_t d0 = dN[a][0];                                                            \
+        const scalar_t d1 = dN[a][1];                                                            \
+        const scalar_t d2 = dN[a][2];                                                            \
+        const scalar_t xa = xyz.x[a][lane];                                                      \
+        const scalar_t ya = xyz.y[a][lane];                                                      \
+        const scalar_t za = xyz.z[a][lane];                                                      \
+        jx0 += xa * d0;                                                                          \
+        jy0 += xa * d1;                                                                          \
+        jz0 += xa * d2;                                                                          \
+        jx1 += ya * d0;                                                                          \
+        jy1 += ya * d1;                                                                          \
+        jz1 += ya * d2;                                                                          \
+        jx2 += za * d0;                                                                          \
+        jy2 += za * d1;                                                                          \
+        jz2 += za * d2;                                                                          \
+        ur0 += fld.ux[a][lane] * d0;                                                             \
+        ur1 += fld.ux[a][lane] * d1;                                                             \
+        ur2 += fld.ux[a][lane] * d2;                                                             \
+        vr0 += fld.uy[a][lane] * d0;                                                             \
+        vr1 += fld.uy[a][lane] * d1;                                                             \
+        vr2 += fld.uy[a][lane] * d2;                                                             \
+        wr0 += fld.uz[a][lane] * d0;                                                             \
+        wr1 += fld.uz[a][lane] * d1;                                                             \
+        wr2 += fld.uz[a][lane] * d2;                                                             \
+    } while (0)
+
+static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar_t      rho_s,
+                                                                   const scalar_t      mu_s,
+                                                                   const Hex8CoordPack &xyz,
+                                                                   const Hex8InputPack &in,
+                                                                   Hex8ResidualPack    &out) {
+    const scalar_t rho  = rho_s;
+    const scalar_t mu   = mu_s;
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t qtr  = scalar_t(0.25);
+
+    cvfem_hex8_zero_residual_pack(out);
+
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        scalar_t dN[CVFEM_HEX8_N_NODES][3];
+        cvfem_hex8_dn_ref(CVFEM_HEX8_SCS_XI[s][0], CVFEM_HEX8_SCS_XI[s][1], CVFEM_HEX8_SCS_XI[s][2], dN);
         const int i = CVFEM_HEX8_SCS[s].i;
         const int j = CVFEM_HEX8_SCS[s].j;
         const int d = s >> 2;
+
 #pragma omp simd
         for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-            const scalar_t ax    = Axv[d][lane];
-            const scalar_t ay    = Ayv[d][lane];
-            const scalar_t az    = Azv[d][lane];
+            scalar_t jx0 = 0, jx1 = 0, jx2 = 0;
+            scalar_t jy0 = 0, jy1 = 0, jy2 = 0;
+            scalar_t jz0 = 0, jz1 = 0, jz2 = 0;
+            scalar_t ur0 = 0, ur1 = 0, ur2 = 0;
+            scalar_t vr0 = 0, vr1 = 0, vr2 = 0;
+            scalar_t wr0 = 0, wr1 = 0, wr2 = 0;
+            CVFEM_HEX8_ISO_NODE(0, in);
+            CVFEM_HEX8_ISO_NODE(1, in);
+            CVFEM_HEX8_ISO_NODE(2, in);
+            CVFEM_HEX8_ISO_NODE(3, in);
+            CVFEM_HEX8_ISO_NODE(4, in);
+            CVFEM_HEX8_ISO_NODE(5, in);
+            CVFEM_HEX8_ISO_NODE(6, in);
+            CVFEM_HEX8_ISO_NODE(7, in);
+
+            const scalar_t c0  = jy1 * jz2 - jy2 * jz1;
+            const scalar_t c1  = jy2 * jz0 - jy0 * jz2;
+            const scalar_t c2  = jy0 * jz1 - jy1 * jz0;
+            const scalar_t c3  = jz1 * jx2 - jz2 * jx1;
+            const scalar_t c4  = jz2 * jx0 - jz0 * jx2;
+            const scalar_t c5  = jz0 * jx1 - jz1 * jx0;
+            const scalar_t c6  = jx1 * jy2 - jx2 * jy1;
+            const scalar_t c7  = jx2 * jy0 - jx0 * jy2;
+            const scalar_t c8  = jx0 * jy1 - jx1 * jy0;
+            const scalar_t det = jx0 * c0 + jx1 * c1 + jx2 * c2;
+            const scalar_t inv = scalar_t(1) / det;
+            scalar_t       ax, ay, az;
+            if (d == 0) {
+                ax = qtr * c0;
+                ay = qtr * c1;
+                az = qtr * c2;
+            } else if (d == 1) {
+                ax = qtr * c3;
+                ay = qtr * c4;
+                az = qtr * c5;
+            } else {
+                ax = qtr * c6;
+                ay = qtr * c7;
+                az = qtr * c8;
+            }
+
+            const scalar_t g00 = (c0 * ur0 + c3 * ur1 + c6 * ur2) * inv;
+            const scalar_t g01 = (c1 * ur0 + c4 * ur1 + c7 * ur2) * inv;
+            const scalar_t g02 = (c2 * ur0 + c5 * ur1 + c8 * ur2) * inv;
+            const scalar_t g10 = (c0 * vr0 + c3 * vr1 + c6 * vr2) * inv;
+            const scalar_t g11 = (c1 * vr0 + c4 * vr1 + c7 * vr2) * inv;
+            const scalar_t g12 = (c2 * vr0 + c5 * vr1 + c8 * vr2) * inv;
+            const scalar_t g20 = (c0 * wr0 + c3 * wr1 + c6 * wr2) * inv;
+            const scalar_t g21 = (c1 * wr0 + c4 * wr1 + c7 * wr2) * inv;
+            const scalar_t g22 = (c2 * wr0 + c5 * wr1 + c8 * wr2) * inv;
+
+            const scalar_t tau_x =
+                    mu * ((scalar_t(2) * g00) * ax + (g01 + g10) * ay + (g02 + g20) * az);
+            const scalar_t tau_y =
+                    mu * ((g10 + g01) * ax + (scalar_t(2) * g11) * ay + (g12 + g21) * az);
+            const scalar_t tau_z =
+                    mu * ((g20 + g02) * ax + (g21 + g12) * ay + (scalar_t(2) * g22) * az);
+
+            const scalar_t adv_x = half * (in.ux[i][lane] + in.ux[j][lane]);
+            const scalar_t adv_y = half * (in.uy[i][lane] + in.uy[j][lane]);
+            const scalar_t adv_z = half * (in.uz[i][lane] + in.uz[j][lane]);
+            const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+            const scalar_t sgn   = mdot > scalar_t(0) ? scalar_t(1) : (mdot < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+            const scalar_t mpos  = half * (mdot + sgn * mdot);
+            const scalar_t mneg  = half * (mdot - sgn * mdot);
+            const scalar_t pmid  = half * (in.p[i][lane] + in.p[j][lane]);
+            const scalar_t fx    = mpos * in.ux[i][lane] + mneg * in.ux[j][lane] + pmid * ax - tau_x;
+            const scalar_t fy    = mpos * in.uy[i][lane] + mneg * in.uy[j][lane] + pmid * ay - tau_y;
+            const scalar_t fz    = mpos * in.uz[i][lane] + mneg * in.uz[j][lane] + pmid * az - tau_z;
+            out.rx[i][lane] += fx;
+            out.ry[i][lane] += fy;
+            out.rz[i][lane] += fz;
+            out.rc[i][lane] += mdot;
+            out.rx[j][lane] -= fx;
+            out.ry[j][lane] -= fy;
+            out.rz[j][lane] -= fz;
+            out.rc[j][lane] -= mdot;
+        }
+    }
+}
+
+static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const scalar_t      rho_s,
+                                                                          const scalar_t      mu_s,
+                                                                          const Hex8CoordPack &xyz,
+                                                                          const Hex8InputPack &u,
+                                                                          const Hex8InputPack &du,
+                                                                          Hex8ResidualPack    &out) {
+    const scalar_t rho  = rho_s;
+    const scalar_t mu   = mu_s;
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t one  = scalar_t(1);
+    const scalar_t qtr  = scalar_t(0.25);
+
+    cvfem_hex8_zero_residual_pack(out);
+
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        scalar_t dN[CVFEM_HEX8_N_NODES][3];
+        cvfem_hex8_dn_ref(CVFEM_HEX8_SCS_XI[s][0], CVFEM_HEX8_SCS_XI[s][1], CVFEM_HEX8_SCS_XI[s][2], dN);
+        const int i = CVFEM_HEX8_SCS[s].i;
+        const int j = CVFEM_HEX8_SCS[s].j;
+        const int d = s >> 2;
+
+#pragma omp simd
+        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+            scalar_t jx0 = 0, jx1 = 0, jx2 = 0;
+            scalar_t jy0 = 0, jy1 = 0, jy2 = 0;
+            scalar_t jz0 = 0, jz1 = 0, jz2 = 0;
+            scalar_t ur0 = 0, ur1 = 0, ur2 = 0;
+            scalar_t vr0 = 0, vr1 = 0, vr2 = 0;
+            scalar_t wr0 = 0, wr1 = 0, wr2 = 0;
+            CVFEM_HEX8_ISO_NODE(0, du);
+            CVFEM_HEX8_ISO_NODE(1, du);
+            CVFEM_HEX8_ISO_NODE(2, du);
+            CVFEM_HEX8_ISO_NODE(3, du);
+            CVFEM_HEX8_ISO_NODE(4, du);
+            CVFEM_HEX8_ISO_NODE(5, du);
+            CVFEM_HEX8_ISO_NODE(6, du);
+            CVFEM_HEX8_ISO_NODE(7, du);
+
+            const scalar_t c0  = jy1 * jz2 - jy2 * jz1;
+            const scalar_t c1  = jy2 * jz0 - jy0 * jz2;
+            const scalar_t c2  = jy0 * jz1 - jy1 * jz0;
+            const scalar_t c3  = jz1 * jx2 - jz2 * jx1;
+            const scalar_t c4  = jz2 * jx0 - jz0 * jx2;
+            const scalar_t c5  = jz0 * jx1 - jz1 * jx0;
+            const scalar_t c6  = jx1 * jy2 - jx2 * jy1;
+            const scalar_t c7  = jx2 * jy0 - jx0 * jy2;
+            const scalar_t c8  = jx0 * jy1 - jx1 * jy0;
+            const scalar_t det = jx0 * c0 + jx1 * c1 + jx2 * c2;
+            const scalar_t inv = scalar_t(1) / det;
+            scalar_t       ax, ay, az;
+            if (d == 0) {
+                ax = qtr * c0;
+                ay = qtr * c1;
+                az = qtr * c2;
+            } else if (d == 1) {
+                ax = qtr * c3;
+                ay = qtr * c4;
+                az = qtr * c5;
+            } else {
+                ax = qtr * c6;
+                ay = qtr * c7;
+                az = qtr * c8;
+            }
+
+            const scalar_t g00 = (c0 * ur0 + c3 * ur1 + c6 * ur2) * inv;
+            const scalar_t g01 = (c1 * ur0 + c4 * ur1 + c7 * ur2) * inv;
+            const scalar_t g02 = (c2 * ur0 + c5 * ur1 + c8 * ur2) * inv;
+            const scalar_t g10 = (c0 * vr0 + c3 * vr1 + c6 * vr2) * inv;
+            const scalar_t g11 = (c1 * vr0 + c4 * vr1 + c7 * vr2) * inv;
+            const scalar_t g12 = (c2 * vr0 + c5 * vr1 + c8 * vr2) * inv;
+            const scalar_t g20 = (c0 * wr0 + c3 * wr1 + c6 * wr2) * inv;
+            const scalar_t g21 = (c1 * wr0 + c4 * wr1 + c7 * wr2) * inv;
+            const scalar_t g22 = (c2 * wr0 + c5 * wr1 + c8 * wr2) * inv;
+
+            const scalar_t tx = mu * ((scalar_t(2) * g00) * ax + (g01 + g10) * ay + (g02 + g20) * az);
+            const scalar_t ty = mu * ((g10 + g01) * ax + (scalar_t(2) * g11) * ay + (g12 + g21) * az);
+            const scalar_t tz = mu * ((g20 + g02) * ax + (g21 + g12) * ay + (scalar_t(2) * g22) * az);
+
             const scalar_t adv_x = half * (u.ux[i][lane] + u.ux[j][lane]);
             const scalar_t adv_y = half * (u.uy[i][lane] + u.uy[j][lane]);
             const scalar_t adv_z = half * (u.uz[i][lane] + u.uz[j][lane]);
@@ -916,11 +1648,14 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
             const scalar_t dneg = d_neg * dmdot;
             const scalar_t qmid = half * (du.p[i][lane] + du.p[j][lane]);
             const scalar_t fx =
-                    dpos * u.ux[i][lane] + mpos * du.ux[i][lane] + dneg * u.ux[j][lane] + mneg * du.ux[j][lane] + qmid * ax;
+                    dpos * u.ux[i][lane] + mpos * du.ux[i][lane] + dneg * u.ux[j][lane] + mneg * du.ux[j][lane] + qmid * ax -
+                    tx;
             const scalar_t fy =
-                    dpos * u.uy[i][lane] + mpos * du.uy[i][lane] + dneg * u.uy[j][lane] + mneg * du.uy[j][lane] + qmid * ay;
+                    dpos * u.uy[i][lane] + mpos * du.uy[i][lane] + dneg * u.uy[j][lane] + mneg * du.uy[j][lane] + qmid * ay -
+                    ty;
             const scalar_t fz =
-                    dpos * u.uz[i][lane] + mpos * du.uz[i][lane] + dneg * u.uz[j][lane] + mneg * du.uz[j][lane] + qmid * az;
+                    dpos * u.uz[i][lane] + mpos * du.uz[i][lane] + dneg * u.uz[j][lane] + mneg * du.uz[j][lane] + qmid * az -
+                    tz;
             out.rx[i][lane] += fx;
             out.ry[i][lane] += fy;
             out.rz[i][lane] += fz;
@@ -932,6 +1667,8 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
         }
     }
 }
+
+#undef CVFEM_HEX8_ISO_NODE
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_fd(const scalar_t                        rho,
                                                          const scalar_t                        mu,
@@ -982,4 +1719,56 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_fd(const scalar_t         
     }
 }
 
+static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_fd_isoparam(const scalar_t                        rho,
+                                                                  const scalar_t                        mu,
+                                                                  const scalar_t *const SFEM_RESTRICT   x,
+                                                                  const scalar_t *const SFEM_RESTRICT   y,
+                                                                  const scalar_t *const SFEM_RESTRICT   z,
+                                                                  const scalar_t *const SFEM_RESTRICT   ux,
+                                                                  const scalar_t *const SFEM_RESTRICT   uy,
+                                                                  const scalar_t *const SFEM_RESTRICT   uz,
+                                                                  const scalar_t *const SFEM_RESTRICT   p,
+                                                                  scalar_t *const SFEM_RESTRICT         ke) {
+    scalar_t q[CVFEM_HEX8_N_DOF];
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        q[a * 4 + 0] = ux[a];
+        q[a * 4 + 1] = uy[a];
+        q[a * 4 + 2] = uz[a];
+        q[a * 4 + 3] = p[a];
+    }
+
+    scalar_t       up[8], vp[8], wp[8], pp[8];
+    scalar_t       rm[CVFEM_HEX8_N_DOF], rp[CVFEM_HEX8_N_DOF];
+    const scalar_t eps = scalar_t(1.0e-6);
+
+    for (int col = 0; col < CVFEM_HEX8_N_DOF; ++col) {
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) {
+            const scalar_t delta = i == col ? eps : scalar_t(0);
+            const int      a     = i / 4;
+            const int      f     = i & 3;
+            if (f == 0) up[a] = q[i] - delta;
+            if (f == 1) vp[a] = q[i] - delta;
+            if (f == 2) wp[a] = q[i] - delta;
+            if (f == 3) pp[a] = q[i] - delta;
+        }
+        cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, up, vp, wp, pp, rm);
+
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) {
+            const scalar_t delta = i == col ? eps : scalar_t(0);
+            const int      a     = i / 4;
+            const int      f     = i & 3;
+            if (f == 0) up[a] = q[i] + delta;
+            if (f == 1) vp[a] = q[i] + delta;
+            if (f == 2) wp[a] = q[i] + delta;
+            if (f == 3) pp[a] = q[i] + delta;
+        }
+        cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, up, vp, wp, pp, rp);
+
+        for (int row = 0; row < CVFEM_HEX8_N_DOF; ++row) {
+            ke[row * CVFEM_HEX8_N_DOF + col] = (rp[row] - rm[row]) / (2 * eps);
+        }
+    }
+}
+
 #endif
+
