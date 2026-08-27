@@ -63,8 +63,7 @@ run_case() {
 compare_case() {
     local reference="$1"
     local candidate="$2"
-    local out_name="$3"
-    local out_dir="$OUT_BASE/compare/$out_name"
+    local out_dir="$OUT_BASE/compare/ref_${reference}__vs__cand_${candidate}"
 
     rm -rf "$out_dir"
     python3 "$COMPARE" \
@@ -85,18 +84,18 @@ run_case per_elem float16
 run_case per_qp float16 tensor
 run_case per_elem float16 tensor
 
-compare_case per_qp_float64 per_elem_float64 per_element_fp64
-compare_case per_qp_float64 per_qp_float32 mixed_precision_per_qp
-compare_case per_elem_float64 per_elem_float32 mixed_precision_per_elem
-compare_case per_qp_float64 per_elem_float32 per_element_and_fp32
-compare_case per_qp_float64 per_qp_float16 fp16_per_qp
-compare_case per_elem_float64 per_elem_float16 fp16_per_elem
-compare_case per_qp_float64 per_elem_float16 per_element_and_fp16
-compare_case per_qp_float64 per_qp_float16_scaled fp16_scaled_per_qp
-compare_case per_elem_float64 per_elem_float16_scaled fp16_scaled_per_elem
-compare_case per_qp_float16 per_qp_float16_scaled fp16_scaling_effect_per_qp
-compare_case per_elem_float16 per_elem_float16_scaled fp16_scaling_effect_per_elem
-compare_case per_qp_float64 per_elem_float16_scaled per_element_and_fp16_scaled
+compare_case per_qp_float64 per_elem_float64
+compare_case per_qp_float64 per_qp_float32
+compare_case per_elem_float64 per_elem_float32
+compare_case per_qp_float64 per_elem_float32
+compare_case per_qp_float64 per_qp_float16
+compare_case per_elem_float64 per_elem_float16
+compare_case per_qp_float64 per_elem_float16
+compare_case per_qp_float64 per_qp_float16_scaled
+compare_case per_elem_float64 per_elem_float16_scaled
+compare_case per_qp_float16 per_qp_float16_scaled
+compare_case per_elem_float16 per_elem_float16_scaled
+compare_case per_qp_float64 per_elem_float16_scaled
 
 echo "[info] Cases: $OUT_BASE/cases"
 echo "[info] Comparisons: $OUT_BASE/compare"
