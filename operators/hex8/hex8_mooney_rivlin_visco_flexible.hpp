@@ -107,6 +107,8 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history,
     void *const SFEM_RESTRICT         new_history,
+    const float *const SFEM_RESTRICT  history_scale,
+    float *const SFEM_RESTRICT        new_history_scale,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -140,6 +142,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history,
+    const float *const SFEM_RESTRICT  history_scale,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -178,6 +181,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history,
+    const float *const SFEM_RESTRICT  history_scale,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
@@ -216,6 +220,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history,
+    const float *const SFEM_RESTRICT  history_scale,
     // 5. Displacement input
     const ptrdiff_t                   u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,

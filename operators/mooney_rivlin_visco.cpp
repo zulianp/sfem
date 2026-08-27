@@ -24,6 +24,8 @@ int mooney_rivlin_visco_update_history_flexible(
     const smesh::PrimitiveType history_storage,
     const void *const SFEM_RESTRICT history,
     void *const SFEM_RESTRICT new_history,
+    const float *const SFEM_RESTRICT history_scale,
+    float *const SFEM_RESTRICT new_history_scale,
     const ptrdiff_t u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
     const real_t *const SFEM_RESTRICT prev_uy,
@@ -38,6 +40,7 @@ int mooney_rivlin_visco_update_history_flexible(
                 C10, C01, K,
                 num_prony_terms, alpha, beta,
                 history_stride, history_n_qp, history_storage, history, new_history,
+                history_scale, new_history_scale,
                 u_stride, prev_ux, prev_uy, prev_uz, ux, uy, uz);
         }
         default: {
@@ -64,6 +67,7 @@ int mooney_rivlin_visco_gradient_flexible(
     const int history_n_qp,
     const smesh::PrimitiveType history_storage,
     const void *const SFEM_RESTRICT history,
+    const float *const SFEM_RESTRICT history_scale,
     const ptrdiff_t u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
     const real_t *const SFEM_RESTRICT prev_uy,
@@ -78,7 +82,7 @@ int mooney_rivlin_visco_gradient_flexible(
                 nelements, 1, nnodes, elements, points,
                 C10, C01, K,
                 num_prony_terms, alpha, beta, gamma,
-                history_stride, history_n_qp, history_storage, history,
+                history_stride, history_n_qp, history_storage, history, history_scale,
                 u_stride, prev_ux, prev_uy, prev_uz, ux, uy, uz,
                 3, &out[0], &out[1], &out[2]);
         }
@@ -106,6 +110,7 @@ int mooney_rivlin_visco_bsr_flexible(
     const int history_n_qp,
     const smesh::PrimitiveType history_storage,
     const void *const SFEM_RESTRICT history,
+    const float *const SFEM_RESTRICT history_scale,
     const ptrdiff_t u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
     const real_t *const SFEM_RESTRICT prev_uy,
@@ -122,7 +127,7 @@ int mooney_rivlin_visco_bsr_flexible(
                 nelements, 1, nnodes, elements, points,
                 C10, C01, K,
                 num_prony_terms, alpha, beta, gamma,
-                history_stride, history_n_qp, history_storage, history,
+                history_stride, history_n_qp, history_storage, history, history_scale,
                 u_stride, prev_ux, prev_uy, prev_uz, ux, uy, uz,
                 1, values, (const idx_t*)rowptr, colidx);
         }
@@ -150,6 +155,7 @@ int mooney_rivlin_visco_hessian_diag_flexible(
     const int history_n_qp,
     const smesh::PrimitiveType history_storage,
     const void *const SFEM_RESTRICT history,
+    const float *const SFEM_RESTRICT history_scale,
     const ptrdiff_t u_stride,
     const real_t *const SFEM_RESTRICT prev_ux,
     const real_t *const SFEM_RESTRICT prev_uy,
@@ -164,7 +170,7 @@ int mooney_rivlin_visco_hessian_diag_flexible(
                 nelements, 1, nnodes, elements, points,
                 C10, C01, K,
                 num_prony_terms, alpha, beta, gamma,
-                history_stride, history_n_qp, history_storage, history,
+                history_stride, history_n_qp, history_storage, history, history_scale,
                 u_stride, prev_ux, prev_uy, prev_uz, ux, uy, uz,
                 3, &out[0], &out[1], &out[2]);
         }

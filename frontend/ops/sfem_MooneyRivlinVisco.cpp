@@ -20,6 +20,7 @@
 
 #include <math.h>
 #include <mpi.h>
+#include <algorithm>
 #include <vector>
 #include <sstream>
 #include <string>
@@ -85,8 +86,11 @@ namespace sfem {
         // History buffer
         std::shared_ptr<smesh::BaseBuffer> history_buffer;
         std::shared_ptr<smesh::BaseBuffer> new_history_buffer;
+        std::shared_ptr<Buffer<float>> history_scale_buffer;
+        std::shared_ptr<Buffer<float>> new_history_scale_buffer;
         int history_n_qp{8};
         smesh::PrimitiveType history_storage{smesh::TypeToEnum<real_t>::value()};
+        bool history_scaling{false};
         
         // Previous displacement
         std::shared_ptr<Buffer<real_t>> prev_u_buffer;
@@ -97,6 +101,7 @@ namespace sfem {
             const std::string storage_name = smesh::Env::read(
                 "SFEM_HISTORY_STORAGE", std::string(smesh::TypeToString<real_t>::value()));
             history_storage = supported_history_storage(smesh::to_real_type(storage_name));
+            history_scaling = smesh::Env::read("SFEM_HISTORY_SCALING", std::string("none")) == "tensor";
         }
         ~Impl();
         
@@ -213,6 +218,16 @@ namespace sfem {
             memset(history_buffer->void_data(), 0, history_buffer->nbytes());
             memset(new_history_buffer->void_data(), 0, new_history_buffer->nbytes());
 
+            history_scale_buffer.reset();
+            new_history_scale_buffer.reset();
+            if (history_scaling && history_storage == smesh::SMESH_FLOAT16) {
+                const ptrdiff_t total_scales = total_size / 6;
+                history_scale_buffer = smesh::create_buffer<float>(total_scales, sfem::EXECUTION_SPACE_HOST);
+                new_history_scale_buffer = smesh::create_buffer<float>(total_scales, sfem::EXECUTION_SPACE_HOST);
+                std::fill_n(history_scale_buffer->data(), total_scales, 1.0f);
+                std::fill_n(new_history_scale_buffer->data(), total_scales, 1.0f);
+            }
+
             auto blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
             // Allocate prev_u buffer
@@ -223,6 +238,7 @@ namespace sfem {
         
         void swap_history_buffers() {
             std::swap(history_buffer, new_history_buffer);
+            std::swap(history_scale_buffer, new_history_scale_buffer);
         }
 
         const void *history_data(const ptrdiff_t offset) const {
@@ -231,6 +247,14 @@ namespace sfem {
 
         void *new_history_data(const ptrdiff_t offset) {
             return static_cast<char *>(new_history_buffer->void_data()) + offset * smesh::num_bytes(history_storage);
+        }
+
+        const float *history_scale_data(const ptrdiff_t history_offset) const {
+            return history_scale_buffer ? history_scale_buffer->data() + history_offset / 6 : nullptr;
+        }
+
+        float *new_history_scale_data(const ptrdiff_t history_offset) {
+            return new_history_scale_buffer ? new_history_scale_buffer->data() + history_offset / 6 : nullptr;
         }
         
         void save_prev_u(const real_t *x) {
@@ -351,6 +375,7 @@ namespace sfem {
                 impl_->history_n_qp,
                 impl_->history_storage,
                 impl_->history_data(history_offset),
+                impl_->history_scale_data(history_offset),
                 3, 
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -394,6 +419,7 @@ namespace sfem {
                 impl_->history_n_qp,
                 impl_->history_storage,
                 impl_->history_data(history_offset),
+                impl_->history_scale_data(history_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -437,6 +463,7 @@ namespace sfem {
                 impl_->history_n_qp,
                 impl_->history_storage,
                 impl_->history_data(history_offset),
+                impl_->history_scale_data(history_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -480,6 +507,8 @@ namespace sfem {
                 impl_->history_storage,
                 impl_->history_data(history_offset),
                 impl_->new_history_data(history_offset),
+                impl_->history_scale_data(history_offset),
+                impl_->new_history_scale_data(history_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -514,6 +543,10 @@ namespace sfem {
     void MooneyRivlinVisco::set_history_storage(const smesh::PrimitiveType storage) {
         impl_->history_storage = supported_history_storage(storage);
     }
+
+    void MooneyRivlinVisco::set_history_scaling(const bool enable) {
+        impl_->history_scaling = enable;
+    }
     
     void MooneyRivlinVisco::set_wlf_params(real_t C1, real_t C2, real_t T_ref) {
         impl_->wlf_C1 = C1;
@@ -543,6 +576,10 @@ namespace sfem {
 
     smesh::PrimitiveType MooneyRivlinVisco::get_history_storage() const {
         return impl_->history_storage;
+    }
+
+    bool MooneyRivlinVisco::get_history_scaling() const {
+        return impl_->history_scaling && impl_->history_storage == smesh::SMESH_FLOAT16;
     }
     
     void MooneyRivlinVisco::set_prony_coefficients(int n_active, const real_t* alpha, const real_t* beta, real_t gamma) {

@@ -50,10 +50,14 @@ fi
 run_case() {
     local mode="$1"
     local storage="$2"
+    local scaling="${3:-none}"
+    local suffix=""
+    [[ "$scaling" == "tensor" ]] && suffix="_scaled"
     "$CASE_RUNNER" \
         --history-mode "$mode" \
         --history-storage "$storage" \
-        --out "$OUT_BASE/cases/${mode}_${storage}"
+        --history-scaling "$scaling" \
+        --out "$OUT_BASE/cases/${mode}_${storage}${suffix}"
 }
 
 compare_case() {
@@ -78,6 +82,8 @@ run_case per_qp float32
 run_case per_elem float32
 run_case per_qp float16
 run_case per_elem float16
+run_case per_qp float16 tensor
+run_case per_elem float16 tensor
 
 compare_case per_qp_float64 per_elem_float64 per_element_fp64
 compare_case per_qp_float64 per_qp_float32 mixed_precision_per_qp
@@ -86,6 +92,11 @@ compare_case per_qp_float64 per_elem_float32 per_element_and_fp32
 compare_case per_qp_float64 per_qp_float16 fp16_per_qp
 compare_case per_elem_float64 per_elem_float16 fp16_per_elem
 compare_case per_qp_float64 per_elem_float16 per_element_and_fp16
+compare_case per_qp_float64 per_qp_float16_scaled fp16_scaled_per_qp
+compare_case per_elem_float64 per_elem_float16_scaled fp16_scaled_per_elem
+compare_case per_qp_float16 per_qp_float16_scaled fp16_scaling_effect_per_qp
+compare_case per_elem_float16 per_elem_float16_scaled fp16_scaling_effect_per_elem
+compare_case per_qp_float64 per_elem_float16_scaled per_element_and_fp16_scaled
 
 echo "[info] Cases: $OUT_BASE/cases"
 echo "[info] Comparisons: $OUT_BASE/compare"

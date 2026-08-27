@@ -34,6 +34,7 @@ namespace sfem {
         void set_prony_terms(const int n, const real_t *g, const real_t *tau);
         // Select history storage format before initialize_history().
         void set_history_storage(const smesh::PrimitiveType storage);
+        void set_history_scaling(const bool enable);
         
         // Initialize history buffer (computes coefficients + allocates buffers)
         // Must be called after setting all parameters
@@ -59,6 +60,7 @@ namespace sfem {
         int get_num_active_terms() const;
         int get_history_n_qp() const;
         smesh::PrimitiveType get_history_storage() const;
+        bool get_history_scaling() const;
         
         // Advanced interface: set precomputed Prony coefficients directly
         // This allows external computation of temperature-shifted tau and filtering
