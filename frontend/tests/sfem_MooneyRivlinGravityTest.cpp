@@ -1302,6 +1302,7 @@ int test_mooney_rivlin_gravity() {
         }
 
         // Newton Loop with Inertia
+        bool converged = false;
         for (int iter = 0; iter < 20; ++iter) {
             // Residual: R = M*a + F_int(u) - F_ext + F_contact
             // where a = c0*(u - u_pred) from Newmark relation
@@ -1337,7 +1338,10 @@ int test_mooney_rivlin_gravity() {
                    inertia_norm,
                    f_int_norm,
                    f_grav_norm);
-            if (r_norm < 1e-8) break;
+            if (r_norm < 1e-8) {
+                converged = true;
+                break;
+            }
 
             // ===== Tangent Stiffness: K_eff = K_tan + c0*M =====
             blas->zeros(values->size(), values->data());
@@ -1401,6 +1405,8 @@ int test_mooney_rivlin_gravity() {
                 blas->axpy(ndofs, -damping, delta_x->data(), lower_bound->data());
             }
         }
+
+        if (!converged) return SFEM_TEST_FAILURE;
 
         for (ptrdiff_t i = 0; i < ndofs; ++i) {
             a->data()[i] = c0 * (x->data()[i] - u_pred->data()[i]);
