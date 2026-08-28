@@ -123,6 +123,20 @@ def structured_square_mesh(nx, ny):
     return X, np.asarray(tris, dtype=int), node(nx, 0)
 
 
+def corner_fixed_dofs(X, boundary_condition="two-corners"):
+    lower_left = np.argmin(X[:, 0] + X[:, 1])
+    lower_right = np.argmax(X[:, 0] - 1000.0 * np.abs(X[:, 1]))
+    upper_right = np.argmax(X[:, 0] + X[:, 1])
+    upper_left = np.argmax(X[:, 1] - 1000.0 * np.abs(X[:, 0]))
+
+    if boundary_condition == "minimal-rbm":
+        return np.array([2 * lower_left, 2 * lower_left + 1, 2 * lower_right + 1])
+
+    corner_count = {"two-corners": 2, "three-corners": 3, "four-corners": 4}[boundary_condition]
+    corners = (lower_left, lower_right, upper_right, upper_left)[:corner_count]
+    return np.asarray([dof for node in corners for dof in (2 * node, 2 * node + 1)])
+
+
 def element_kinematics(xe, Xe):
     Dm = np.column_stack((Xe[1] - Xe[0], Xe[2] - Xe[0]))
     inv_Dm = np.linalg.inv(Dm)
@@ -508,10 +522,12 @@ def run_homotopy(
     kappa,
     Jc_target,
     Jmin,
+    fixed=None,
     use_numba=True,
     verbose=True,
 ):
-    fixed = np.array([0, 1, 2 * anchor_right + 1], dtype=int)
+    if fixed is None:
+        fixed = corner_fixed_dofs(X)
     x = x0.copy()
     stages = [0.50, 0.35, 0.25, max(Jc_target, 0.20), Jc_target]
     all_hist = []
@@ -780,6 +796,7 @@ def random_deformed_initial_state(
     seed,
     max_inversion_ratio=None,
     max_inverted_fraction=None,
+    fixed_dofs=None,
     return_scale=False,
 ):
     rng = np.random.default_rng(seed)
@@ -790,10 +807,9 @@ def random_deformed_initial_state(
     h = min(hx, hy)
     x0 = X + amplitude * h * rng.standard_normal(X.shape)
 
-    lower_left = np.argmin(np.sum(X * X, axis=1))
-    lower_right = np.argmax(X[:, 0] - 1000.0 * np.abs(X[:, 1]))
-    x0[lower_left] = X[lower_left]
-    x0[lower_right, 1] = X[lower_right, 1]
+    if fixed_dofs is None:
+        fixed_dofs = corner_fixed_dofs(X)
+    x0.ravel()[fixed_dofs] = X.ravel()[fixed_dofs]
     x0, Js, scale = cap_initial_inversion(
         X, triangles, x0, max_inversion_ratio, max_inverted_fraction
     )
@@ -812,6 +828,7 @@ def folded_random_initial_state(
     seed,
     max_inversion_ratio=None,
     max_inverted_fraction=None,
+    fixed_dofs=None,
     return_scale=False,
 ):
     rng = np.random.default_rng(seed)
@@ -849,10 +866,9 @@ def folded_random_initial_state(
     hy = np.min(np.diff(uy)) if len(uy) > 1 else 1.0
     x0 += noise_amplitude * min(hx, hy) * rng.standard_normal(X.shape)
 
-    lower_left = np.argmin(np.sum(X * X, axis=1))
-    lower_right = np.argmax(X[:, 0] - 1000.0 * np.abs(X[:, 1]))
-    x0[lower_left] = X[lower_left]
-    x0[lower_right, 1] = X[lower_right, 1]
+    if fixed_dofs is None:
+        fixed_dofs = corner_fixed_dofs(X)
+    x0.ravel()[fixed_dofs] = X.ravel()[fixed_dofs]
     x0, Js, scale = cap_initial_inversion(
         X, triangles, x0, max_inversion_ratio, max_inverted_fraction
     )
@@ -896,6 +912,11 @@ def main():
     ap.add_argument("--Jmin", type=float, default=-1.0)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--amplitude", type=float, default=1.0)
+    ap.add_argument(
+        "--boundary-condition",
+        choices=["minimal-rbm", "two-corners", "three-corners", "four-corners"],
+        default="two-corners",
+    )
     ap.add_argument("--plot", default="invertible_mooney_rivlin_plane_strain_2d.png")
     ap.add_argument("--no-numba", action="store_true")
     ap.add_argument("--check-derivatives", action="store_true")
@@ -910,7 +931,10 @@ def main():
         print(f"material_hessian_directional_error: {ehess:.6e}")
 
     X, tris, anchor_right = structured_square_mesh(args.nx, args.ny)
-    x0, Js0 = random_deformed_initial_state(X, tris, args.amplitude, args.seed)
+    fixed = corner_fixed_dofs(X, args.boundary_condition)
+    x0, Js0 = random_deformed_initial_state(
+        X, tris, args.amplitude, args.seed, fixed_dofs=fixed
+    )
     n_inv0 = int(np.count_nonzero(Js0 < 0.0))
 
     print(f"Initial random deformation: seed={args.seed}, amplitude={args.amplitude}")
@@ -933,6 +957,7 @@ def main():
         args.kappa,
         args.Jc,
         args.Jmin,
+        fixed=fixed,
         use_numba=use_numba,
         verbose=True,
     )
@@ -950,11 +975,11 @@ def main():
         mesh_data=mesh_data,
         use_numba=use_numba,
     )
-    fixed = np.array([0, 1, 2 * anchor_right + 1], dtype=int)
     free = np.setdiff1d(np.arange(2 * len(X)), fixed)
 
     print("\nConverged:", ok)
     print(f"Mesh: {len(X)} vertices, {len(tris)} triangles")
+    print(f"Boundary condition: {args.boundary_condition} ({len(fixed)} fixed DOFs)")
     print("Final J range:", (Js.min(), Js.max()))
     print("Final energy:", E)
     print("Final free-gradient norm:", np.linalg.norm(g[free]))

@@ -66,5 +66,23 @@ foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baselin
     target_include_directories(${_cvfem_tgt} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
+set(_cvfem_solver_opts)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    list(APPEND _cvfem_solver_opts -O3 -DNDEBUG -funroll-loops)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+        list(APPEND _cvfem_solver_opts -mcpu=native -mtune=native)
+    else()
+        list(APPEND _cvfem_solver_opts -march=native -mtune=native)
+    endif()
+endif()
+
+add_executable(cvfem_hex8_ns_steady cvfem_hex8_ns_steady.cpp)
+target_link_libraries(cvfem_hex8_ns_steady
+    PRIVATE
+        SFEM::sfem
+        $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+target_compile_options(cvfem_hex8_ns_steady PRIVATE ${_cvfem_solver_opts})
+target_include_directories(cvfem_hex8_ns_steady PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

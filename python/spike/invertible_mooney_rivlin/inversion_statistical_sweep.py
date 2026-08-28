@@ -46,7 +46,7 @@ def run_elastic_homotopy_capped(
     X,
     triangles,
     x0,
-    anchor_right,
+    fixed,
     C10,
     C01,
     kappa,
@@ -57,7 +57,6 @@ def run_elastic_homotopy_capped(
     grad_tol,
     final_grad_tol,
 ):
-    fixed = np.array([0, 1, 2 * anchor_right + 1], dtype=int)
     x = x0.copy()
     stages = [0.50, 0.35, 0.25, max(Jc_target, 0.20), Jc_target]
     all_hist = []
@@ -113,6 +112,7 @@ def one_run(args):
         initial_state,
         fold_noise_amplitude,
         fold_inversion_amplitude,
+        boundary_condition,
         nx,
         ny,
         C10,
@@ -146,6 +146,7 @@ def one_run(args):
     m = load_module(ELASTIC_MODEL, "inv_mr_model")
     t0 = time.time()
     X, tris, anchor_right = m.structured_square_mesh(nx, ny)
+    fixed = m.corner_fixed_dofs(X, boundary_condition)
     if initial_state == "folded-random":
         x0, Js0, initial_deformation_scale = m.folded_random_initial_state(
             X,
@@ -156,6 +157,7 @@ def one_run(args):
             seed,
             max_inversion_ratio=max_inversion_ratio,
             max_inverted_fraction=max_inverted_fraction,
+            fixed_dofs=fixed,
             return_scale=True,
         )
     else:
@@ -166,6 +168,7 @@ def one_run(args):
             seed,
             max_inversion_ratio=max_inversion_ratio,
             max_inverted_fraction=max_inverted_fraction,
+            fixed_dofs=fixed,
             return_scale=True,
         )
     n_inv0 = int(np.count_nonzero(Js0 < 0.0))
@@ -196,7 +199,7 @@ def one_run(args):
                 X,
                 tris,
                 x0,
-                anchor_right,
+                fixed,
                 C10,
                 C01,
                 kappa,
@@ -247,7 +250,6 @@ def one_run(args):
             mesh_data=mesh_data,
             use_numba=use_numba,
         )
-        fixed = np.array([0, 1, 2 * anchor_right + 1], dtype=int)
         free = np.setdiff1d(np.arange(2 * len(X)), fixed)
         gnorm = float(np.linalg.norm(g[free]))
         xerr = float(np.linalg.norm(x - X))
@@ -273,6 +275,8 @@ def one_run(args):
             mode = "other"
         row = dict(
             solver=solver,
+            boundary_condition=boundary_condition,
+            fixed_dofs=len(fixed),
             seed=seed,
             amplitude=amp,
             initial_state=initial_state,
@@ -311,6 +315,8 @@ def one_run(args):
     except RunTimeout:
         row = dict(
             solver=solver,
+            boundary_condition=boundary_condition,
+            fixed_dofs=len(fixed),
             seed=seed,
             amplitude=amp,
             initial_state=initial_state,
@@ -349,6 +355,8 @@ def one_run(args):
     except Exception as exc:
         row = dict(
             solver=solver,
+            boundary_condition=boundary_condition,
+            fixed_dofs=len(fixed),
             seed=seed,
             amplitude=amp,
             initial_state=initial_state,
@@ -589,6 +597,11 @@ def main():
         choices=["random", "folded-random"],
         default="random",
     )
+    ap.add_argument(
+        "--boundary-condition",
+        choices=["minimal-rbm", "two-corners", "three-corners", "four-corners"],
+        default="two-corners",
+    )
     ap.add_argument("--fold-noise-amplitude", type=float, default=0.04)
     ap.add_argument(
         "--fold-inversion-amplitudes", type=float, nargs="+", default=[1.0]
@@ -667,6 +680,7 @@ def main():
             args.initial_state,
             args.fold_noise_amplitude,
             fold_inversion_amplitude,
+            args.boundary_condition,
             args.nx,
             args.ny,
             args.C10,

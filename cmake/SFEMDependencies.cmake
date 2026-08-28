@@ -6,6 +6,14 @@ set(SFEM_SMESH_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/smesh")
 # treat .cu sources as CUDA and smesh CUDA kernels (e.g. macrotet4 prolongation)
 # are never compiled into libsmesh.
 if(SFEM_ENABLE_CUDA)
+    if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
+        set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "CUDA host compiler")
+    endif()
+
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 90 CACHE STRING "CUDA architectures")
+    endif()
+
     enable_language(CUDA)
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
         set(CMAKE_CUDA_STANDARD 17)
