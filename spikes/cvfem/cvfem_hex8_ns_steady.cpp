@@ -1,7 +1,9 @@
 #include "sfem_BSR.hpp"
 #include "sfem_Operator.hpp"
 #include "sfem_base.hpp"
+#include "sfem_bcgs.hpp"
 #include "sfem_context.hpp"
+#include "sfem_openmp_blas.hpp"
 #include "smesh_buffer.hpp"
 #include "smesh_context.hpp"
 #include "smesh_env.hpp"
@@ -965,33 +967,6 @@ static void apply_block_jacobi(const std::vector<scalar_t> &inv_diag,
     }
 }
 
-static void bsr4_spmv(const BSR4 &b, const ptrdiff_t nnodes, const scalar_t *const x, scalar_t *const y) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::bsr4_spmv");
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < nnodes; ++row) {
-        scalar_t acc[4] = {0, 0, 0, 0};
-        for (smesh::count_t k = b.rowptr[row]; k < b.rowptr[row + 1]; ++k) {
-            const scalar_t *const blk = b.values->data() + (ptrdiff_t)k * 16;
-            const scalar_t *const xx  = x + (ptrdiff_t)b.colidx[k] * 4;
-            acc[0] += blk[0] * xx[0] + blk[1] * xx[1] + blk[2] * xx[2] + blk[3] * xx[3];
-            acc[1] += blk[4] * xx[0] + blk[5] * xx[1] + blk[6] * xx[2] + blk[7] * xx[3];
-            acc[2] += blk[8] * xx[0] + blk[9] * xx[1] + blk[10] * xx[2] + blk[11] * xx[3];
-            acc[3] += blk[12] * xx[0] + blk[13] * xx[1] + blk[14] * xx[2] + blk[15] * xx[3];
-        }
-        y[(ptrdiff_t)row * 4 + 0] = acc[0];
-        y[(ptrdiff_t)row * 4 + 1] = acc[1];
-        y[(ptrdiff_t)row * 4 + 2] = acc[2];
-        y[(ptrdiff_t)row * 4 + 3] = acc[3];
-    }
-}
-
-static scalar_t norm2(const scalar_t *const v, const ptrdiff_t n) {
-    scalar_t s = 0;
-#pragma omp parallel for reduction(+ : s) schedule(static)
-    for (ptrdiff_t i = 0; i < n; ++i) s += v[i] * v[i];
-    return std::sqrt(s);
-}
-
 static bool all_finite(const scalar_t *const v, const ptrdiff_t n) {
     for (ptrdiff_t i = 0; i < n; ++i) {
         if (!std::isfinite(v[i])) return false;
@@ -1005,12 +980,12 @@ static scalar_t max_abs(const scalar_t *const v, const ptrdiff_t n) {
     return m;
 }
 
-static void compare_hessian_apply(MeshData &d, BSR4 &bsr, const scalar_t rho, const scalar_t mu, const GeomKind geom,
-                                  const std::vector<uint8_t> &constrained, const scalar_t *const SFEM_RESTRICT v,
-                                  const ptrdiff_t ndof) {
+static void compare_hessian_apply(MeshData &d, sfem::Operator<scalar_t> &A_bsr, const scalar_t rho, const scalar_t mu,
+                                  const GeomKind geom, const std::vector<uint8_t> &constrained,
+                                  const scalar_t *const SFEM_RESTRICT v, const ptrdiff_t ndof) {
     std::vector<scalar_t> y_mf((size_t)ndof), y_asm((size_t)ndof);
     apply_jacobian_action(d, rho, mu, geom, constrained, v, y_mf.data());
-    bsr4_spmv(bsr, d.nnodes, v, y_asm.data());
+    A_bsr.apply(v, y_asm.data());
     scalar_t linf = 0, l2 = 0, nrm = 0, linf_u = 0, linf_p = 0;
     ptrdiff_t imax = 0;
     for (ptrdiff_t i = 0; i < ndof; ++i) {
@@ -1035,143 +1010,6 @@ static void compare_hessian_apply(MeshData &d, BSR4 &bsr, const scalar_t rho, co
                 (long)imax,
                 (long)(imax / 4),
                 (long)(imax & 3));
-}
-
-struct BicgstabWork {
-    std::vector<scalar_t> r0, r, p, v, h, s, t, y, z;
-    void ensure(const ptrdiff_t n) {
-        const size_t N = (size_t)n;
-        if (r0.size() == N) return;
-        r0.assign(N, 0);
-        r.assign(N, 0);
-        p.assign(N, 0);
-        v.assign(N, 0);
-        h.assign(N, 0);
-        s.assign(N, 0);
-        t.assign(N, 0);
-        y.assign(N, 0);
-        z.assign(N, 0);
-    }
-};
-
-static void vec_copy(const scalar_t *const SFEM_RESTRICT src, scalar_t *const SFEM_RESTRICT dest, const ptrdiff_t n) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < n; ++i) dest[i] = src[i];
-}
-
-static void vec_axpby(const scalar_t alpha, const scalar_t *const SFEM_RESTRICT x, const scalar_t beta,
-                      scalar_t *const SFEM_RESTRICT y, const ptrdiff_t n) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < n; ++i) y[i] = alpha * x[i] + beta * y[i];
-}
-
-static void vec_zaxpby(const scalar_t alpha, const scalar_t *const SFEM_RESTRICT x, const scalar_t beta,
-                       const scalar_t *const SFEM_RESTRICT y, scalar_t *const SFEM_RESTRICT z, const ptrdiff_t n) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < n; ++i) z[i] = alpha * x[i] + beta * y[i];
-}
-
-static scalar_t vec_dot(const scalar_t *const SFEM_RESTRICT l, const scalar_t *const SFEM_RESTRICT r, const ptrdiff_t n) {
-    scalar_t s = 0;
-#pragma omp parallel for reduction(+ : s) schedule(static)
-    for (ptrdiff_t i = 0; i < n; ++i) s += l[i] * r[i];
-    return s;
-}
-
-template <typename ApplyOp, typename ApplyPrec>
-static int bicgstab_rightprec(ApplyOp &&apply_op, const int have_prec, ApplyPrec &&apply_prec, const scalar_t *const b,
-                              scalar_t *const x, const ptrdiff_t n, BicgstabWork &w, const int max_it, const scalar_t rtol,
-                              const scalar_t atol, const int verbose, int &iterations) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::bicgstab");
-    w.ensure(n);
-    iterations = 0;
-
-    apply_op(x, w.r0.data());
-    vec_axpby(scalar_t(1), b, scalar_t(-1), w.r0.data(), n);
-
-    const scalar_t r0n2  = vec_dot(w.r0.data(), w.r0.data(), n);
-    const scalar_t r_norm0 = std::sqrt(std::max(r0n2, scalar_t(0)));
-    if (!std::isfinite(r_norm0)) return SFEM_FAILURE;
-    if (r_norm0 < atol) return SFEM_SUCCESS;
-
-    vec_copy(w.r0.data(), w.r.data(), n);
-    vec_copy(w.r0.data(), w.p.data(), n);
-    scalar_t rho = r0n2;
-    int      info = SFEM_FAILURE;
-
-    for (iterations = 0; iterations < max_it; ++iterations) {
-        if (have_prec)
-            apply_prec(w.p.data(), w.y.data());
-        else
-            vec_copy(w.p.data(), w.y.data(), n);
-
-        apply_op(w.y.data(), w.v.data());
-        const scalar_t ptv = vec_dot(w.r0.data(), w.v.data(), n);
-        if (ptv == scalar_t(0) || !std::isfinite(ptv)) break;
-
-        const scalar_t alpha = rho / ptv;
-        if (!std::isfinite(alpha)) break;
-
-        vec_zaxpby(scalar_t(1), x, alpha, w.y.data(), w.h.data(), n);
-        vec_zaxpby(scalar_t(1), w.r.data(), -alpha, w.v.data(), w.s.data(), n);
-
-        const scalar_t s_norm = std::sqrt(std::max(vec_dot(w.s.data(), w.s.data(), n), scalar_t(0)));
-        if (!std::isfinite(s_norm)) break;
-        if (s_norm < atol || (r_norm0 > 0 && s_norm / r_norm0 < rtol)) {
-            vec_copy(w.h.data(), x, n);
-            info = SFEM_SUCCESS;
-            break;
-        }
-
-        if (have_prec)
-            apply_prec(w.s.data(), w.z.data());
-        else
-            vec_copy(w.s.data(), w.z.data(), n);
-
-        apply_op(w.z.data(), w.t.data());
-        const scalar_t tts = vec_dot(w.t.data(), w.s.data(), n);
-        const scalar_t ttt = vec_dot(w.t.data(), w.t.data(), n);
-        if (ttt == scalar_t(0) || !std::isfinite(ttt) || !std::isfinite(tts)) {
-            vec_copy(w.h.data(), x, n);
-            break;
-        }
-
-        const scalar_t omega = tts / ttt;
-        if (!std::isfinite(omega)) {
-            vec_copy(w.h.data(), x, n);
-            break;
-        }
-
-        vec_zaxpby(scalar_t(1), w.h.data(), omega, w.z.data(), x, n);
-        vec_zaxpby(scalar_t(1), w.s.data(), -omega, w.t.data(), w.r.data(), n);
-
-        const scalar_t r_norm = std::sqrt(std::max(vec_dot(w.r.data(), w.r.data(), n), scalar_t(0)));
-        if (!std::isfinite(r_norm) || !all_finite(x, n)) {
-            vec_copy(w.h.data(), x, n);
-            break;
-        }
-        if (verbose && (iterations % 100 == 0 || r_norm < atol || (r_norm0 > 0 && r_norm / r_norm0 < rtol))) {
-            std::printf("  bicgstab %d  abs: %.6e  rel: %.6e\n",
-                        iterations,
-                        r_norm,
-                        (r_norm0 > 0) ? r_norm / r_norm0 : r_norm);
-        }
-        if (r_norm < atol || (r_norm0 > 0 && r_norm / r_norm0 < rtol)) {
-            info = SFEM_SUCCESS;
-            break;
-        }
-
-        const scalar_t rho_new = vec_dot(w.r0.data(), w.r.data(), n);
-        if (rho == scalar_t(0) || omega == scalar_t(0) || !std::isfinite(rho_new)) break;
-        const scalar_t beta = (rho_new / rho) * (alpha / omega);
-        if (!std::isfinite(beta)) break;
-        rho = rho_new;
-        vec_axpby(scalar_t(1), w.r.data(), beta, w.p.data(), n);
-        vec_axpby(-omega * beta, w.v.data(), scalar_t(1), w.p.data(), n);
-    }
-
-    if (info != SFEM_SUCCESS && !all_finite(x, n) && all_finite(w.h.data(), n)) vec_copy(w.h.data(), x, n);
-    return info;
 }
 
 static bool newton_step_converged(const scalar_t rn, const scalar_t r0, const scalar_t atol, const scalar_t rtol) {
@@ -1493,7 +1331,6 @@ int main(int argc, char **argv) {
 
     const ptrdiff_t       ndof = d.nnodes * N_FIELDS;
     std::vector<scalar_t> x((size_t)ndof), r((size_t)ndof), dx((size_t)ndof), rhs((size_t)ndof);
-    BicgstabWork          kwork;
     std::vector<scalar_t> inv_diag;
     pack_fields(d, x.data());
 
@@ -1513,17 +1350,42 @@ int main(int argc, char **argv) {
     std::printf("init: %s\n", init_name.c_str());
     std::printf("hessian: %s\n", matrix_free ? "matrix-free J(u)v" : "assembled BSR");
 
+    auto blas = sfem::make_openmp_blas<scalar_t>();
+
     scalar_t rho_lin = rho;
-    auto     A       = sfem::make_op<scalar_t>(
-            ndof,
-            ndof,
-            [&](const scalar_t *const xx, scalar_t *const yy) {
-                if (matrix_free)
+    std::shared_ptr<sfem::Operator<scalar_t>> A_bsr;
+    if (assemble_jac) {
+        A_bsr = sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, scalar_t>(
+                d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(), bsr.values, scalar_t(0));
+    }
+
+    std::shared_ptr<sfem::Operator<scalar_t>> A;
+    if (matrix_free) {
+        A = sfem::make_op<scalar_t>(
+                ndof,
+                ndof,
+                [&](const scalar_t *const xx, scalar_t *const yy) {
                     apply_jacobian_action(d, rho_lin, mu, geom, constrained, xx, yy);
-                else
-                    bsr4_spmv(bsr, d.nnodes, xx, yy);
-            },
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    } else {
+        A = A_bsr;
+    }
+
+    auto M = sfem::make_op<scalar_t>(
+            ndof,
+            ndof,
+            [&](const scalar_t *const xx, scalar_t *const yy) { apply_block_jacobi(inv_diag, d.nnodes, xx, yy); },
             sfem::EXECUTION_SPACE_HOST);
+
+    auto solver = sfem::h_bcgs<scalar_t>();
+    solver->set_n_dofs(ndof);
+    solver->set_op(A);
+    solver->set_max_it(lin_max_it);
+    solver->set_rtol(lin_rtol);
+    solver->set_atol(lin_atol);
+    solver->verbose = verbose != 0;
+    if (use_prec) solver->set_preconditioner_op(M);
 
     int            newton_it = 0;
     int            converged = 0;
@@ -1560,7 +1422,7 @@ int main(int argc, char **argv) {
                 for (ptrdiff_t i = 0; i < d.nnodes; ++i) s += r[(size_t)i * 4 + 3] * r[(size_t)i * 4 + 3];
                 return std::sqrt(s);
             }();
-            const scalar_t rn = all_finite(r.data(), ndof) ? norm2(r.data(), ndof) : scalar_t(-1);
+            const scalar_t rn = all_finite(r.data(), ndof) ? blas->norm2(ndof, r.data()) : scalar_t(-1);
             if (r0 == scalar_t(0) && rn > 0) r0 = rn;
             const scalar_t rrel = (r0 > 0 && rn >= 0) ? rn / r0 : rn;
             std::printf("newton %d  ||R||: %.6e  rel: %.6e  ||Ru||: %.6e  ||Rp||: %.6e\n", newton_it, rn, rrel, ru, rp);
@@ -1579,14 +1441,9 @@ int main(int argc, char **argv) {
                 apply_dirichlet_bsr(bsr, constrained, d.nnodes);
                 if (use_prec) build_block_jacobi(bsr, constrained, d.nnodes, inv_diag);
                 if (check_jv && matrix_free && newton_it == 0 && stage == 0) {
-                    compare_hessian_apply(d, bsr, rho_use, mu, geom, constrained, r.data(), ndof);
+                    compare_hessian_apply(d, *A_bsr, rho_use, mu, geom, constrained, r.data(), ndof);
                 }
             }
-
-            auto apply_A = [&](const scalar_t *const xx, scalar_t *const yy) { A->apply(xx, yy); };
-            auto apply_M = [&](const scalar_t *const xx, scalar_t *const yy) {
-                apply_block_jacobi(inv_diag, d.nnodes, xx, yy);
-            };
 
 #pragma omp parallel for schedule(static)
             for (ptrdiff_t i = 0; i < ndof; ++i) {
@@ -1594,19 +1451,8 @@ int main(int argc, char **argv) {
                 dx[i]  = scalar_t(0);
             }
 
-            int lin_it = 0;
-            int lin_ok = bicgstab_rightprec(apply_A,
-                                            use_prec,
-                                            apply_M,
-                                            rhs.data(),
-                                            dx.data(),
-                                            ndof,
-                                            kwork,
-                                            lin_max_it,
-                                            lin_rtol,
-                                            lin_atol,
-                                            verbose,
-                                            lin_it);
+            const int lin_ok = solver->apply(rhs.data(), dx.data());
+            const int lin_it = solver->iterations();
             apply_dirichlet_residual(constrained, dx.data(), ndof);
             const int      dx_ok = all_finite(dx.data(), ndof);
             const scalar_t dxn   = dx_ok ? max_abs(dx.data(), ndof) : scalar_t(-1);
