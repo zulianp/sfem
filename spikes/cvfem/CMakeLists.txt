@@ -82,7 +82,10 @@ target_link_libraries(cvfem_hex8_ns_steady
         SFEM::sfem
         $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
 target_compile_options(cvfem_hex8_ns_steady PRIVATE ${_cvfem_solver_opts})
-target_include_directories(cvfem_hex8_ns_steady PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(cvfem_hex8_ns_steady PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
 
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
