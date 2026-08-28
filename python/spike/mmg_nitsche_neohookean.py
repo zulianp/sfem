@@ -6,9 +6,9 @@ same nonlinear multigrid skeleton and jump-free coarse active-space filter,
 but replaces the small-strain elastic residual/tangent and Nitsche stress
 diagnostic with a compressible Neo-Hookean plane-strain model.
 
-The hyperelastic tangent is assembled by local element finite differences.
-That is deliberate for this spike: it keeps the constitutive experiment compact
-and easy to audit before moving the kernel to generated or matrix-free code.
+The hyperelastic tangent can be assembled by a closed-form TRI3 tangent or by
+local finite differences for audit runs before moving the kernel to generated
+or matrix-free code.
 """
 
 from __future__ import annotations
@@ -206,16 +206,18 @@ def neo_normal_penalty_modulus(px, py, u_elem, mu, lam, nx, ny, fd_eps):
     except FloatingPointError:
         sp = sigma_nn(F + eps * dF)
         kn = (sp - s0) / eps
-    if not np.isfinite(kn):
+    if not np.isfinite(kn) or kn <= 0.0:
         return float(mu)
-    return float(max(abs(kn), mu))
+    return float(max(kn, mu))
 
 
 def contact_penalty_gamma(length, px, py, u_elem, mu, lam, gamma0, nx, ny, fd_eps, scaling):
     if scaling == "normal-tangent":
         modulus = neo_normal_penalty_modulus(px, py, u_elem, mu, lam, nx, ny, fd_eps)
-    else:
+    elif scaling == "shear":
         modulus = mu
+    else:
+        raise ValueError(f"unknown contact penalty scaling '{scaling}'")
     return gamma0 * modulus / length
 
 
@@ -480,6 +482,7 @@ def build_level(ps, args):
     level.fd_eps = float(args.fd_eps)
     level.material_tangent = getattr(args, "material_tangent", "analytic")
     level.material_linearization = getattr(args, "material_linearization", "every-call")
+    level.contact_penalty_scaling = getattr(args, "contact_penalty_scaling", "shear")
     level.cached_K_elastic = None
 
     def refresh_material_tangent(u_vec):
@@ -519,7 +522,7 @@ def build_level(ps, args):
                 level.edges_o, ps, level.mesh, level.mu_b, level.lam_b,
                 args.gamma0, level.theta_b, False, args.mu_f, g_contact, coo, level.radius,
                 0, new_active, False, None, None, True, level.include_sigma, forced_active,
-                None, None, frozen_b, level.fd_eps,
+                None, None, frozen_b, level.fd_eps, level.contact_penalty_scaling,
             )
         if level.theta_o > 0:
             n_qp += neo_surface_contrib(
@@ -527,7 +530,7 @@ def build_level(ps, args):
                 level.edges_b, ps, level.mesh, level.mu_o, level.lam_o,
                 args.gamma0, level.theta_o, False, args.mu_f, g_contact, coo, level.radius,
                 1, new_active, True, None, None, True, level.include_sigma, forced_active,
-                None, None, frozen_o, level.fd_eps,
+                None, None, frozen_o, level.fd_eps, level.contact_penalty_scaling,
             )
         if coo:
             ii, jj, vv = zip(*coo)
@@ -587,12 +590,12 @@ def pack_result(fine, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist=Non
     tr_x, tr_g, tr_sn, tr_pn, tr_on, tr_xi, tr_w = contact_trace_neo(
         X, Y, u, fine.edges_b, fine.elems_b, fine.bid_b, fine.edges_o, fine.ps, fine.mesh,
         fine.mu_b, fine.lam_b, args.gamma0, fine.theta_b if fine.theta_b > 0 else 1.0,
-        fine.radius, fine.include_sigma, False, 0.0, fine.fd_eps,
+        fine.radius, fine.include_sigma, False, 0.0, fine.fd_eps, fine.contact_penalty_scaling,
     )
     tr_x_o, tr_g_o, tr_sn_o, tr_pn_o, tr_on_o, _, tr_w_o = contact_trace_neo(
         X, Y, u, fine.edges_o, fine.elems_o, fine.bid_o, fine.edges_b, fine.ps, fine.mesh,
         fine.mu_o, fine.lam_o, args.gamma0, fine.theta_o if fine.theta_o > 0 else 1.0,
-        fine.radius, fine.include_sigma, True, 0.0, fine.fd_eps,
+        fine.radius, fine.include_sigma, True, 0.0, fine.fd_eps, fine.contact_penalty_scaling,
     )
     th = fine.theta_b if fine.theta_b > 0.0 else 1.0
     p_applied = np.where(tr_on, np.maximum(-tr_pn / th, 0.0), 0.0)
@@ -641,6 +644,8 @@ def pack_result(fine, args, u, r_hist, n_active_hist, n_qp_hist, vcycle_hist=Non
         "theta_o": float(fine.theta_o),
         "indent": float(args.indent),
         "min_J": float(min_J),
+        "gamma0": float(args.gamma0),
+        "contact_penalty_scaling": str(fine.contact_penalty_scaling),
     }
 
 
@@ -933,6 +938,15 @@ def parse_args(argv=None):
     p.add_argument("--E-obstacle", type=float, default=1.0)
     p.add_argument("--nu", type=float, default=0.3)
     p.add_argument("--gamma0", type=float, default=50.0)
+    p.add_argument(
+        "--contact-penalty-scaling",
+        choices=("shear", "normal-tangent"),
+        default="shear",
+        help=(
+            "Scale Nitsche gamma with mu/h or with a local finite-deformation "
+            "normal tangent modulus divided by h."
+        ),
+    )
     p.add_argument("--fd-eps", type=float, default=1e-7)
     p.add_argument(
         "--material-tangent",
