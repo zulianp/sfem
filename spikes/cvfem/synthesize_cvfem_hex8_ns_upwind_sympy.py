@@ -195,8 +195,7 @@ def input_locals(include_pressure: bool) -> str:
 
 
 def geom_locals() -> str:
-    lines = [f"    const scalar_t cof{i} = geom.cof[{i}];" for i in range(9)]
-    lines.append("    const scalar_t det = geom.det;")
+    lines = [f"    const scalar_t cof{i} = adj[{i}];" for i in range(9)]
     return "\n".join(lines)
 
 
@@ -313,7 +312,7 @@ def generate() -> str:
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual(const scalar_t rho,
                                                             const scalar_t mu,
-                                                            const Hex8Geom &geom,
+                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                             const scalar_t *const SFEM_RESTRICT ux,
                                                             const scalar_t *const SFEM_RESTRICT uy,
                                                             const scalar_t *const SFEM_RESTRICT uz,
@@ -328,7 +327,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual(const scalar_t rho,
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
                                                                           const scalar_t mu,
-                                                                          const Hex8Geom &geom,
+                                                                          const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                           const scalar_t *const SFEM_RESTRICT ux,
                                                                           const scalar_t *const SFEM_RESTRICT uy,
                                                                           const scalar_t *const SFEM_RESTRICT uz,
@@ -342,7 +341,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const 
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(const scalar_t rho,
                                                                                     const scalar_t mu,
-                                                                                    const Hex8Geom &geom,
+                                                                                    const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                     const scalar_t *const SFEM_RESTRICT ux,
                                                                                     const scalar_t *const SFEM_RESTRICT uy,
                                                                                     const scalar_t *const SFEM_RESTRICT uz,
@@ -356,7 +355,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockw
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(const scalar_t rho,
                                                                                   const scalar_t mu,
-                                                                                  const Hex8Geom &geom,
+                                                                                  const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                   const scalar_t *const SFEM_RESTRICT ux,
                                                                                   const scalar_t *const SFEM_RESTRICT uy,
                                                                                   const scalar_t *const SFEM_RESTRICT uz,
@@ -370,7 +369,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwis
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise(const scalar_t rho,
                                                                                    const scalar_t mu,
-                                                                                   const Hex8Geom &geom,
+                                                                                   const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                    const scalar_t *const SFEM_RESTRICT ux,
                                                                                    const scalar_t *const SFEM_RESTRICT uy,
                                                                                    const scalar_t *const SFEM_RESTRICT uz,
@@ -384,7 +383,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewi
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(const scalar_t rho,
                                                                             const scalar_t mu,
-                                                                            const Hex8Geom &geom,
+                                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                             const scalar_t *const SFEM_RESTRICT ux,
                                                                             const scalar_t *const SFEM_RESTRICT uy,
                                                                             const scalar_t *const SFEM_RESTRICT uz,
@@ -398,7 +397,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(cons
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_blockwise(const scalar_t rho,
                                                                                       const scalar_t mu,
-                                                                                      const Hex8Geom &geom,
+                                                                                      const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                       const scalar_t *const SFEM_RESTRICT ux,
                                                                                       const scalar_t *const SFEM_RESTRICT uy,
                                                                                       const scalar_t *const SFEM_RESTRICT uz,
@@ -412,7 +411,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_bloc
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(const scalar_t rho,
                                                                                     const scalar_t mu,
-                                                                                    const Hex8Geom &geom,
+                                                                                    const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                     const scalar_t *const SFEM_RESTRICT ux,
                                                                                     const scalar_t *const SFEM_RESTRICT uy,
                                                                                     const scalar_t *const SFEM_RESTRICT uz,
@@ -426,7 +425,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_roww
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise(const scalar_t rho,
                                                                                      const scalar_t mu,
-                                                                                     const Hex8Geom &geom,
+                                                                                     const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                      const scalar_t *const SFEM_RESTRICT ux,
                                                                                      const scalar_t *const SFEM_RESTRICT uy,
                                                                                      const scalar_t *const SFEM_RESTRICT uz,

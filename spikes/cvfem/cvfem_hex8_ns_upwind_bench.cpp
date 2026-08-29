@@ -102,7 +102,8 @@ struct MeshData {
 
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> rx, ry, rz, rc;
-    std::vector<Hex8Geom> geom;
+    std::vector<scalar_t> jacobian_adjugate[9];
+    std::vector<scalar_t> jacobian_determinant;
 };
 
 struct BSR4 {
@@ -200,43 +201,30 @@ static void reset_residual(MeshData &d) {
 }
 
 static void precompute_affine_geometry(MeshData &d) {
-    d.geom.resize((size_t)d.nelements);
-
-    const auto *const    x  = d.points[0];
-    const auto *const    y  = d.points[1];
-    const auto *const    z  = d.points[2];
-    smesh::idx_t **const ev = d.elems;
+    for (int c = 0; c < 9; ++c) d.jacobian_adjugate[c].resize((size_t)d.nelements);
+    d.jacobian_determinant.resize((size_t)d.nelements);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        const smesh::idx_t i0 = ev[0][e];
-        const smesh::idx_t i1 = ev[1][e];
-        const smesh::idx_t i3 = ev[3][e];
-        const smesh::idx_t i4 = ev[4][e];
-
-        const scalar_t jx0 = scalar_t(x[i1] - x[i0]);
-        const scalar_t jx1 = scalar_t(y[i1] - y[i0]);
-        const scalar_t jx2 = scalar_t(z[i1] - z[i0]);
-        const scalar_t jy0 = scalar_t(x[i3] - x[i0]);
-        const scalar_t jy1 = scalar_t(y[i3] - y[i0]);
-        const scalar_t jy2 = scalar_t(z[i3] - z[i0]);
-        const scalar_t jz0 = scalar_t(x[i4] - x[i0]);
-        const scalar_t jz1 = scalar_t(y[i4] - y[i0]);
-        const scalar_t jz2 = scalar_t(z[i4] - z[i0]);
-
-        Hex8Geom g;
-        g.cof[0] = jy1 * jz2 - jy2 * jz1;
-        g.cof[1] = jy2 * jz0 - jy0 * jz2;
-        g.cof[2] = jy0 * jz1 - jy1 * jz0;
-        g.cof[3] = jz1 * jx2 - jz2 * jx1;
-        g.cof[4] = jz2 * jx0 - jz0 * jx2;
-        g.cof[5] = jz0 * jx1 - jz1 * jx0;
-        g.cof[6] = jx1 * jy2 - jx2 * jy1;
-        g.cof[7] = jx2 * jy0 - jx0 * jy2;
-        g.cof[8] = jx0 * jy1 - jx1 * jy0;
-        g.det    = jx0 * g.cof[0] + jx1 * g.cof[1] + jx2 * g.cof[2];
-        d.geom[(size_t)e] = g;
+        scalar_t x[8], y[8], z[8], adj[9], det;
+        const auto *const px = d.points[0];
+        const auto *const py = d.points[1];
+        const auto *const pz = d.points[2];
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            x[a]                 = scalar_t(px[g]);
+            y[a]                 = scalar_t(py[g]);
+            z[a]                 = scalar_t(pz[g]);
+        }
+        cvfem_hex8_affine_adj(x, y, z, adj, &det);
+        for (int c = 0; c < 9; ++c) d.jacobian_adjugate[c][(size_t)e] = adj[c];
+        d.jacobian_determinant[(size_t)e] = det;
     }
+}
+
+static SFEM_INLINE void load_hex8_adj(const MeshData &d, const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {
+    for (int c = 0; c < 9; ++c) adj[c] = d.jacobian_adjugate[c][(size_t)e];
+    *det = d.jacobian_determinant[(size_t)e];
 }
 
 static BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
@@ -484,9 +472,48 @@ static SFEM_INLINE void gather_element_coords(const MeshData               &d,
     }
 }
 
+static SFEM_INLINE void gather_hex8_adj_soa(const MeshData               &d,
+                                            const ptrdiff_t               begin,
+                                            const int                     nlanes,
+                                            scalar_t *const SFEM_RESTRICT cof0,
+                                            scalar_t *const SFEM_RESTRICT cof1,
+                                            scalar_t *const SFEM_RESTRICT cof2,
+                                            scalar_t *const SFEM_RESTRICT cof3,
+                                            scalar_t *const SFEM_RESTRICT cof4,
+                                            scalar_t *const SFEM_RESTRICT cof5,
+                                            scalar_t *const SFEM_RESTRICT cof6,
+                                            scalar_t *const SFEM_RESTRICT cof7,
+                                            scalar_t *const SFEM_RESTRICT cof8,
+                                            scalar_t *const SFEM_RESTRICT det) {
+    const size_t n = (size_t)nlanes * sizeof(scalar_t);
+    std::memcpy(cof0, d.jacobian_adjugate[0].data() + begin, n);
+    std::memcpy(cof1, d.jacobian_adjugate[1].data() + begin, n);
+    std::memcpy(cof2, d.jacobian_adjugate[2].data() + begin, n);
+    std::memcpy(cof3, d.jacobian_adjugate[3].data() + begin, n);
+    std::memcpy(cof4, d.jacobian_adjugate[4].data() + begin, n);
+    std::memcpy(cof5, d.jacobian_adjugate[5].data() + begin, n);
+    std::memcpy(cof6, d.jacobian_adjugate[6].data() + begin, n);
+    std::memcpy(cof7, d.jacobian_adjugate[7].data() + begin, n);
+    std::memcpy(cof8, d.jacobian_adjugate[8].data() + begin, n);
+    std::memcpy(det, d.jacobian_determinant.data() + begin, n);
+    if (nlanes < CVFEM_HEX8_VEC_SIZE) {
+        const size_t pad = (size_t)(CVFEM_HEX8_VEC_SIZE - nlanes) * sizeof(scalar_t);
+        std::memset(cof0 + nlanes, 0, pad);
+        std::memset(cof1 + nlanes, 0, pad);
+        std::memset(cof2 + nlanes, 0, pad);
+        std::memset(cof3 + nlanes, 0, pad);
+        std::memset(cof4 + nlanes, 0, pad);
+        std::memset(cof5 + nlanes, 0, pad);
+        std::memset(cof6 + nlanes, 0, pad);
+        std::memset(cof7 + nlanes, 0, pad);
+        std::memset(cof8 + nlanes, 0, pad);
+        for (int lane = nlanes; lane < CVFEM_HEX8_VEC_SIZE; ++lane) det[lane] = scalar_t(1);
+    }
+}
+
 static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
                                                    const scalar_t *const SFEM_RESTRICT pack_u,
-                                                   const Hex8Geom *const SFEM_RESTRICT geom,
+                                                   const MeshData                     &d,
                                                    const ptrdiff_t                     begin,
                                                    const int                           nlanes,
                                                    Hex8InputPack                      &in,
@@ -500,20 +527,10 @@ static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTR
                                                    scalar_t *const SFEM_RESTRICT       cof7,
                                                    scalar_t *const SFEM_RESTRICT       cof8,
                                                    scalar_t *const SFEM_RESTRICT       det) {
+    gather_hex8_adj_soa(d, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
-            const Hex8Geom &g = geom[e];
-            cof0[lane]        = g.cof[0];
-            cof1[lane]        = g.cof[1];
-            cof2[lane]        = g.cof[2];
-            cof3[lane]        = g.cof[3];
-            cof4[lane]        = g.cof[4];
-            cof5[lane]        = g.cof[5];
-            cof6[lane]        = g.cof[6];
-            cof7[lane]        = g.cof[7];
-            cof8[lane]        = g.cof[8];
-            det[lane]         = g.det;
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                 const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)elems[a][e] * N_FIELDS;
                 in.ux[a][lane]                        = u[0];
@@ -522,10 +539,6 @@ static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTR
                 in.p[a][lane]                         = u[3];
             }
         } else {
-            cof0[lane] = cof1[lane] = cof2[lane] = scalar_t(0);
-            cof3[lane] = cof4[lane] = cof5[lane] = scalar_t(0);
-            cof6[lane] = cof7[lane] = cof8[lane] = scalar_t(0);
-            det[lane]                            = scalar_t(1);
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                 in.ux[a][lane] = in.uy[a][lane] = in.uz[a][lane] = in.p[a][lane] = scalar_t(0);
             }
@@ -553,7 +566,7 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
 static SFEM_INLINE void gather_hex8_action_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
                                                           const scalar_t *const SFEM_RESTRICT pack_u,
                                                           const scalar_t *const SFEM_RESTRICT pack_dir,
-                                                          const Hex8Geom *const SFEM_RESTRICT geom,
+                                                          const MeshData                     &d,
                                                           const ptrdiff_t                     begin,
                                                           const int                           nlanes,
                                                           Hex8InputPack                      &u,
@@ -568,7 +581,7 @@ static SFEM_INLINE void gather_hex8_action_simd_from_pack(pack_idx_t **const SFE
                                                           scalar_t *const SFEM_RESTRICT       cof7,
                                                           scalar_t *const SFEM_RESTRICT       cof8,
                                                           scalar_t *const SFEM_RESTRICT       det) {
-    gather_hex8_simd_from_pack(elems, pack_u, geom, begin, nlanes, u, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+    gather_hex8_simd_from_pack(elems, pack_u, d, begin, nlanes, u, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
@@ -725,7 +738,9 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
             vz[a]                            = dv[2];
             q[a]                             = dv[3];
         }
-        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, d.geom[(size_t)e], ux, uy, uz, vx, vy, vz, q, r);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
@@ -774,7 +789,9 @@ static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho,
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
         gather_element_fields(d, e, ux, uy, uz, p);
-        cvfem_hex8_ns_upwind_residual(rho, mu, d.geom[(size_t)e], ux, uy, uz, p, r);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_residual(rho, mu, adj, det, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -793,7 +810,9 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
         gather_element_fields(d, e, ux, uy, uz, p);
-        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, d.geom[(size_t)e], ux, uy, uz, p, r);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -832,7 +851,9 @@ static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
         gather_element_fields(d, e, ux, uy, uz, p);
-        cvfem_hex8_ns_upwind_sympy_residual(rho, mu, d.geom[(size_t)e], ux, uy, uz, p, r);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -853,7 +874,9 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, cons
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
         gather_element_fields(d, e, ux, uy, uz, p);
-        cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, d.geom[(size_t)e], ux, uy, uz, p, ke);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, adj, det, ux, uy, uz, p, ke);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t row = d.elems[a][e];
@@ -882,7 +905,9 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, c
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
-        cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, d.geom[(size_t)e], ux, uy, uz, slots + (size_t)e * 64, values);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
 
@@ -895,8 +920,10 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(MeshData &d, BSR4
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(
-                rho, mu, d.geom[(size_t)e], ux, uy, uz, slots + (size_t)e * 64, values);
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
 
@@ -909,8 +936,10 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(MeshData &d, BSR4 &
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(
-                rho, mu, d.geom[(size_t)e], ux, uy, uz, slots + (size_t)e * 64, values);
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
 
@@ -923,8 +952,10 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(MeshData &d, BSR4 
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise(
-                rho, mu, d.geom[(size_t)e], ux, uy, uz, slots + (size_t)e * 64, values);
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
 
@@ -937,8 +968,10 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots<true>(
-                rho, mu, d.geom[(size_t)e], ux, uy, uz, slots + (size_t)e * 64, values);
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
         (void)p;
     }
 }
@@ -1039,7 +1072,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                     const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                     gather_hex8_simd_from_pack(p.elems,
                                                pack_u,
-                                               d.geom.data(),
+                                               d,
                                                begin,
                                                nlanes,
                                                in,
@@ -1068,10 +1101,12 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                         uz_e[a]                              = u[2];
                         p_e[a]                               = u[3];
                     }
+                    scalar_t adj[9], det;
+                    load_hex8_adj(d, e, adj, &det);
                     if (sympy)
-                        cvfem_hex8_ns_upwind_sympy_residual(rho, mu, d.geom[(size_t)e], ux_e, uy_e, uz_e, p_e, r);
+                        cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r);
                     else
-                        cvfem_hex8_ns_upwind_residual(rho, mu, d.geom[(size_t)e], ux_e, uy_e, uz_e, p_e, r);
+                        cvfem_hex8_ns_upwind_residual(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r);
 
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         scalar_t *const SFEM_RESTRICT out = pack_out + (ptrdiff_t)p.elems[a][e] * N_FIELDS;
@@ -1203,6 +1238,8 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                 }
 
                 const int *const SFEM_RESTRICT slots = p.local_element_slot.data() + (size_t)e * 64;
+                scalar_t adj[9], det;
+                if (geom_kind != GeomKind::Isoparam) load_hex8_adj(d, e, adj, &det);
                 if (geom_kind == GeomKind::Isoparam) {
                     scalar_t x[8], y[8], z[8];
                     gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, x, y, z);
@@ -1216,21 +1253,21 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                     }
                 } else if (kernel_kind == KernelKind::Sumfact) {
                     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                            rho, mu, d.geom[(size_t)e], ux_e, uy_e, uz_e, slots, local_vals);
+                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
                 } else if (kernel_kind == KernelKind::Sympy) {
-                    cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(rho, mu, d.geom[(size_t)e], ux_e, uy_e, uz_e, slots, local_vals);
+                    cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
                 } else if (kernel_kind == KernelKind::SympyBlock) {
                     cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_blockwise(
-                            rho, mu, d.geom[(size_t)e], ux_e, uy_e, uz_e, slots, local_vals);
+                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
                 } else if (kernel_kind == KernelKind::SympyRow) {
                     cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(
-                            rho, mu, d.geom[(size_t)e], ux_e, uy_e, uz_e, slots, local_vals);
+                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
                 } else if (kernel_kind == KernelKind::SympyFace) {
                     cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise(
-                            rho, mu, d.geom[(size_t)e], ux_e, uy_e, uz_e, slots, local_vals);
+                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
                 } else {
                     scalar_t ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
-                    cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, d.geom[(size_t)e], ux_e, uy_e, uz_e, p_e, ke);
+                    cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, ke);
                     hex8_local_slots_to_bsr4(slots, ke, local_vals);
                 }
             }
@@ -1361,7 +1398,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                     gather_hex8_action_simd_from_pack(p.elems,
                                                       pack_u,
                                                       pack_dir,
-                                                      d.geom.data(),
+                                                      d,
                                                       begin,
                                                       nlanes,
                                                       u_pack,

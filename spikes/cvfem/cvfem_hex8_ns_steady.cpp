@@ -49,6 +49,8 @@ enum class GeomKind { Affine, Isoparam };
 enum class FlowCase { Poiseuille, Couette };
 enum class InitKind { Zero, Exact };
 
+struct PackedData;
+
 struct MeshData {
     std::shared_ptr<smesh::Mesh> mesh;
     ptrdiff_t                    nnodes{0};
@@ -62,9 +64,14 @@ struct MeshData {
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> rx, ry, rz, rc;
     std::vector<scalar_t> pgx, pgy, pgz;
-    std::vector<Hex8Geom> geom;
+    std::vector<scalar_t> jacobian_adjugate[9];
+    std::vector<scalar_t> jacobian_determinant;
+    PackedData           *packed{nullptr};
     scalar_t              rhie_chow_scale{1};
 };
+
+#include "cvfem_hex8_ns_packed.hpp"
+#include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 
 struct BSR4 {
     std::shared_ptr<smesh::Mesh::NodeToNodeGraph> graph;
@@ -106,7 +113,8 @@ static void usage(const char *argv0) {
                  "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default 0 = assembled BSR)\n"
                  "  SFEM_CHECK_JV        1: print |J_mf v - J_asm v| after first assembly\n"
                  "  SFEM_RHIE_CHOW       colocated mass-flux interpolation (default 1)\n"
-                 "  SFEM_RHIE_CHOW_SCALE D_f = scale * h^2 / (2 mu) (default 1)\n",
+                 "  SFEM_RHIE_CHOW_SCALE D_f = scale * h^2 / (2 mu) (default 1)\n"
+                 "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n",
                  argv0);
 }
 
@@ -164,47 +172,6 @@ static void reset_residual(MeshData &d) {
         d.ry[i] = scalar_t(0);
         d.rz[i] = scalar_t(0);
         d.rc[i] = scalar_t(0);
-    }
-}
-
-static void precompute_affine_geometry(MeshData &d) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::precompute_affine_geometry");
-    d.geom.resize((size_t)d.nelements);
-
-    const auto *const    x  = d.points[0];
-    const auto *const    y  = d.points[1];
-    const auto *const    z  = d.points[2];
-    smesh::idx_t **const ev = d.elems;
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        const smesh::idx_t i0 = ev[0][e];
-        const smesh::idx_t i1 = ev[1][e];
-        const smesh::idx_t i3 = ev[3][e];
-        const smesh::idx_t i4 = ev[4][e];
-
-        const scalar_t jx0 = scalar_t(x[i1] - x[i0]);
-        const scalar_t jx1 = scalar_t(y[i1] - y[i0]);
-        const scalar_t jx2 = scalar_t(z[i1] - z[i0]);
-        const scalar_t jy0 = scalar_t(x[i3] - x[i0]);
-        const scalar_t jy1 = scalar_t(y[i3] - y[i0]);
-        const scalar_t jy2 = scalar_t(z[i3] - z[i0]);
-        const scalar_t jz0 = scalar_t(x[i4] - x[i0]);
-        const scalar_t jz1 = scalar_t(y[i4] - y[i0]);
-        const scalar_t jz2 = scalar_t(z[i4] - z[i0]);
-
-        Hex8Geom g;
-        g.cof[0]          = jy1 * jz2 - jy2 * jz1;
-        g.cof[1]          = jy2 * jz0 - jy0 * jz2;
-        g.cof[2]          = jy0 * jz1 - jy1 * jz0;
-        g.cof[3]          = jz1 * jx2 - jz2 * jx1;
-        g.cof[4]          = jz2 * jx0 - jz0 * jx2;
-        g.cof[5]          = jz0 * jx1 - jz1 * jx0;
-        g.cof[6]          = jx1 * jy2 - jx2 * jy1;
-        g.cof[7]          = jx2 * jy0 - jx0 * jy2;
-        g.cof[8]          = jx0 * jy1 - jx1 * jy0;
-        g.det             = jx0 * g.cof[0] + jx1 * g.cof[1] + jx2 * g.cof[2];
-        d.geom[(size_t)e] = g;
     }
 }
 
@@ -294,11 +261,12 @@ static SFEM_INLINE void gather_element_coords(const MeshData               &d,
     }
 }
 
-static SFEM_INLINE void cvfem_hex8_grad_scalar(const Hex8Geom &g, const scalar_t *const SFEM_RESTRICT p, scalar_t &gx,
-                                               scalar_t &gy, scalar_t &gz) {
+static SFEM_INLINE void cvfem_hex8_grad_scalar(const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+                                               const scalar_t *const SFEM_RESTRICT p, scalar_t &gx, scalar_t &gy,
+                                               scalar_t &gz) {
     scalar_t dr, ds, dt;
     cvfem_hex8_face_diff(p, dr, ds, dt);
-    cvfem_hex8_pushforward(g, dr, ds, dt, gx, gy, gz);
+    cvfem_hex8_pushforward(adj, scalar_t(1) / det, dr, ds, dt, gx, gy, gz);
 }
 
 /* Nodal ∇p (volume-weighted element gradients). Element-local ∇p makes
@@ -320,9 +288,9 @@ static void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
             scalar_t x[8], y[8], z[8], dN[CVFEM_HEX8_N_NODES][3];
             gather_element_coords(d, e, x, y, z);
             cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
-            Hex8Geom gs;
-            cvfem_hex8_jac_at(x, y, z, dN, gs);
-            vol = std::fabs(gs.det);
+            scalar_t adj[9], det;
+            cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
+            vol = std::fabs(det);
             if (vol < scalar_t(1e-30)) continue;
             scalar_t dr = 0, ds = 0, dt = 0;
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -330,12 +298,13 @@ static void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
                 ds += p[a] * dN[a][1];
                 dt += p[a] * dN[a][2];
             }
-            cvfem_hex8_pushforward(gs, dr, ds, dt, gx, gy, gz);
+            cvfem_hex8_pushforward(adj, scalar_t(1) / det, dr, ds, dt, gx, gy, gz);
         } else {
-            const Hex8Geom &g = d.geom[(size_t)e];
-            vol               = std::fabs(g.det);
+            scalar_t adj[9], det;
+            cvfem_hex8_load_adj(d, e, adj, &det);
+            vol = std::fabs(det);
             if (vol < scalar_t(1e-30)) continue;
-            cvfem_hex8_grad_scalar(g, p, gx, gy, gz);
+            cvfem_hex8_grad_scalar(adj, det, p, gx, gy, gz);
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t id = d.elems[a][e];
@@ -438,7 +407,7 @@ static SFEM_INLINE void hex8_visc_jac_row(const scalar_t mu, const scalar_t ax, 
     }
 }
 
-static SFEM_INLINE void boundary_scs_add_residual(const scalar_t rho, const scalar_t mu, const int isoparam, const Hex8Geom &geom,
+static SFEM_INLINE void boundary_scs_add_residual(const scalar_t rho, const scalar_t mu, const int isoparam, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                   const scalar_t Lx, const scalar_t Ly, const scalar_t Lz,
                                                   const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
                                                   const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
@@ -447,9 +416,9 @@ static SFEM_INLINE void boundary_scs_add_residual(const scalar_t rho, const scal
     scalar_t grad_el[9];
     scalar_t A[3][3];
     if (!isoparam) {
-        if (std::fabs(geom.det) < scalar_t(1e-30)) return;
-        cvfem_hex8_grad_sumfact(geom, ux, uy, uz, grad_el);
-        cvfem_hex8_dir_areas(geom, A);
+        if (std::fabs(det) < scalar_t(1e-30)) return;
+        cvfem_hex8_grad_sumfact(adj, det, ux, uy, uz, grad_el);
+        cvfem_hex8_dir_areas(adj, A);
     }
 
     for (int f = 0; f < 6; ++f) {
@@ -462,14 +431,15 @@ static SFEM_INLINE void boundary_scs_add_residual(const scalar_t rho, const scal
             if (isoparam) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
                 cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
-                Hex8Geom gs;
-                cvfem_hex8_jac_at(x, y, z, dN, gs);
-                if (std::fabs(gs.det) < scalar_t(1e-30)) continue;
-                cvfem_hex8_area_dir(gs, axis, ax, ay, az);
+                scalar_t adj[9], det;
+                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
+                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
+                if (std::fabs(det) < scalar_t(1e-30)) continue;
+                cvfem_hex8_area_dir(adj, axis, ax, ay, az);
                 ax *= out;
                 ay *= out;
                 az *= out;
-                cvfem_hex8_grad_at(gs, dN, ux, uy, uz, grad);
+                cvfem_hex8_grad_at(adj, det, dN, ux, uy, uz, grad);
             } else {
                 ax = out * A[axis][0];
                 ay = out * A[axis][1];
@@ -489,7 +459,7 @@ static SFEM_INLINE void boundary_scs_add_residual(const scalar_t rho, const scal
 }
 
 template <bool Atomic>
-static SFEM_INLINE void boundary_scs_add_jacobian(const scalar_t rho, const scalar_t mu, const int isoparam, const Hex8Geom &geom,
+static SFEM_INLINE void boundary_scs_add_jacobian(const scalar_t rho, const scalar_t mu, const int isoparam, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                  const scalar_t Lx, const scalar_t Ly, const scalar_t Lz,
                                                  const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
                                                  const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
@@ -498,11 +468,11 @@ static SFEM_INLINE void boundary_scs_add_jacobian(const scalar_t rho, const scal
     scalar_t A[3][3];
     scalar_t w_el[CVFEM_HEX8_N_NODES][3];
     if (!isoparam) {
-        if (std::fabs(geom.det) < scalar_t(1e-30)) return;
-        cvfem_hex8_dir_areas(geom, A);
-        const scalar_t inv_det = scalar_t(1) / geom.det;
+        if (std::fabs(det) < scalar_t(1e-30)) return;
+        cvfem_hex8_dir_areas(adj, A);
+        const scalar_t inv_det = scalar_t(1) / det;
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            cvfem_hex8_pushforward(geom, inv_det, CVFEM_HEX8_DN_REF[a][0], CVFEM_HEX8_DN_REF[a][1], CVFEM_HEX8_DN_REF[a][2],
+            cvfem_hex8_pushforward(adj, inv_det, CVFEM_HEX8_DN_REF[a][0], CVFEM_HEX8_DN_REF[a][1], CVFEM_HEX8_DN_REF[a][2],
                                    w_el[a][0], w_el[a][1], w_el[a][2]);
         }
     }
@@ -518,16 +488,17 @@ static SFEM_INLINE void boundary_scs_add_jacobian(const scalar_t rho, const scal
             if (isoparam) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
                 cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
-                Hex8Geom gs;
-                cvfem_hex8_jac_at(x, y, z, dN, gs);
-                if (std::fabs(gs.det) < scalar_t(1e-30)) continue;
-                cvfem_hex8_area_dir(gs, axis, ax, ay, az);
+                scalar_t adj[9], det;
+                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
+                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
+                if (std::fabs(det) < scalar_t(1e-30)) continue;
+                cvfem_hex8_area_dir(adj, axis, ax, ay, az);
                 ax *= out;
                 ay *= out;
                 az *= out;
-                const scalar_t inv_det = scalar_t(1) / gs.det;
+                const scalar_t inv_det = scalar_t(1) / det;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    cvfem_hex8_pushforward(gs, inv_det, dN[a][0], dN[a][1], dN[a][2], w[a][0], w[a][1], w[a][2]);
+                    cvfem_hex8_pushforward(adj, inv_det, dN[a][0], dN[a][1], dN[a][2], w[a][0], w[a][1], w[a][2]);
                 }
             } else {
                 ax = out * A[axis][0];
@@ -565,7 +536,7 @@ static SFEM_INLINE void boundary_scs_add_jacobian(const scalar_t rho, const scal
 }
 
 static SFEM_INLINE void boundary_scs_add_jacobian_action(const scalar_t rho, const scalar_t mu, const int isoparam,
-                                                         const Hex8Geom &geom, const scalar_t Lx, const scalar_t Ly,
+                                                         const scalar_t *const SFEM_RESTRICT adj, const scalar_t det, const scalar_t Lx, const scalar_t Ly,
                                                          const scalar_t Lz, const scalar_t *const SFEM_RESTRICT x,
                                                          const scalar_t *const SFEM_RESTRICT y, const scalar_t *const SFEM_RESTRICT z,
                                                          const scalar_t *const SFEM_RESTRICT ux, const scalar_t *const SFEM_RESTRICT uy,
@@ -575,9 +546,9 @@ static SFEM_INLINE void boundary_scs_add_jacobian_action(const scalar_t rho, con
     scalar_t dgrad_el[9];
     scalar_t A[3][3];
     if (!isoparam) {
-        if (std::fabs(geom.det) < scalar_t(1e-30)) return;
-        cvfem_hex8_grad_sumfact(geom, vx, vy, vz, dgrad_el);
-        cvfem_hex8_dir_areas(geom, A);
+        if (std::fabs(det) < scalar_t(1e-30)) return;
+        cvfem_hex8_grad_sumfact(adj, det, vx, vy, vz, dgrad_el);
+        cvfem_hex8_dir_areas(adj, A);
     }
 
     for (int f = 0; f < 6; ++f) {
@@ -590,14 +561,15 @@ static SFEM_INLINE void boundary_scs_add_jacobian_action(const scalar_t rho, con
             if (isoparam) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
                 cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
-                Hex8Geom gs;
-                cvfem_hex8_jac_at(x, y, z, dN, gs);
-                if (std::fabs(gs.det) < scalar_t(1e-30)) continue;
-                cvfem_hex8_area_dir(gs, axis, ax, ay, az);
+                scalar_t adj[9], det;
+                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
+                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
+                if (std::fabs(det) < scalar_t(1e-30)) continue;
+                cvfem_hex8_area_dir(adj, axis, ax, ay, az);
                 ax *= out;
                 ay *= out;
                 az *= out;
-                cvfem_hex8_grad_at(gs, dN, vx, vy, vz, dgrad);
+                cvfem_hex8_grad_at(adj, det, dN, vx, vy, vz, dgrad);
             } else {
                 ax = out * A[axis][0];
                 ay = out * A[axis][1];
@@ -617,6 +589,64 @@ static SFEM_INLINE void boundary_scs_add_jacobian_action(const scalar_t rho, con
     }
 }
 
+static SFEM_INLINE void gather_element_dir(const MeshData &d, const ptrdiff_t e, const scalar_t *const SFEM_RESTRICT dir,
+                                           scalar_t *const SFEM_RESTRICT vx, scalar_t *const SFEM_RESTRICT vy,
+                                           scalar_t *const SFEM_RESTRICT vz, scalar_t *const SFEM_RESTRICT q);
+
+static SFEM_NOINLINE void apply_boundary_scs_residual(MeshData &d, const scalar_t rho, const scalar_t mu,
+                                                      const int isoparam) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_boundary_scs_residual");
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        std::memset(r, 0, sizeof(r));
+        scalar_t adj[9], det = scalar_t(0);
+        if (!isoparam) cvfem_hex8_load_adj(d, e, adj, &det);
+        boundary_scs_add_residual(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                                  p, r);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
+                r[a * 4 + 3] == scalar_t(0))
+                continue;
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(d.rx.data(), g, r[a * 4 + 0]);
+            atomic_add(d.ry.data(), g, r[a * 4 + 1]);
+            atomic_add(d.rz.data(), g, r[a * 4 + 2]);
+            atomic_add(d.rc.data(), g, r[a * 4 + 3]);
+        }
+    }
+}
+
+static SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu,
+                                                             const int isoparam, const scalar_t *const SFEM_RESTRICT dir,
+                                                             scalar_t *const SFEM_RESTRICT jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action");
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_dir(d, e, dir, vx, vy, vz, q);
+        std::memset(r, 0, sizeof(r));
+        scalar_t adj[9], det = scalar_t(0);
+        if (!isoparam) cvfem_hex8_load_adj(d, e, adj, &det);
+        boundary_scs_add_jacobian_action(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux,
+                                         uy, uz, vx, vy, vz, q, r);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
+                r[a * 4 + 3] == scalar_t(0))
+                continue;
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);
+            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, r[a * 4 + 3]);
+        }
+    }
+}
+
 static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_sumfact");
     reset_residual(d);
@@ -629,8 +659,10 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
-        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, d.geom[(size_t)e], ux, uy, uz, p, r, rc);
-        boundary_scs_add_residual(rho, mu, 0, d.geom[(size_t)e], d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
+        scalar_t adj[9], det;
+        cvfem_hex8_load_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc);
+        boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -655,7 +687,7 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r, rc);
-        boundary_scs_add_residual(rho, mu, 1, d.geom[(size_t)e], d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
+        boundary_scs_add_residual(rho, mu, 1, nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -681,10 +713,13 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
-        cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, d.geom[(size_t)e], ux, uy, uz, slots + (size_t)e * 64, values, rc,
-                                                     p);
-        boundary_scs_add_jacobian<true>(rho, mu, 0, d.geom[(size_t)e], d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
-                                        slots + (size_t)e * 64, values);
+        scalar_t adj[9], det;
+        cvfem_hex8_load_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
+        cvfem_hex8_ns_upwind_jacobian_add_rhie_chow<true>(
+                rho, mu, adj, rc, ux, uy, uz, p, slots + (size_t)e * 64, values);
+        boundary_scs_add_jacobian<true>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
 
@@ -704,18 +739,25 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values, rc,
                                                               p);
-        boundary_scs_add_jacobian<true>(rho, mu, 1, d.geom[(size_t)e], d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
-                                        slots + (size_t)e * 64, values);
+        boundary_scs_add_jacobian<true>(rho, mu, 1, nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64,
+                                        values);
     }
 }
 
 static void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual");
     assemble_nodal_p_grad(d, geom);
-    if (geom == GeomKind::Isoparam)
+    if (geom == GeomKind::Isoparam) {
         apply_residual_atomic_isoparam(d, rho, mu);
-    else
-        apply_residual_atomic_sumfact(d, rho, mu);
+        return;
+    }
+    if (d.packed) {
+        reset_residual(d);
+        cvfem_hex8_apply_residual_packed(d, *d.packed, rho, mu);
+        apply_boundary_scs_residual(d, rho, mu, 0);
+        return;
+    }
+    apply_residual_atomic_sumfact(d, rho, mu);
 }
 
 static void assemble_jacobian(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu, const GeomKind geom) {
@@ -752,8 +794,10 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, cons
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
-        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, d.geom[(size_t)e], ux, uy, uz, vx, vy, vz, q, r, rc, p);
-        boundary_scs_add_jacobian_action(rho, mu, 0, d.geom[(size_t)e], d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r);
+        scalar_t adj[9], det;
+        cvfem_hex8_load_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
+        boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
@@ -778,7 +822,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, x, y, z, ux, uy, uz, vx, vy, vz, q, r, rc, p);
-        boundary_scs_add_jacobian_action(rho, mu, 1, d.geom[(size_t)e], d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r);
+        boundary_scs_add_jacobian_action(rho, mu, 1, nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
@@ -795,10 +839,14 @@ static void apply_jacobian_action(MeshData &d, const scalar_t rho, const scalar_
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action");
     const ptrdiff_t ndof = d.nnodes * N_FIELDS;
     cvfem_zero_scalars(jv, ndof);
-    if (geom == GeomKind::Isoparam)
+    if (geom == GeomKind::Isoparam) {
         apply_jacobian_action_atomic_isoparam(d, rho, mu, dir, jv);
-    else
+    } else if (d.packed) {
+        cvfem_hex8_apply_jacobian_action_packed(d, *d.packed, rho, mu, dir, jv);
+        apply_boundary_scs_jacobian_action(d, rho, mu, 0, dir, jv);
+    } else {
         apply_jacobian_action_atomic_sumfact(d, rho, mu, dir, jv);
+    }
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < ndof; ++i) {
         if (constrained[(size_t)i]) jv[i] = dir[i];
@@ -1206,6 +1254,7 @@ int main(int argc, char **argv) {
     int         check_jv    = smesh::Env::read<int>("SFEM_CHECK_JV", 0);
     int         rhie_chow   = smesh::Env::read<int>("SFEM_RHIE_CHOW", 1);
     scalar_t    rc_scale    = smesh::Env::read<scalar_t>("SFEM_RHIE_CHOW_SCALE", 1);
+    int         pack_size   = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
 
     if (case_name.empty()) {
         std::fprintf(stderr, "SFEM_CASE is required (poiseuille, couette, or coutte)\n");
@@ -1272,6 +1321,7 @@ int main(int argc, char **argv) {
             "- SFEM_MATRIX_FREE=%d\n"
             "- SFEM_RHIE_CHOW=%d\n"
             "- SFEM_RHIE_CHOW_SCALE=%g\n"
+            "- SFEM_PACK_SIZE=%d\n"
             "----------------------------------------\n",
             flow_name,
             n,
@@ -1297,7 +1347,8 @@ int main(int argc, char **argv) {
             use_prec ? 0 : 1,
             matrix_free,
             rhie_chow,
-            (rhie_chow == 0) ? scalar_t(0) : rc_scale);
+            (rhie_chow == 0) ? scalar_t(0) : rc_scale,
+            pack_size);
 
     MeshData d;
     d.Lx               = Lx;
@@ -1310,17 +1361,23 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    PackedData packed_storage;
+    if (geom == GeomKind::Affine && pack_size > 0) {
+        packed_storage = cvfem_hex8_make_packed(d.mesh, pack_size);
+        d.packed       = &packed_storage;
+    }
+
     d.nnodes    = d.mesh->n_nodes();
     d.nelements = d.mesh->n_elements(0);
     d.elems     = d.mesh->elements(0)->data();
     d.points    = d.mesh->points()->data();
+    if (geom == GeomKind::Affine) cvfem_hex8_precompute_affine_geometry(d);
 
     std::vector<uint8_t>  constrained;
     std::vector<scalar_t> bc;
     ptrdiff_t             pin_p = 0;
     mark_constraints(d, flow, mu, U, constrained, bc, pin_p);
     init_fields(d, init, constrained, bc);
-    precompute_affine_geometry(d);
 
     BSR4 bsr;
     const int assemble_jac = (!matrix_free || use_prec) ? 1 : 0;
@@ -1349,6 +1406,11 @@ int main(int argc, char **argv) {
     }
     std::printf("init: %s\n", init_name.c_str());
     std::printf("hessian: %s\n", matrix_free ? "matrix-free J(u)v" : "assembled BSR");
+    if (geom == GeomKind::Affine) {
+        std::printf("kernels: residual=%s  assemble=sympy_row  jac-action=%s\n",
+                    d.packed ? "packed SIMD sumfact" : "atomic sumfact",
+                    d.packed ? "packed SIMD sumfact" : "atomic sumfact");
+    }
 
     auto blas = sfem::make_openmp_blas<scalar_t>();
 

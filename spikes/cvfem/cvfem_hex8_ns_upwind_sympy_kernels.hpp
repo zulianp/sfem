@@ -5,23 +5,22 @@
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual(const scalar_t rho,
                                                             const scalar_t mu,
-                                                            const Hex8Geom &geom,
+                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                             const scalar_t *const SFEM_RESTRICT ux,
                                                             const scalar_t *const SFEM_RESTRICT uy,
                                                             const scalar_t *const SFEM_RESTRICT uz,
                                                             const scalar_t *const SFEM_RESTRICT p,
                                                             scalar_t *const SFEM_RESTRICT r) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
@@ -360,22 +359,21 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual(const scalar_t rho,
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
                                                                           const scalar_t mu,
-                                                                          const Hex8Geom &geom,
+                                                                          const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                           const scalar_t *const SFEM_RESTRICT ux,
                                                                           const scalar_t *const SFEM_RESTRICT uy,
                                                                           const scalar_t *const SFEM_RESTRICT uz,
                                                                           const smesh::count_t *const SFEM_RESTRICT slots,
                                                                           scalar_t *const SFEM_RESTRICT values) {
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
@@ -3991,22 +3989,21 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const 
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(const scalar_t rho,
                                                                                     const scalar_t mu,
-                                                                                    const Hex8Geom &geom,
+                                                                                    const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                     const scalar_t *const SFEM_RESTRICT ux,
                                                                                     const scalar_t *const SFEM_RESTRICT uy,
                                                                                     const scalar_t *const SFEM_RESTRICT uz,
                                                                                     const smesh::count_t *const SFEM_RESTRICT slots,
                                                                                     scalar_t *const SFEM_RESTRICT values) {
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
@@ -8475,22 +8472,21 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockw
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(const scalar_t rho,
                                                                                   const scalar_t mu,
-                                                                                  const Hex8Geom &geom,
+                                                                                  const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                   const scalar_t *const SFEM_RESTRICT ux,
                                                                                   const scalar_t *const SFEM_RESTRICT uy,
                                                                                   const scalar_t *const SFEM_RESTRICT uz,
                                                                                   const smesh::count_t *const SFEM_RESTRICT slots,
                                                                                   scalar_t *const SFEM_RESTRICT values) {
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
@@ -13384,22 +13380,21 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwis
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise(const scalar_t rho,
                                                                                    const scalar_t mu,
-                                                                                   const Hex8Geom &geom,
+                                                                                   const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                    const scalar_t *const SFEM_RESTRICT ux,
                                                                                    const scalar_t *const SFEM_RESTRICT uy,
                                                                                    const scalar_t *const SFEM_RESTRICT uz,
                                                                                    const smesh::count_t *const SFEM_RESTRICT slots,
                                                                                    scalar_t *const SFEM_RESTRICT values) {
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
@@ -21474,22 +21469,21 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewi
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(const scalar_t rho,
                                                                             const scalar_t mu,
-                                                                            const Hex8Geom &geom,
+                                                                            const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                             const scalar_t *const SFEM_RESTRICT ux,
                                                                             const scalar_t *const SFEM_RESTRICT uy,
                                                                             const scalar_t *const SFEM_RESTRICT uz,
                                                                             const int *const SFEM_RESTRICT slots,
                                                                             scalar_t *const SFEM_RESTRICT values) {
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
@@ -23569,22 +23563,21 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(cons
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_blockwise(const scalar_t rho,
                                                                                       const scalar_t mu,
-                                                                                      const Hex8Geom &geom,
+                                                                                      const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                       const scalar_t *const SFEM_RESTRICT ux,
                                                                                       const scalar_t *const SFEM_RESTRICT uy,
                                                                                       const scalar_t *const SFEM_RESTRICT uz,
                                                                                       const int *const SFEM_RESTRICT slots,
                                                                                       scalar_t *const SFEM_RESTRICT values) {
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
@@ -26517,22 +26510,21 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_bloc
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(const scalar_t rho,
                                                                                     const scalar_t mu,
-                                                                                    const Hex8Geom &geom,
+                                                                                    const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                     const scalar_t *const SFEM_RESTRICT ux,
                                                                                     const scalar_t *const SFEM_RESTRICT uy,
                                                                                     const scalar_t *const SFEM_RESTRICT uz,
                                                                                     const int *const SFEM_RESTRICT slots,
                                                                                     scalar_t *const SFEM_RESTRICT values) {
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
@@ -29890,22 +29882,21 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_roww
 
 static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise(const scalar_t rho,
                                                                                      const scalar_t mu,
-                                                                                     const Hex8Geom &geom,
+                                                                                     const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                                                      const scalar_t *const SFEM_RESTRICT ux,
                                                                                      const scalar_t *const SFEM_RESTRICT uy,
                                                                                      const scalar_t *const SFEM_RESTRICT uz,
                                                                                      const int *const SFEM_RESTRICT slots,
                                                                                      scalar_t *const SFEM_RESTRICT values) {
-    const scalar_t cof0 = geom.cof[0];
-    const scalar_t cof1 = geom.cof[1];
-    const scalar_t cof2 = geom.cof[2];
-    const scalar_t cof3 = geom.cof[3];
-    const scalar_t cof4 = geom.cof[4];
-    const scalar_t cof5 = geom.cof[5];
-    const scalar_t cof6 = geom.cof[6];
-    const scalar_t cof7 = geom.cof[7];
-    const scalar_t cof8 = geom.cof[8];
-    const scalar_t det = geom.det;
+    const scalar_t cof0 = adj[0];
+    const scalar_t cof1 = adj[1];
+    const scalar_t cof2 = adj[2];
+    const scalar_t cof3 = adj[3];
+    const scalar_t cof4 = adj[4];
+    const scalar_t cof5 = adj[5];
+    const scalar_t cof6 = adj[6];
+    const scalar_t cof7 = adj[7];
+    const scalar_t cof8 = adj[8];
     const scalar_t ux0 = ux[0];
     const scalar_t ux1 = ux[1];
     const scalar_t ux2 = ux[2];
