@@ -81,7 +81,7 @@ target_link_libraries(cvfem_hex8_ns_steady
     PRIVATE
         SFEM::sfem
         $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
-target_compile_options(cvfem_hex8_ns_steady PRIVATE ${_cvfem_solver_opts})
+target_compile_options(cvfem_hex8_ns_steady PRIVATE ${_cvfem_perf_opts})
 target_include_directories(cvfem_hex8_ns_steady PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
