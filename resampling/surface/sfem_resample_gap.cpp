@@ -11,6 +11,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -43,6 +44,7 @@ int resample_gap_local(
             return trishell3_resample_gap_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, xnormal, ynormal, znormal);
         case smesh::BEAM2:
+        case smesh::EDGESHELL2:
             return beam2_resample_gap_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, wg, xnormal, ynormal, znormal);
         case smesh::QUADSHELL4: {
@@ -73,6 +75,7 @@ int resample_weight_local(
         case smesh::TRISHELL3:
             return trishell3_resample_weight_local(nelements, nnodes, elems, xyz, w);
         case smesh::BEAM2:
+        case smesh::EDGESHELL2:
             return beam2_resample_weight_local(nelements, nnodes, elems, xyz, w);
         case smesh::QUADSHELL4: {
             return quadshell4_resample_weight_local(nelements, nnodes, elems, xyz, w);
@@ -160,6 +163,29 @@ int resample_gap_value_local(
         case smesh::QUADSHELL4: {
             return quadshell4_resample_gap_value_local(nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g);
         }
+        case smesh::TRISHELL3: {
+            real_t *xn = (real_t *)calloc(nnodes, sizeof(real_t));
+            real_t *yn = (real_t *)calloc(nnodes, sizeof(real_t));
+            real_t *zn = (real_t *)calloc(nnodes, sizeof(real_t));
+            const int err =
+                    trishell3_resample_gap_local(nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, xn, yn, zn);
+            free(xn);
+            free(yn);
+            free(zn);
+            return err;
+        }
+        case smesh::BEAM2:
+        case smesh::EDGESHELL2: {
+            real_t *xn = (real_t *)calloc(nnodes, sizeof(real_t));
+            real_t *yn = (real_t *)calloc(nnodes, sizeof(real_t));
+            real_t *zn = (real_t *)calloc(nnodes, sizeof(real_t));
+            const int err =
+                    beam2_resample_gap_local(nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, xn, yn, zn);
+            free(xn);
+            free(yn);
+            free(zn);
+            return err;
+        }
         default: {
             SFEM_ERROR("Invalid shell_element_type: %d from  element_type: %d\n", st, element_type);
             return SFEM_FAILURE;
@@ -231,6 +257,21 @@ int resample_gap_normals_local(
         case smesh::QUADSHELL4: {
             return quadshell4_resample_gap_normals_local(
                     nelements, nnodes, elems, xyz, n, stride, origin, delta, data, xnormal, ynormal, znormal);
+        }
+        case smesh::TRISHELL3: {
+            real_t *g = (real_t *)calloc(nnodes, sizeof(real_t));
+            const int err = trishell3_resample_gap_local(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, xnormal, ynormal, znormal);
+            free(g);
+            return err;
+        }
+        case smesh::BEAM2:
+        case smesh::EDGESHELL2: {
+            real_t *g = (real_t *)calloc(nnodes, sizeof(real_t));
+            const int err = beam2_resample_gap_local(
+                    nelements, nnodes, elems, xyz, n, stride, origin, delta, data, g, xnormal, ynormal, znormal);
+            free(g);
+            return err;
         }
         default: {
             SFEM_ERROR("Invalid shell_element_type: %d from element_type: %d\n", st, element_type);

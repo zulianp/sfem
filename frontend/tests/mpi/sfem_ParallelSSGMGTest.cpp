@@ -2,14 +2,18 @@
 
 #include "sfem_API.hpp"
 #include "sfem_ssgmg.hpp"
+#include "sfem_ssmgc.hpp"
 
 #include "smesh_base.hpp"
+#include "smesh_distributed_base.hpp"
+#include "smesh_grid.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_semistructured.hpp"
 #include "smesh_sideset.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <vector>
 
 namespace {
@@ -358,6 +362,82 @@ namespace {
                                               smesh::Env::read("SFEM_MG_MAX_IT", 40));
     }
 
+    int test_parallel_checkerboard_ssmgc() {
+        SFEM_TRACE_SCOPE("test_parallel_checkerboard_ssmgc");
+        auto comm = sfem::Communicator::world();
+
+        auto hex = sfem::Mesh::create_hex8_checkerboard_cube(comm, 2, 2, 2);
+        auto ss  = smesh::to_semistructured(2, hex, true, false);
+        SFEM_TEST_ASSERT(ss != nullptr);
+
+        auto fs = sfem::FunctionSpace::create(ss, 3);
+        auto f  = sfem::Function::create(fs);
+        auto op = sfem::create_op(fs, "LinearElasticity", sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(op != nullptr);
+        SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+        f->add_operator(op);
+
+        auto wall = sfem::Sideset::create_from_selector(
+                ss, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
+                    return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8;
+                });
+        SFEM_TEST_ASSERT(!wall.empty());
+        sfem::DirichletConditions::Condition xc{.sidesets = wall, .value = 0, .component = 0};
+        sfem::DirichletConditions::Condition yc{.sidesets = wall, .value = real_t(-0.05), .component = 1};
+        sfem::DirichletConditions::Condition zc{.sidesets = wall, .value = 0, .component = 2};
+        f->add_constraint(sfem::create_dirichlet_conditions(fs, {xc, yc, zc}, sfem::EXECUTION_SPACE_HOST));
+
+        auto contact_ss = sfem::Sideset::create_from_selector(
+                ss, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
+        SFEM_TEST_ASSERT(contact_ss.size() >= 1);
+
+        auto sdf = smesh::create_sdf(comm,
+                                     16,
+                                     8,
+                                     16,
+                                     -0.1,
+                                     -0.2,
+                                     -0.1,
+                                     1.1,
+                                     0.2,
+                                     1.1,
+                                     [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                                         const geom_t cx = 0.5, cy = -0.5, cz = 0.5, radius = 0.5;
+                                         const geom_t dx = cx - x, dy = cy - y, dz = cz - z;
+                                         return radius - sqrt(dx * dx + dy * dy + dz * dz);
+                                     });
+
+        auto contact_conds = sfem::ContactConditions::create(fs, sdf, contact_ss, sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(contact_conds != nullptr);
+        {
+            ptrdiff_t nloc  = contact_conds->n_constrained_dofs();
+            ptrdiff_t nglob = 0;
+            MPI_Allreduce(&nloc, &nglob, 1, smesh::mpi_type<ptrdiff_t>(), MPI_SUM, comm->get());
+            SFEM_TEST_ASSERT(nglob > 0);
+        }
+
+        const ptrdiff_t ndofs = fs->n_dofs();
+        auto            x     = sfem::create_host_buffer<real_t>(ndofs);
+        auto            rhs   = sfem::create_host_buffer<real_t>(ndofs);
+        std::fill(x->data(), x->data() + ndofs, real_t(0));
+        std::fill(rhs->data(), rhs->data() + ndofs, real_t(0));
+        f->apply_constraints(rhs->data());
+        contact_conds->init();
+        f->apply_constraints(x->data());
+
+        setenv("SFEM_MAX_IT", "1", 1);
+
+        auto solver = sfem::create_ssmgc(f, contact_conds, nullptr);
+        SFEM_TEST_ASSERT(solver != nullptr);
+        SFEM_TEST_ASSERT(solver->apply(rhs->data(), x->data()) == SFEM_SUCCESS);
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            SFEM_TEST_ASSERT(std::isfinite(x->data()[i]));
+        }
+        solver.reset();
+        comm->barrier();
+        return SFEM_TEST_SUCCESS;
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -366,6 +446,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_parallel_quad4_ssgmg);
     SFEM_RUN_TEST(test_parallel_tet4_ssgmg);
     SFEM_RUN_TEST(test_parallel_hex8_tet4_ssgmg);
+    SFEM_RUN_TEST(test_parallel_checkerboard_ssmgc);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

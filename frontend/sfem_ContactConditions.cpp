@@ -290,6 +290,11 @@ namespace sfem {
 
             contact_surface->reset_points();
 
+            if (contact_surface->node_mapping()->size() == 0) {
+                mass_vector = create_host_buffer<real_t>(0);
+                return;
+            }
+
             auto st = contact_surface->element_type();
             auto surface_mesh =
                     std::make_shared<Mesh>(space->mesh_ptr()->comm(), st, contact_surface->elements(), contact_surface->points());
@@ -334,7 +339,7 @@ namespace sfem {
 #endif
 
             printf("AREA: %g\n", (double)area);
-            assert(area > 0);
+            assert(mass_vector->size() == 0 || area > 0);
         }
     };
 
@@ -365,7 +370,7 @@ namespace sfem {
             cc->impl_->contact_surface = MeshContactSurface::create(space, sidesets, es);
         }
 
-        cc->impl_->normals = smesh::create_buffer<real_t>(space->mesh_ptr()->spatial_dimension(), cc->n_constrained_dofs(), es);
+        cc->impl_->normals = smesh::create_buffer<real_t>(3, cc->n_constrained_dofs(), es);
         cc->impl_->execution_space = es;
         cc->impl_->blas_           = sfem::blas<real_t>(es);
         cc->impl_->assemble_mass_vector();
@@ -529,6 +534,9 @@ namespace sfem {
         auto cs = impl_->contact_surface;
 
         int err = 0;
+        if (cs->node_mapping()->size() == 0) {
+            return SFEM_SUCCESS;
+        }
         for (auto &obs : impl_->obstacles) {
 #ifdef SFEM_ENABLE_CUDA
             if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
@@ -583,8 +591,11 @@ namespace sfem {
     int ContactConditions::signed_distance(real_t *const g) {
         SFEM_TRACE_SCOPE("ContactConditions::signed_distance");
 
-        auto cs  = impl_->contact_surface;
-        int  err = 0;
+        auto cs = impl_->contact_surface;
+        if (cs->node_mapping()->size() == 0) {
+            return SFEM_SUCCESS;
+        }
+        int err = 0;
 
         for (auto &obs : impl_->obstacles) {
 #ifdef SFEM_ENABLE_CUDA
@@ -646,7 +657,10 @@ namespace sfem {
     int ContactConditions::hessian_block_diag_sym(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("ContactConditions::hessian_block_diag_sym");
 
-        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
+        const ptrdiff_t n = impl_->contact_surface->node_mapping()->size();
+        if (n == 0) {
+            return SFEM_SUCCESS;
+        }
         const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
 
         const int dim     = impl_->space->mesh_ptr()->spatial_dimension();
@@ -663,3 +677,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

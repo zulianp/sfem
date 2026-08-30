@@ -38,11 +38,12 @@ namespace sfem {
         int iterations() const override { return iterations_; }
 
         void configure_sizes_from_op() {
-            n_dofs  = op ? op->rows() : SFEM_PTRDIFF_INVALID;
-            n_alloc = n_dofs;
+            n_dofs = op ? op->rows() : SFEM_PTRDIFF_INVALID;
             auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(op);
             if (pop && pop->comm() && pop->comm()->size() > 1) {
                 n_alloc = std::max(pop->row_allocation_size(), pop->col_allocation_size());
+            } else if (n_alloc < n_dofs) {
+                n_alloc = n_dofs;
             }
         }
 
