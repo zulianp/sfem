@@ -10,68 +10,9 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <vector>
 
 namespace {
-
-    sfem::SharedBuffer<idx_t> nodeset_from_sidesets(const std::shared_ptr<smesh::Mesh>                 &mesh,
-                                                    const std::vector<std::shared_ptr<smesh::Sideset>> &sidesets) {
-        std::vector<idx_t> ids;
-        for (const auto &ss : sidesets) {
-            auto ns = smesh::create_nodeset_from_sideset(mesh, ss);
-            if (!ns || ns->size() == 0) {
-                continue;
-            }
-            auto d = ns->data();
-            ids.insert(ids.end(), d, d + ns->size());
-        }
-        std::sort(ids.begin(), ids.end());
-        ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
-
-        auto out = sfem::create_host_buffer<idx_t>((ptrdiff_t)ids.size());
-        if (!ids.empty()) {
-            std::memcpy(out->data(), ids.data(), ids.size() * sizeof(idx_t));
-        }
-        return out;
-    }
-
-    template <typename Pred>
-    sfem::SharedBuffer<idx_t> nodeset_from_point_selector(const std::shared_ptr<smesh::Mesh> &mesh, Pred pred) {
-        auto               pts = mesh->points()->data();
-        const ptrdiff_t    n   = mesh->n_nodes();
-        const bool         has_z = mesh->spatial_dimension() > 2;
-        std::vector<idx_t> ids;
-        ids.reserve((size_t)n);
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            const geom_t z = has_z ? pts[2][i] : geom_t(0);
-            if (pred(pts[0][i], pts[1][i], z)) {
-                ids.push_back((idx_t)i);
-            }
-        }
-        auto out = sfem::create_host_buffer<idx_t>((ptrdiff_t)ids.size());
-        if (!ids.empty()) {
-            std::memcpy(out->data(), ids.data(), ids.size() * sizeof(idx_t));
-        }
-        return out;
-    }
-
-    sfem::SharedBuffer<idx_t> union_nodesets(const sfem::SharedBuffer<idx_t> &a, const sfem::SharedBuffer<idx_t> &b) {
-        std::vector<idx_t> ids;
-        if (a && a->size() > 0) {
-            ids.insert(ids.end(), a->data(), a->data() + a->size());
-        }
-        if (b && b->size() > 0) {
-            ids.insert(ids.end(), b->data(), b->data() + b->size());
-        }
-        std::sort(ids.begin(), ids.end());
-        ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
-        auto out = sfem::create_host_buffer<idx_t>((ptrdiff_t)ids.size());
-        if (!ids.empty()) {
-            std::memcpy(out->data(), ids.data(), ids.size() * sizeof(idx_t));
-        }
-        return out;
-    }
 
     std::shared_ptr<sfem::Function> make_homogeneous_checkerboard_ss_poisson(const int                          element_level,
                                                                              const std::shared_ptr<sfem::Mesh> &hex) {
@@ -96,17 +37,12 @@ namespace {
         auto bottom_ss = sfem::Sideset::create_from_selector(ss, bottom_pred);
         auto right_ss  = sfem::Sideset::create_from_selector(ss, right_pred);
 
-        // Sideset parent ids from SS create_from_selector come from a throwaway derefined HEX8
-        // mesh; on MPI they need not match local SS element order. Union with a point selector
-        // so every owned/ghost Dirichlet node is constrained (B5.7 block_id grouping is out of scope).
         sfem::DirichletConditions::Condition left{
                 .sidesets  = bottom_ss,
-                .nodeset   = union_nodesets(nodeset_from_sidesets(ss, bottom_ss), nodeset_from_point_selector(ss, bottom_pred)),
                 .value     = -1,
                 .component = 0};
         sfem::DirichletConditions::Condition right{
                 .sidesets  = right_ss,
-                .nodeset   = union_nodesets(nodeset_from_sidesets(ss, right_ss), nodeset_from_point_selector(ss, right_pred)),
                 .value     = 1,
                 .component = 0};
         f->add_constraint(sfem::create_dirichlet_conditions(fs, {left, right}, sfem::EXECUTION_SPACE_HOST));
@@ -133,34 +69,88 @@ namespace {
             return x > 1 - 1e-5 && x < 1 + 1e-5;
         };
 
+        auto bottom_ss = sfem::Sideset::create_from_selector(ss, bottom_pred);
+        auto right_ss  = sfem::Sideset::create_from_selector(ss, right_pred);
+
         sfem::DirichletConditions::Condition bottom{
-                .nodeset   = nodeset_from_point_selector(ss, bottom_pred),
+                .sidesets  = bottom_ss,
                 .value     = -1,
                 .component = 0};
         sfem::DirichletConditions::Condition right{
-                .nodeset   = nodeset_from_point_selector(ss, right_pred),
+                .sidesets  = right_ss,
                 .value     = 1,
                 .component = 0};
         f->add_constraint(sfem::create_dirichlet_conditions(fs, {bottom, right}, sfem::EXECUTION_SPACE_HOST));
         return f;
     }
 
+    smesh::ElemType block_source_family(const smesh::ElemType type) {
+        return smesh::is_semistructured_type(type) ? smesh::ss_source_family(type) : type;
+    }
+
+    void mark_hex_tet_nodes(const smesh::Mesh &mesh, std::vector<char> &hex, std::vector<char> &tet) {
+        hex.assign((size_t)mesh.n_nodes(), 0);
+        tet.assign((size_t)mesh.n_nodes(), 0);
+        for (size_t b = 0; b < mesh.n_blocks(); ++b) {
+            auto            block = mesh.block(b);
+            const ptrdiff_t ne    = block->n_elements();
+            if (ne == 0) {
+                continue;
+            }
+            const smesh::ElemType fam = block_source_family(block->element_type());
+            std::vector<char>    *mask = nullptr;
+            if (fam == smesh::HEX8) {
+                mask = &hex;
+            } else if (fam == smesh::TET4) {
+                mask = &tet;
+            } else {
+                continue;
+            }
+            const int nxe = block->n_nodes_per_element();
+            auto      els = block->elements()->data();
+            for (int d = 0; d < nxe; ++d) {
+                for (ptrdiff_t e = 0; e < ne; ++e) {
+                    const idx_t n = els[d][e];
+                    if (n >= 0 && (size_t)n < mask->size()) {
+                        (*mask)[(size_t)n] = 1;
+                    }
+                }
+            }
+        }
+    }
+
+    // Mixed HEX+TET SS can place two family-local nodes at the same xyz (HEX face
+    // interior vs TET face/edge on the interface). Prefer the serial node with the
+    // same HEX/TET occupancy; otherwise the first geometric hit.
     int find_serial_node(const geom_t *const *serial_pts,
-                         const int           serial_spatial_dim,
+                         const int            serial_spatial_dim,
                          const ptrdiff_t      n_serial,
+                         const char          *serial_hex,
+                         const char          *serial_tet,
                          const geom_t         x,
                          const geom_t         y,
                          const geom_t         z,
-                         const geom_t         tol) {
-        const bool has_z = serial_spatial_dim > 2;
+                         const geom_t         tol,
+                         const char           par_hex,
+                         const char           par_tet) {
+        const bool has_z     = serial_spatial_dim > 2;
+        int        first     = -1;
+        int        occ_match = -1;
         for (ptrdiff_t j = 0; j < n_serial; ++j) {
             const geom_t serial_z = has_z ? serial_pts[2][j] : geom_t(0);
-            if (std::fabs(serial_pts[0][j] - x) <= tol && std::fabs(serial_pts[1][j] - y) <= tol &&
-                std::fabs(serial_z - z) <= tol) {
-                return (int)j;
+            if (std::fabs(serial_pts[0][j] - x) > tol || std::fabs(serial_pts[1][j] - y) > tol ||
+                std::fabs(serial_z - z) > tol) {
+                continue;
+            }
+            if (first < 0) {
+                first = (int)j;
+            }
+            if (serial_hex && serial_tet && serial_hex[j] == par_hex && serial_tet[j] == par_tet) {
+                occ_match = (int)j;
+                break;
             }
         }
-        return -1;
+        return occ_match >= 0 ? occ_match : first;
     }
 
     int solve_and_check_parallel_ssgmg(const char                          *label,
@@ -237,15 +227,29 @@ namespace {
         SFEM_TEST_ASSERT(abs_res < abs_tol || rel_res < rel_tol);
 
         if (compare_serial) {
-            const geom_t    geom_tol     = sizeof(geom_t) == sizeof(double) ? geom_t(1e-12) : geom_t(1e-5);
-            auto            serial_pts   = serial_mesh->points()->data();
-            auto            parallel_pts = parallel_mesh->points()->data();
-            const ptrdiff_t n_serial     = serial_fs->n_dofs();
+            const geom_t    geom_tol       = sizeof(geom_t) == sizeof(double) ? geom_t(1e-12) : geom_t(1e-5);
+            auto            serial_pts     = serial_mesh->points()->data();
+            auto            parallel_pts   = parallel_mesh->points()->data();
+            const ptrdiff_t n_serial       = serial_fs->n_dofs();
             const bool      parallel_has_z = parallel_mesh->spatial_dimension() > 2;
+            std::vector<char> serial_hex, serial_tet, parallel_hex, parallel_tet;
+            mark_hex_tet_nodes(*serial_mesh, serial_hex, serial_tet);
+            mark_hex_tet_nodes(*parallel_mesh, parallel_hex, parallel_tet);
             for (ptrdiff_t i = 0; i < n_owned; ++i) {
-                const geom_t z = parallel_has_z ? parallel_pts[2][i] : geom_t(0);
-                const int j    = find_serial_node(
-                        serial_pts, serial_mesh->spatial_dimension(), n_serial, parallel_pts[0][i], parallel_pts[1][i], z, geom_tol);
+                const geom_t z  = parallel_has_z ? parallel_pts[2][i] : geom_t(0);
+                const char   ph = (size_t)i < parallel_hex.size() ? parallel_hex[(size_t)i] : 0;
+                const char   pt = (size_t)i < parallel_tet.size() ? parallel_tet[(size_t)i] : 0;
+                const int    j  = find_serial_node(serial_pts,
+                                                serial_mesh->spatial_dimension(),
+                                                n_serial,
+                                                serial_hex.data(),
+                                                serial_tet.data(),
+                                                parallel_pts[0][i],
+                                                parallel_pts[1][i],
+                                                z,
+                                                geom_tol,
+                                                ph,
+                                                pt);
                 SFEM_TEST_ASSERT(j >= 0);
                 SFEM_TEST_APPROXEQ(parallel_x->data()[i], serial_x->data()[j], sol_tol);
             }
@@ -327,6 +331,33 @@ namespace {
                                               smesh::Env::read("SFEM_MG_MAX_IT", 40));
     }
 
+    int test_parallel_hex8_tet4_ssgmg() {
+        SFEM_TRACE_SCOPE("test_parallel_hex8_tet4_ssgmg");
+        auto comm = sfem::Communicator::world();
+
+        const ptrdiff_t n = smesh::Env::read("SFEM_MIXED_BASE_RESOLUTION", 2);
+        const int       l = smesh::Env::read("SFEM_MIXED_ELEMENT_REFINE_LEVEL", 4);
+
+        auto serial   = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), n, n, n);
+        auto parallel = sfem::Mesh::create_hex8_tet4_cube(comm, n, n, n);
+        SFEM_TEST_ASSERT(serial != nullptr);
+        SFEM_TEST_ASSERT(parallel != nullptr);
+        SFEM_TEST_EQ(parallel->n_blocks(), static_cast<size_t>(2));
+        SFEM_TEST_ASSERT(parallel->block(0)->name() == "hex");
+        SFEM_TEST_ASSERT(parallel->block(1)->name() == "tet");
+
+        const real_t abs_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+        const real_t rel_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+        const real_t sol_tol = sizeof(real_t) == sizeof(double) ? real_t(5e-6) : real_t(1e-4);
+        return solve_and_check_parallel_ssgmg("hex8_tet4",
+                                              make_homogeneous_ss_poisson(l, serial),
+                                              make_homogeneous_ss_poisson(l, parallel),
+                                              abs_tol,
+                                              rel_tol,
+                                              sol_tol,
+                                              smesh::Env::read("SFEM_MG_MAX_IT", 40));
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -334,6 +365,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_parallel_checkerboard_ssgmg);
     SFEM_RUN_TEST(test_parallel_quad4_ssgmg);
     SFEM_RUN_TEST(test_parallel_tet4_ssgmg);
+    SFEM_RUN_TEST(test_parallel_hex8_tet4_ssgmg);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+
+

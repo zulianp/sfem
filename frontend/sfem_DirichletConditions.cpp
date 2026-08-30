@@ -150,6 +150,7 @@ namespace sfem {
 
         for (auto &c : dc->impl_->conditions) {
             if (!c.nodeset) {
+                // Per-sideset extract uses Sideset::block_id(); multi-block vectors are unioned.
                 auto mesh_for_sidesets = space->mesh_ptr();
                 c.nodeset              = smesh::create_nodeset_from_sidesets(mesh_for_sidesets, c.sidesets);
             }

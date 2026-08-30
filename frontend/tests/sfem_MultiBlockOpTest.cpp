@@ -2,6 +2,8 @@
 
 #include "sfem_API.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "laplacian.hpp"
+#include "linear_elasticity.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_semistructured.hpp"
 
@@ -150,6 +152,42 @@ int test_checkerboard_sshex_em_laplacian_apply() {
     return compare_mapped_dofs(y_cb, y_cube, cb_to_cube, 1, tol);
 }
 
+int test_checkerboard_ss_laplacian_apply() {
+    auto cb_hex   = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 4, 4, 4);
+    auto cube_hex = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 4, 4, 4);
+    auto cb_ss    = smesh::to_semistructured(2, cb_hex, true, false);
+    auto cube_ss  = smesh::to_semistructured(2, cube_hex, true, false);
+    SFEM_TEST_ASSERT(cb_ss != nullptr);
+    SFEM_TEST_ASSERT(cube_ss != nullptr);
+    SFEM_TEST_EQ(cb_ss->n_blocks(), static_cast<size_t>(2));
+
+    std::vector<ptrdiff_t> cb_to_cube;
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_ss, *cube_ss, cb_to_cube) == SFEM_TEST_SUCCESS);
+
+    auto cb_space   = sfem::FunctionSpace::create(cb_ss, 1);
+    auto cube_space = sfem::FunctionSpace::create(cube_ss, 1);
+    auto x_cb       = sfem::create_host_buffer<real_t>(cb_space->n_dofs());
+    auto x_cube     = sfem::create_host_buffer<real_t>(cube_space->n_dofs());
+    auto y_cb       = sfem::create_host_buffer<real_t>(cb_space->n_dofs());
+    auto y_cube     = sfem::create_host_buffer<real_t>(cube_space->n_dofs());
+    fill_scalar_field(*cb_ss, x_cb->data());
+    fill_scalar_field(*cube_ss, x_cube->data());
+    std::fill(y_cb->data(), y_cb->data() + y_cb->size(), real_t(0));
+    std::fill(y_cube->data(), y_cube->data() + y_cube->size(), real_t(0));
+
+    auto cb_op   = sfem::create_op(cb_space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+    auto cube_op = sfem::create_op(cube_space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(cb_op != nullptr);
+    SFEM_TEST_ASSERT(cube_op != nullptr);
+    SFEM_TEST_ASSERT(cb_op->initialize() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(cube_op->initialize() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(cb_op->apply(nullptr, x_cb->data(), y_cb->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(cube_op->apply(nullptr, x_cube->data(), y_cube->data()) == SFEM_SUCCESS);
+
+    const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-10) : real_t(1e-5);
+    return compare_mapped_dofs(y_cb, y_cube, cb_to_cube, 1, tol);
+}
+
 int test_checkerboard_sshex_em_linear_elasticity_apply() {
     auto cb_hex   = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 4, 4, 4);
     auto cube_hex = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 4, 4, 4);
@@ -224,14 +262,246 @@ int test_hex8_tet4_laplacian_apply() {
     return SFEM_TEST_SUCCESS;
 }
 
+int apply_mixed_ss_split(const std::shared_ptr<sfem::FunctionSpace> &space,
+                         const char                                 *op_name,
+                         const real_t                               *const x,
+                         real_t                                     *const y_all,
+                         real_t                                     *const y_sum,
+                         const ptrdiff_t                             n) {
+    auto op_all = sfem::create_op(space, op_name, sfem::EXECUTION_SPACE_HOST);
+    auto op_hex = sfem::create_op(space, op_name, sfem::EXECUTION_SPACE_HOST);
+    auto op_tet = sfem::create_op(space, op_name, sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(op_all != nullptr);
+    SFEM_TEST_ASSERT(op_hex != nullptr);
+    SFEM_TEST_ASSERT(op_tet != nullptr);
+    SFEM_TEST_ASSERT(op_all->initialize({}) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_hex->initialize({"hex"}) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_tet->initialize({"tet"}) == SFEM_SUCCESS);
+
+    std::fill(y_all, y_all + n, real_t(0));
+    std::fill(y_sum, y_sum + n, real_t(0));
+    auto y_hex = sfem::create_host_buffer<real_t>(n);
+    auto y_tet = sfem::create_host_buffer<real_t>(n);
+    std::fill(y_hex->data(), y_hex->data() + n, real_t(0));
+    std::fill(y_tet->data(), y_tet->data() + n, real_t(0));
+
+    SFEM_TEST_ASSERT(op_all->apply(nullptr, x, y_all) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_hex->apply(nullptr, x, y_hex->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op_tet->apply(nullptr, x, y_tet->data()) == SFEM_SUCCESS);
+
+    real_t nrm_all = 0;
+    real_t nrm_hex = 0;
+    real_t nrm_tet = 0;
+    real_t diff2   = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        SFEM_TEST_ASSERT(std::isfinite(y_all[i]));
+        SFEM_TEST_ASSERT(std::isfinite(y_hex->data()[i]));
+        SFEM_TEST_ASSERT(std::isfinite(y_tet->data()[i]));
+        y_sum[i] = y_hex->data()[i] + y_tet->data()[i];
+        const real_t d = y_all[i] - y_sum[i];
+        diff2 += d * d;
+        nrm_all += y_all[i] * y_all[i];
+        nrm_hex += y_hex->data()[i] * y_hex->data()[i];
+        nrm_tet += y_tet->data()[i] * y_tet->data()[i];
+    }
+    SFEM_TEST_ASSERT(nrm_all > 0);
+    SFEM_TEST_ASSERT(nrm_hex > 0);
+    SFEM_TEST_ASSERT(nrm_tet > 0);
+    const real_t rel = std::sqrt(diff2) / (std::sqrt(nrm_all) + real_t(1e-16));
+    const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-10) : real_t(1e-5);
+    SFEM_TEST_ASSERT(rel < tol);
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_hex8_tet4_ss_laplacian_apply() {
+    auto mesh = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    SFEM_TEST_ASSERT(mesh != nullptr);
+    auto ss = smesh::to_semistructured(2, mesh, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+    SFEM_TEST_EQ(ss->n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_ASSERT(ss->block(0)->name() == "hex");
+    SFEM_TEST_ASSERT(ss->block(1)->name() == "tet");
+    SFEM_TEST_ASSERT(smesh::is_hex_ss_family(ss->element_type(0)));
+    SFEM_TEST_ASSERT(smesh::is_tet_ss_family(ss->element_type(1)));
+
+    auto space = sfem::FunctionSpace::create(ss, 1);
+    auto x     = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto y_all = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto y_sum = sfem::create_host_buffer<real_t>(space->n_dofs());
+    fill_scalar_field(*ss, x->data());
+    return apply_mixed_ss_split(space, "Laplacian", x->data(), y_all->data(), y_sum->data(), space->n_dofs());
+}
+
+int test_hex8_tet4_ss_linear_elasticity_apply() {
+    auto mesh = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    SFEM_TEST_ASSERT(mesh != nullptr);
+    auto ss = smesh::to_semistructured(2, mesh, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+
+    auto space = sfem::FunctionSpace::create(ss, 3);
+    auto x     = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto y_all = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto y_sum = sfem::create_host_buffer<real_t>(space->n_dofs());
+    fill_vector_field(*ss, x->data());
+    return apply_mixed_ss_split(space, "LinearElasticity", x->data(), y_all->data(), y_sum->data(), space->n_dofs());
+}
+
+int checkerboard_ss_to_hex8_derefine_compare(const char *op_name, const int block_size, const bool hessian_diag) {
+    auto cb_hex   = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 4, 4, 4);
+    auto cube_hex = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 4, 4, 4);
+    auto cb_ss    = smesh::to_semistructured(2, cb_hex, true, false);
+    auto cube_ss  = smesh::to_semistructured(2, cube_hex, true, false);
+    SFEM_TEST_ASSERT(cb_ss != nullptr);
+    SFEM_TEST_ASSERT(cube_ss != nullptr);
+    SFEM_TEST_EQ(cb_ss->n_blocks(), static_cast<size_t>(2));
+
+    auto cb_fs   = sfem::FunctionSpace::create(cb_ss, block_size);
+    auto cube_fs = sfem::FunctionSpace::create(cube_ss, block_size);
+    auto cb_op   = sfem::create_op(cb_fs, op_name, sfem::EXECUTION_SPACE_HOST);
+    auto cube_op = sfem::create_op(cube_fs, op_name, sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(cb_op != nullptr);
+    SFEM_TEST_ASSERT(cube_op != nullptr);
+    SFEM_TEST_ASSERT(cb_op->initialize() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(cube_op->initialize() == SFEM_SUCCESS);
+
+    auto cb_coarse_fs   = cb_fs->derefine(1);
+    auto cube_coarse_fs = cube_fs->derefine(1);
+    SFEM_TEST_ASSERT(cb_coarse_fs != nullptr);
+    SFEM_TEST_ASSERT(cube_coarse_fs != nullptr);
+    SFEM_TEST_ASSERT(!cb_coarse_fs->has_semi_structured_mesh());
+    SFEM_TEST_ASSERT(!cube_coarse_fs->has_semi_structured_mesh());
+    SFEM_TEST_EQ(cb_coarse_fs->n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_EQ(cb_coarse_fs->element_type(0), smesh::HEX8);
+    SFEM_TEST_EQ(cb_coarse_fs->element_type(1), smesh::HEX8);
+
+    auto cb_coarse_op   = cb_op->derefine_op(cb_coarse_fs);
+    auto cube_coarse_op = cube_op->derefine_op(cube_coarse_fs);
+    SFEM_TEST_ASSERT(cb_coarse_op != nullptr);
+    SFEM_TEST_ASSERT(cube_coarse_op != nullptr);
+
+    std::vector<ptrdiff_t> cb_to_cube;
+    SFEM_TEST_ASSERT(map_nodes_by_xyz(*cb_coarse_fs->mesh_ptr(), *cube_coarse_fs->mesh_ptr(), cb_to_cube) ==
+                     SFEM_TEST_SUCCESS);
+
+    auto x_cb    = sfem::create_host_buffer<real_t>(cb_coarse_fs->n_dofs());
+    auto x_cube  = sfem::create_host_buffer<real_t>(cube_coarse_fs->n_dofs());
+    auto y_cb    = sfem::create_host_buffer<real_t>(cb_coarse_fs->n_dofs());
+    auto y_cube  = sfem::create_host_buffer<real_t>(cube_coarse_fs->n_dofs());
+    if (block_size == 1) {
+        fill_scalar_field(*cb_coarse_fs->mesh_ptr(), x_cb->data());
+        fill_scalar_field(*cube_coarse_fs->mesh_ptr(), x_cube->data());
+    } else {
+        fill_vector_field(*cb_coarse_fs->mesh_ptr(), x_cb->data());
+        fill_vector_field(*cube_coarse_fs->mesh_ptr(), x_cube->data());
+    }
+    std::fill(y_cb->data(), y_cb->data() + y_cb->size(), real_t(0));
+    std::fill(y_cube->data(), y_cube->data() + y_cube->size(), real_t(0));
+
+    if (hessian_diag) {
+        SFEM_TEST_ASSERT(cb_coarse_op->hessian_diag(nullptr, y_cb->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(cube_coarse_op->hessian_diag(nullptr, y_cube->data()) == SFEM_SUCCESS);
+    } else {
+        SFEM_TEST_ASSERT(cb_coarse_op->apply(nullptr, x_cb->data(), y_cb->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(cube_coarse_op->apply(nullptr, x_cube->data(), y_cube->data()) == SFEM_SUCCESS);
+    }
+
+    const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-10) : real_t(1e-5);
+    return compare_mapped_dofs(y_cb, y_cube, cb_to_cube, block_size, tol);
+}
+
+int test_checkerboard_ss_derefine_lumped_mass() {
+    return checkerboard_ss_to_hex8_derefine_compare("LumpedMass", 1, true);
+}
+
+int test_checkerboard_ss_derefine_vector_laplacian() {
+    return checkerboard_ss_to_hex8_derefine_compare("VectorLaplacian", 3, false);
+}
+
+int test_laplacian_has_kernel_wedge_pyramid() {
+    SFEM_TEST_ASSERT(laplacian_has_kernel(smesh::HEX8));
+    SFEM_TEST_ASSERT(laplacian_has_kernel(smesh::TET4));
+    SFEM_TEST_ASSERT(laplacian_has_kernel(smesh::QUAD4));
+    SFEM_TEST_ASSERT(laplacian_has_kernel(smesh::semistructured_type(smesh::HEX8, 2)));
+    SFEM_TEST_ASSERT(laplacian_has_kernel(smesh::semistructured_type(smesh::TET4, 2)));
+    SFEM_TEST_ASSERT(!laplacian_has_kernel(smesh::WEDGE6));
+    SFEM_TEST_ASSERT(!laplacian_has_kernel(smesh::PYRAMID5));
+    SFEM_TEST_ASSERT(!laplacian_has_kernel(smesh::semistructured_type(smesh::WEDGE6, 2)));
+    SFEM_TEST_ASSERT(!laplacian_has_kernel(smesh::semistructured_type(smesh::PYRAMID5, 2)));
+    SFEM_TEST_ASSERT(!linear_elasticity_has_kernel(smesh::WEDGE6));
+    SFEM_TEST_ASSERT(!linear_elasticity_has_kernel(smesh::PYRAMID5));
+    SFEM_TEST_ASSERT(linear_elasticity_has_kernel(smesh::HEX8));
+    SFEM_TEST_ASSERT(linear_elasticity_has_kernel(smesh::TET4));
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_hex_dominant_laplacian_hex_tet_only() {
+    auto mesh = smesh::Mesh::create_hex_dominant_serial(sfem::Communicator::self());
+    SFEM_TEST_ASSERT(mesh != nullptr);
+    SFEM_TEST_EQ(mesh->n_blocks(), static_cast<size_t>(4));
+    SFEM_TEST_EQ(mesh->element_type(0), smesh::HEX8);
+    SFEM_TEST_EQ(mesh->element_type(1), smesh::PYRAMID5);
+    SFEM_TEST_EQ(mesh->element_type(2), smesh::TET4);
+    SFEM_TEST_EQ(mesh->element_type(3), smesh::WEDGE6);
+
+    auto space = sfem::FunctionSpace::create(mesh, 1);
+    auto op    = sfem::create_op(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(op != nullptr);
+    SFEM_TEST_ASSERT(op->initialize({"hex", "tet"}) == SFEM_SUCCESS);
+
+    auto x = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto y = sfem::create_host_buffer<real_t>(space->n_dofs());
+    fill_scalar_field(*mesh, x->data());
+    std::fill(y->data(), y->data() + y->size(), real_t(0));
+    SFEM_TEST_ASSERT(op->apply(nullptr, x->data(), y->data()) == SFEM_SUCCESS);
+    for (ptrdiff_t i = 0; i < (ptrdiff_t)y->size(); ++i) {
+        SFEM_TEST_ASSERT(std::isfinite(y->data()[i]));
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_hex_dominant_ss_laplacian_hex_tet_only() {
+    auto hexdom = smesh::Mesh::create_hex_dominant_serial(sfem::Communicator::self());
+    auto ss     = smesh::to_semistructured(2, hexdom, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+    SFEM_TEST_EQ(ss->n_blocks(), static_cast<size_t>(4));
+    SFEM_TEST_ASSERT(smesh::is_hex_ss_family(ss->element_type(0)));
+    SFEM_TEST_ASSERT(smesh::is_pyramid_ss_family(ss->element_type(1)));
+    SFEM_TEST_ASSERT(smesh::is_tet_ss_family(ss->element_type(2)));
+    SFEM_TEST_ASSERT(smesh::is_wedge_ss_family(ss->element_type(3)));
+
+    auto space = sfem::FunctionSpace::create(ss, 1);
+    auto op    = sfem::create_op(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(op != nullptr);
+    SFEM_TEST_ASSERT(op->initialize({"hex", "tet"}) == SFEM_SUCCESS);
+
+    auto x = sfem::create_host_buffer<real_t>(space->n_dofs());
+    auto y = sfem::create_host_buffer<real_t>(space->n_dofs());
+    fill_scalar_field(*ss, x->data());
+    std::fill(y->data(), y->data() + y->size(), real_t(0));
+    SFEM_TEST_ASSERT(op->apply(nullptr, x->data(), y->data()) == SFEM_SUCCESS);
+    for (ptrdiff_t i = 0; i < (ptrdiff_t)y->size(); ++i) {
+        SFEM_TEST_ASSERT(std::isfinite(y->data()[i]));
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
     SFEM_RUN_TEST(test_multi_block_op);
+    SFEM_RUN_TEST(test_checkerboard_ss_laplacian_apply);
     SFEM_RUN_TEST(test_checkerboard_sshex_em_laplacian_apply);
     SFEM_RUN_TEST(test_checkerboard_sshex_em_linear_elasticity_apply);
     SFEM_RUN_TEST(test_hex8_tet4_laplacian_apply);
+    SFEM_RUN_TEST(test_hex8_tet4_ss_laplacian_apply);
+    SFEM_RUN_TEST(test_hex8_tet4_ss_linear_elasticity_apply);
+    SFEM_RUN_TEST(test_checkerboard_ss_derefine_lumped_mass);
+    SFEM_RUN_TEST(test_checkerboard_ss_derefine_vector_laplacian);
+    SFEM_RUN_TEST(test_laplacian_has_kernel_wedge_pyramid);
+    SFEM_RUN_TEST(test_hex_dominant_laplacian_hex_tet_only);
+    SFEM_RUN_TEST(test_hex_dominant_ss_laplacian_hex_tet_only);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

@@ -135,8 +135,11 @@ int linear_elasticity_apply_adjugate_soa(const smesh::ElemType                  
                                          const real_t *const SFEM_RESTRICT              u,
                                          real_t *const SFEM_RESTRICT                    values);
 
-/// Element types that support linear_elasticity_apply_adjugate_aos (HEX8 and Proteus semistructured hex).
+/// Element types that support linear_elasticity_apply_adjugate_aos (HEX8 and HEX-family SS).
 int linear_elasticity_is_opt(smesh::ElemType element_type);
+
+/// 1 if linear_elasticity_apply_aos has a kernel; 0 for WEDGE/PYRAMID and other gaps.
+int linear_elasticity_has_kernel(smesh::ElemType element_type);
 
 int linear_elasticity_block_diag_sym_aos(const smesh::ElemType        element_type,
                                          const ptrdiff_t              nelements,

@@ -197,6 +197,50 @@ std::shared_ptr<smesh::Mesh> create_two_block_tet4_cube(const ptrdiff_t nx, cons
     return std::make_shared<smesh::Mesh>(base->comm(), blocks, base->points());
 }
 
+std::shared_ptr<smesh::Mesh> mesh_from_single_block(const std::shared_ptr<smesh::Mesh> &mesh, const size_t b) {
+    std::vector<std::shared_ptr<smesh::Mesh::Block>> blocks;
+    blocks.push_back(mesh->block(b));
+    return std::make_shared<smesh::Mesh>(mesh->comm(), blocks, mesh->points());
+}
+
+void mark_block_nodes(const std::shared_ptr<smesh::Mesh::Block> &block, std::vector<char> &mask) {
+    const ptrdiff_t ne = block->n_elements();
+    if (ne == 0) {
+        return;
+    }
+    const int nxe = block->n_nodes_per_element();
+    auto      els = block->elements()->data();
+    for (int d = 0; d < nxe; ++d) {
+        for (ptrdiff_t e = 0; e < ne; ++e) {
+            const idx_t n = els[d][e];
+            if (n >= 0 && (size_t)n < mask.size()) {
+                mask[(size_t)n] = 1;
+            }
+        }
+    }
+}
+
+int compare_masked(const sfem::SharedBuffer<real_t> &a, const sfem::SharedBuffer<real_t> &b, const std::vector<char> &mask) {
+    const ptrdiff_t n   = (ptrdiff_t)a->size();
+    const real_t    tol = val_tol();
+    SFEM_TEST_EQ(n, (ptrdiff_t)b->size());
+    SFEM_TEST_EQ(n, (ptrdiff_t)mask.size());
+    auto      da        = a->data();
+    auto      db        = b->data();
+    ptrdiff_t n_checked = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        if (!mask[(size_t)i]) {
+            continue;
+        }
+        SFEM_TEST_ASSERT(std::isfinite(da[i]));
+        SFEM_TEST_ASSERT(std::isfinite(db[i]));
+        SFEM_TEST_ASSERT(std::fabs(da[i] - db[i]) <= tol);
+        ++n_checked;
+    }
+    SFEM_TEST_ASSERT(n_checked > 0);
+    return SFEM_TEST_SUCCESS;
+}
+
 }  // namespace
 
 int test_checkerboard_prolong_ones() {
@@ -452,6 +496,109 @@ int test_two_block_tet4_vs_cube() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_hex8_tet4_ss_vs_split_blocks() {
+    auto mesh = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    SFEM_TEST_ASSERT(mesh != nullptr);
+    SFEM_TEST_EQ(mesh->n_blocks(), static_cast<size_t>(2));
+    SFEM_TEST_ASSERT(mesh->block(0)->name() == "hex");
+    SFEM_TEST_ASSERT(mesh->block(1)->name() == "tet");
+
+    auto mixed = make_ss_pair(mesh);
+    SFEM_TEST_ASSERT(mixed.fine->has_semi_structured_mesh());
+    SFEM_TEST_ASSERT(mixed.coarse->has_semi_structured_mesh());
+    SFEM_TEST_ASSERT(smesh::is_hex_ss_family(mixed.fine->element_type(0)));
+    SFEM_TEST_ASSERT(smesh::is_tet_ss_family(mixed.fine->element_type(1)));
+    SFEM_TEST_ASSERT(smesh::is_hex_ss_family(mixed.coarse->element_type(0)));
+    SFEM_TEST_ASSERT(smesh::is_tet_ss_family(mixed.coarse->element_type(1)));
+
+    auto hex_fine   = sfem::FunctionSpace::create(mesh_from_single_block(mixed.fine->mesh_ptr(), 0), 1);
+    auto hex_coarse = sfem::FunctionSpace::create(mesh_from_single_block(mixed.coarse->mesh_ptr(), 0), 1);
+    auto tet_fine   = sfem::FunctionSpace::create(mesh_from_single_block(mixed.fine->mesh_ptr(), 1), 1);
+    auto tet_coarse = sfem::FunctionSpace::create(mesh_from_single_block(mixed.coarse->mesh_ptr(), 1), 1);
+    SFEM_TEST_EQ(hex_fine->n_dofs(), mixed.fine->n_dofs());
+    SFEM_TEST_EQ(tet_fine->n_dofs(), mixed.fine->n_dofs());
+    SFEM_TEST_EQ(hex_coarse->n_dofs(), mixed.coarse->n_dofs());
+    SFEM_TEST_EQ(tet_coarse->n_dofs(), mixed.coarse->n_dofs());
+
+    std::vector<char> hex_fine_nodes((size_t)mixed.fine->n_dofs(), 0);
+    std::vector<char> tet_fine_nodes((size_t)mixed.fine->n_dofs(), 0);
+    std::vector<char> hex_coarse_nodes((size_t)mixed.coarse->n_dofs(), 0);
+    std::vector<char> tet_coarse_nodes((size_t)mixed.coarse->n_dofs(), 0);
+    mark_block_nodes(mixed.fine->mesh().block(0), hex_fine_nodes);
+    mark_block_nodes(mixed.fine->mesh().block(1), tet_fine_nodes);
+    mark_block_nodes(mixed.coarse->mesh().block(0), hex_coarse_nodes);
+    mark_block_nodes(mixed.coarse->mesh().block(1), tet_coarse_nodes);
+
+    std::vector<char> hex_exclusive_coarse = hex_coarse_nodes;
+    std::vector<char> tet_exclusive_coarse = tet_coarse_nodes;
+    for (size_t i = 0; i < hex_exclusive_coarse.size(); ++i) {
+        if (hex_coarse_nodes[i] && tet_coarse_nodes[i]) {
+            hex_exclusive_coarse[i] = 0;
+            tet_exclusive_coarse[i] = 0;
+        }
+    }
+
+    const auto es = sfem::EXECUTION_SPACE_HOST;
+
+    {
+        auto p_mixed = sfem::create_hierarchical_prolongation(mixed.coarse, mixed.fine, es);
+        auto p_hex   = sfem::create_hierarchical_prolongation(hex_coarse, hex_fine, es);
+        auto p_tet   = sfem::create_hierarchical_prolongation(tet_coarse, tet_fine, es);
+
+        auto c_mixed = sfem::create_host_buffer<real_t>(mixed.coarse->n_dofs());
+        auto c_hex   = sfem::create_host_buffer<real_t>(hex_coarse->n_dofs());
+        auto c_tet   = sfem::create_host_buffer<real_t>(tet_coarse->n_dofs());
+        auto f_mixed = sfem::create_host_buffer<real_t>(mixed.fine->n_dofs());
+        auto f_hex   = sfem::create_host_buffer<real_t>(hex_fine->n_dofs());
+        auto f_tet   = sfem::create_host_buffer<real_t>(tet_fine->n_dofs());
+
+        fill_ones(c_mixed);
+        fill_ones(c_hex);
+        fill_ones(c_tet);
+        SFEM_TEST_ASSERT(p_mixed->apply(c_mixed->data(), f_mixed->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(p_hex->apply(c_hex->data(), f_hex->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(p_tet->apply(c_tet->data(), f_tet->data()) == SFEM_SUCCESS);
+
+        const real_t tol = val_tol();
+        auto         dm  = f_mixed->data();
+        for (ptrdiff_t i = 0; i < mixed.fine->n_dofs(); ++i) {
+            SFEM_TEST_ASSERT(std::isfinite(dm[i]));
+            SFEM_TEST_ASSERT(std::fabs(dm[i] - real_t(1)) <= tol);
+        }
+        SFEM_TEST_ASSERT(compare_masked(f_mixed, f_hex, hex_fine_nodes) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(compare_masked(f_mixed, f_tet, tet_fine_nodes) == SFEM_TEST_SUCCESS);
+    }
+
+    {
+        auto r_mixed = sfem::create_hierarchical_restriction(mixed.fine, mixed.coarse, es);
+        auto r_hex   = sfem::create_hierarchical_restriction(hex_fine, hex_coarse, es);
+        auto r_tet   = sfem::create_hierarchical_restriction(tet_fine, tet_coarse, es);
+
+        auto f_mixed = sfem::create_host_buffer<real_t>(mixed.fine->n_dofs());
+        auto f_hex   = sfem::create_host_buffer<real_t>(hex_fine->n_dofs());
+        auto f_tet   = sfem::create_host_buffer<real_t>(tet_fine->n_dofs());
+        auto c_mixed = sfem::create_host_buffer<real_t>(mixed.coarse->n_dofs());
+        auto c_hex   = sfem::create_host_buffer<real_t>(hex_coarse->n_dofs());
+        auto c_tet   = sfem::create_host_buffer<real_t>(tet_coarse->n_dofs());
+
+        fill_ones(f_mixed);
+        fill_ones(f_hex);
+        fill_ones(f_tet);
+        SFEM_TEST_ASSERT(r_mixed->apply(f_mixed->data(), c_mixed->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(r_hex->apply(f_hex->data(), c_hex->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(r_tet->apply(f_tet->data(), c_tet->data()) == SFEM_SUCCESS);
+
+        auto d = c_mixed->data();
+        for (ptrdiff_t i = 0; i < mixed.coarse->n_dofs(); ++i) {
+            SFEM_TEST_ASSERT(std::isfinite(d[i]));
+        }
+        SFEM_TEST_ASSERT(compare_masked(c_mixed, c_hex, hex_exclusive_coarse) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(compare_masked(c_mixed, c_tet, tet_exclusive_coarse) == SFEM_TEST_SUCCESS);
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
@@ -460,7 +607,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_checkerboard_vs_cube);
     SFEM_RUN_TEST(test_two_block_quad4_vs_square);
     SFEM_RUN_TEST(test_two_block_tet4_vs_cube);
+    SFEM_RUN_TEST(test_hex8_tet4_ss_vs_split_blocks);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

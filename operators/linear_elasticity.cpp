@@ -3,6 +3,7 @@
 #include "hex8_linear_elasticity.hpp"
 #include "sfem_defs.hpp"
 #include "sshex8_linear_elasticity.hpp"
+#include "sstet4_linear_elasticity.hpp"
 
 #include "macro_tet4_linear_elasticity.hpp"
 #include "tet10_linear_elasticity.hpp"
@@ -13,7 +14,40 @@
 #include <stdio.h>
 
 int linear_elasticity_is_opt(smesh::ElemType element_type) {
-    return element_type == smesh::HEX8 || sfem::is_semistructured_type(element_type);
+    return element_type == smesh::HEX8 ||
+           (sfem::is_semistructured_type(element_type) && smesh::is_hex_ss_family(element_type));
+}
+
+static int linear_elasticity_ss_not_implemented(const char *const fn, const smesh::ElemType element_type) {
+    if (smesh::is_wedge_ss_family(element_type)) {
+        SFEM_ERROR("%s: no kernel for WEDGE family (%s); hex-dominant apply is not implemented\n",
+                   fn,
+                   type_to_string(element_type));
+    } else if (smesh::is_pyramid_ss_family(element_type)) {
+        SFEM_ERROR("%s: no kernel for PYRAMID family (%s); hex-dominant apply is not implemented\n",
+                   fn,
+                   type_to_string(element_type));
+    } else {
+        SFEM_ERROR("%s not implemented for semi-structured element type %s\n", fn, type_to_string(element_type));
+    }
+    return SFEM_FAILURE;
+}
+
+int linear_elasticity_has_kernel(smesh::ElemType element_type) {
+    if (sfem::is_semistructured_type(element_type)) {
+        return smesh::is_hex_ss_family(element_type) || smesh::is_tet_ss_family(element_type);
+    }
+
+    switch (element_type) {
+        case smesh::TRI3:
+        case smesh::TET4:
+        case smesh::TET10:
+        case smesh::MACRO_TET4:
+        case smesh::HEX8:
+            return 1;
+        default:
+            return 0;
+    }
 }
 
 int linear_elasticity_assemble_value_soa(const smesh::ElemType              element_type,
@@ -163,8 +197,14 @@ int linear_elasticity_assemble_diag_aos(const smesh::ElemType        element_typ
                                         real_t *const SFEM_RESTRICT  values) {
     if (sfem::is_semistructured_type(element_type)) {
         const int level = smesh::semistructured_level(element_type);
-        return affine_sshex8_linear_elasticity_diag(
-                level, nelements, nnodes, elements, points, mu, lambda, 3, &values[0], &values[1], &values[2]);
+        if (smesh::is_hex_ss_family(element_type)) {
+            return affine_sshex8_linear_elasticity_diag(
+                    level, nelements, nnodes, elements, points, mu, lambda, 3, &values[0], &values[1], &values[2]);
+        }
+        if (smesh::is_tet_ss_family(element_type)) {
+            return sstet4_linear_elasticity_diag_points(level, nelements, elements, points, mu, lambda, values);
+        }
+        return linear_elasticity_ss_not_implemented("linear_elasticity_assemble_diag_aos", element_type);
     }
 
     switch (element_type) {
@@ -206,21 +246,27 @@ int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                 real_t *const SFEM_RESTRICT       values) {
     if (sfem::is_semistructured_type(element_type)) {
         const int level = smesh::semistructured_level(element_type);
-        return sshex8_linear_elasticity_apply(level,
-                                              nelements,
-                                              nnodes,
-                                              elements,
-                                              points,
-                                              mu,
-                                              lambda,
-                                              3,
-                                              &u[0],
-                                              &u[1],
-                                              &u[2],
-                                              3,
-                                              &values[0],
-                                              &values[1],
-                                              &values[2]);
+        if (smesh::is_hex_ss_family(element_type)) {
+            return sshex8_linear_elasticity_apply(level,
+                                                  nelements,
+                                                  nnodes,
+                                                  elements,
+                                                  points,
+                                                  mu,
+                                                  lambda,
+                                                  3,
+                                                  &u[0],
+                                                  &u[1],
+                                                  &u[2],
+                                                  3,
+                                                  &values[0],
+                                                  &values[1],
+                                                  &values[2]);
+        }
+        if (smesh::is_tet_ss_family(element_type)) {
+            return sstet4_linear_elasticity_apply_points(level, nelements, elements, points, mu, lambda, u, values);
+        }
+        return linear_elasticity_ss_not_implemented("linear_elasticity_apply_aos", element_type);
     }
 
     switch (element_type) {
@@ -293,6 +339,9 @@ int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                                  &values[2]);
         }
         default: {
+            if (smesh::is_wedge_ss_family(element_type) || smesh::is_pyramid_ss_family(element_type)) {
+                return linear_elasticity_ss_not_implemented("linear_elasticity_apply_aos", element_type);
+            }
             SFEM_ERROR("linear_elasticity_apply_aos not implemented for type %s\n", type_to_string(element_type));
         }
     }
@@ -332,6 +381,9 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 e
     }
 
     if (sfem::is_semistructured_type(element_type)) {
+        if (!smesh::is_hex_ss_family(element_type)) {
+            return linear_elasticity_ss_not_implemented("linear_elasticity_apply_adjugate_aos", element_type);
+        }
         const int level = smesh::semistructured_level(element_type);
         return affine_sshex8_linear_elasticity_apply_macro_adjugate(level,
                                                                     nelements,
@@ -424,6 +476,9 @@ int linear_elasticity_bsr(const smesh::ElemType              element_type,
                           const idx_t *const SFEM_RESTRICT   colidx,
                           real_t *const SFEM_RESTRICT        values) {
     if (sfem::is_semistructured_type(element_type)) {
+        if (!smesh::is_hex_ss_family(element_type)) {
+            return linear_elasticity_ss_not_implemented("linear_elasticity_bsr", element_type);
+        }
         const int level = smesh::semistructured_level(element_type);
         return affine_sshex8_elasticity_bsr(level, nelements, nnodes, elements, points, mu, lambda, rowptr, colidx, values);
     }
@@ -481,6 +536,9 @@ int linear_elasticity_block_diag_sym_aos(const smesh::ElemType        element_ty
                                          const real_t                 lambda,
                                          real_t *const                out) {
     if (sfem::is_semistructured_type(element_type)) {
+        if (!smesh::is_hex_ss_family(element_type)) {
+            return linear_elasticity_ss_not_implemented("linear_elasticity_block_diag_sym_aos", element_type);
+        }
         const int level = smesh::semistructured_level(element_type);
         return affine_sshex8_linear_elasticity_block_diag_sym(
                 level, nelements, nnodes, elements, points, mu, lambda, 6, &out[0], &out[1], &out[2], &out[3], &out[4], &out[5]);
@@ -511,6 +569,9 @@ int linear_elasticity_block_diag_sym_soa(const smesh::ElemType        element_ty
                                          const real_t                 lambda,
                                          real_t **const SFEM_RESTRICT out) {
     if (sfem::is_semistructured_type(element_type)) {
+        if (!smesh::is_hex_ss_family(element_type)) {
+            return linear_elasticity_ss_not_implemented("linear_elasticity_block_diag_sym_soa", element_type);
+        }
         const int level = smesh::semistructured_level(element_type);
         return affine_sshex8_linear_elasticity_block_diag_sym(
                 level, nelements, nnodes, elements, points, mu, lambda, 1, out[0], out[1], out[2], out[3], out[4], out[5]);
@@ -542,6 +603,9 @@ int linear_elasticity_objective_steps_aos(const smesh::ElemType             elem
                                           const real_t *const               steps,
                                           real_t *const SFEM_RESTRICT       out) {
     if (sfem::is_semistructured_type(element_type)) {
+        if (!smesh::is_hex_ss_family(element_type)) {
+            return linear_elasticity_ss_not_implemented("linear_elasticity_objective_steps_aos", element_type);
+        }
         const int level = smesh::semistructured_level(element_type);
         return sshex8_linear_elasticity_objective_steps(level,
                                                         nelements,

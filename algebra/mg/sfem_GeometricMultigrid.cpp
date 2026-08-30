@@ -22,9 +22,11 @@ namespace sfem {
         auto  es     = f->execution_space();
         auto &ssmesh = f->space()->mesh();
 
-        smesh::ElemType family = smesh::INVALID;
+        bool has_hex  = false;
+        bool has_tet  = false;
+        bool has_quad = false;
         for (size_t b = 0; b < ssmesh.n_blocks(); ++b) {
-            const auto bid = static_cast<smesh::block_idx_t>(b);
+            const auto bid  = static_cast<smesh::block_idx_t>(b);
             const auto type = ssmesh.element_type(bid);
             if (!smesh::is_semistructured_type(type)) {
                 SFEM_ERROR("create_gmg_data: block %zu is not semistructured (type %s)\n",
@@ -34,21 +36,20 @@ namespace sfem {
             }
 
             const auto block_family = smesh::ss_source_family(type);
-            if (family == smesh::INVALID) {
-                family = block_family;
-            } else if (family != block_family) {
-                SFEM_ERROR("create_gmg_data: mixed SS families are not implemented (block %zu type %s, expected %s)\n",
-                           b,
-                           smesh::type_to_string(type),
-                           smesh::type_to_string(family));
+            if (block_family != smesh::HEX8 && block_family != smesh::QUAD4 && block_family != smesh::TET4) {
+                SFEM_ERROR("create_gmg_data: SS family %s is not implemented in SSGMG yet\n",
+                           smesh::type_to_string(block_family));
                 return nullptr;
             }
 
-            if (family != smesh::HEX8 && family != smesh::QUAD4 && family != smesh::TET4) {
-                SFEM_ERROR("create_gmg_data: SS family %s is not implemented in SSGMG yet\n",
-                           smesh::type_to_string(family));
-                return nullptr;
-            }
+            has_hex |= block_family == smesh::HEX8;
+            has_tet |= block_family == smesh::TET4;
+            has_quad |= block_family == smesh::QUAD4;
+        }
+
+        if (has_quad && (has_hex || has_tet)) {
+            SFEM_ERROR("create_gmg_data: mixed SS families with QUAD are not implemented\n");
+            return nullptr;
         }
 
         std::vector<int> levels = smesh::derefinement_levels(ssmesh);
@@ -132,6 +133,22 @@ namespace sfem {
         const int  nlevels        = data->functions.size();
         const int  sym_block_size = (block_size == 3 ? 6 : 3);
 
+        bool mixed_hex_tet = false;
+        {
+            auto &mesh = data->functions.front()->space()->mesh();
+            bool  has_hex = false;
+            bool  has_tet = false;
+            for (size_t b = 0; b < mesh.n_blocks(); ++b) {
+                const auto fam = smesh::ss_source_family(mesh.element_type(static_cast<smesh::block_idx_t>(b)));
+                has_hex |= fam == smesh::HEX8;
+                has_tet |= fam == smesh::TET4;
+            }
+            mixed_hex_tet = has_hex && has_tet;
+        }
+        // ω=1 is unstable on mixed HEX+TET rediscretization (interface modes).
+        const real_t jacobi_omega =
+                smesh::Env::read("SFEM_MG_JACOBI_RELAXATION", mixed_hex_tet ? real_t(0.5) : real_t(1));
+
         auto create_jacobi = [&](const std::shared_ptr<Function> &f) -> std::shared_ptr<Operator<real_t>> {
             if (block_size == 1) {
                 auto diag = sfem::create_buffer<real_t>(f->space()->n_dofs(), es);
@@ -139,7 +156,7 @@ namespace sfem {
                 f->set_value_to_constrained_dofs(1, diag->data());
 
                 auto jacobi = sfem::create_shiftable_jacobi(diag, es);
-                jacobi->set_relaxation_parameter(smesh::Env::read("SFEM_MG_JACOBI_RELAXATION", real_t(1)));
+                jacobi->set_relaxation_parameter(jacobi_omega);
                 return jacobi;
             } else {
                 auto fs   = f->space();
@@ -209,3 +226,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

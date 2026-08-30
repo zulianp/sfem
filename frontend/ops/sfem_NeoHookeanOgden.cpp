@@ -380,8 +380,6 @@ namespace sfem {
             ret->impl_->mu                       = impl_->mu;
             ret->impl_->lambda                   = impl_->lambda;
             ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
-            assert(space->n_blocks() == 1);
-            ret->override_element_types({space->element_type()});
             return ret;
         }
 
