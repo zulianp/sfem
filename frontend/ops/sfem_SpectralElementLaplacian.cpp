@@ -11,6 +11,7 @@
 #include "smesh_semistructured.hpp"
 
 #include "smesh_glob.hpp"
+#include "sfem_logger.hpp"
 
 namespace sfem {
 
@@ -54,18 +55,21 @@ namespace sfem {
     std::shared_ptr<Op> SpectralElementLaplacian::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("SpectralElementLaplacian::derefine_op");
 
+        if (space->n_blocks() > 1) {
+            SFEM_ERROR("SpectralElementLaplacian::derefine_op: multi-block is not implemented\n");
+            return nullptr;
+        }
+
         assert(space->has_semi_structured_mesh() || space->element_type() == macro_base_elem(element_type));
         if (space->has_semi_structured_mesh()) {
             auto ret          = std::make_shared<SpectralElementLaplacian>(space);
             ret->element_type = element_type;
             return ret;
-        } else {
-            auto ret = std::make_shared<Laplacian>(space);
-            // ret->element_type = macro_base_elem(element_type);
-            assert(space->n_blocks() == 1);  // FIXME
-            ret->override_element_types({macro_base_elem(element_type)});
-            return ret;
         }
+
+        auto ret = std::make_shared<Laplacian>(space);
+        ret->initialize({});
+        return ret;
     }
 
     const char *SpectralElementLaplacian::name() const { return "SpectralElementLaplacian"; }
@@ -97,13 +101,24 @@ namespace sfem {
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
         auto &ssm = space->mesh();
+        if (ssm.n_blocks() != 1) {
+            SFEM_ERROR("SpectralElementLaplacian::apply: multi-block is not implemented\n");
+            return SFEM_FAILURE;
+        }
+        if (!smesh::is_hex_ss_family(ssm.element_type(0))) {
+            SFEM_ERROR("SpectralElementLaplacian::apply: HEX SS family required (got %s)\n",
+                       smesh::type_to_string(ssm.element_type(0)));
+            return SFEM_FAILURE;
+        }
+
+        auto block = ssm.block(0);
 
         double tick = smesh::time_seconds();
 
         int err = spectral_hex_laplacian_apply(smesh::semistructured_level(ssm),
-                                               ssm.n_elements(),
+                                               block->n_elements(),
                                                smesh::semistructured_interior_start(ssm),
-                                               ssm.elements(0)->data(),
+                                               block->elements()->data(),
                                                ssm.points()->data(),
                                                h,
                                                out);
@@ -126,3 +141,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

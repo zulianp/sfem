@@ -170,7 +170,8 @@ namespace sfem {
         }
 
         bool domain_supports_adjugate_cache(const smesh::ElemType et) {
-            return et == smesh::HEX8 || sfem::is_semistructured_type(et);
+            return et == smesh::HEX8 ||
+                   (sfem::is_semistructured_type(et) && smesh::is_hex_ss_family(et));
         }
 
         int linear_elasticity_dispatch_domain_vector(const OpDomain     &domain,
@@ -252,6 +253,9 @@ namespace sfem {
     int LinearElasticity::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("LinearElasticity::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+        if (impl_->domains->require_supported_types("LinearElasticity", linear_elasticity_has_kernel) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
 
         real_t SFEM_SHEAR_MODULUS        = 1;
         real_t SFEM_FIRST_LAME_PARAMETER = 1;
@@ -677,3 +681,4 @@ namespace sfem {
 #endif  // SFEM_ENABLE_RYAML
 
 }  // namespace sfem
+

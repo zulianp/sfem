@@ -343,6 +343,56 @@ int sstet4_linear_elasticity_apply_points(const int                         leve
     return SFEM_SUCCESS;
 }
 
+int sstet4_linear_elasticity_diag_points(const int                    level,
+                                         const ptrdiff_t              nelements,
+                                         idx_t **const SFEM_RESTRICT  elements,
+                                         geom_t **const SFEM_RESTRICT points,
+                                         const real_t                 mu,
+                                         const real_t                 lambda,
+                                         real_t *const SFEM_RESTRICT  values) {
+    if (!elements || !points || !values || level < 1 || nelements < 0) {
+        return SFEM_FAILURE;
+    }
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
+        smesh::sstet4_transfer::for_each_microtet(level, [&](const int *const lev) {
+            const idx_t gv[4] = {elements[lev[0]][e], elements[lev[1]][e], elements[lev[2]][e], elements[lev[3]][e]};
+            accumulator_t outx[4], outy[4], outz[4];
+            scalar_t      jacobian_adjugate[9];
+            scalar_t      jacobian_determinant = 0;
+
+            tet4_adjugate_and_det_s(points[0][gv[0]],
+                                    points[0][gv[1]],
+                                    points[0][gv[2]],
+                                    points[0][gv[3]],
+                                    points[1][gv[0]],
+                                    points[1][gv[1]],
+                                    points[1][gv[2]],
+                                    points[1][gv[3]],
+                                    points[2][gv[0]],
+                                    points[2][gv[1]],
+                                    points[2][gv[2]],
+                                    points[2][gv[3]],
+                                    jacobian_adjugate,
+                                    &jacobian_determinant);
+
+            tet4_linear_elasticity_diag_adj(mu, lambda, jacobian_adjugate, jacobian_determinant, outx, outy, outz);
+
+            for (int i = 0; i < 4; ++i) {
+#pragma omp atomic update
+                values[gv[i] * 3 + 0] += outx[i];
+#pragma omp atomic update
+                values[gv[i] * 3 + 1] += outy[i];
+#pragma omp atomic update
+                values[gv[i] * 3 + 2] += outz[i];
+            }
+        });
+    }
+
+    return SFEM_SUCCESS;
+}
+
 int sstet4_linear_elasticity_stencil_create_from_points(const int                                  level,
                                                         const ptrdiff_t                            nelements,
                                                         idx_t **const SFEM_RESTRICT                elements,

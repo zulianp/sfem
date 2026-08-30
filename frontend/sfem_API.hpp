@@ -416,14 +416,29 @@ namespace sfem {
         return smesh::is_semistructured_type(type) ? smesh::ss_source_family(type) : type;
     }
 
-    static smesh::ElemType assert_supported_ss_transfer_meshes(const Mesh &from, const Mesh &to) {
+    static smesh::ElemType ss_block_family(const Mesh &mesh, const size_t b) {
+        return smesh::ss_source_family(mesh.element_type(static_cast<smesh::block_idx_t>(b)));
+    }
+
+    static bool ss_all_hex_family(const Mesh &mesh) {
+        for (size_t b = 0; b < mesh.n_blocks(); ++b) {
+            if (ss_block_family(mesh, b) != smesh::HEX8) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static void assert_supported_ss_transfer_meshes(const Mesh &from, const Mesh &to) {
         if (from.n_blocks() != to.n_blocks()) {
             SFEM_ERROR("hierarchical transfer: from/to n_blocks mismatch (%zu vs %zu)\n", from.n_blocks(), to.n_blocks());
         }
 
-        smesh::ElemType family = smesh::INVALID;
+        bool has_hex  = false;
+        bool has_tet  = false;
+        bool has_quad = false;
         for (size_t b = 0; b < from.n_blocks(); ++b) {
-            const auto bid = static_cast<smesh::block_idx_t>(b);
+            const auto bid       = static_cast<smesh::block_idx_t>(b);
             const auto from_type = from.element_type(bid);
             const auto to_type   = to.element_type(bid);
             if (!smesh::is_semistructured_type(to_type)) {
@@ -441,22 +456,18 @@ namespace sfem {
                            smesh::type_to_string(to_type));
             }
 
-            if (family == smesh::INVALID) {
-                family = to_family;
-            } else if (family != to_family) {
-                SFEM_ERROR(
-                        "hierarchical transfer: mixed SS families are not implemented (block %zu type %s, expected %s)\n",
-                        b,
-                        smesh::type_to_string(to_type),
-                        smesh::type_to_string(family));
+            if (to_family != smesh::HEX8 && to_family != smesh::QUAD4 && to_family != smesh::TET4) {
+                SFEM_ERROR("hierarchical transfer: SS family %s is not implemented\n", smesh::type_to_string(to_family));
             }
 
-            if (family != smesh::HEX8 && family != smesh::QUAD4 && family != smesh::TET4) {
-                SFEM_ERROR("hierarchical transfer: SS family %s is not implemented\n", smesh::type_to_string(family));
-            }
+            has_hex |= to_family == smesh::HEX8;
+            has_tet |= to_family == smesh::TET4;
+            has_quad |= to_family == smesh::QUAD4;
         }
 
-        return family;
+        if (has_quad && (has_hex || has_tet)) {
+            SFEM_ERROR("hierarchical transfer: mixed SS families with QUAD are not implemented\n");
+        }
     }
 
     static std::shared_ptr<Operator<real_t>> wrap_prolongation_coarse_gather(
@@ -489,8 +500,9 @@ namespace sfem {
                                                                               const ExecutionSpace                  es) {
         const bool to_ss   = to_space->has_semi_structured_mesh();
         const bool from_ss = from_space->has_semi_structured_mesh();
-        const auto ss_family =
-                to_ss ? assert_supported_ss_transfer_meshes(from_space->mesh(), to_space->mesh()) : smesh::INVALID;
+        if (to_ss) {
+            assert_supported_ss_transfer_meshes(from_space->mesh(), to_space->mesh());
+        }
         if (!to_ss && to_space->mesh().n_blocks() > 1) {
             SFEM_ERROR("create_hierarchical_prolongation: unstructured multi-block is not implemented\n");
         }
@@ -498,7 +510,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == es) {
             if (to_ss) {
-                if (ss_family != smesh::HEX8) {
+                if (!ss_all_hex_family(to_space->mesh())) {
                     SFEM_ERROR("create_hierarchical_prolongation: DEVICE SS transfer is implemented for HEX-family only\n");
                 }
                 if (from_ss) {
@@ -586,12 +598,17 @@ namespace sfem {
                                 es));
             }
 
+            if (to_space->mesh().n_blocks() != 1) {
+                SFEM_ERROR("create_hierarchical_prolongation: DEVICE unstructured multi-block is not implemented\n");
+            }
+
             auto elements = to_space->device_elements();
             if (!elements) {
                 elements = create_device_elements(to_space, to_space->element_type());
                 to_space->set_device_elements(elements);
             }
 
+            const ptrdiff_t n_elements = to_space->mesh().n_elements(0);
             return wrap_prolongation_coarse_gather(
                     from_space,
                     es,
@@ -601,7 +618,7 @@ namespace sfem {
                             [=](const real_t *const from, real_t *const to) {
                                 SFEM_TRACE_SCOPE("smesh::cu_macrotet4_to_tet4_prolongation_element_based");
 
-                                smesh::cu_macrotet4_to_tet4_prolongation_element_based(from_space->mesh().n_elements(),
+                                smesh::cu_macrotet4_to_tet4_prolongation_element_based(n_elements,
                                                                                        elements->data(),
                                                                                        from_space->block_size(),
                                                                                        smesh::SMESH_DEFAULT,
@@ -622,7 +639,7 @@ namespace sfem {
                     auto from_mesh = from_space->mesh_ptr();
                     const bool mpi_from = from_mesh && from_mesh->is_distributed() && from_mesh->comm() &&
                                           from_mesh->comm()->size() > 1;
-                    if (mpi_from && ss_family == smesh::HEX8) {
+                    if (mpi_from && ss_all_hex_family(to_space->mesh())) {
                         return wrap_prolongation_coarse_gather(
                                 from_space,
                                 es,
@@ -677,14 +694,15 @@ namespace sfem {
                                             if (ne == 0) {
                                                 continue;
                                             }
-                                            if (ss_family == smesh::HEX8) {
+                                            const auto fam = ss_block_family(ssm, b);
+                                            if (fam == smesh::HEX8) {
                                                 smesh::sshex8_hierarchical_prolongation(level,
                                                                                        ne,
                                                                                        to_b->elements()->data(),
                                                                                        from_space->block_size(),
                                                                                        from,
                                                                                        to);
-                                            } else if (ss_family == smesh::QUAD4) {
+                                            } else if (fam == smesh::QUAD4) {
                                                 smesh::ssquad4_hierarchical_prolongation(level,
                                                                                         ne,
                                                                                         to_b->elements()->data(),
@@ -704,7 +722,13 @@ namespace sfem {
                                     EXECUTION_SPACE_HOST));
                 }
 
-                assert(smesh::semistructured_level(from_space->mesh()) > 1);
+                // Homogeneous HEX SS level 1 is converted to unstructured HEX8 in
+                // FunctionSpace::derefine, so that case never takes SS-to-SS at from_level == 1.
+                // Mixed HEX+TET and homogeneous QUAD/TET keep a level-1 SS coarse space;
+                // ss*_prolongate(..., from_level=1, ...) is valid.
+                assert(smesh::semistructured_level(from_space->mesh()) >= 1);
+                assert(!ss_all_hex_family(from_space->mesh()) ||
+                       smesh::semistructured_level(from_space->mesh()) > 1);
 
                 return wrap_prolongation_coarse_gather(
                         from_space,
@@ -726,7 +750,8 @@ namespace sfem {
                                         if (ne == 0) {
                                             continue;
                                         }
-                                        if (ss_family == smesh::HEX8) {
+                                        const auto fam = ss_block_family(from_ssm, b);
+                                        if (fam == smesh::HEX8) {
                                             smesh::sshex8_prolongate(ne,
                                                                      from_level,
                                                                      1,
@@ -737,7 +762,7 @@ namespace sfem {
                                                                      from_space->block_size(),
                                                                      from,
                                                                      to);
-                                        } else if (ss_family == smesh::QUAD4) {
+                                        } else if (fam == smesh::QUAD4) {
                                             smesh::ssquad4_prolongate(ne,
                                                                       from_level,
                                                                       1,
@@ -1739,26 +1764,9 @@ namespace sfem {
         return max_node_id;
     }
 
+    /// Singular skin: one block only. Multi-block: \c smesh::skin_sidesets.
     static std::shared_ptr<sfem::Sideset> create_skin_sideset(const std::shared_ptr<sfem::Mesh> &mesh) {
-        ptrdiff_t      n_surf_elements = 0;
-        element_idx_t *parent          = 0;
-        int16_t       *side_idx        = 0;
-
-        if (extract_skin_sideset(mesh->n_elements(),
-                                 mesh->n_nodes(),
-                                 mesh->element_type(0),
-                                 mesh->elements(0)->data(),
-                                 &n_surf_elements,
-                                 &parent,
-                                 &side_idx) != SFEM_SUCCESS) {
-            SFEM_ERROR("Failed to extract skin!\n");
-        }
-
-        auto sideset = std::make_shared<sfem::Sideset>(mesh->comm(),
-                                                       sfem::manage_host_buffer(n_surf_elements, parent),
-                                                       sfem::manage_host_buffer(n_surf_elements, side_idx));
-
-        return sideset;
+        return smesh::skin_sideset(mesh);
     }
 
     static SharedInPlaceOperator<real_t> create_zero_constraints_op(const std::shared_ptr<Function> &f) {
@@ -1769,3 +1777,4 @@ namespace sfem {
 }  // namespace sfem
 
 #endif  // SFEM_API_HPP
+

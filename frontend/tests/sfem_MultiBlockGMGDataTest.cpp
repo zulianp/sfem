@@ -54,6 +54,21 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    int assert_named_hex_tet_blocks(const std::shared_ptr<smesh::Mesh> &mesh) {
+        SFEM_TEST_ASSERT(mesh != nullptr);
+        SFEM_TEST_EQ(mesh->n_blocks(), static_cast<size_t>(2));
+        SFEM_TEST_ASSERT(mesh->block(0)->name() == "hex");
+        SFEM_TEST_ASSERT(mesh->block(1)->name() == "tet");
+        return SFEM_TEST_SUCCESS;
+    }
+
+    int assert_hex_tet_ss_types(const std::shared_ptr<smesh::Mesh> &mesh) {
+        SFEM_TEST_ASSERT(assert_named_hex_tet_blocks(mesh) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(smesh::is_hex_ss_family(mesh->element_type(0)));
+        SFEM_TEST_ASSERT(smesh::is_tet_ss_family(mesh->element_type(1)));
+        return SFEM_TEST_SUCCESS;
+    }
+
     sfem::SharedBuffer<idx_t> nodeset_from_sidesets(const std::shared_ptr<smesh::Mesh>                 &mesh,
                                                     const std::vector<std::shared_ptr<smesh::Sideset>> &sidesets) {
         std::vector<idx_t> ids;
@@ -541,6 +556,205 @@ int test_two_block_tet4_ssgmg_residual() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_hex8_tet4_derefine_keeps_blocks() {
+    auto mixed = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    SFEM_TEST_ASSERT(assert_named_hex_tet_blocks(mixed) == SFEM_TEST_SUCCESS);
+
+    auto ss   = smesh::to_semistructured(4, mixed, true, false);
+    auto fine = sfem::FunctionSpace::create(ss, 1);
+    SFEM_TEST_ASSERT(fine->has_semi_structured_mesh());
+    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(fine->mesh_ptr()) == SFEM_TEST_SUCCESS);
+
+    auto mid = fine->derefine(2);
+    SFEM_TEST_ASSERT(mid != nullptr);
+    SFEM_TEST_ASSERT(mid->has_semi_structured_mesh());
+    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(mid->mesh_ptr()) == SFEM_TEST_SUCCESS);
+
+    auto coarse = fine->derefine(1);
+    SFEM_TEST_ASSERT(coarse != nullptr);
+    SFEM_TEST_ASSERT(coarse->has_semi_structured_mesh());
+    SFEM_TEST_ASSERT(assert_hex_tet_ss_types(coarse->mesh_ptr()) == SFEM_TEST_SUCCESS);
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_hex8_tet4_create_gmg_data() {
+    auto mixed = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto ss    = smesh::to_semistructured(4, mixed, true, false);
+    auto fs    = sfem::FunctionSpace::create(ss, 1);
+
+    auto f  = sfem::Function::create(fs);
+    auto op = sfem::create_op(fs, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(op != nullptr);
+    SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+    f->add_operator(op);
+
+    auto data = sfem::create_gmg_data(f);
+    SFEM_TEST_ASSERT(data != nullptr);
+
+    auto levels = smesh::derefinement_levels(fs->mesh());
+    SFEM_TEST_EQ(data->functions.size(), levels.size());
+    SFEM_TEST_EQ(data->restrictions.size(), levels.size() - 1);
+    SFEM_TEST_EQ(data->prolongations.size(), levels.size());
+    SFEM_TEST_ASSERT(data->prolongations.front() == nullptr);
+
+    for (size_t i = 0; i < data->functions.size(); ++i) {
+        auto space = data->functions[i]->space();
+        SFEM_TEST_ASSERT(space != nullptr);
+        SFEM_TEST_ASSERT(space->has_semi_structured_mesh());
+        SFEM_TEST_ASSERT(assert_hex_tet_ss_types(space->mesh_ptr()) == SFEM_TEST_SUCCESS);
+    }
+
+    for (size_t i = 0; i < data->restrictions.size(); ++i) {
+        SFEM_TEST_ASSERT(data->restrictions[i] != nullptr);
+    }
+    for (size_t i = 1; i < data->prolongations.size(); ++i) {
+        SFEM_TEST_ASSERT(data->prolongations[i] != nullptr);
+    }
+
+    auto coarse = sfem::create_host_buffer<real_t>(data->functions[1]->space()->n_dofs());
+    auto fine_v = sfem::create_host_buffer<real_t>(data->functions[0]->space()->n_dofs());
+    fill_ones(coarse);
+    SFEM_TEST_ASSERT(data->prolongations[1]->apply(coarse->data(), fine_v->data()) == SFEM_SUCCESS);
+
+    const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-12) : real_t(1e-5);
+    auto         d   = fine_v->data();
+    for (ptrdiff_t i = 0; i < data->functions[0]->space()->n_dofs(); ++i) {
+        SFEM_TEST_ASSERT(std::isfinite(d[i]));
+        SFEM_TEST_ASSERT(std::fabs(d[i] - real_t(1)) <= tol);
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_hex8_tet4_ssgmg_residual() {
+    auto mixed = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto f     = make_ss_poisson(mixed, false);
+    SFEM_TEST_ASSERT(f != nullptr);
+
+    auto data = sfem::create_gmg_data(f);
+    SFEM_TEST_ASSERT(data != nullptr);
+    SFEM_TEST_EQ(data->functions.size(), smesh::derefinement_levels(f->space()->mesh()).size());
+    for (size_t i = 0; i < data->functions.size(); ++i) {
+        SFEM_TEST_ASSERT(data->functions[i]->space()->has_semi_structured_mesh());
+        SFEM_TEST_ASSERT(assert_hex_tet_ss_types(data->functions[i]->space()->mesh_ptr()) == SFEM_TEST_SUCCESS);
+    }
+
+    SSGMGResidual res;
+    SFEM_TEST_ASSERT(compute_ssgmg_residual(f, res) == SFEM_TEST_SUCCESS);
+
+    printf("hex8+tet4 ssgmg residual abs %g rel %g\n", (double)res.abs_res, (double)res.rel_res);
+
+    const real_t abs_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+    const real_t rel_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+    SFEM_TEST_ASSERT(res.abs_res < abs_tol || res.rel_res < rel_tol);
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_checkerboard_ss_sideset_dirichlet() {
+    auto hex = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 4, 4, 4);
+    auto ss  = smesh::to_semistructured(4, hex, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+
+    auto bottom_pred = [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; };
+    auto right_pred  = [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
+        return x > 1 - 1e-5 && x < 1 + 1e-5;
+    };
+    auto bottom_ss = sfem::Sideset::create_from_selector(ss, bottom_pred);
+    auto right_ss  = sfem::Sideset::create_from_selector(ss, right_pred);
+    SFEM_TEST_ASSERT(!bottom_ss.empty());
+    SFEM_TEST_ASSERT(!right_ss.empty());
+    ptrdiff_t n_bottom_faces = 0;
+    ptrdiff_t n_right_faces  = 0;
+    for (const auto &s : bottom_ss) {
+        SFEM_TEST_ASSERT(s->block_id() == 0 || s->block_id() == 1);
+        n_bottom_faces += s->size();
+    }
+    for (const auto &s : right_ss) {
+        SFEM_TEST_ASSERT(s->block_id() == 0 || s->block_id() == 1);
+        n_right_faces += s->size();
+    }
+    SFEM_TEST_ASSERT(n_bottom_faces > 0);
+    SFEM_TEST_ASSERT(n_right_faces > 0);
+
+    auto fs = sfem::FunctionSpace::create(ss, 1);
+    sfem::DirichletConditions::Condition left{.sidesets = bottom_ss, .value = -1, .component = 0};
+    sfem::DirichletConditions::Condition right{.sidesets = right_ss, .value = 1, .component = 0};
+    auto dc = sfem::DirichletConditions::create(fs, {left, right});
+    SFEM_TEST_ASSERT(dc != nullptr);
+    SFEM_TEST_ASSERT(dc->conditions()[0].nodeset != nullptr);
+    SFEM_TEST_ASSERT(dc->conditions()[0].nodeset->size() > 0);
+
+    auto coarse_fs = fs->derefine(2);
+    SFEM_TEST_ASSERT(coarse_fs != nullptr);
+    auto coarse_dc = std::dynamic_pointer_cast<sfem::DirichletConditions>(dc->derefine(coarse_fs, false));
+    SFEM_TEST_ASSERT(coarse_dc != nullptr);
+    SFEM_TEST_ASSERT(coarse_dc->conditions()[0].nodeset != nullptr);
+    SFEM_TEST_ASSERT(coarse_dc->conditions()[0].nodeset->size() > 0);
+
+    auto fine_ns   = dc->conditions()[0].nodeset;
+    auto coarse_ns = coarse_dc->conditions()[0].nodeset;
+    std::vector<idx_t> fine_ids(fine_ns->data(), fine_ns->data() + fine_ns->size());
+    std::sort(fine_ids.begin(), fine_ids.end());
+    for (ptrdiff_t i = 0; i < coarse_ns->size(); ++i) {
+        const idx_t id = coarse_ns->data()[i];
+        SFEM_TEST_ASSERT(std::binary_search(fine_ids.begin(), fine_ids.end(), id));
+    }
+
+    auto f  = sfem::Function::create(fs);
+    auto op = sfem::create_op(fs, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(op != nullptr);
+    SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+    f->add_operator(op);
+    f->add_constraint(dc);
+
+    SSGMGResidual res;
+    SFEM_TEST_ASSERT(compute_ssgmg_residual(f, res) == SFEM_TEST_SUCCESS);
+    const real_t abs_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+    const real_t rel_tol = sizeof(real_t) == sizeof(double) ? real_t(1e-6) : real_t(1e-4);
+    SFEM_TEST_ASSERT(res.abs_res < abs_tol || res.rel_res < rel_tol);
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_hex8_tet4_ss_sideset_dirichlet() {
+    auto mixed = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto ss    = smesh::to_semistructured(4, mixed, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+    SFEM_TEST_ASSERT(ss->block(0)->name() == "hex");
+    SFEM_TEST_ASSERT(ss->block(1)->name() == "tet");
+
+    auto bottom_pred = [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; };
+    auto hex_ss = sfem::Sideset::create_from_selector(ss, bottom_pred, {"hex"});
+    auto tet_ss = sfem::Sideset::create_from_selector(ss, bottom_pred, {"tet"});
+    SFEM_TEST_EQ(hex_ss.size(), static_cast<size_t>(1));
+    SFEM_TEST_EQ(tet_ss.size(), static_cast<size_t>(1));
+    SFEM_TEST_EQ(hex_ss[0]->block_id(), static_cast<smesh::block_idx_t>(0));
+    SFEM_TEST_EQ(tet_ss[0]->block_id(), static_cast<smesh::block_idx_t>(1));
+    SFEM_TEST_ASSERT(hex_ss[0]->size() > 0);
+    SFEM_TEST_ASSERT(tet_ss[0]->size() > 0);
+
+    std::vector<std::shared_ptr<sfem::Sideset>> both;
+    both.insert(both.end(), hex_ss.begin(), hex_ss.end());
+    both.insert(both.end(), tet_ss.begin(), tet_ss.end());
+
+    auto fs = sfem::FunctionSpace::create(ss, 1);
+    sfem::DirichletConditions::Condition bottom{.sidesets = both, .value = -1, .component = 0};
+    auto dc = sfem::DirichletConditions::create(fs, {bottom});
+    SFEM_TEST_ASSERT(dc != nullptr);
+    SFEM_TEST_ASSERT(dc->conditions()[0].nodeset != nullptr);
+    SFEM_TEST_ASSERT(dc->conditions()[0].nodeset->size() > 0);
+
+    auto hex_ns = smesh::create_nodeset_from_sideset(ss, hex_ss[0]);
+    auto tet_ns = smesh::create_nodeset_from_sideset(ss, tet_ss[0]);
+    SFEM_TEST_ASSERT(hex_ns != nullptr);
+    SFEM_TEST_ASSERT(tet_ns != nullptr);
+    const ptrdiff_t n_union = dc->conditions()[0].nodeset->size();
+    SFEM_TEST_ASSERT(n_union >= hex_ns->size());
+    SFEM_TEST_ASSERT(n_union >= tet_ns->size());
+    SFEM_TEST_ASSERT(n_union <= hex_ns->size() + tet_ns->size());
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
@@ -550,7 +764,13 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_checkerboard_ssgmg_residual);
     SFEM_RUN_TEST(test_two_block_quad4_ssgmg_residual);
     SFEM_RUN_TEST(test_two_block_tet4_ssgmg_residual);
+    SFEM_RUN_TEST(test_hex8_tet4_derefine_keeps_blocks);
+    SFEM_RUN_TEST(test_hex8_tet4_create_gmg_data);
+    SFEM_RUN_TEST(test_hex8_tet4_ssgmg_residual);
+    SFEM_RUN_TEST(test_checkerboard_ss_sideset_dirichlet);
+    SFEM_RUN_TEST(test_hex8_tet4_ss_sideset_dirichlet);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+

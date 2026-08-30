@@ -9,6 +9,7 @@
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
 #include "vector_laplacian.hpp"
+#include "laplacian.hpp"
 
 namespace sfem {
 
@@ -80,6 +81,9 @@ namespace sfem {
     int VectorLaplacian::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("VectorLaplacian::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+        if (impl_->domains->require_supported_types("VectorLaplacian", laplacian_has_kernel) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
 
         auto mesh = impl_->space->mesh_ptr();
 
@@ -142,8 +146,6 @@ namespace sfem {
             !is_semistructured_type(space->element_type())) {
             auto ret = std::make_shared<VectorLaplacian>(space);
             ret->initialize({});
-            assert(space->n_blocks() == 1);
-            ret->override_element_types({space->element_type()});
             return ret;
         }
 

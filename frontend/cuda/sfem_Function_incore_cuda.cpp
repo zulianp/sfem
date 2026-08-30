@@ -1,6 +1,9 @@
 #include "sfem_Function_incore_cuda.hpp"
+#include <algorithm>
 #include <cstring>
 #include <memory>
+#include <string>
+#include <vector>
 #include "boundary_condition.hpp"
 
 #include <cuda_runtime_api.h>
@@ -61,20 +64,24 @@ namespace sfem {
         (void)element_type;
         assert(space);
         assert(space->mesh_ptr());
-        assert(space->mesh_ptr()->n_blocks() >= 1);
+        if (space->mesh_ptr()->n_blocks() != 1) {
+            SFEM_ERROR("create_device_elements: multi-block requires per-block device_elements_SoA (n_blocks=%zu)\n",
+                       space->mesh_ptr()->n_blocks());
+            return nullptr;
+        }
         return space->mesh_ptr()->block(0)->device_elements_SoA();
     }
 
     std::shared_ptr<Buffer<idx_t>> create_device_elements_AoS(const std::shared_ptr<FunctionSpace> &space,
                                                               const smesh::ElemType                 element_type) {
-        if (space->has_semi_structured_mesh()) {
-            auto nxe = space->mesh().n_nodes_per_element(0);
-            return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
-
-        } else {
-            auto nxe = space->mesh().n_nodes_per_element(0);
-            return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
+        (void)element_type;
+        if (space->mesh_ptr()->n_blocks() != 1) {
+            SFEM_ERROR("create_device_elements_AoS: multi-block requires per-block AoS (n_blocks=%zu)\n",
+                       space->mesh_ptr()->n_blocks());
+            return nullptr;
         }
+        auto nxe = space->mesh().n_nodes_per_element(0);
+        return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(0)));
     }
 
     class GPUDirichletConditions final : public Constraint {
@@ -562,6 +569,14 @@ namespace sfem {
         int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("GPULaplacian:initialize");
             domains = std::make_shared<MultiDomainOp>(space, block_names);
+            if (domains->require_supported_types("gpu:Laplacian", [](const smesh::ElemType et) {
+                    if (sfem::is_semistructured_type(et)) {
+                        return smesh::is_hex_ss_family(et);
+                    }
+                    return et == smesh::TET4 || et == smesh::TET10 || et == smesh::MACRO_TET4 || et == smesh::HEX8;
+                }) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
 
             for (auto &n2d : domains->domains()) {
                 OpDomain &domain    = n2d.second;
@@ -866,6 +881,15 @@ namespace sfem {
         int initialize(const std::vector<std::string> &block_names = {}) override {
             SFEM_TRACE_SCOPE("GPULinearElasticity:initialize");
             domains = std::make_shared<MultiDomainOp>(space, block_names);
+            if (domains->require_supported_types("gpu:LinearElasticity", [](const smesh::ElemType et) {
+                    if (sfem::is_semistructured_type(et)) {
+                        return smesh::is_hex_ss_family(et);
+                    }
+                    return et == smesh::TET4 || et == smesh::TET10 || et == smesh::MACRO_TET4 || et == smesh::HEX8 ||
+                           et == smesh::TRI3;
+                }) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
 
             real_t SFEM_SHEAR_MODULUS        = 1;
             real_t SFEM_FIRST_LAME_PARAMETER = 1;
@@ -1382,12 +1406,58 @@ namespace sfem {
         }
     };
 
+    namespace {
+        static bool gpu_em_block_is_selected(const std::string &name, const std::vector<std::string> &block_names) {
+            return block_names.empty() || std::find(block_names.begin(), block_names.end(), name) != block_names.end();
+        }
+
+        static int require_gpu_em_hex_block(const char *const op_name, const smesh::Mesh &mesh, const size_t block_id) {
+            const auto et = mesh.element_type(static_cast<smesh::block_idx_t>(block_id));
+            if (!smesh::is_hex_ss_family(et)) {
+                SFEM_ERROR("%s supports HEX8 / SSHEX8 blocks only (block %s is %s)\n",
+                           op_name,
+                           mesh.block(static_cast<smesh::block_idx_t>(block_id))->name().c_str(),
+                           smesh::type_to_string(et));
+                return SFEM_FAILURE;
+            }
+            return SFEM_SUCCESS;
+        }
+
+        static std::shared_ptr<Buffer<idx_t>> create_device_elements_aos_block(const std::shared_ptr<FunctionSpace> &space,
+                                                                               const smesh::block_idx_t              block_id) {
+            auto nxe = space->mesh().n_nodes_per_element(block_id);
+            return smesh::to_device(soa_to_aos(1, nxe, space->mesh().elements(block_id)));
+        }
+
+        static std::shared_ptr<smesh::Mesh> gpu_em_element_matrix_mesh(const std::shared_ptr<FunctionSpace> &space) {
+            auto mesh = space->has_semi_structured_mesh() ? smesh::derefine(space->mesh_ptr(), 1) : space->mesh_ptr();
+            if (mesh && mesh->element_type(0) == smesh::PROTEUS_HEX8) {
+                mesh = smesh::sshex_to_hex8(mesh);
+            }
+            return mesh;
+        }
+
+        struct GPUEMSoABlock {
+            bool                             is_ss{false};
+            ptrdiff_t                        n_elements{0};
+            std::shared_ptr<Buffer<idx_t *>> elements;
+            std::shared_ptr<Buffer<real_t *>> element_matrix;
+        };
+
+        struct GPUEMAoSBlock {
+            smesh::block_idx_t             block_id{0};
+            std::string                    name;
+            ptrdiff_t                      n_elements{0};
+            std::shared_ptr<Buffer<idx_t>> elements;
+            std::shared_ptr<Buffer<real_t>> element_matrix;
+        };
+    }  // namespace
+
     class GPUEMOp : public Op {
     public:
-        std::shared_ptr<FunctionSpace>    space;
-        enum smesh::PrimitiveType         real_type{smesh::SMESH_DEFAULT};
-        std::shared_ptr<Buffer<idx_t *>>  elements;
-        std::shared_ptr<Buffer<real_t *>> element_matrix;
+        std::shared_ptr<FunctionSpace> space;
+        enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
+        std::vector<GPUEMSoABlock>     blocks;
 
         GPUEMOp(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -1408,57 +1478,79 @@ namespace sfem {
         }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
-            auto mesh             = space->mesh_ptr();
-            auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
+            auto mesh = space->mesh_ptr();
+            blocks.clear();
 
-            int err = 0;
-            if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->mesh();
-                err       = sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
-                                                      mesh->n_elements(),
+            int err = SFEM_SUCCESS;
+            for (size_t b = 0; b < mesh->n_blocks(); ++b) {
+                if (!gpu_em_block_is_selected(mesh->block(b)->name(), block_names)) {
+                    continue;
+                }
+
+                err = require_gpu_em_hex_block(name(), *mesh, b);
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+
+                const auto      bid = static_cast<smesh::block_idx_t>(b);
+                const ptrdiff_t ne  = mesh->n_elements(bid);
+                if (ne == 0) {
+                    continue;
+                }
+
+                const auto et    = mesh->element_type(bid);
+                const bool is_ss = is_semistructured_type(et);
+                const int  level = is_ss ? smesh::semistructured_level(space->mesh()) : 1;
+
+                auto h_element_matrix = sfem::create_host_buffer<real_t>(ne * 64);
+                err                   = sshex8_laplacian_element_matrix(level,
+                                                      ne,
                                                       mesh->n_nodes(),
-                                                      mesh->elements(0)->data(),
+                                                      mesh->elements(bid)->data(),
                                                       mesh->points()->data(),
                                                       h_element_matrix->data());
-            } else {
-                err = sshex8_laplacian_element_matrix(1,
-                                                      mesh->n_elements(),
-                                                      mesh->n_nodes(),
-                                                      mesh->elements(0)->data(),
-                                                      mesh->points()->data(),
-                                                      h_element_matrix->data());
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+
+                GPUEMSoABlock bd;
+                bd.is_ss          = is_ss;
+                bd.n_elements     = ne;
+                bd.elements       = mesh->block(bid)->device_elements_SoA();
+                bd.element_matrix = smesh::to_device(sfem::aos_to_soa(64, ne, 1, 64, h_element_matrix));
+                blocks.push_back(std::move(bd));
             }
 
-            auto soa       = sfem::aos_to_soa(64, mesh->n_elements(), 1, 64, h_element_matrix);
-            element_matrix = smesh::to_device(soa);
-
-            elements = create_device_elements(space, space->element_type());
             return err;
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
             SFEM_TRACE_SCOPE("GPUEMOp::apply");
 
-            int err = 0;
-            if (space->has_semi_structured_mesh()) {
-                auto     &ssm   = space->mesh();
-                const int level = smesh::semistructured_level(ssm);
-                err             = cu_affine_sshex8_elemental_matrix_apply(level,
-                                                              ssm.n_elements(),
-                                                              elements->data(),
-                                                              real_type,
-                                                              (void **)element_matrix->data(),
-                                                              h,
-                                                              out,
-                                                              SFEM_DEFAULT_STREAM);
-            } else {
-                err = cu_affine_hex8_elemental_matrix_apply(space->mesh_ptr()->n_elements(),
-                                                            elements->data(),
-                                                            real_type,
-                                                            (void **)element_matrix->data(),
-                                                            h,
-                                                            out,
-                                                            SFEM_DEFAULT_STREAM);
+            int err = SFEM_SUCCESS;
+            for (const auto &bd : blocks) {
+                if (bd.is_ss) {
+                    const int level = smesh::semistructured_level(space->mesh());
+                    err             = cu_affine_sshex8_elemental_matrix_apply(level,
+                                                                  bd.n_elements,
+                                                                  bd.elements->data(),
+                                                                  real_type,
+                                                                  (void **)bd.element_matrix->data(),
+                                                                  h,
+                                                                  out,
+                                                                  SFEM_DEFAULT_STREAM);
+                } else {
+                    err = cu_affine_hex8_elemental_matrix_apply(bd.n_elements,
+                                                                bd.elements->data(),
+                                                                real_type,
+                                                                (void **)bd.element_matrix->data(),
+                                                                h,
+                                                                out,
+                                                                SFEM_DEFAULT_STREAM);
+                }
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
             }
 
             return err;
@@ -1495,11 +1587,10 @@ namespace sfem {
 
     class GPUEMWarpOp : public Op {
     public:
-        std::shared_ptr<FunctionSpace>  space;
-        enum smesh::PrimitiveType       real_type{smesh::SMESH_DEFAULT};
-        std::shared_ptr<Buffer<idx_t>>  elements;
-        std::shared_ptr<Buffer<real_t>> element_matrix;
-        bool                            cartesian_ordering{true};
+        std::shared_ptr<FunctionSpace> space;
+        enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
+        std::vector<GPUEMAoSBlock>     blocks;
+        bool                           cartesian_ordering{true};
 
         GPUEMWarpOp(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -1520,56 +1611,86 @@ namespace sfem {
         }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
-            auto mesh             = space->mesh_ptr();
-            auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
+            if (!space->has_semi_structured_mesh()) {
+                SFEM_ERROR("Only works with SSMesh!\n");
+                return SFEM_FAILURE;
+            }
 
-            int err = 0;
-            if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->mesh();
+            auto &ssm = space->mesh();
+            blocks.clear();
+
+            int err = SFEM_SUCCESS;
+            for (size_t b = 0; b < ssm.n_blocks(); ++b) {
+                if (!gpu_em_block_is_selected(ssm.block(b)->name(), block_names)) {
+                    continue;
+                }
+
+                err = require_gpu_em_hex_block(name(), ssm, b);
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+
+                const auto      bid = static_cast<smesh::block_idx_t>(b);
+                const ptrdiff_t ne  = ssm.n_elements(bid);
+                if (ne == 0) {
+                    continue;
+                }
+
+                auto h_element_matrix = sfem::create_host_buffer<real_t>(ne * 64);
                 if (cartesian_ordering) {
                     err = sshex8_laplacian_element_matrix_cartesian(smesh::semistructured_level(ssm),
-                                                                    mesh->n_elements(),
-                                                                    mesh->n_nodes(),
-                                                                    mesh->elements(0)->data(),
-                                                                    mesh->points()->data(),
+                                                                    ne,
+                                                                    ssm.n_nodes(),
+                                                                    ssm.elements(bid)->data(),
+                                                                    ssm.points()->data(),
                                                                     h_element_matrix->data());
                 } else {
                     err = sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
-                                                          mesh->n_elements(),
-                                                          mesh->n_nodes(),
-                                                          mesh->elements(0)->data(),
-                                                          mesh->points()->data(),
+                                                          ne,
+                                                          ssm.n_nodes(),
+                                                          ssm.elements(bid)->data(),
+                                                          ssm.points()->data(),
                                                           h_element_matrix->data());
                 }
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
 
-            } else {
-                SFEM_ERROR("Only works with SSMesh!\n");
+                GPUEMAoSBlock bd;
+                bd.block_id       = bid;
+                bd.name           = ssm.block(b)->name();
+                bd.n_elements     = ne;
+                bd.elements       = create_device_elements_aos_block(space, bid);
+                bd.element_matrix = smesh::to_device(h_element_matrix);
+                blocks.push_back(std::move(bd));
             }
 
-            elements       = create_device_elements_AoS(space, space->element_type());
-            element_matrix = smesh::to_device(h_element_matrix);
-
-            // h_element_matrix->print(std::cout);
             return err;
         }
 
         int apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) override {
             SFEM_TRACE_SCOPE("GPUEMWarpOp::apply");
 
-            int err = 0;
-            if (space->has_semi_structured_mesh()) {
-                auto     &ssm   = space->mesh();
-                const int level = smesh::semistructured_level(ssm);
-                err             = cu_affine_sshex8_elemental_matrix_apply_AoS(level,
-                                                                  ssm.n_elements(),
-                                                                  elements->data(),
+            if (!space->has_semi_structured_mesh()) {
+                SFEM_ERROR("Only works with SSMesh!\n");
+                return SFEM_FAILURE;
+            }
+
+            auto     &ssm   = space->mesh();
+            const int level = smesh::semistructured_level(ssm);
+            int       err   = SFEM_SUCCESS;
+            for (const auto &bd : blocks) {
+                err = cu_affine_sshex8_elemental_matrix_apply_AoS(level,
+                                                                  bd.n_elements,
+                                                                  bd.elements->data(),
                                                                   real_type,
-                                                                  (void *)element_matrix->data(),
+                                                                  (void *)bd.element_matrix->data(),
                                                                   h,
                                                                   out,
                                                                   SFEM_DEFAULT_STREAM);
-            } else {
-                SFEM_ERROR("Only works with SSMesh!\n");
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
             }
 
             return err;
@@ -1606,11 +1727,10 @@ namespace sfem {
 
     class GPUEMMultiVectorWarpOp : public Op {
     public:
-        std::shared_ptr<FunctionSpace>  space;
-        enum smesh::PrimitiveType       real_type{smesh::SMESH_DEFAULT};
-        std::shared_ptr<Buffer<idx_t>>  elements;
-        std::shared_ptr<Buffer<real_t>> element_matrix;
-        bool                            cartesian_ordering{true};
+        std::shared_ptr<FunctionSpace> space;
+        enum smesh::PrimitiveType      real_type{smesh::SMESH_DEFAULT};
+        std::vector<GPUEMAoSBlock>     blocks;
+        bool                           cartesian_ordering{true};
 
         GPUEMMultiVectorWarpOp(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
 
@@ -1635,34 +1755,60 @@ namespace sfem {
         }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
-            auto mesh             = space->mesh_ptr();
-            auto h_element_matrix = sfem::create_host_buffer<real_t>(mesh->n_elements() * 64);
-
-            int err = 0;
-            if (space->has_semi_structured_mesh()) {
-                auto &ssm = space->mesh();
-                if (cartesian_ordering) {
-                    err = sshex8_laplacian_element_matrix_cartesian(smesh::semistructured_level(ssm),
-                                                                    mesh->n_elements(),
-                                                                    mesh->n_nodes(),
-                                                                    mesh->elements(0)->data(),
-                                                                    mesh->points()->data(),
-                                                                    h_element_matrix->data());
-                } else {
-                    err = sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
-                                                          mesh->n_elements(),
-                                                          mesh->n_nodes(),
-                                                          mesh->elements(0)->data(),
-                                                          mesh->points()->data(),
-                                                          h_element_matrix->data());
-                }
-            } else {
+            if (!space->has_semi_structured_mesh()) {
                 SFEM_ERROR("Only works with SSMesh!\n");
                 return SFEM_FAILURE;
             }
 
-            elements       = create_device_elements_AoS(space, space->element_type());
-            element_matrix = smesh::to_device(h_element_matrix);
+            auto &ssm = space->mesh();
+            blocks.clear();
+
+            int err = SFEM_SUCCESS;
+            for (size_t b = 0; b < ssm.n_blocks(); ++b) {
+                if (!gpu_em_block_is_selected(ssm.block(b)->name(), block_names)) {
+                    continue;
+                }
+
+                err = require_gpu_em_hex_block(name(), ssm, b);
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+
+                const auto      bid = static_cast<smesh::block_idx_t>(b);
+                const ptrdiff_t ne  = ssm.n_elements(bid);
+                if (ne == 0) {
+                    continue;
+                }
+
+                auto h_element_matrix = sfem::create_host_buffer<real_t>(ne * 64);
+                if (cartesian_ordering) {
+                    err = sshex8_laplacian_element_matrix_cartesian(smesh::semistructured_level(ssm),
+                                                                    ne,
+                                                                    ssm.n_nodes(),
+                                                                    ssm.elements(bid)->data(),
+                                                                    ssm.points()->data(),
+                                                                    h_element_matrix->data());
+                } else {
+                    err = sshex8_laplacian_element_matrix(smesh::semistructured_level(ssm),
+                                                          ne,
+                                                          ssm.n_nodes(),
+                                                          ssm.elements(bid)->data(),
+                                                          ssm.points()->data(),
+                                                          h_element_matrix->data());
+                }
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+
+                GPUEMAoSBlock bd;
+                bd.block_id       = bid;
+                bd.name           = ssm.block(b)->name();
+                bd.n_elements     = ne;
+                bd.elements       = create_device_elements_aos_block(space, bid);
+                bd.element_matrix = smesh::to_device(h_element_matrix);
+                blocks.push_back(std::move(bd));
+            }
+
             return err;
         }
 
@@ -1676,15 +1822,23 @@ namespace sfem {
 
             auto     &ssm   = space->mesh();
             const int level = smesh::semistructured_level(ssm);
-            return cu_affine_sshex8_elemental_matrix_apply_AoS_multivector(level,
-                                                                           ssm.n_elements(),
-                                                                           elements->data(),
-                                                                           real_type,
-                                                                           space->block_size(),
-                                                                           (void *)element_matrix->data(),
-                                                                           h,
-                                                                           out,
-                                                                           SFEM_DEFAULT_STREAM);
+            int       err   = SFEM_SUCCESS;
+            for (const auto &bd : blocks) {
+                err = cu_affine_sshex8_elemental_matrix_apply_AoS_multivector(level,
+                                                                              bd.n_elements,
+                                                                              bd.elements->data(),
+                                                                              real_type,
+                                                                              space->block_size(),
+                                                                              (void *)bd.element_matrix->data(),
+                                                                              h,
+                                                                              out,
+                                                                              SFEM_DEFAULT_STREAM);
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+            }
+
+            return err;
         }
 
         int hessian_crs(const real_t *const  x,
@@ -1716,10 +1870,10 @@ namespace sfem {
         ptrdiff_t   n_dofs_image() const override { return space->n_dofs(); }
 
         std::shared_ptr<Op> clone() const override {
-            auto ret            = std::make_shared<GPUEMMultiVectorWarpOp>(space);
-            ret->real_type      = real_type;
-            ret->elements       = elements;
-            ret->element_matrix = element_matrix;
+            auto ret                = std::make_shared<GPUEMMultiVectorWarpOp>(space);
+            ret->real_type          = real_type;
+            ret->blocks             = blocks;
+            ret->cartesian_ordering = cartesian_ordering;
             return ret;
         }
     };
@@ -1728,8 +1882,7 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace>       space;
         enum smesh::PrimitiveType            real_type{smesh::SMESH_DEFAULT};
-        std::shared_ptr<Buffer<idx_t>>       elements;
-        std::shared_ptr<Buffer<real_t>>      element_matrix;
+        std::vector<GPUEMAoSBlock>           blocks;
         std::shared_ptr<GPULinearElasticity> linear_elasticity;
         real_t                               mu{1};
         real_t                               lambda{1};
@@ -1756,9 +1909,9 @@ namespace sfem {
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override {
             SFEM_TRACE_SCOPE("GPUEMVectorWarpOp::derefine_op");
 
-            assert(element_matrix);
+            assert(!blocks.empty());
             assert(linear_elasticity);
-            if (!element_matrix || !linear_elasticity) {
+            if (blocks.empty() || !linear_elasticity) {
                 SFEM_ERROR("GPUEMVectorWarpOp::derefine_op requires initialized operator\n");
                 return nullptr;
             }
@@ -1768,8 +1921,13 @@ namespace sfem {
                 ret->real_type      = real_type;
                 ret->mu             = mu;
                 ret->lambda         = lambda;
-                ret->element_matrix = element_matrix;  // share as-is
-                ret->elements       = create_device_elements_AoS(derefined_space, derefined_space->element_type());
+                ret->blocks.reserve(blocks.size());
+                for (const auto &bd : blocks) {
+                    GPUEMAoSBlock c = bd;
+                    c.n_elements    = derefined_space->mesh().n_elements(bd.block_id);
+                    c.elements      = create_device_elements_aos_block(derefined_space, bd.block_id);
+                    ret->blocks.push_back(std::move(c));
+                }
                 ret->linear_elasticity =
                         std::static_pointer_cast<GPULinearElasticity>(linear_elasticity->derefine_op(derefined_space));
                 if (!ret->linear_elasticity) {
@@ -1780,6 +1938,94 @@ namespace sfem {
 
             // Coarsest level: fall back to matrix-free GPU LinearElasticity
             return linear_elasticity->derefine_op(derefined_space);
+        }
+
+        int assemble_block_matrix(const smesh::Mesh                 &em_mesh,
+                                  const smesh::block_idx_t           bid,
+                                  std::shared_ptr<Buffer<real_t>>   &out_matrix) {
+            auto     &ssm = space->mesh();
+            const ptrdiff_t ne = em_mesh.n_elements(bid);
+            auto h_element_matrix = sfem::create_host_buffer<scalar_t>(ne * 24 * 24);
+
+            int err = sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
+                                                                        ne,
+                                                                        em_mesh.n_nodes(),
+                                                                        em_mesh.elements(bid)->data(),
+                                                                        em_mesh.points()->data(),
+                                                                        mu,
+                                                                        lambda,
+                                                                        h_element_matrix->data());
+            if (err != SFEM_SUCCESS) {
+                return err;
+            }
+
+            {
+                const scalar_t *const A = h_element_matrix->data();
+                const ptrdiff_t       n = (ptrdiff_t)h_element_matrix->size();
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    if (A[i] != A[i]) {
+                        SFEM_ERROR("GPUEMVectorWarpOp: NaN in elemental matrix at %ld\n", (long)i);
+                        return SFEM_FAILURE;
+                    }
+                }
+            }
+
+            auto h_real = sfem::create_host_buffer<real_t>(h_element_matrix->size());
+            for (ptrdiff_t i = 0; i < (ptrdiff_t)h_element_matrix->size(); ++i) {
+                h_real->data()[i] = (real_t)h_element_matrix->data()[i];
+            }
+            out_matrix = smesh::to_device(h_real);
+            return SFEM_SUCCESS;
+        }
+
+        int rebuild_element_matrices(const std::vector<std::string> &block_names, const bool create_blocks) {
+            auto em_mesh = gpu_em_element_matrix_mesh(space);
+            if (!em_mesh) {
+                SFEM_ERROR("GPUEMVectorWarpOp: sshex_to_hex8(derefine) failed\n");
+                return SFEM_FAILURE;
+            }
+
+            auto &ssm = space->mesh();
+            int   err = SFEM_SUCCESS;
+
+            if (create_blocks) {
+                blocks.clear();
+                for (size_t b = 0; b < ssm.n_blocks(); ++b) {
+                    if (!gpu_em_block_is_selected(ssm.block(b)->name(), block_names)) {
+                        continue;
+                    }
+
+                    err = require_gpu_em_hex_block(name(), ssm, b);
+                    if (err != SFEM_SUCCESS) {
+                        return err;
+                    }
+
+                    const auto bid = static_cast<smesh::block_idx_t>(b);
+                    GPUEMAoSBlock bd;
+                    bd.block_id   = bid;
+                    bd.name       = ssm.block(b)->name();
+                    bd.n_elements = ssm.n_elements(bid);
+                    bd.elements   = create_device_elements_aos_block(space, bid);
+                    err           = assemble_block_matrix(*em_mesh, bid, bd.element_matrix);
+                    if (err != SFEM_SUCCESS) {
+                        return err;
+                    }
+                    blocks.push_back(std::move(bd));
+                }
+                return SFEM_SUCCESS;
+            }
+
+            for (auto &bd : blocks) {
+                if (!gpu_em_block_is_selected(bd.name, block_names)) {
+                    continue;
+                }
+                err = assemble_block_matrix(*em_mesh, bd.block_id, bd.element_matrix);
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+            }
+
+            return SFEM_SUCCESS;
         }
 
         int initialize(const std::vector<std::string> &block_names = {}) override {
@@ -1797,47 +2043,10 @@ namespace sfem {
             mu     = SFEM_SHEAR_MODULUS;
             lambda = SFEM_FIRST_LAME_PARAMETER;
 
-            auto &ssm = space->mesh();
-            // Macro HEX8 corners in standard HEX8 order (not SS lexicographic).
-            auto mesh = smesh::sshex_to_hex8(smesh::derefine(space->mesh_ptr(), 1));
-            if (!mesh) {
-                SFEM_ERROR("GPUEMVectorWarpOp::initialize: sshex_to_hex8(derefine) failed\n");
-                return SFEM_FAILURE;
-            }
-
-            auto h_element_matrix = sfem::create_host_buffer<scalar_t>(mesh->n_elements() * 24 * 24);
-
-            int err = sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
-                                                                        mesh->n_elements(),
-                                                                        mesh->n_nodes(),
-                                                                        mesh->elements(0)->data(),
-                                                                        mesh->points()->data(),
-                                                                        mu,
-                                                                        lambda,
-                                                                        h_element_matrix->data());
+            int err = rebuild_element_matrices(block_names, true);
             if (err != SFEM_SUCCESS) {
                 return err;
             }
-
-            {
-                const scalar_t *const A = h_element_matrix->data();
-                const ptrdiff_t       n = (ptrdiff_t)h_element_matrix->size();
-                for (ptrdiff_t i = 0; i < n; ++i) {
-                    if (A[i] != A[i]) {
-                        SFEM_ERROR("GPUEMVectorWarpOp::initialize: NaN in elemental matrix at %ld\n", (long)i);
-                        return SFEM_FAILURE;
-                    }
-                }
-            }
-
-            // Device apply uses real_t; convert explicitly if scalar_t != real_t.
-            auto h_real = sfem::create_host_buffer<real_t>(h_element_matrix->size());
-            for (ptrdiff_t i = 0; i < (ptrdiff_t)h_element_matrix->size(); ++i) {
-                h_real->data()[i] = (real_t)h_element_matrix->data()[i];
-            }
-
-            elements       = create_device_elements_AoS(space, space->element_type());
-            element_matrix = smesh::to_device(h_real);
 
             // Companion matrix-free LE for hessian_diag / block_diag / BSR / etc.
             linear_elasticity = std::make_shared<GPULinearElasticity>(space);
@@ -1860,14 +2069,22 @@ namespace sfem {
 
             auto     &ssm   = space->mesh();
             const int level = smesh::semistructured_level(ssm);
-            return cu_affine_sshex8_elemental_matrix_apply_AoS_vector(level,
-                                                                      ssm.n_elements(),
-                                                                      elements->data(),
-                                                                      real_type,
-                                                                      (void *)element_matrix->data(),
-                                                                      h,
-                                                                      out,
-                                                                      SFEM_DEFAULT_STREAM);
+            int       err   = SFEM_SUCCESS;
+            for (const auto &bd : blocks) {
+                err = cu_affine_sshex8_elemental_matrix_apply_AoS_vector(level,
+                                                                        bd.n_elements,
+                                                                        bd.elements->data(),
+                                                                        real_type,
+                                                                        (void *)bd.element_matrix->data(),
+                                                                        h,
+                                                                        out,
+                                                                        SFEM_DEFAULT_STREAM);
+                if (err != SFEM_SUCCESS) {
+                    return err;
+                }
+            }
+
+            return err;
         }
 
         int hessian_crs(const real_t *const  x,
@@ -1914,8 +2131,7 @@ namespace sfem {
         std::shared_ptr<Op> clone() const override {
             auto ret               = std::make_shared<GPUEMVectorWarpOp>(space);
             ret->real_type         = real_type;
-            ret->elements          = elements;
-            ret->element_matrix    = element_matrix;
+            ret->blocks            = blocks;
             ret->linear_elasticity = linear_elasticity;
             ret->mu                = mu;
             ret->lambda            = lambda;
@@ -1923,8 +2139,17 @@ namespace sfem {
         }
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override {
-            if (!block_name.empty() && space->mesh().n_blocks() == 1 && block_name != space->mesh().block(0)->name()) {
-                return;
+            if (!block_name.empty()) {
+                bool exists = false;
+                for (size_t b = 0; b < space->mesh().n_blocks(); ++b) {
+                    if (space->mesh().block(b)->name() == block_name) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    return;
+                }
             }
 
             bool changed = false;
@@ -1936,30 +2161,12 @@ namespace sfem {
                 changed = true;
             }
 
-            if (changed && element_matrix) {
-                auto &ssm  = space->mesh();
-                auto  mesh = smesh::sshex_to_hex8(smesh::derefine(space->mesh_ptr(), 1));
-                if (!mesh) {
-                    SFEM_ERROR("GPUEMVectorWarpOp::set_value_in_block: sshex_to_hex8(derefine) failed\n");
-                    return;
+            if (changed && !blocks.empty()) {
+                std::vector<std::string> names;
+                if (!block_name.empty()) {
+                    names.push_back(block_name);
                 }
-
-                auto h_element_matrix = sfem::create_host_buffer<scalar_t>(mesh->n_elements() * 24 * 24);
-
-                sshex8_linear_elasticity_element_matrix_cartesian(smesh::semistructured_level(ssm),
-                                                                  mesh->n_elements(),
-                                                                  mesh->n_nodes(),
-                                                                  mesh->elements(0)->data(),
-                                                                  mesh->points()->data(),
-                                                                  mu,
-                                                                  lambda,
-                                                                  h_element_matrix->data());
-
-                auto h_real = sfem::create_host_buffer<real_t>(h_element_matrix->size());
-                for (ptrdiff_t i = 0; i < (ptrdiff_t)h_element_matrix->size(); ++i) {
-                    h_real->data()[i] = (real_t)h_element_matrix->data()[i];
-                }
-                element_matrix = smesh::to_device(h_real);
+                rebuild_element_matrices(names, false);
             }
 
             if (linear_elasticity && linear_elasticity->domains) {
@@ -1987,3 +2194,4 @@ namespace sfem {
     }
 
 }  // namespace sfem
+

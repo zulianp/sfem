@@ -244,6 +244,9 @@ namespace sfem {
     int Laplacian::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("Laplacian::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+        if (impl_->domains->require_supported_types("Laplacian", laplacian_has_kernel) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
         laplacian_seed_diffusion(*impl_->domains, real_t(1));
 
         auto mesh = impl_->space->mesh_ptr();
