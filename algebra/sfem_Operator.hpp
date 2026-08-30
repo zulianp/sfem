@@ -55,8 +55,10 @@ namespace sfem {
         }
 
         int apply(const T* const x, T* const y) override {
-            int err = right_->apply(x, y);
-            err |= left_->apply(x, y);
+            // ATTENTION !!! Change in OperatorAdd
+            // Left first: matrix-free ops zero y, then the additive term (e.g. contact SBV) accumulates.
+            int err = left_->apply(x, y);
+            err |= right_->apply(x, y);
             return err;
         }
 

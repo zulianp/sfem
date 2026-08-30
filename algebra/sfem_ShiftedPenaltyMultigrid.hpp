@@ -11,7 +11,10 @@
 #include <memory>
 #include <vector>
 
+#include <algorithm>
+
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_ShiftedPenalty_impl.hpp"
 #include "sfem_openmp_blas.hpp"
 #include "sfem_tpl_blas.hpp"
@@ -206,11 +209,11 @@ namespace sfem {
 
             count_smoothing_steps = 0;
 
-            // Wrap input arrays into fine level of mg
+            // Wrap input arrays into fine level of mg (allocation size: owned + ghosts).
             if (wrap_input_) {
-                memory_[finest_level()]->solution = Buffer<T>::wrap(smoother_[finest_level()]->rows(), x);
-
-                memory_[finest_level()]->rhs = Buffer<T>::wrap(smoother_[finest_level()]->rows(), (T*)rhs);
+                const ptrdiff_t n_alloc           = level_alloc(finest_level());
+                memory_[finest_level()]->solution = Buffer<T>::wrap(n_alloc, x);
+                memory_[finest_level()]->rhs      = Buffer<T>::wrap(n_alloc, (T*)rhs);
             }
 
             const int level    = finest_level();
@@ -237,12 +240,13 @@ namespace sfem {
 
             SharedBuffer<T> x_old;
             if (collect_energy_norm_correction_) {
-                x_old = make_buffer(n_dofs);
+                x_old = make_buffer(level_alloc(finest_level()));
                 blas_->copy(n_dofs, x, x_old->data());
             }
 
             T residual_norm_0 = 1;
             if (constraints_op_) {
+                gather_solution_ghosts();
                 blas_->zeros(n_dofs, mem->work->data());
 
                 // Solution space to constraints space
@@ -262,7 +266,7 @@ namespace sfem {
                 blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
                 blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
 
-                residual_norm_0 = blas_->norm2(n_dofs, mem->work->data());
+                residual_norm_0 = reduce_norm2(n_dofs, mem->work->data());
 
                 if (debug) {
                     printf("||g|| start: %e\n", (double)residual_norm_0);
@@ -289,6 +293,7 @@ namespace sfem {
                     }
 
                     if (constraints_op_) {
+                        gather_solution_ghosts();
                         blas_->zeros(n_constrained_dofs, correction->data());
 
                         // Solution space to constraints space
@@ -327,7 +332,7 @@ namespace sfem {
                                          mem->work->data());
                     }
 
-                    const T residual_norm = blas_->norm2(n_dofs, mem->work->data());
+                    const T residual_norm = reduce_norm2(n_dofs, mem->work->data());
 
                     if (debug) {
                         printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)residual_norm, omega);
@@ -357,8 +362,8 @@ namespace sfem {
                 const T e_pen = ((ub) ? impl_.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
                                 ((lb) ? impl_.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
 
-                const T norm_pen      = std::sqrt(e_pen);
-                const T norm_residual = blas_->norm2(n_dofs, mem->work->data());
+                const T norm_pen      = std::sqrt(reduce_sum(e_pen));
+                const T norm_residual = reduce_norm2(n_dofs, mem->work->data());
 
                 if (enable_shift) {
                     if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
@@ -410,9 +415,9 @@ namespace sfem {
                     SFEM_TRACE_SCOPE("collect_energy_norm_correction");
 
                     blas_->zaxpby(n_dofs, 1, x, -1, x_old->data(), correction->data());
-                    blas_->zeros(n_dofs, x_old->data());
+                    blas_->zeros(x_old->size(), x_old->data());
                     op->apply(correction->data(), x_old->data());
-                    energy_norm_correction = sqrt(blas_->dot(n_dofs, x_old->data(), correction->data()));
+                    energy_norm_correction = sqrt(reduce_sum(blas_->dot(n_dofs, x_old->data(), correction->data())));
                     blas_->copy(n_dofs, x, x_old->data());
                 }
 
@@ -506,6 +511,51 @@ namespace sfem {
         inline int coarser_level(int level) const { return level + 1; }
         inline int finer_level(int level) const { return level - 1; }
 
+        std::ptrdiff_t level_owned(const int l) const {
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[l]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return pop->rows();
+            }
+            return smoother_[l]->rows();
+        }
+
+        std::ptrdiff_t level_alloc(const int l) const {
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[l]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return std::max(pop->row_allocation_size(), pop->col_allocation_size());
+            }
+            return smoother_[l]->rows();
+        }
+
+        std::shared_ptr<Communicator> parallel_comm() const {
+            if (operator_.empty()) {
+                return nullptr;
+            }
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[finest_level()]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return pop->comm();
+            }
+            return nullptr;
+        }
+
+        T reduce_sum(const T local) const {
+            auto comm = parallel_comm();
+            return comm ? comm->sum(local) : local;
+        }
+
+        T reduce_norm2(const ptrdiff_t n, const T* const x) const {
+            const T local_sq = blas_->dot(n, x, x);
+            return std::sqrt(reduce_sum(local_sq));
+        }
+
+        void gather_solution_ghosts() {
+            if (!parallel_comm()) {
+                return;
+            }
+            auto mem = memory_[finest_level()];
+            operator_[finest_level()]->apply(mem->solution->data(), mem->work->data());
+        }
+
         void ensure_init() {
             if (memory_.empty()) {
                 init();
@@ -521,11 +571,11 @@ namespace sfem {
             memory_.clear();
             memory_.resize(this->n_levels());
 
-            correction = make_buffer(rows());
+            correction = make_buffer(level_alloc(finest_level()));
             for (int l = 0; l < n_levels(); l++) {
                 memory_[l] = std::make_shared<Memory>();
 
-                const ptrdiff_t n = smoother_[l]->rows();
+                const ptrdiff_t n = level_alloc(l);
                 if (l != finest_level() || !wrap_input_) {
                     memory_[l]->solution = make_buffer(n);
                     memory_[l]->rhs      = make_buffer(n);
@@ -543,12 +593,25 @@ namespace sfem {
         }
 
         std::shared_ptr<Operator<T>> shifted_op(const int level) {
+            std::shared_ptr<Operator<T>> sop;
             if (constraints_op_) {
-                return operator_[level] + sfem::create_sparse_block_vector_mult(
-                                                  operator_[level]->rows(), constraints_op_x_op_[level], memory_[level]->diag);
+                sop = operator_[level] + sfem::create_sparse_block_vector_mult(
+                                                 operator_[level]->rows(), constraints_op_x_op_[level], memory_[level]->diag);
             } else {
-                return operator_[level] + sfem::diag_op(memory_[level]->diag, execution_space());
+                sop = operator_[level] + sfem::diag_op(memory_[level]->diag, execution_space());
             }
+
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return make_parallel_op<T>(pop->comm(),
+                                           pop->rows(),
+                                           pop->cols(),
+                                           pop->row_allocation_size(),
+                                           pop->col_allocation_size(),
+                                           [sop](const T* const x, T* const y) { sop->apply(x, y); },
+                                           pop->execution_space());
+            }
+            return sop;
         }
 
         void eval_residual_and_jacobian() {
@@ -578,13 +641,12 @@ namespace sfem {
             }
 
             if (constraints_op_) {
+                gather_solution_ghosts();
                 // Jacobian
                 blas_->zeros(n_constrained_dofs, correction->data());
 
                 // Solution space to constraints space
                 constraints_op_->apply(mem->solution->data(), correction->data());
-                blas_->zeros(n_constrained_dofs, mem->diag->data());
-
                 blas_->zeros(n_constrained_dofs, mem->diag->data());
                 impl_.calc_J_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->diag->data());
 
@@ -756,8 +818,8 @@ namespace sfem {
 
             const ptrdiff_t n_dofs = op->rows();
 
-            assert(n_dofs == mem->solution->size());
-            assert(n_dofs == mem->rhs->size());
+            assert(mem->solution->size() >= static_cast<size_t>(n_dofs));
+            assert(mem->rhs->size() >= static_cast<size_t>(n_dofs));
 
             if (coarsest_level() == level) {
                 if (constraints_op_) {
@@ -823,6 +885,11 @@ namespace sfem {
         void collect_stats(struct Stats s) { stats.push_back(s); }
 
         void write_stats() {
+            if (auto comm = parallel_comm()) {
+                if (comm->rank() != 0) {
+                    return;
+                }
+            }
             const char* SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH = "./spmg_stats.csv";
             SFEM_READ_ENV(SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH, );
 

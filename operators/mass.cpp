@@ -205,7 +205,8 @@ void assemble_lumped_mass(const int element_type,
             tet10_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
         }
-        case smesh::BEAM2: {
+        case smesh::BEAM2:
+        case smesh::EDGESHELL2: {
             beam2_assemble_lumped_mass(nelements, nnodes, elems, xyz, values);
             break;
         }
@@ -258,7 +259,8 @@ void apply_inv_lumped_mass(const int element_type,
             tet10_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;
         }
-        case smesh::BEAM2: {
+        case smesh::BEAM2:
+        case smesh::EDGESHELL2: {
             beam2_apply_inv_lumped_mass(nelements, nnodes, elems, xyz, x, values);
             break;
         }
@@ -282,7 +284,8 @@ void apply_mass(const int element_type,
     if (!nelements) return;
 
     switch (element_type) {
-        case smesh::BEAM2: {
+        case smesh::BEAM2:
+        case smesh::EDGESHELL2: {
             beam2_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
             break;
         }

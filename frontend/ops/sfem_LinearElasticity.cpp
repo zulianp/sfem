@@ -2,20 +2,28 @@
 
 #include "linear_elasticity.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_GeneratedLinearElasticity_c_abi.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
+#include "smesh_buffer.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_spaces.hpp"
+#include "smesh_ssquad4.hpp"
+#include "smesh_ssquad4_mesh.hpp"
 
 #include "sfem_ElasticityParameters.hpp"
+#include "sfem_ElementScope.hpp"
 
+#include <algorithm>
 #include <assert.h>
 #include <functional>
+#include <type_traits>
+#include <vector>
 
 namespace sfem {
 
@@ -174,47 +182,209 @@ namespace sfem {
                    (sfem::is_semistructured_type(et) && smesh::is_hex_ss_family(et));
         }
 
+        ElementRange domain_element_range(const smesh::Mesh &mesh, const OpDomain &domain, const ElementScope scope) {
+            if (!mesh_is_distributed(mesh)) {
+                if (scope == ElementScope::SHARED_AND_AURA) {
+                    return {0, 0};
+                }
+                return {0, domain.block->n_elements()};
+            }
+            const smesh::block_idx_t b = block_id_for_domain(mesh, *domain.block);
+            return element_range(mesh, b, scope);
+        }
+
+        ElementRange clamp_to_block(const ElementRange range, const ptrdiff_t n_block) {
+            const ptrdiff_t begin = std::max(range.begin, ptrdiff_t(0));
+            const ptrdiff_t end   = std::min(range.end, n_block);
+            if (begin >= end) {
+                return {0, 0};
+            }
+            return {begin, end};
+        }
+
+        idx_t **element_soa_view(idx_t **const        elems,
+                                 const int            nxe,
+                                 const ptrdiff_t      begin,
+                                 idx_t               *stack_view[32],
+                                 std::vector<idx_t *> &heap_view) {
+            if (begin == 0) {
+                return elems;
+            }
+            if (nxe <= 32) {
+                for (int v = 0; v < nxe; ++v) {
+                    stack_view[v] = elems[v] + begin;
+                }
+                return stack_view;
+            }
+            heap_view.resize((size_t)nxe);
+            for (int v = 0; v < nxe; ++v) {
+                heap_view[v] = elems[v] + begin;
+            }
+            return heap_view.data();
+        }
+
+        static bool is_quad_ss_linear_elasticity(const smesh::ElemType et) {
+            return sfem::is_semistructured_type(et) && smesh::is_quad_ss_family(et);
+        }
+
+        static auto expand_ssquad_to_quad4(const smesh::ElemType      element_type,
+                                           const ptrdiff_t            nelements,
+                                           idx_t **const              elements) {
+            const int       level  = smesh::semistructured_level(element_type);
+            const ptrdiff_t nmicro = nelements * static_cast<ptrdiff_t>(smesh::ssquad4_txe(level));
+            auto            q4     = smesh::create_host_buffer<idx_t>(4, nmicro);
+            if (nmicro > 0) {
+                smesh::ssquad4_to_standard_quad4_mesh(level, nelements, elements, q4->data());
+            }
+            return q4;
+        }
+
+        template <typename Scalar>
+        static int linear_elasticity_quad_ss_apply_aos(const smesh::ElemType element_type,
+                                                       const ptrdiff_t       nelements,
+                                                       const ptrdiff_t       nnodes,
+                                                       idx_t **const         elements,
+                                                       geom_t **const        points,
+                                                       const Scalar          mu,
+                                                       const Scalar          lambda,
+                                                       const Scalar *const   u,
+                                                       Scalar *const         values) {
+            auto            q4     = expand_ssquad_to_quad4(element_type, nelements, elements);
+            const ptrdiff_t nmicro = q4->extent(1);
+            if (nmicro == 0) {
+                return SFEM_SUCCESS;
+            }
+            const geom_t *const *pts = const_cast<const geom_t *const *>(points);
+            if constexpr (std::is_same<Scalar, double>::value) {
+                return linear_elasticity_apply_2d_isoparametric_mesh_soa(smesh::QUAD4,
+                                                                         nmicro,
+                                                                         nnodes,
+                                                                         q4->data(),
+                                                                         pts,
+                                                                         lambda,
+                                                                         mu,
+                                                                         2,
+                                                                         &u[0],
+                                                                         &u[1],
+                                                                         2,
+                                                                         &values[0],
+                                                                         &values[1]);
+            } else {
+                return linear_elasticity_apply_2d_isoparametric_mesh_soa_float(smesh::QUAD4,
+                                                                              nmicro,
+                                                                              nnodes,
+                                                                              q4->data(),
+                                                                              pts,
+                                                                              lambda,
+                                                                              mu,
+                                                                              2,
+                                                                              &u[0],
+                                                                              &u[1],
+                                                                              2,
+                                                                              &values[0],
+                                                                              &values[1]);
+            }
+        }
+
+        template <typename Scalar>
+        static int linear_elasticity_quad_ss_block_diag_sym_aos(const smesh::ElemType element_type,
+                                                                const ptrdiff_t       nelements,
+                                                                const ptrdiff_t       nnodes,
+                                                                idx_t **const         elements,
+                                                                geom_t **const        points,
+                                                                const Scalar          mu,
+                                                                const Scalar          lambda,
+                                                                Scalar *const         values) {
+            auto            q4     = expand_ssquad_to_quad4(element_type, nelements, elements);
+            const ptrdiff_t nmicro = q4->extent(1);
+            if (nmicro == 0) {
+                return SFEM_SUCCESS;
+            }
+            const geom_t *const *pts = const_cast<const geom_t *const *>(points);
+            if constexpr (std::is_same<Scalar, double>::value) {
+                return linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(
+                        smesh::QUAD4, nmicro, nnodes, q4->data(), pts, lambda, mu, values);
+            } else {
+                return linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa_float(
+                        smesh::QUAD4, nmicro, nnodes, q4->data(), pts, lambda, mu, values);
+            }
+        }
+
         int linear_elasticity_dispatch_domain_vector(const OpDomain     &domain,
                                                      smesh::Mesh        &mesh,
                                                      const real_t        mu,
                                                      const real_t        lambda,
                                                      const real_t *const h,
-                                                     real_t *const       out) {
-            auto block        = domain.block;
-            auto element_type = domain.element_type;
+                                                     real_t *const       out,
+                                                     const ElementRange  range_in) {
+            const ElementRange range = clamp_to_block(range_in, domain.block->n_elements());
+            if (range.empty()) {
+                return SFEM_SUCCESS;
+            }
+
+            auto                block        = domain.block;
+            auto                element_type = domain.element_type;
+            const ptrdiff_t     ne           = range.size();
+            idx_t **const       elems        = block->elements()->data();
+            const int           nxe          = elem_num_nodes(element_type);
+            idx_t              *stack_view[32];
+            std::vector<idx_t *> heap_view;
+            idx_t **const       view         = element_soa_view(elems, nxe, range.begin, stack_view, heap_view);
+
+            if (is_quad_ss_linear_elasticity(element_type)) {
+                return linear_elasticity_quad_ss_apply_aos(element_type,
+                                                           ne,
+                                                           mesh.n_nodes(),
+                                                           view,
+                                                           mesh.points()->data(),
+                                                           mu,
+                                                           lambda,
+                                                           h,
+                                                           out);
+            }
             if (domain.user_data) {
-                auto jac = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(domain.user_data);
+                auto             jac = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(domain.user_data);
+                const geom_t    *det = jac->jacobian_determinant()->data() + range.begin;
                 if (element_type == smesh::HEX8) {
                     SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_soa");
+                    jacobian_t *adj_rows[9];
+                    auto        adj = jac->jacobian_adjugate_SoA()->data();
+                    if (range.begin != 0) {
+                        for (int i = 0; i < 9; ++i) {
+                            adj_rows[i] = adj[i] + range.begin;
+                        }
+                        adj = adj_rows;
+                    }
                     return linear_elasticity_apply_adjugate_soa(element_type,
-                                                                block->n_elements(),
+                                                                ne,
                                                                 mesh.n_nodes(),
-                                                                block->elements()->data(),
+                                                                view,
                                                                 mesh.points()->data(),
-                                                                jac->jacobian_adjugate_SoA()->data(),
-                                                                jac->jacobian_determinant()->data(),
+                                                                adj,
+                                                                det,
                                                                 mu,
                                                                 lambda,
                                                                 h,
                                                                 out);
                 }
                 SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_aos");
+                constexpr ptrdiff_t adjugate_size = 9;
                 return linear_elasticity_apply_adjugate_aos(element_type,
-                                                            block->n_elements(),
+                                                            ne,
                                                             mesh.n_nodes(),
-                                                            block->elements()->data(),
+                                                            view,
                                                             mesh.points()->data(),
-                                                            jac->jacobian_adjugate_AoS()->data(),
-                                                            jac->jacobian_determinant()->data(),
+                                                            jac->jacobian_adjugate_AoS()->data() + range.begin * adjugate_size,
+                                                            det,
                                                             mu,
                                                             lambda,
                                                             h,
                                                             out);
             }
             return linear_elasticity_apply_aos(element_type,
-                                               block->n_elements(),
+                                               ne,
                                                mesh.n_nodes(),
-                                               block->elements()->data(),
+                                               view,
                                                mesh.points()->data(),
                                                mu,
                                                lambda,
@@ -465,6 +635,17 @@ namespace sfem {
             auto mu           = domain.parameters->require_real_value("mu");
             auto element_type = domain.element_type;
 
+            if (is_quad_ss_linear_elasticity(element_type)) {
+                return linear_elasticity_quad_ss_block_diag_sym_aos(element_type,
+                                                                    block->n_elements(),
+                                                                    mesh->n_nodes(),
+                                                                    block->elements()->data(),
+                                                                    mesh->points()->data(),
+                                                                    mu,
+                                                                    lambda,
+                                                                    values);
+            }
+
             return linear_elasticity_block_diag_sym_aos(element_type,
                                                         block->n_elements(),
                                                         mesh->n_nodes(),
@@ -529,26 +710,70 @@ namespace sfem {
     }
 
     int LinearElasticity::gradient(const real_t *const x, real_t *const out) {
+        return gradient(x, out, ElementScope::ALL);
+    }
+
+    int LinearElasticity::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("LinearElasticity::apply");
+        SFEM_OP_CAPTURE();
+        return apply(x, h, out, ElementScope::ALL);
+    }
+
+    int LinearElasticity::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
         SFEM_TRACE_SCOPE("LinearElasticity::gradient");
 
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->require_real_value("lambda");
             auto mu     = domain.parameters->require_real_value("mu");
-            return linear_elasticity_dispatch_domain_vector(domain, *mesh, mu, lambda, x, out);
+            return linear_elasticity_dispatch_domain_vector(
+                    domain, *mesh, mu, lambda, x, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
-    int LinearElasticity::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("LinearElasticity::apply");
-        SFEM_OP_CAPTURE();
-
+    int LinearElasticity::apply(const real_t *const /*x*/,
+                                const real_t *const h,
+                                real_t *const       out,
+                                const ElementScope  scope) {
         auto mesh = impl_->space->mesh_ptr();
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->require_real_value("lambda");
             auto mu     = domain.parameters->require_real_value("mu");
-            return linear_elasticity_dispatch_domain_vector(domain, *mesh, mu, lambda, h, out);
+            return linear_elasticity_dispatch_domain_vector(
+                    domain, *mesh, mu, lambda, h, out, domain_element_range(*mesh, domain, scope));
         });
+    }
+
+    int LinearElasticity::apply_scope_flat_range(const real_t *const /*x*/,
+                                                 const real_t *const h,
+                                                 real_t *const       out,
+                                                 const ElementScope  scope,
+                                                 const ptrdiff_t     flat_begin,
+                                                 const ptrdiff_t     flat_end) {
+        SFEM_TRACE_SCOPE("LinearElasticity::apply_scope_flat_range");
+        SFEM_OP_CAPTURE();
+
+        if (flat_end <= flat_begin) {
+            return SFEM_SUCCESS;
+        }
+
+        auto mesh = impl_->space->mesh_ptr();
+        int  err  = SFEM_SUCCESS;
+        for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
+            const smesh::block_idx_t block = slice.block;
+            const ElementRange       range = slice.range;
+            if (impl_->iterate([&](const OpDomain &domain) {
+                    if (block_id_for_domain(*mesh, *domain.block) != block) {
+                        return SFEM_SUCCESS;
+                    }
+                    auto lambda = domain.parameters->require_real_value("lambda");
+                    auto mu     = domain.parameters->require_real_value("mu");
+                    return linear_elasticity_dispatch_domain_vector(domain, *mesh, mu, lambda, h, out, range);
+                }) != SFEM_SUCCESS) {
+                err = SFEM_FAILURE;
+            }
+        }
+        return err;
     }
 
     int LinearElasticity::value(const real_t *x, real_t *const out) {
@@ -681,4 +906,5 @@ namespace sfem {
 #endif  // SFEM_ENABLE_RYAML
 
 }  // namespace sfem
+
 

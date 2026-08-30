@@ -72,7 +72,7 @@ namespace sfem {
     std::shared_ptr<SparseBlockVector<T>> create_sparse_block_vector(const SharedBuffer<idx_t>& idx,
                                                                      const SharedBuffer<T>&     data) {
         auto ret         = std::make_shared<SparseBlockVector<T>>();
-        ret->block_size_ = data->size() / idx->size();
+        ret->block_size_ = idx->size() ? static_cast<int>(data->size() / idx->size()) : 0;
         ret->idx_        = idx;
         ret->data_       = data;
         return ret;
@@ -88,39 +88,43 @@ namespace sfem {
 
         void default_init() {
             apply_ = [this](const T* const x, T* const y) -> int {
-                const ptrdiff_t    n_blocks   = sbv->n_blocks();
-                const idx_t* const idx        = sbv->idx()->data();
-                const T* const     dd         = sbv->data()->data();
-                const T* const     s          = scaling->data();
-                const int          block_size = 3;
-                assert(sbv->block_size() == 6);
-                // memset(y, 0, n_blocks * 3 * sizeof(T));
+                const ptrdiff_t n_blocks = sbv->n_blocks();
+                if (n_blocks == 0) {
+                    return SFEM_SUCCESS;
+                }
+                const idx_t* const idx            = sbv->idx()->data();
+                const T* const     dd             = sbv->data()->data();
+                const T* const     s              = scaling->data();
+                const int          sym_block_size = sbv->block_size();
+                const int          vec_dim        = (sym_block_size == 6) ? 3 : 2;
+                assert(sym_block_size == 6 || sym_block_size == 3);
+                assert(sym_block_size == vec_dim * (vec_dim + 1) / 2);
 
 #pragma omp parallel for
                 for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                    auto di = &dd[i * 6];
+                    auto di = &dd[i * sym_block_size];
                     auto si = s[i];
 
                     const ptrdiff_t b  = idx[i];
-                    auto            xi = &x[b * block_size];
-                    auto            yi = &y[b * block_size];
+                    auto            xi = &x[b * vec_dim];
+                    auto            yi = &y[b * vec_dim];
 
                     T buff[3] = {0, 0, 0};
 
                     int d_idx = 0;
-                    for (int d1 = 0; d1 < block_size; d1++) {
+                    for (int d1 = 0; d1 < vec_dim; d1++) {
                         const auto m = si * di[d_idx++];
                         buff[d1] += m * xi[d1];
-                        for (int d2 = d1 + 1; d2 < block_size; d2++) {
+                        for (int d2 = d1 + 1; d2 < vec_dim; d2++) {
                             const auto m = si * di[d_idx++];
                             buff[d1] += m * xi[d2];
                             buff[d2] += m * xi[d1];
                         }
                     }
 
-                    yi[0] += buff[0];
-                    yi[1] += buff[1];
-                    yi[2] += buff[2];
+                    for (int d = 0; d < vec_dim; d++) {
+                        yi[d] += buff[d];
+                    }
                 }
 
                 return SFEM_SUCCESS;
@@ -131,10 +135,13 @@ namespace sfem {
         void cuda_init() {
             assert(sbv->mem_space() == MEMORY_SPACE_DEVICE);
             apply_ = [this](const T* const x, T* const y) -> int {
-                const ptrdiff_t    n_blocks = this->sbv->n_blocks();
-                const idx_t* const idx      = this->sbv->idx()->data();
-                const T* const     dd       = this->sbv->data()->data();
-                const T* const     s        = this->scaling->data();
+                const ptrdiff_t n_blocks = this->sbv->n_blocks();
+                if (n_blocks == 0) {
+                    return SFEM_SUCCESS;
+                }
+                const idx_t* const idx = this->sbv->idx()->data();
+                const T* const     dd  = this->sbv->data()->data();
+                const T* const     s   = this->scaling->data();
 
                 return sbv_mult3<T>(n_blocks, idx, dd, s, x, y);
             };

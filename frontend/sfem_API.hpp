@@ -16,6 +16,7 @@
 #include "smesh_sshex8_restriction.hpp"
 #include "smesh_ssquad4.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
+#include "smesh_sstet4.hpp"
 #include "smesh_sstet4_prolongation.hpp"
 
 // C++ includes
@@ -105,7 +106,7 @@ namespace sfem {
                 n,
                 [n, diagonal_scaling, impl](const T *const x, T *const y) {
                     auto d = diagonal_scaling->data();
-                    impl->xypaz(n, x, d, 0, y);
+                    impl->xypaz(n, x, d, 1, y);
                 },
                 es);
     }
@@ -1744,6 +1745,60 @@ namespace sfem {
                 const int to_lidx     = smesh::ssquad4_lidx(to_level, xi, yi);
                 view->data()[to_lidx] = elements->data()[from_lidx];
             }
+        }
+
+        return view;
+    }
+
+    static SharedBuffer<idx_t *> sstri_derefine_element_connectivity(const int                    from_level,
+                                                                     const int                    to_level,
+                                                                     const SharedBuffer<idx_t *> &elements) {
+        const int       step_factor = from_level / to_level;
+        const int       nxe         = smesh::sstri_nxe(to_level);
+        const ptrdiff_t nelements   = elements->extent(1);
+
+        auto view = std::make_shared<Buffer<idx_t *>>(
+                nxe,
+                nelements,
+                (idx_t **)malloc(nxe * sizeof(idx_t *)),
+                [keep_alive = elements](int, void **v) {
+                    (void)keep_alive;
+                    free(v);
+                },
+                elements->mem_space());
+
+        for (int yi = 0; yi <= to_level; yi++) {
+            for (int xi = 0; xi <= to_level - yi; xi++) {
+                const int from_lidx   = smesh::sstri_lidx(from_level, xi * step_factor, yi * step_factor);
+                const int to_lidx     = smesh::sstri_lidx(to_level, xi, yi);
+                view->data()[to_lidx] = elements->data()[from_lidx];
+            }
+        }
+
+        return view;
+    }
+
+    static SharedBuffer<idx_t *> ssedge_derefine_element_connectivity(const int                    from_level,
+                                                                      const int                    to_level,
+                                                                      const SharedBuffer<idx_t *> &elements) {
+        const int       step_factor = from_level / to_level;
+        const int       nxe         = smesh::ssedge_nxe(to_level);
+        const ptrdiff_t nelements   = elements->extent(1);
+
+        auto view = std::make_shared<Buffer<idx_t *>>(
+                nxe,
+                nelements,
+                (idx_t **)malloc(nxe * sizeof(idx_t *)),
+                [keep_alive = elements](int, void **v) {
+                    (void)keep_alive;
+                    free(v);
+                },
+                elements->mem_space());
+
+        for (int xi = 0; xi <= to_level; xi++) {
+            const int from_lidx   = smesh::ssedge_lidx(from_level, xi * step_factor);
+            const int to_lidx     = smesh::ssedge_lidx(to_level, xi);
+            view->data()[to_lidx] = elements->data()[from_lidx];
         }
 
         return view;
