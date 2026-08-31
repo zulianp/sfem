@@ -362,13 +362,13 @@ namespace {
                                               smesh::Env::read("SFEM_MG_MAX_IT", 40));
     }
 
-    int test_parallel_checkerboard_ssmgc() {
-        SFEM_TRACE_SCOPE("test_parallel_checkerboard_ssmgc");
-        auto comm = sfem::Communicator::world();
-
-        auto hex = sfem::Mesh::create_hex8_checkerboard_cube(comm, 2, 2, 2);
-        auto ss  = smesh::to_semistructured(2, hex, true, false);
+    int run_parallel_ssmgc_contact(const std::shared_ptr<sfem::Mesh> &ss) {
         SFEM_TEST_ASSERT(ss != nullptr);
+        auto comm = ss->comm();
+
+        if (!smesh::is_hex_ss_family(ss->element_type(0))) {
+            setenv("SFEM_COARSE_OP_TYPE", sfem::op_type::MATRIX_FREE, 1);
+        }
 
         auto fs = sfem::FunctionSpace::create(ss, 3);
         auto f  = sfem::Function::create(fs);
@@ -381,7 +381,11 @@ namespace {
                 ss, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
                     return fabs(x) < 1e-8 || fabs(x - 1) < 1e-8;
                 });
-        SFEM_TEST_ASSERT(!wall.empty());
+        ptrdiff_t n_wall = 0;
+        for (const auto &s : wall) {
+            n_wall += s ? s->size() : 0;
+        }
+        SFEM_TEST_ASSERT(comm->sum(real_t(n_wall)) > 0);
         sfem::DirichletConditions::Condition xc{.sidesets = wall, .value = 0, .component = 0};
         sfem::DirichletConditions::Condition yc{.sidesets = wall, .value = real_t(-0.05), .component = 1};
         sfem::DirichletConditions::Condition zc{.sidesets = wall, .value = 0, .component = 2};
@@ -389,7 +393,11 @@ namespace {
 
         auto contact_ss = sfem::Sideset::create_from_selector(
                 ss, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
-        SFEM_TEST_ASSERT(contact_ss.size() >= 1);
+        ptrdiff_t n_contact = 0;
+        for (const auto &s : contact_ss) {
+            n_contact += s ? s->size() : 0;
+        }
+        SFEM_TEST_ASSERT(comm->sum(real_t(n_contact)) > 0);
 
         auto sdf = smesh::create_sdf(comm,
                                      16,
@@ -479,6 +487,22 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    int test_parallel_checkerboard_ssmgc() {
+        SFEM_TRACE_SCOPE("test_parallel_checkerboard_ssmgc");
+        auto comm = sfem::Communicator::world();
+        auto hex  = sfem::Mesh::create_hex8_checkerboard_cube(comm, 2, 2, 2);
+        auto ss   = smesh::to_semistructured(2, hex, true, false);
+        return run_parallel_ssmgc_contact(ss);
+    }
+
+    int test_parallel_tet4_ssmgc() {
+        SFEM_TRACE_SCOPE("test_parallel_tet4_ssmgc");
+        auto comm = sfem::Communicator::world();
+        auto tet  = sfem::Mesh::create_tet4_cube(comm, 2, 2, 2);
+        auto ss   = smesh::to_semistructured(2, tet, true, false);
+        return run_parallel_ssmgc_contact(ss);
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -488,6 +512,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_parallel_tet4_ssgmg);
     SFEM_RUN_TEST(test_parallel_hex8_tet4_ssgmg);
     SFEM_RUN_TEST(test_parallel_checkerboard_ssmgc);
+    SFEM_RUN_TEST(test_parallel_tet4_ssmgc);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

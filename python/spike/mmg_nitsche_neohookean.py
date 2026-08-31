@@ -757,8 +757,9 @@ def plot_result(result, path):
             labels += labels2
         ax_conv.legend(lines, labels, loc="best", fontsize=8)
 
+    title = result.get("formulation_label", "Compressible Neo-Hookean Nitsche contact")
     fig.suptitle(
-        "Compressible Neo-Hookean Nitsche contact: "
+        f"{title}: "
         f"F={result['F']:.4e}, |g_-|={result['penetration']:.3e}, "
         f"active={result['n_active']}, final ||r||={rh[-1]:.3e}"
     )
