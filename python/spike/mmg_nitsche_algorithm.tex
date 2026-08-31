@@ -43,7 +43,7 @@
 \newcommand{\tr}{\operatorname{tr}}
 \newcommand{\negpart}[1]{\left[#1\right]_-}
 
-\title{A Filtered Nonlinear Multigrid Method for Nitsche Contact with Hyperelastic Continuation}
+\title{A Filtered Nonlinear Multigrid Method for Stabilized Dual-Pass Mortar Contact}
 \author{}
 \date{}
 
@@ -51,22 +51,23 @@
 \maketitle
 
 \begin{abstract}
-We describe a nonlinear multigrid method for unilateral, frictionless
-self-contact discretized by a Nitsche-type active-set formulation.  The method
-uses a shifted-penalty multigrid skeleton in which nonlinear fine-level
-smoothing is combined with a recursively computed coarse correction.  The
-central construction is a filtered coarse active space: coarse corrections are
-excluded from the supports of currently active contact rows, while the fine
-nonlinear relaxation remains free to resolve the contact constraints.  This
-separation suppresses discontinuous coarse contact modes without freezing the
-fine contact dynamics.  For finite-strain elasticity, the same framework is
-combined with compressible Neo--Hookean stresses, a quasi-Newton material
-linearization that may be frozen during a multigrid cycle, rediscretized coarse
-tangents evaluated at projected coarse displacements, and an inversion-aware
-globalization based on the positivity of the deformation Jacobian.  The
-resulting algorithm is intended as a robust experimental model for studying
-the interaction between Nitsche contact, active-space coarsening, and nonlinear
-elasticity.
+We describe a nonlinear multigrid method for unilateral, frictionless contact
+based on the stabilized dual-pass mortar discretization of Puso and Solberg.
+The contact pressure is represented by localized nodal multiplier fields on
+both potential contact surfaces.  For contact, these scalar nodal pressures
+are converted into vector tractions by nodal normals, and stability is obtained
+by penalizing the jump of the resulting traction vectors across the interface.
+The displacement equation is solved by a shifted-penalty multigrid skeleton in
+which nonlinear fine-level smoothing is combined with a recursively computed
+coarse correction.  The central multigrid construction is a filtered coarse
+active space: coarse corrections are excluded from the displacement supports
+of currently active contact multipliers and their stabilization neighbors,
+while the fine nonlinear relaxation remains free to update the active set.
+For finite-strain elasticity, the same framework is combined with compressible
+Neo--Hookean stresses, optional quasi-Newton material linearization during a
+multigrid cycle, rediscretized coarse material tangents evaluated at projected
+coarse displacements, and an inversion-aware globalization based on the
+positivity of the deformation Jacobian.
 \end{abstract}
 
 \section{Introduction}
@@ -81,20 +82,20 @@ Conversely, over-constraining the fine problem would prevent the nonlinear
 iteration from adapting the contact set.
 
 The approach considered here follows a conservative principle.  The fine
-problem is solved with the full active-set Nitsche residual and tangent.  The
-coarse correction, however, is computed in a filtered active space that is
-jump-free on the supports of the current active contact rows.  In its present
-form the filter removes both Cartesian displacement components at active
-contact-adjacent nodes.  This is stronger than the minimal normal-component
-filter, but it has the practical advantage of being independent of a
-normal-tangential basis and therefore provides a simple baseline for
-experiments.
+problem is solved with the full stabilized active-set mortar residual and
+tangent.  The coarse correction, however, is computed in a filtered active
+space that is jump-free on the displacement supports of the current active
+contact multipliers.  In its present form the filter removes both Cartesian
+displacement components at active contact-adjacent nodes.  This is stronger
+than the minimal normal-component filter, but it has the practical advantage
+of being independent of a normal-tangential basis and therefore provides a
+simple baseline for experiments.
 
 The paper is organized as follows.  Section~\ref{sec:model} states the
-finite-strain elastic model.  Section~\ref{sec:nitsche} gives the active-set
-Nitsche contact formulation.  Section~\ref{sec:filtered-space} defines the
-filtered coarse active space and explains why it removes active contact
-Hessian modes from the coarse correction.  Section~\ref{sec:mg} presents the
+finite-strain elastic model.  Section~\ref{sec:sp-contact} gives the
+stabilized dual-pass mortar contact formulation.  Section~\ref{sec:filtered-space}
+defines the filtered coarse active space and explains why it removes active
+contact modes from the coarse correction.  Section~\ref{sec:mg} presents the
 nonlinear multigrid algorithm.  Section~\ref{sec:coarse-tangents} discusses
 coarse tangent construction, including rediscretization at projected coarse
 displacements.  Section~\ref{sec:globalization} describes material
@@ -156,92 +157,107 @@ Admissible finite-strain states must satisfy $\JJ>0$ elementwise.  This
 condition is not merely a diagnostic: it is required for the energy, stress,
 and tangent to remain well defined.
 
-\section{Active-Set Nitsche Contact}
-\label{sec:nitsche}
+\section{Stabilized Dual-Pass Mortar Contact}
+\label{sec:sp-contact}
 
-Let $\calC$ be a set of potential contact quadrature rows.  For each
-$c\in\calC$, a point on one side of the possible contact interface is paired
-with an interpolated point on the opposite side.  We denote the normal by
-$\nn^c$, the side-one displacement trace by $\ud_1^c$, and the interpolated
-side-two displacement trace by $\ud_2^c$.  The normal gap is
+Let $\Gamma_c^1$ and $\Gamma_c^2$ denote the two potential contact traces.
+Following Puso and Solberg, the multiplier space is not chosen from one
+privileged mortar side.  Instead,
 \[
-    g^c(\ud)
-    =
-    {\nn^c}^{T}
-    \left(
-        \xx_2^c+\ud_2^c
-        -
-        \xx_1^c-\ud_1^c
-    \right).
-\]
-For an edge-based quadrature rule the formulation uses an edge-averaged gap
-$\bar g^c$.  With local length scale $h_c$ and stabilization parameter
-$\gamma_0$, the penalty scale is
-\[
-    \gamma_c = \gamma_0\frac{\mu}{h_c}.
-\]
-The normal Cauchy stress is
-\[
-    \sigma_n^c(\ud)
-    =
-    {\nn^c}^{T}\SSig(\FF(\ud))\nn^c .
-\]
-The active set is determined by the augmented normal quantity
-\[
-    P_n^c(\ud)
-    =
-    \theta_c\,\sigma_n^c(\ud)+\gamma_c\,\bar g^c(\ud),
+    M_h=M_h^1\times M_h^2,
     \qquad
-    \alpha_c(\ud)=
-    \begin{cases}
-    1, & P_n^c(\ud)<0,\\
-    0, & P_n^c(\ud)\ge 0 .
-    \end{cases}
+    \lambda_h=(\lambda_h^1,\lambda_h^2),
 \]
-Only active rows contribute to the contact residual and tangent.  Therefore an
-inactive potential contact row is a natural Neumann boundary row in the weak
-sense: no contact force is assembled there.  A plotted value of
-$-\sigma_n^c$ outside the active set is not, by itself, a contact pressure; it
-is a stress diagnostic of the elastic state.  The contact pressure associated
-with the active-set formulation is instead
+where each $M_h^i$ is the localized trace space on $\Gamma_c^i$.  For the
+linear triangular prototype this gives a continuous piecewise-linear scalar
+pressure on each contact edge trace.  If $N_{b,h}^i$ is the set of contact
+boundary nodes on side $i$, then
 \[
-    p_c(\ud)
+    \lambda_h^i(x)
     =
-    \alpha_c(\ud)
-    \max\!\left(-\frac{P_n^c(\ud)}{\theta_c},0\right).
+    \sum_{A\in N_{b,h}^i}
+    \varphi_A^i(x)\lambda_A^i\nn_A^i ,
+    \qquad x\in\Gamma_c^i .
 \]
+The unknown $\lambda_A^i\in\R$ is non-negative for unilateral frictionless
+contact, and $\nn_A^i$ is a nodal normal obtained by averaging adjacent
+oriented edge normals and normalizing.  Thus the unknown field is scalar, but
+the physical traction entering the weak form is vector-valued.
 
-For a frozen geometry and frozen active set, the local contact potential can
-be written in the shifted-penalty form
+For every overlapping pair of contact edges the method performs two directed
+integrations.  In the first pass, side $1$ supplies the multiplier test
+function and side $2$ supplies the opposing displacement trace; in the second
+pass the roles are reversed.  The resulting discrete coupling can be written
+as
 \[
-    \Pi_c(\ud)
-    =
-    \sum_{c\in\calC}
-    \frac{m_c}{2\theta_c\gamma_c}
-    \negpart{P_n^c(\ud)}^2,
+    b(\lambda_h,\vv_h)=\lambda^T B^T v,
 \]
-where $m_c$ is the quadrature weight.  On active rows,
+where $B^T u-g_0$ is the vector of physical normal gap moments associated
+with the localized multiplier basis.  In the present sign convention, positive
+gap means separation and negative gap means penetration.
+
+The dual-pass multiplier space contains two pressure descriptions of the same
+contact traction.  Stability is obtained by the Solberg-Puso traction-jump
+term
 \[
-    \delta\Pi_c(\ud;\vv)
+    j(\mu_h,\lambda_h)
     =
-    \sum_{c:\alpha_c=1}
-    \frac{m_c}{\theta_c\gamma_c}
-    P_n^c(\ud)\,
-    \delta P_n^c(\ud;\vv),
+    \frac{1}{2}
+    \sum_p
+    \gamma_p h_p
+    \left[
+    \int_{\Gamma^{p,12}}
+    \mu_h^1\cdot(\lambda_h^1+\lambda_h^2)\,d\Gamma
+    +
+    \int_{\Gamma^{p,21}}
+    \mu_h^2\cdot(\lambda_h^2+\lambda_h^1)\,d\Gamma
+    \right],
 \]
-and the corresponding tangent contribution has the rank-one structure
+which has the matrix form $\mu^T J\lambda$.  Because the normal directions on
+the two sides are opposite in the continuum limit, equal scalar pressures on
+the two sides produce equal and opposite vector tractions and therefore a
+small stabilized jump.  The stabilization parameter is written
+$\gamma_p=\alpha/E_p$ with a dimensionless $\alpha$ of order one and a
+representative pair modulus $E_p$.
+
+With geometry frozen during one nonlinear contact evaluation, the stabilized
+unilateral conditions are
 \[
-    \HH_c
-    =
-    \sum_{c:\alpha_c=1}
-    \frac{m_c}{\theta_c\gamma_c}
-    \boldsymbol{p}_c\boldsymbol{p}_c^T,
+    R_u(u,\lambda)=R_e(u)-B\lambda=0,
+\]
+\[
+    g(u,\lambda)=B^T u+J\lambda-g_0\ge 0,
     \qquad
-    \boldsymbol{p}_c=\nabla_{\ud}P_n^c .
+    \lambda\ge 0,
+    \qquad
+    \lambda\cdot g(u,\lambda)=0 .
 \]
-The derivative $\boldsymbol{p}_c$ includes the gap derivative and, for
-finite-strain elasticity, the derivative of the normal Cauchy stress with
-respect to the displacement.
+The augmented-Lagrangian displacement residual used by the nonlinear
+multigrid smoother replaces $\lambda$ by the projected active pressure
+\[
+    p_\rho(u,\lambda)
+    =
+    \max\{0,\lambda-\rho\,g(u,\lambda)\},
+\]
+with row-wise penalty $\rho>0$.  Active multiplier nodes are those for which
+$p_\rho>0$.  The associated displacement tangent contains the positive
+semidefinite active contribution
+\[
+    H_c
+    =
+    \sum_{A\in\calA}
+    m_A\rho_A\,B_A B_A^T ,
+\]
+where $m_A$ is the lumped contact mass of the multiplier basis function and
+$B_A$ is the frozen gap derivative.  The multiplier update is a damped
+projected augmentation,
+\[
+    \lambda^{k+1}
+    =
+    \max\{0,\lambda^k-\omega_\lambda\rho\,g(u^{k+1},\lambda^k)\},
+\]
+and therefore the active release condition includes the stabilization term
+$J\lambda$, as required by the stabilized KKT system.
 
 \section{Filtered Coarse Active Space}
 \label{sec:filtered-space}

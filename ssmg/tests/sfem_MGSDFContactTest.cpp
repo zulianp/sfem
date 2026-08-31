@@ -449,7 +449,9 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
                                 const int                                          block_size,
                                 const std::vector<std::shared_ptr<sfem::Sideset>> &contact_sides,
                                 const std::shared_ptr<smesh::Grid<geom_t>>        &sdf,
-                                const geom_t                                       disp_y) {
+                                const geom_t                                       disp_y,
+                                const char                                        *op_name = "LinearElasticity",
+                                const char                                        *out_dir = nullptr) {
     SFEM_TEST_ASSERT(ss != nullptr);
     SFEM_TEST_ASSERT(!contact_sides.empty());
     auto comm = ss->comm();
@@ -463,10 +465,15 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
 
     auto fs = sfem::FunctionSpace::create(ss, block_size);
     auto f  = sfem::Function::create(fs);
-    auto op = sfem::create_op(fs, "LinearElasticity", sfem::EXECUTION_SPACE_HOST);
+    auto op = sfem::create_op(fs, op_name, sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
     f->add_operator(op);
+    if (std::string(op_name) == "LinearElasticity") {
+        SFEM_TEST_ASSERT(f->is_linear());
+    } else {
+        SFEM_TEST_ASSERT(!f->is_linear());
+    }
 
     const int dim  = ss->spatial_dimension();
     auto      wall = sfem::Sideset::create_from_selector(ss, [](const geom_t x, const geom_t /*y*/, const geom_t /*z*/) -> bool {
@@ -509,6 +516,43 @@ static int run_ssmgc_on_ss_mesh(const std::shared_ptr<sfem::Mesh>               
         nrm += x->data()[i] * x->data()[i];
     }
     SFEM_TEST_ASSERT(std::isfinite(nrm));
+
+    const int enable_output = smesh::Env::read("SFEM_ENABLE_OUTPUT", int(1));
+    if (enable_output && out_dir && out_dir[0]) {
+        const smesh::Path root(out_dir);
+        smesh::create_directory(root);
+        contact_conds->update(x->data());
+
+        if (smesh::semistructured_export_as_standard(fs->mesh_ptr(), root / "mesh") != SFEM_SUCCESS) {
+            SFEM_ERROR("run_ssmgc_on_ss_mesh: failed to export mesh to %s\n", out_dir);
+        }
+        if (sdf && (!comm || comm->rank() == 0)) {
+            sdf->to_file(root / "sdf");
+        }
+
+        auto gap = sfem::create_host_buffer<real_t>(ndofs);
+        std::fill(gap->data(), gap->data() + ndofs, real_t(0));
+        contact_conds->signed_distance_for_mesh_viz(x->data(), gap->data());
+
+        auto grad = sfem::create_host_buffer<real_t>(ndofs);
+        std::fill(grad->data(), grad->data() + ndofs, real_t(0));
+        f->gradient(x->data(), grad->data());
+        auto stress = sfem::create_host_buffer<real_t>(ndofs);
+        std::fill(stress->data(), stress->data() + ndofs, real_t(0));
+        contact_conds->full_apply_boundary_mass_inverse(grad->data(), stress->data());
+
+        auto out = f->output();
+        out->set_output_dir(root / "out");
+        out->enable_AoS_to_SoA(true);
+        out->write("gap", gap->data());
+        out->write("rhs", rhs->data());
+        out->write("disp", x->data());
+        out->write("contact_stress", stress->data());
+
+        if (!comm || comm->rank() == 0) {
+            printf("Wrote %s/{mesh,sdf,out/{disp,gap,rhs,contact_stress}}\n", out_dir);
+        }
+    }
     return SFEM_TEST_SUCCESS;
 }
 
@@ -570,6 +614,57 @@ int test_quad2d_ssmgc() {
     return run_ssmgc_on_ss_mesh(ss, 2, contact_ss, sdf, real_t(-0.05));
 }
 
+int test_function_is_linear() {
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 1, 1, 1, 0, 0, 0, 1, 1, 1);
+    SFEM_TEST_ASSERT(mesh != nullptr);
+    auto fs = sfem::FunctionSpace::create(mesh, 3);
+    auto f  = sfem::Function::create(fs);
+    SFEM_TEST_ASSERT(f->is_linear());
+
+    auto le = sfem::create_op(fs, "LinearElasticity", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(le != nullptr);
+    SFEM_TEST_ASSERT(le->initialize() == SFEM_SUCCESS);
+    f->add_operator(le);
+    SFEM_TEST_ASSERT(f->is_linear());
+
+    auto mass = sfem::create_op(fs, "LumpedMass", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(mass != nullptr);
+    SFEM_TEST_ASSERT(mass->initialize() == SFEM_SUCCESS);
+    f->add_operator(mass);
+    SFEM_TEST_ASSERT(f->is_linear());
+
+    auto f_nl = sfem::Function::create(fs);
+    auto nh   = sfem::create_op(fs, "NeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(nh != nullptr);
+    SFEM_TEST_ASSERT(nh->initialize() == SFEM_SUCCESS);
+    f_nl->add_operator(nh);
+    SFEM_TEST_ASSERT(!f_nl->is_linear());
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_contact_neohookean() {
+    auto comm = sfem::Communicator::world();
+    if (comm && comm->size() > 1) {
+        return SFEM_TEST_SUCCESS;
+    }
+
+    auto hex = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 1, 2, 0, 0, 0, 1, 1, 1);
+    auto ss  = smesh::to_semistructured(2, hex, true, false);
+    SFEM_TEST_ASSERT(ss != nullptr);
+
+    auto contact_ss = sfem::Sideset::create_from_selector(
+            ss, [](const geom_t /*x*/, const geom_t y, const geom_t /*z*/) -> bool { return y > -1e-5 && y < 1e-5; });
+    SFEM_TEST_ASSERT(!contact_ss.empty());
+
+    auto sdf = smesh::create_sdf(
+            ss->comm(), 8, 4, 8, -0.1, -0.2, -0.1, 1.1, 0.2, 1.1, [](const geom_t x, const geom_t y, const geom_t z) -> geom_t {
+                const geom_t cx = 0.5, cy = -0.5, cz = 0.5, radius = 0.5;
+                const geom_t dx = cx - x, dy = cy - y, dz = cz - z;
+                return radius - sqrt(dx * dx + dy * dy + dz * dz);
+            });
+    return run_ssmgc_on_ss_mesh(ss, 3, contact_ss, sdf, real_t(-0.05), "NeoHookeanOgden", "test_contact_neohookean");
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
@@ -577,7 +672,10 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_checkerboard_hex_ssmgc);
     SFEM_RUN_TEST(test_tet_ssmgc);
     SFEM_RUN_TEST(test_quad2d_ssmgc);
+    SFEM_RUN_TEST(test_function_is_linear);
+    SFEM_RUN_TEST(test_contact_neohookean);
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
+
