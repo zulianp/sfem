@@ -394,29 +394,28 @@ namespace sfem {
                 complete_surface_nodal(mass_vector && n_geom > 0 ? mass_vector->data() : nullptr, n_geom);
             }
 
-            if (!mass_vector || mass_vector->size() == 0) {
-                return;
-            }
-
-            auto m = mass_vector->data();
-
             real_t area = 0;
-            const ptrdiff_t n_area = contact_surface->node_mapping()->size();
-            for (ptrdiff_t i = 0; i < n_area; ++i) {
-                area += m[i];
-            }
-
+            if (mass_vector && mass_vector->size() > 0) {
+                auto            m      = mass_vector->data();
+                const ptrdiff_t n_area = contact_surface->node_mapping()->size();
+                for (ptrdiff_t i = 0; i < n_area; ++i) {
+                    area += m[i];
+                }
 #ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == execution_space) {
-                mass_vector = smesh::to_device(mass_vector);
-            }
+                if (EXECUTION_SPACE_DEVICE == execution_space) {
+                    mass_vector = smesh::to_device(mass_vector);
+                }
 #endif
+            }
 
             auto comm = space->mesh_ptr() ? space->mesh_ptr()->comm() : nullptr;
+            if (comm) {
+                area = comm->sum(area);
+            }
             if (!comm || comm->rank() == 0) {
                 printf("AREA: %g\n", (double)area);
             }
-            assert(mass_vector->size() == 0 || area > 0);
+            assert(area > 0);
         }
     };
 
@@ -512,32 +511,21 @@ namespace sfem {
     }
 
     int ContactConditions::signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const {
-        auto cs = impl_->contact_surface;
-        cs->displace_points(x);
-
-        const ptrdiff_t n_geom = contact_geometry_n_nodes(cs);
-        auto            temp   = create_host_buffer<real_t>(n_geom);
-        auto            tt     = temp->data();
-
-        for (auto &obs : impl_->obstacles) {
-            int err = obs->sample(cs->element_type(),
-                                  cs->elements()->extent(1),
-                                  n_geom,
-                                  cs->elements()->data(),
-                                  cs->points()->data(),
-                                  impl_->normals->data(),
-                                  tt);
-
-            if (SFEM_SUCCESS != err) {
-                SFEM_ERROR("Unable to sample obstacle");
-            }
+        const ptrdiff_t n   = impl_->contact_surface->node_mapping()->size();
+        const int       dim = impl_->space->mesh_ptr()->spatial_dimension();
+        auto            gap = create_host_buffer<real_t>(n > 0 ? n : 0);
+        auto *          self = const_cast<ContactConditions *>(this);
+        const int       err  = self->signed_distance(x, n > 0 ? gap->data() : nullptr);
+        if (err != SFEM_SUCCESS) {
+            return err;
+        }
+        if (n <= 0 || !g) {
+            return SFEM_SUCCESS;
         }
 
-        const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
-        int                dim = impl_->space->mesh_ptr()->spatial_dimension();
-
-        auto normals = impl_->normals->data();
+        const idx_t *const idx     = impl_->contact_surface->node_mapping()->data();
+        auto               normals = impl_->normals->data();
+        auto               tt      = gap->data();
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
