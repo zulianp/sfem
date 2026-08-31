@@ -17,6 +17,7 @@ namespace sfem {
         virtual SharedBuffer<geom_t *> points()             = 0;
         virtual SharedBuffer<idx_t *>  elements()           = 0;
         virtual SharedBuffer<idx_t>    node_mapping()       = 0;
+        virtual SharedBuffer<idx_t>    geometry_node_mapping() { return node_mapping(); }
         virtual smesh::ElemType          element_type() const = 0;
 
 #ifdef SFEM_ENABLE_CUDA
@@ -71,6 +72,7 @@ namespace sfem {
         SharedBuffer<geom_t *> points() override;
         SharedBuffer<idx_t *>  elements() override;
         SharedBuffer<idx_t>    node_mapping() override;
+        SharedBuffer<idx_t>    geometry_node_mapping() override;
 
 #ifdef SFEM_ENABLE_CUDA
         SharedBuffer<geom_t *> points_device() override;

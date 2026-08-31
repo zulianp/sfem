@@ -471,12 +471,24 @@ namespace sfem {
         }
     }
 
+    static bool mesh_is_mpi(const std::shared_ptr<Mesh> &mesh) {
+        return mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1;
+    }
+
+    static ptrdiff_t transfer_nelements(const std::shared_ptr<Mesh> &mesh, const std::shared_ptr<Mesh::Block> &block) {
+        if (!block) {
+            return 0;
+        }
+        return mesh_is_mpi(mesh) ? block->n_elements_owned() : block->n_elements();
+    }
+
     static std::shared_ptr<Operator<real_t>> wrap_prolongation_coarse_gather(
             const std::shared_ptr<FunctionSpace>         &from_space,
+            const std::shared_ptr<FunctionSpace>         &to_space,
             const ExecutionSpace                          es,
             const std::shared_ptr<Operator<real_t>>      &op) {
-        auto mesh = from_space->mesh_ptr();
-        if (!mesh || !mesh->is_distributed() || !mesh->comm() || mesh->comm()->size() <= 1) {
+        auto from_mesh = from_space->mesh_ptr();
+        if (!mesh_is_mpi(from_mesh)) {
             return op;
         }
         if (es == EXECUTION_SPACE_DEVICE) {
@@ -484,8 +496,12 @@ namespace sfem {
             return op;
         }
 
-        auto      ex = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
+        // Every owned fine node is incident to an owned macro (Restrict dual). Assignment
+        // interpolant must not scatter_add: neighbor writes of the same node can disagree
+        // when coarse ghosts are incomplete, and averaging then corrupts the owner value.
+        auto      ex = smesh::Exchange::create_nodal(from_mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
         const int bs = from_space->block_size();
+        (void)to_space;
         return make_op<real_t>(
                 op->rows(),
                 op->cols(),
@@ -517,6 +533,7 @@ namespace sfem {
                 if (from_ss) {
                     return wrap_prolongation_coarse_gather(
                             from_space,
+                            to_space,
                             es,
                             make_op<real_t>(
                                     to_space->n_dofs(),
@@ -564,6 +581,7 @@ namespace sfem {
 
                 return wrap_prolongation_coarse_gather(
                         from_space,
+                        to_space,
                         es,
                         make_op<real_t>(
                                 to_space->n_dofs(),
@@ -612,6 +630,7 @@ namespace sfem {
             const ptrdiff_t n_elements = to_space->mesh().n_elements(0);
             return wrap_prolongation_coarse_gather(
                     from_space,
+                    to_space,
                     es,
                     make_op<real_t>(
                             to_space->n_dofs(),
@@ -643,6 +662,7 @@ namespace sfem {
                     if (mpi_from && ss_all_hex_family(to_space->mesh())) {
                         return wrap_prolongation_coarse_gather(
                                 from_space,
+                                to_space,
                                 es,
                                 make_op<real_t>(
                                         to_space->n_dofs(),
@@ -656,7 +676,9 @@ namespace sfem {
                                             for (size_t b = 0; b < to_ssm.n_blocks(); ++b) {
                                                 auto            from_b = from_m.block(b);
                                                 auto            to_b   = to_ssm.block(b);
-                                                const ptrdiff_t ne     = to_b->n_elements();
+                                                const ptrdiff_t ne_from = transfer_nelements(from_space->mesh_ptr(), from_b);
+                                                const ptrdiff_t ne_to   = transfer_nelements(to_space->mesh_ptr(), to_b);
+                                                const ptrdiff_t ne      = ne_from < ne_to ? ne_from : ne_to;
                                                 if (ne == 0) {
                                                     continue;
                                                 }
@@ -680,6 +702,7 @@ namespace sfem {
 
                     return wrap_prolongation_coarse_gather(
                             from_space,
+                            to_space,
                             es,
                             make_op<real_t>(
                                     to_space->n_dofs(),
@@ -691,7 +714,7 @@ namespace sfem {
                                         const int level = smesh::semistructured_level(ssm);
                                         for (size_t b = 0; b < ssm.n_blocks(); ++b) {
                                             auto            to_b = ssm.block(b);
-                                            const ptrdiff_t ne   = to_b->n_elements();
+                                            const ptrdiff_t ne   = transfer_nelements(to_space->mesh_ptr(), to_b);
                                             if (ne == 0) {
                                                 continue;
                                             }
@@ -733,6 +756,7 @@ namespace sfem {
 
                 return wrap_prolongation_coarse_gather(
                         from_space,
+                        to_space,
                         es,
                         make_op<real_t>(
                                 to_space->n_dofs(),
@@ -745,9 +769,11 @@ namespace sfem {
                                     const int from_level = smesh::semistructured_level(from_ssm);
                                     const int to_level   = smesh::semistructured_level(to_ssm);
                                     for (size_t b = 0; b < from_ssm.n_blocks(); ++b) {
-                                        auto            from_b = from_ssm.block(b);
-                                        auto            to_b   = to_ssm.block(b);
-                                        const ptrdiff_t ne     = from_b->n_elements();
+                                        auto            from_b  = from_ssm.block(b);
+                                        auto            to_b    = to_ssm.block(b);
+                                        const ptrdiff_t ne_from = transfer_nelements(from_space->mesh_ptr(), from_b);
+                                        const ptrdiff_t ne_to   = transfer_nelements(to_space->mesh_ptr(), to_b);
+                                        const ptrdiff_t ne      = ne_from < ne_to ? ne_from : ne_to;
                                         if (ne == 0) {
                                             continue;
                                         }
@@ -793,6 +819,7 @@ namespace sfem {
 
             return wrap_prolongation_coarse_gather(
                     from_space,
+                    to_space,
                     es,
                     make_op<real_t>(
                             to_space->n_dofs(),
@@ -802,7 +829,8 @@ namespace sfem {
 
                                 smesh::hierarchical_prolongation(from_space->element_type(),
                                                                  to_space->element_type(),
-                                                                 to_space->mesh().n_elements(),
+                                                                 transfer_nelements(to_space->mesh_ptr(),
+                                                                                    to_space->mesh_ptr()->block(0)),
                                                                  to_space->mesh().elements(0)->data(),
                                                                  from_space->block_size(),
                                                                  from,

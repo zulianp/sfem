@@ -136,6 +136,48 @@ namespace sfem {
                 normals[2]);
     }
 
+    int SDFObstacle::sample_normals_accumulate(smesh::ElemType              element_type,
+                                               const ptrdiff_t              nelements,
+                                               const ptrdiff_t              nnodes,
+                                               idx_t **const SFEM_RESTRICT  elements,
+                                               geom_t **const SFEM_RESTRICT points,
+                                               real_t **const SFEM_RESTRICT normals) {
+        auto sdf = impl_->sdf;
+        return resample_gap_normals_local(element_type,
+                                          nelements,
+                                          nnodes,
+                                          elements,
+                                          points,
+                                          sdf->nlocal(),
+                                          sdf->stride(),
+                                          sdf->origin(),
+                                          sdf->delta(),
+                                          sdf->data(),
+                                          normals[0],
+                                          normals[1],
+                                          normals[2]);
+    }
+
+    int SDFObstacle::sample_value_accumulate(smesh::ElemType              element_type,
+                                             const ptrdiff_t              nelements,
+                                             const ptrdiff_t              nnodes,
+                                             idx_t **const SFEM_RESTRICT  elements,
+                                             geom_t **const SFEM_RESTRICT points,
+                                             real_t *const SFEM_RESTRICT  gap) {
+        auto sdf = impl_->sdf;
+        return resample_gap_value_local(element_type,
+                                        nelements,
+                                        nnodes,
+                                        elements,
+                                        points,
+                                        sdf->nlocal(),
+                                        sdf->stride(),
+                                        sdf->origin(),
+                                        sdf->delta(),
+                                        sdf->data(),
+                                        gap);
+    }
+
     int SDFObstacle::sample_value(smesh::ElemType              element_type,
                                   const ptrdiff_t              nelements,
                                   const ptrdiff_t              nnodes,
