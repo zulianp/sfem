@@ -425,7 +425,39 @@ namespace {
         contact_conds->init();
         f->apply_constraints(x->data());
 
-        setenv("SFEM_MAX_IT", "1", 1);
+        unsetenv("SFEM_MAX_IT");
+
+        auto gap_norm = [&](const real_t *const u) -> real_t {
+            const ptrdiff_t ncon = contact_conds->n_constrained_dofs();
+            auto            g    = sfem::create_host_buffer<real_t>(ncon);
+            SFEM_TEST_ASSERT(contact_conds->signed_distance(u, g->data()) == SFEM_SUCCESS);
+            real_t local = 0;
+            for (ptrdiff_t i = 0; i < ncon; ++i) {
+                const real_t pen = std::min(g->data()[i], real_t(0));
+                local += pen * pen;
+            }
+            return std::sqrt(comm->sum(local));
+        };
+
+        auto residual_norm = [&](const real_t *const u) -> real_t {
+            auto r = sfem::create_host_buffer<real_t>(ndofs);
+            std::fill(r->data(), r->data() + ndofs, real_t(0));
+            auto lop = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, sfem::EXECUTION_SPACE_HOST);
+            SFEM_TEST_ASSERT(lop != nullptr);
+            SFEM_TEST_ASSERT(lop->apply(u, r->data()) == SFEM_SUCCESS);
+            const ptrdiff_t nowned = fs->n_owned_dofs();
+            real_t          local  = 0;
+            for (ptrdiff_t i = 0; i < nowned; ++i) {
+                const real_t d = rhs->data()[i] - r->data()[i];
+                local += d * d;
+            }
+            return std::sqrt(comm->sum(local));
+        };
+
+        const real_t pen0 = gap_norm(x->data());
+        const real_t res0 = residual_norm(x->data());
+        SFEM_TEST_ASSERT(std::isfinite(pen0));
+        SFEM_TEST_ASSERT(std::isfinite(res0));
 
         auto solver = sfem::create_ssmgc(f, contact_conds, nullptr);
         SFEM_TEST_ASSERT(solver != nullptr);
@@ -433,6 +465,15 @@ namespace {
         for (ptrdiff_t i = 0; i < ndofs; ++i) {
             SFEM_TEST_ASSERT(std::isfinite(x->data()[i]));
         }
+
+        const real_t pen1 = gap_norm(x->data());
+        const real_t res1 = residual_norm(x->data());
+        SFEM_TEST_ASSERT(std::isfinite(pen1));
+        SFEM_TEST_ASSERT(std::isfinite(res1));
+        // Geometric gap / material residual need not decrease: SPMG converges the
+        // linearized shifted-penalty residual (apply SUCCESS). Material ||b-Au||
+        // can grow as contact forces appear.
+
         solver.reset();
         comm->barrier();
         return SFEM_TEST_SUCCESS;

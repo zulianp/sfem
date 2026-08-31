@@ -22,6 +22,7 @@
 #include "sfem_aliases.hpp"
 
 #include "smesh_env.hpp"
+#include "smesh_exchange.hpp"
 
 // MATLAB version
 // https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
@@ -256,19 +257,21 @@ namespace sfem {
                 blas_->zeros(n_constrained_dofs, mem->work->data());
                 impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
-                blas_->zeros(n_dofs, correction->data());
+                blas_->zeros(level_alloc(level), correction->data());
 
                 // Constraints space to solution space
                 constraints_op_transpose_->apply(mem->work->data(), correction->data());
+                exchange_scatter_add_and_gather(level, correction->data());
 
                 blas_->zeros(n_dofs, mem->work->data());
                 op->apply(mem->solution->data(), mem->work->data());
                 blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
                 blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
+                apply_zero_constraints_level(level, mem->work->data());
 
                 residual_norm_0 = reduce_norm2(n_dofs, mem->work->data());
 
-                if (debug) {
+                if (debug && is_root_rank()) {
                     printf("||g|| start: %e\n", (double)residual_norm_0);
                 }
             }
@@ -304,15 +307,17 @@ namespace sfem {
                         impl_.calc_r_pen(
                                 n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
-                        blas_->zeros(n_dofs, correction->data());
+                        blas_->zeros(level_alloc(level), correction->data());
 
                         // Constraints space to solution space
                         constraints_op_transpose_->apply(mem->work->data(), correction->data());
+                        exchange_scatter_add_and_gather(level, correction->data());
 
                         blas_->zeros(n_dofs, mem->work->data());
                         op->apply(mem->solution->data(), mem->work->data());
                         blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
                         blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
+                        apply_zero_constraints_level(level, mem->work->data());
 
                     } else {
                         blas_->zeros(n_dofs, mem->work->data());
@@ -334,13 +339,13 @@ namespace sfem {
 
                     const T residual_norm = reduce_norm2(n_dofs, mem->work->data());
 
-                    if (debug) {
+                    if (debug && is_root_rank()) {
                         printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)residual_norm, omega);
                     }
 
                     bool stagnation = (std::abs(residual_norm / rnorm_previous) > stagnation_threshold);
                     rnorm_previous  = residual_norm;
-                    if (stagnation) {
+                    if (stagnation && is_root_rank()) {
                         printf("Stagnation detected\n");
                     }
 
@@ -354,8 +359,9 @@ namespace sfem {
                 auto Tx = x;
 
                 if (constraints_op_) {
+                    gather_solution_ghosts();
                     blas_->zeros(n_constrained_dofs, correction->data());
-                    constraints_op_->apply(x, correction->data());
+                    constraints_op_->apply(mem->solution->data(), correction->data());
                     Tx = correction->data();
                 }
 
@@ -392,11 +398,11 @@ namespace sfem {
                     omega           = omega_factor / penalty_param_;
                 }
 
-                if (debug && ub) {
+                if (debug && is_root_rank() && ub) {
                     printf("lagr_ub: %e\n", blas_->norm2(n_constrained_dofs, lagr_ub->data()));
                 }
 
-                if (debug && lb) {
+                if (debug && is_root_rank() && lb) {
                     printf("lagr_lb: %e\n", blas_->norm2(n_constrained_dofs, lagr_lb->data()));
                 }
 
@@ -469,6 +475,14 @@ namespace sfem {
             constraints_restriction_.push_back(restict_diag);
         }
 
+        void set_nodal_block_size(const int block_size) { nodal_block_size_ = block_size > 0 ? block_size : 1; }
+
+        void add_level_exchange(const std::shared_ptr<smesh::Exchange>& exchange) { exchanges_.push_back(exchange); }
+
+        void add_level_apply_zero_constraints(const std::function<void(T* const)>& fn) {
+            apply_zero_constraints_.push_back(fn);
+        }
+
         void default_init() {
             blas_ = make_openmp_blas<T>();
             OpenMP_ShiftedPenalty<T>::build(impl_);
@@ -538,6 +552,11 @@ namespace sfem {
             return nullptr;
         }
 
+        bool is_root_rank() const {
+            auto comm = parallel_comm();
+            return !comm || comm->rank() == 0;
+        }
+
         T reduce_sum(const T local) const {
             auto comm = parallel_comm();
             return comm ? comm->sum(local) : local;
@@ -548,12 +567,41 @@ namespace sfem {
             return std::sqrt(reduce_sum(local_sq));
         }
 
+        smesh::Exchange* level_exchange(const int level) const {
+            if (level < 0 || static_cast<size_t>(level) >= exchanges_.size()) {
+                return nullptr;
+            }
+            return exchanges_[static_cast<size_t>(level)].get();
+        }
+
+        void exchange_gather(const int level, T* const x) const {
+            if (auto* ex = level_exchange(level)) {
+                ex->gather(x, nodal_block_size_);
+            }
+        }
+
+        void apply_zero_constraints_level(const int level, T* const x) const {
+            if (level < 0 || static_cast<size_t>(level) >= apply_zero_constraints_.size()) {
+                return;
+            }
+            if (auto& fn = apply_zero_constraints_[static_cast<size_t>(level)]) {
+                fn(x);
+            }
+        }
+
+        void exchange_scatter_add_and_gather(const int level, T* const y) const {
+            if (auto* ex = level_exchange(level)) {
+                ex->scatter_add(y, nodal_block_size_);
+                ex->gather(y, nodal_block_size_);
+            }
+        }
+
         void gather_solution_ghosts() {
             if (!parallel_comm()) {
                 return;
             }
             auto mem = memory_[finest_level()];
-            operator_[finest_level()]->apply(mem->solution->data(), mem->work->data());
+            exchange_gather(finest_level(), mem->solution->data());
         }
 
         void ensure_init() {
@@ -603,12 +651,19 @@ namespace sfem {
 
             auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
             if (pop && pop->comm() && pop->comm()->size() > 1) {
+                auto*     ex = level_exchange(level);
+                const int bs = nodal_block_size_;
                 return make_parallel_op<T>(pop->comm(),
                                            pop->rows(),
                                            pop->cols(),
                                            pop->row_allocation_size(),
                                            pop->col_allocation_size(),
-                                           [sop](const T* const x, T* const y) { sop->apply(x, y); },
+                                           [sop, ex, bs](const T* const x, T* const y) {
+                                               if (ex) {
+                                                   ex->gather(const_cast<T*>(x), bs);
+                                               }
+                                               sop->apply(x, y);
+                                           },
                                            pop->execution_space());
             }
             return sop;
@@ -630,7 +685,7 @@ namespace sfem {
             const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
             const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
 
-            if (debug > 1) {
+            if (debug > 1 && is_root_rank()) {
                 printf("Residual: %g\n", blas_->norm2(n_dofs, mem->work->data()));
                 if (ub) {
                     printf("UB: %g, LUB %g\n", blas_->norm2(n_constrained_dofs, ub), blas_->norm2(n_constrained_dofs, l_ub));
@@ -654,15 +709,17 @@ namespace sfem {
                 blas_->zeros(n_constrained_dofs, mem->work->data());
                 impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, lb, ub, l_lb, l_ub, mem->work->data());
 
-                blas_->zeros(n_dofs, correction->data());
+                blas_->zeros(level_alloc(level), correction->data());
 
                 // Constraints space to solution space
                 constraints_op_transpose_->apply(mem->work->data(), correction->data());
+                exchange_scatter_add_and_gather(level, correction->data());
 
                 blas_->zeros(n_dofs, mem->work->data());
                 op->apply(mem->solution->data(), mem->work->data());
                 blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
                 blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
+                apply_zero_constraints_level(level, mem->work->data());
 
             } else {
                 blas_->zeros(n_dofs, mem->work->data());
@@ -713,7 +770,8 @@ namespace sfem {
                     smoother->set_op_and_diag_shift(sop, mem->diag);
                 }
 
-                blas_->zeros(n_dofs, correction->data());
+                // Zero owned+ghosts: Jacobi n_blocks is n_local and accumulates (+=).
+                blas_->zeros(correction->size(), correction->data());
                 smoother->apply(mem->work->data(), correction->data());
                 blas_->axpy(n_dofs, 1, correction->data(), mem->solution->data());
 
@@ -731,6 +789,7 @@ namespace sfem {
             auto      restriction  = restriction_[level];
             auto      prolongation = prolongation_[coarser_level(level)];
             auto      mem_coarse   = memory_[coarser_level(level)];
+            const ptrdiff_t n_fine = operator_[level]->rows();
 
             if (smesh::Env::read<bool>("UPDATE_CONSTRAINTS_IN_NONLINEAR_CYCLE", false)) {
                 if (update_constraints_) {
@@ -755,7 +814,7 @@ namespace sfem {
 
                 int ret = cycle(coarser_level(finest_level()));
 
-                if (ret == CYCLE_FAILURE) {
+                if (ret == CYCLE_FAILURE && is_root_rank()) {
                     fprintf(stderr, "Coarse level solver did not converge as desired!\n");
                 }
 
@@ -777,7 +836,7 @@ namespace sfem {
                         T denominator = blas_->dot(correction->size(), correction->data(), mem->work->data());
                         T alpha       = numerator / (denominator == 0 ? T(1e-16) : denominator);
 
-                        if (debug) printf("alpha = %g\n", alpha);
+                        if (debug && is_root_rank()) printf("alpha = %g\n", alpha);
 
                         blas_->scal(correction->size(), alpha, correction->data());
                     }
@@ -797,9 +856,10 @@ namespace sfem {
                         }
 
                     } else {
-                        // Apply coarse space correction
-                        blas_->axpby(mem->size(), 1, correction->data(), 1, mem->solution->data());
+                        // Owned dofs only; ghosts are filled by gather (avoid polluting aura).
+                        blas_->axpby(n_fine, 1, correction->data(), 1, mem->solution->data());
                     }
+                    gather_solution_ghosts();
                 }
             }
 
@@ -832,9 +892,11 @@ namespace sfem {
                 if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
                     return CYCLE_CONTINUE;
                 } else {
-                    fflush(stdout);
-                    fflush(stderr);
-                    fprintf(stderr, "Coarse grid solver did not reach desired tol in %d\n", smoother->iterations());
+                    if (is_root_rank()) {
+                        fflush(stdout);
+                        fflush(stderr);
+                        fprintf(stderr, "Coarse grid solver did not reach desired tol in %d\n", smoother->iterations());
+                    }
                     return CYCLE_FAILURE;
                 }
             }
@@ -854,9 +916,9 @@ namespace sfem {
 
                 {
                     // Compute residual
-                    blas_->zeros(mem->size(), mem->work->data());
+                    blas_->zeros(mem->work->size(), mem->work->data());
                     sop->apply(mem->solution->data(), mem->work->data());
-                    blas_->axpby(mem->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                    blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
                 }
 
                 {
@@ -873,8 +935,9 @@ namespace sfem {
                     blas_->zeros(mem->work->size(), mem->work->data());
                     prolongation->apply(mem_coarse->solution->data(), mem->work->data());
 
-                    // Apply coarse space correction
-                    blas_->axpby(mem->size(), 1, mem->work->data(), 1, mem->solution->data());
+                    // Apply coarse space correction (owned); ghosts via gather.
+                    blas_->axpby(n_dofs, 1, mem->work->data(), 1, mem->solution->data());
+                    exchange_gather(level, mem->solution->data());
                 }
 
                 smoother->apply(mem->rhs->data(), mem->solution->data());
@@ -885,10 +948,8 @@ namespace sfem {
         void collect_stats(struct Stats s) { stats.push_back(s); }
 
         void write_stats() {
-            if (auto comm = parallel_comm()) {
-                if (comm->rank() != 0) {
-                    return;
-                }
+            if (!is_root_rank()) {
+                return;
             }
             const char* SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH = "./spmg_stats.csv";
             SFEM_READ_ENV(SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH, );
@@ -921,6 +982,9 @@ namespace sfem {
                      const T   relative_residual,
                      const T   penetration_tol,
                      const T   penalty_param) {
+            if (!is_root_rank()) {
+                return;
+            }
             printf("%d|%d|%d) [lagr++ %d] norm_pen %e, ||r|| %e, ||r/r0|| %e, penetration_tol %e, "
                    "penalty "
                    "%e\n",
@@ -947,7 +1011,10 @@ namespace sfem {
         std::shared_ptr<Operator<T>>                       constraints_op_transpose_;
         std::vector<std::shared_ptr<SparseBlockVector<T>>> constraints_op_x_op_;
         std::vector<std::shared_ptr<Operator<T>>>          constraints_restriction_;
-        std::function<void(const T* const)>                update_constraints_;
+        std::vector<std::shared_ptr<smesh::Exchange>>                    exchanges_;
+        std::vector<std::function<void(T* const)>>                       apply_zero_constraints_;
+        std::function<void(const T* const)>                              update_constraints_;
+        int                                                nodal_block_size_{1};
 
         SharedBuffer<T> upper_bound_;
         SharedBuffer<T> lower_bound_;
