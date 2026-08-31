@@ -57,10 +57,10 @@ static int dispatch_history_update(const smesh::PrimitiveType storage,
     return SFEM_FAILURE;
 }
 
-static inline float fp16_history_tensor_scale(const scalar_t H[6]) {
+static inline float fp16_history_scale(const scalar_t *const H, const int n) {
     scalar_t max_abs = 0;
-    for (int c = 0; c < 6; ++c) {
-        max_abs = fmax(max_abs, fabs(H[c]));
+    for (int i = 0; i < n; ++i) {
+        max_abs = fmax(max_abs, fabs(H[i]));
     }
 
     if (max_abs == 0) return 1;
@@ -91,6 +91,7 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const real_t *const SFEM_RESTRICT beta,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const ptrdiff_t                   history_scale_stride,
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history_data,
@@ -119,24 +120,23 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const ptrdiff_t history_per_qp = num_prony_terms * 6;
 
     auto update_tensor = [&](const ptrdiff_t hist_offset,
+                             const ptrdiff_t scale_offset,
                              const int p,
-                             const scalar_t S_dev_prev[6],
-                             const scalar_t S_dev_curr[6]) {
+                             const scalar_t delta_S[6]) {
         const auto *H_old = history + hist_offset + p * 6;
         auto *H_new = new_history + hist_offset + p * 6;
-        const ptrdiff_t tensor_offset = hist_offset / 6 + p;
-        const scalar_t old_scale = history_scale_data ? history_scale_data[tensor_offset] : 1;
+        const scalar_t old_scale = history_scale_data ? history_scale_data[scale_offset + p] : 1;
         scalar_t updated[6];
 
         for (int c = 0; c < 6; ++c) {
             const scalar_t old_value = old_scale * static_cast<scalar_t>(H_old[c]);
-            updated[c] = alpha[p] * old_value + beta[p] * (S_dev_curr[c] - S_dev_prev[c]);
+            updated[c] = alpha[p] * old_value + beta[p] * delta_S[c];
         }
 
         if (new_history_scale_data) {
-            const float new_scale = fp16_history_tensor_scale(updated);
+            const float new_scale = fp16_history_scale(updated, 6);
             const scalar_t inv_scale = 1.0 / new_scale;
-            new_history_scale_data[tensor_offset] = new_scale;
+            new_history_scale_data[scale_offset + p] = new_scale;
             for (int c = 0; c < 6; ++c) {
                 H_new[c] = updated[c] * inv_scale;
             }
@@ -209,10 +209,13 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
             }
 
             const ptrdiff_t hist_offset = i * history_stride;
+            scalar_t delta_S[6];
+            for (int c = 0; c < 6; ++c) delta_S[c] = S_dev_curr_avg[c] - S_dev_prev_avg[c];
             for (int p = 0; p < num_prony_terms; ++p) {
-                update_tensor(hist_offset, p, S_dev_prev_avg, S_dev_curr_avg);
+                update_tensor(hist_offset, i * history_scale_stride, p, delta_S);
             }
         } else {
+            scalar_t delta_S[8][6];
             for (int kz = 0; kz < n_qp; kz++) {
                 for (int ky = 0; ky < n_qp; ky++) {
                     for (int kx = 0; kx < n_qp; kx++) {
@@ -221,7 +224,6 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
                         assert(jacobian_determinant > 0);
 
                         const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
-                        const ptrdiff_t hist_offset = (i * history_stride) + (qp_idx * history_per_qp);
 
                         scalar_t S_dev_prev[6];
                         hex8_mooney_rivlin_S_dev_from_disp(
@@ -239,9 +241,41 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
                             edispx, edispy, edispz,
                             S_dev_curr);
 
-                        for (int p = 0; p < num_prony_terms; ++p) {
-                            update_tensor(hist_offset, p, S_dev_prev, S_dev_curr);
+                        for (int c = 0; c < 6; ++c) delta_S[qp_idx][c] = S_dev_curr[c] - S_dev_prev[c];
+                    }
+                }
+            }
+
+            if (new_history_scale_data && history_scale_stride == num_prony_terms) {
+                scalar_t updated[8][6];
+                for (int p = 0; p < num_prony_terms; ++p) {
+                    const ptrdiff_t scale_offset = i * history_scale_stride + p;
+                    const scalar_t old_scale = history_scale_data[scale_offset];
+
+                    for (int qp = 0; qp < history_n_qp; ++qp) {
+                        const ptrdiff_t hist_offset = i * history_stride + qp * history_per_qp + p * 6;
+                        for (int c = 0; c < 6; ++c) {
+                            const scalar_t old_value = old_scale * static_cast<scalar_t>(history[hist_offset + c]);
+                            updated[qp][c] = alpha[p] * old_value + beta[p] * delta_S[qp][c];
                         }
+                    }
+
+                    const float new_scale = fp16_history_scale(&updated[0][0], history_n_qp * 6);
+                    const scalar_t inv_scale = 1.0 / new_scale;
+                    new_history_scale_data[scale_offset] = new_scale;
+                    for (int qp = 0; qp < history_n_qp; ++qp) {
+                        const ptrdiff_t hist_offset = i * history_stride + qp * history_per_qp + p * 6;
+                        for (int c = 0; c < 6; ++c) {
+                            new_history[hist_offset + c] = updated[qp][c] * inv_scale;
+                        }
+                    }
+                }
+            } else {
+                for (int qp = 0; qp < history_n_qp; ++qp) {
+                    const ptrdiff_t hist_offset = i * history_stride + qp * history_per_qp;
+                    const ptrdiff_t scale_offset = i * history_scale_stride + qp * num_prony_terms;
+                    for (int p = 0; p < num_prony_terms; ++p) {
+                        update_tensor(hist_offset, scale_offset, p, delta_S[qp]);
                     }
                 }
             }
@@ -276,6 +310,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const ptrdiff_t                   history_scale_stride,
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history_data,
@@ -343,6 +378,10 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
                     const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
                     const ptrdiff_t hist_offset = (i * history_stride) +
                                                  ((history_n_qp == 1) ? 0 : (qp_idx * history_per_qp));
+                    const ptrdiff_t scale_offset = (i * history_scale_stride) +
+                                                  ((history_scale_stride > num_prony_terms)
+                                                       ? qp_idx * num_prony_terms
+                                                       : 0);
 
                     scalar_t S_dev_prev[6];
                     hex8_mooney_rivlin_S_dev_from_disp(
@@ -356,7 +395,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
                         const auto *H_i = history + hist_offset + p * 6;
-                        const scalar_t H_scale = history_scale_data ? history_scale_data[hist_offset / 6 + p] : 1;
+                        const scalar_t H_scale = history_scale_data ? history_scale_data[scale_offset + p] : 1;
                         for (int c = 0; c < 6; ++c) {
                             S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
                         }
@@ -414,6 +453,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const ptrdiff_t                   history_scale_stride,
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history_data,
@@ -482,6 +522,10 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
                     const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
                     const ptrdiff_t hist_offset = (i * history_stride) +
                                                  ((history_n_qp == 1) ? 0 : (qp_idx * history_per_qp));
+                    const ptrdiff_t scale_offset = (i * history_scale_stride) +
+                                                  ((history_scale_stride > num_prony_terms)
+                                                       ? qp_idx * num_prony_terms
+                                                       : 0);
 
                     scalar_t S_dev_prev[6];
                     hex8_mooney_rivlin_S_dev_from_disp(
@@ -495,7 +539,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
                         const auto *H_i = history + hist_offset + p * 6;
-                        const scalar_t H_scale = history_scale_data ? history_scale_data[hist_offset / 6 + p] : 1;
+                        const scalar_t H_scale = history_scale_data ? history_scale_data[scale_offset + p] : 1;
                         for (int c = 0; c < 6; ++c) {
                             S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
                         }
@@ -544,6 +588,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const ptrdiff_t                   history_scale_stride,
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history_data,
@@ -611,6 +656,10 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
                     const ptrdiff_t qp_idx = (kz * n_qp * n_qp + ky * n_qp + kx);
                     const ptrdiff_t hist_offset = (i * history_stride) +
                                                  ((history_n_qp == 1) ? 0 : (qp_idx * history_per_qp));
+                    const ptrdiff_t scale_offset = (i * history_scale_stride) +
+                                                  ((history_scale_stride > num_prony_terms)
+                                                       ? qp_idx * num_prony_terms
+                                                       : 0);
 
                     scalar_t S_dev_prev[6];
                     hex8_mooney_rivlin_S_dev_from_disp(
@@ -624,7 +673,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
                     scalar_t S_hist[6] = {0};
                     for (int p = 0; p < num_prony_terms; ++p) {
                         const auto *H_i = history + hist_offset + p * 6;
-                        const scalar_t H_scale = history_scale_data ? history_scale_data[hist_offset / 6 + p] : 1;
+                        const scalar_t H_scale = history_scale_data ? history_scale_data[scale_offset + p] : 1;
                         for (int c = 0; c < 6; ++c) {
                             S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
                         }

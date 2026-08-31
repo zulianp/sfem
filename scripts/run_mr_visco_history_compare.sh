@@ -52,7 +52,10 @@ run_case() {
     local storage="$2"
     local scaling="${3:-none}"
     local suffix=""
-    [[ "$scaling" == "tensor" ]] && suffix="_scaled"
+    case "$scaling" in
+        tensor) suffix="_scaled" ;;
+        element_prony) suffix="_element_prony" ;;
+    esac
     "$CASE_RUNNER" \
         --history-mode "$mode" \
         --history-storage "$storage" \
@@ -83,6 +86,7 @@ run_case per_qp float16
 run_case per_elem float16
 run_case per_qp float16 tensor
 run_case per_elem float16 tensor
+run_case per_qp float16 element_prony
 
 compare_case per_qp_float64 per_elem_float64
 compare_case per_qp_float64 per_qp_float32
@@ -96,6 +100,8 @@ compare_case per_elem_float64 per_elem_float16_scaled
 compare_case per_qp_float16 per_qp_float16_scaled
 compare_case per_elem_float16 per_elem_float16_scaled
 compare_case per_qp_float64 per_elem_float16_scaled
+compare_case per_qp_float64 per_qp_float16_element_prony
+compare_case per_qp_float16_scaled per_qp_float16_element_prony
 
 echo "[info] Cases: $OUT_BASE/cases"
 echo "[info] Comparisons: $OUT_BASE/compare"

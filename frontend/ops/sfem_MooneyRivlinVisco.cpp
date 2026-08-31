@@ -90,7 +90,7 @@ namespace sfem {
         std::shared_ptr<Buffer<float>> new_history_scale_buffer;
         int history_n_qp{8};
         smesh::PrimitiveType history_storage{smesh::TypeToEnum<real_t>::value()};
-        bool history_scaling{false};
+        std::string history_scaling_mode{"none"};
         
         // Previous displacement
         std::shared_ptr<Buffer<real_t>> prev_u_buffer;
@@ -101,7 +101,7 @@ namespace sfem {
             const std::string storage_name = smesh::Env::read(
                 "SFEM_HISTORY_STORAGE", std::string(smesh::TypeToString<real_t>::value()));
             history_storage = supported_history_storage(smesh::to_real_type(storage_name));
-            history_scaling = smesh::Env::read("SFEM_HISTORY_SCALING", std::string("none")) == "tensor";
+            history_scaling_mode = smesh::Env::read("SFEM_HISTORY_SCALING", std::string("none"));
         }
         ~Impl();
         
@@ -194,6 +194,13 @@ namespace sfem {
             // Store H_i for active terms only
             return num_active_terms * 6;
         }
+
+        ptrdiff_t history_scale_stride() const {
+            if (history_storage != smesh::SMESH_FLOAT16) return 0;
+            if (history_scaling_mode == "tensor") return history_n_qp * num_active_terms;
+            if (history_scaling_mode == "element_prony") return num_active_terms;
+            return 0;
+        }
         
         void allocate_history_buffers() {
             ptrdiff_t total_elements = 0;
@@ -220,8 +227,9 @@ namespace sfem {
 
             history_scale_buffer.reset();
             new_history_scale_buffer.reset();
-            if (history_scaling && history_storage == smesh::SMESH_FLOAT16) {
-                const ptrdiff_t total_scales = total_size / 6;
+            const ptrdiff_t scale_stride = history_scale_stride();
+            if (scale_stride) {
+                const ptrdiff_t total_scales = total_elements * scale_stride;
                 history_scale_buffer = smesh::create_buffer<float>(total_scales, sfem::EXECUTION_SPACE_HOST);
                 new_history_scale_buffer = smesh::create_buffer<float>(total_scales, sfem::EXECUTION_SPACE_HOST);
                 std::fill_n(history_scale_buffer->data(), total_scales, 1.0f);
@@ -249,12 +257,12 @@ namespace sfem {
             return static_cast<char *>(new_history_buffer->void_data()) + offset * smesh::num_bytes(history_storage);
         }
 
-        const float *history_scale_data(const ptrdiff_t history_offset) const {
-            return history_scale_buffer ? history_scale_buffer->data() + history_offset / 6 : nullptr;
+        const float *history_scale_data(const ptrdiff_t scale_offset) const {
+            return history_scale_buffer ? history_scale_buffer->data() + scale_offset : nullptr;
         }
 
-        float *new_history_scale_data(const ptrdiff_t history_offset) {
-            return new_history_scale_buffer ? new_history_scale_buffer->data() + history_offset / 6 : nullptr;
+        float *new_history_scale_data(const ptrdiff_t scale_offset) {
+            return new_history_scale_buffer ? new_history_scale_buffer->data() + scale_offset : nullptr;
         }
         
         void save_prev_u(const real_t *x) {
@@ -354,7 +362,9 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
+        ptrdiff_t history_scale_offset = 0;
         const ptrdiff_t history_stride = impl_->history_n_qp * impl_->history_per_qp();
+        const ptrdiff_t history_scale_stride = impl_->history_scale_stride();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -372,10 +382,11 @@ namespace sfem {
                 impl_->prony_beta.data(),
                 impl_->prony_gamma,
                 history_stride,
+                history_scale_stride,
                 impl_->history_n_qp,
                 impl_->history_storage,
                 impl_->history_data(history_offset),
-                impl_->history_scale_data(history_offset),
+                impl_->history_scale_data(history_scale_offset),
                 3, 
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -384,6 +395,7 @@ namespace sfem {
                 rowptr, colidx, values);
                 
             history_offset += nelements * history_stride;
+            history_scale_offset += nelements * history_scale_stride;
             return ret;
         });
     }
@@ -398,7 +410,9 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
+        ptrdiff_t history_scale_offset = 0;
         const ptrdiff_t history_stride = impl_->history_n_qp * impl_->history_per_qp();
+        const ptrdiff_t history_scale_stride = impl_->history_scale_stride();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -416,10 +430,11 @@ namespace sfem {
                 impl_->prony_beta.data(),
                 impl_->prony_gamma,
                 history_stride,
+                history_scale_stride,
                 impl_->history_n_qp,
                 impl_->history_storage,
                 impl_->history_data(history_offset),
-                impl_->history_scale_data(history_offset),
+                impl_->history_scale_data(history_scale_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -428,6 +443,7 @@ namespace sfem {
                 out);
                 
             history_offset += nelements * history_stride;
+            history_scale_offset += nelements * history_scale_stride;
             return ret;
         });
     }
@@ -442,7 +458,9 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
+        ptrdiff_t history_scale_offset = 0;
         const ptrdiff_t history_stride = impl_->history_n_qp * impl_->history_per_qp();
+        const ptrdiff_t history_scale_stride = impl_->history_scale_stride();
 
         return impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -460,10 +478,11 @@ namespace sfem {
                 impl_->prony_beta.data(),
                 impl_->prony_gamma,
                 history_stride,
+                history_scale_stride,
                 impl_->history_n_qp,
                 impl_->history_storage,
                 impl_->history_data(history_offset),
-                impl_->history_scale_data(history_offset),
+                impl_->history_scale_data(history_scale_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -472,6 +491,7 @@ namespace sfem {
                 out);
                 
             history_offset += nelements * history_stride;
+            history_scale_offset += nelements * history_scale_stride;
             return ret;
         });
     }
@@ -486,7 +506,9 @@ namespace sfem {
         }
 
         ptrdiff_t history_offset = 0;
+        ptrdiff_t history_scale_offset = 0;
         const ptrdiff_t history_stride = impl_->history_n_qp * impl_->history_per_qp();
+        const ptrdiff_t history_scale_stride = impl_->history_scale_stride();
 
         int ret = impl_->iterate([&](const OpDomain &domain) -> int {
             const ptrdiff_t nelements = domain.block->n_elements();
@@ -503,12 +525,13 @@ namespace sfem {
                 impl_->prony_alpha.data(),
                 impl_->prony_beta.data(),
                 history_stride,
+                history_scale_stride,
                 impl_->history_n_qp,
                 impl_->history_storage,
                 impl_->history_data(history_offset),
                 impl_->new_history_data(history_offset),
-                impl_->history_scale_data(history_offset),
-                impl_->new_history_scale_data(history_offset),
+                impl_->history_scale_data(history_scale_offset),
+                impl_->new_history_scale_data(history_scale_offset),
                 3,
                 &impl_->prev_u_buffer->data()[0],
                 &impl_->prev_u_buffer->data()[1],
@@ -516,6 +539,7 @@ namespace sfem {
                 &x[0], &x[1], &x[2]);
                 
             history_offset += nelements * history_stride;
+            history_scale_offset += nelements * history_scale_stride;
             return r;
         });
         
@@ -545,7 +569,7 @@ namespace sfem {
     }
 
     void MooneyRivlinVisco::set_history_scaling(const bool enable) {
-        impl_->history_scaling = enable;
+        impl_->history_scaling_mode = enable ? "tensor" : "none";
     }
     
     void MooneyRivlinVisco::set_wlf_params(real_t C1, real_t C2, real_t T_ref) {
@@ -579,7 +603,13 @@ namespace sfem {
     }
 
     bool MooneyRivlinVisco::get_history_scaling() const {
-        return impl_->history_scaling && impl_->history_storage == smesh::SMESH_FLOAT16;
+        return impl_->history_storage == smesh::SMESH_FLOAT16 &&
+               (impl_->history_scaling_mode == "tensor" ||
+                impl_->history_scaling_mode == "element_prony");
+    }
+
+    const std::string &MooneyRivlinVisco::get_history_scaling_mode() const {
+        return impl_->history_scaling_mode;
     }
     
     void MooneyRivlinVisco::set_prony_coefficients(int n_active, const real_t* alpha, const real_t* beta, real_t gamma) {

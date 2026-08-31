@@ -13,7 +13,7 @@ HISTORY_SCALING="none"
 OUT_DIR=""
 
 usage() {
-    echo "Usage: $0 --history-mode per_qp|per_elem --history-storage float64|float32|float16 [--history-scaling none|tensor] --out DIR"
+    echo "Usage: $0 --history-mode per_qp|per_elem --history-storage float64|float32|float16 [--history-scaling none|tensor|element_prony] --out DIR"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -56,9 +56,9 @@ case "$HISTORY_MODE" in
 esac
 
 case "$HISTORY_SCALING" in
-    none|tensor) ;;
+    none|tensor|element_prony) ;;
     *)
-        echo "[error] --history-scaling must be none or tensor" >&2
+        echo "[error] --history-scaling must be none, tensor, or element_prony" >&2
         exit 2
         ;;
 esac
