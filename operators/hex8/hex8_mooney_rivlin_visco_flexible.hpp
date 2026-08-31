@@ -103,6 +103,7 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const real_t *const SFEM_RESTRICT beta,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const ptrdiff_t                   history_scale_stride,
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history,
@@ -139,6 +140,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const ptrdiff_t                   history_scale_stride,
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history,
@@ -178,6 +180,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const ptrdiff_t                   history_scale_stride,
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history,
@@ -217,6 +220,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     const real_t                      gamma,
     // 4. History variables
     const ptrdiff_t                   history_stride,
+    const ptrdiff_t                   history_scale_stride,
     const int                         history_n_qp,
     const smesh::PrimitiveType        history_storage,
     const void *const SFEM_RESTRICT   history,

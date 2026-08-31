@@ -61,6 +61,7 @@ namespace sfem {
         int get_history_n_qp() const;
         smesh::PrimitiveType get_history_storage() const;
         bool get_history_scaling() const;
+        const std::string &get_history_scaling_mode() const;
         
         // Advanced interface: set precomputed Prony coefficients directly
         // This allows external computation of temperature-shifted tau and filtering
