@@ -228,6 +228,15 @@ namespace sfem {
         os << "n_constraints: " << impl_->constraints.size() << "\n";
     }
 
+    bool Function::is_linear() const {
+        for (const auto &op : impl_->ops) {
+            if (op && !op->is_linear()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     Function::Function(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space  = space;
         impl_->output = std::make_shared<Output>(space);

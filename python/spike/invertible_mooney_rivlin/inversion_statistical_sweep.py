@@ -22,6 +22,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 ELASTIC_MODEL = os.path.join(HERE, "invertible_mooney_rivlin_plane_strain_2d.py")
 KV_MODEL = os.path.join(HERE, "invertible_mooney_rivlin_kelvin_voigt_plane_strain_2d.py")
+_WORKER_ELASTIC_MODEL = None
 
 
 class RunTimeout(Exception):
@@ -41,6 +42,13 @@ def load_module(path, name):
     return module
 
 
+def worker_elastic_model():
+    global _WORKER_ELASTIC_MODEL
+    if _WORKER_ELASTIC_MODEL is None:
+        _WORKER_ELASTIC_MODEL = load_module(ELASTIC_MODEL, "inv_mr_worker_model")
+    return _WORKER_ELASTIC_MODEL
+
+
 def run_elastic_homotopy_capped(
     m,
     X,
@@ -50,6 +58,9 @@ def run_elastic_homotopy_capped(
     C10,
     C01,
     kappa,
+    material,
+    mu,
+    lame_lambda,
     Jc_target,
     Jmin,
     stage_max_iter,
@@ -58,7 +69,9 @@ def run_elastic_homotopy_capped(
     final_grad_tol,
 ):
     x = x0.copy()
-    stages = [0.50, 0.35, 0.25, max(Jc_target, 0.20), Jc_target]
+    stages = []
+    if material == m.MOONEY_RIVLIN:
+        stages = [0.50, 0.35, 0.25, max(Jc_target, 0.20), Jc_target]
     all_hist = []
     use_numba = getattr(m, "NUMBA_AVAILABLE", False)
     mesh_data = m.prepare_mesh_data(X, triangles) if use_numba else None
@@ -79,6 +92,9 @@ def run_elastic_homotopy_capped(
             mesh_data=mesh_data,
             use_numba=use_numba,
             verbose=False,
+            material=material,
+            mu=mu,
+            lame_lambda=lame_lambda,
         )
         all_hist.append((Jc, hist))
         if not ok:
@@ -99,6 +115,9 @@ def run_elastic_homotopy_capped(
         mesh_data=mesh_data,
         use_numba=use_numba,
         verbose=False,
+        material=material,
+        mu=mu,
+        lame_lambda=lame_lambda,
     )
     all_hist.append((Jc_target, hist))
     return x, all_hist, ok
@@ -118,6 +137,9 @@ def one_run(args):
         C10,
         C01,
         kappa,
+        material,
+        mu,
+        lame_lambda,
         Jc,
         Jmin,
         eta_s,
@@ -143,7 +165,7 @@ def one_run(args):
     os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
     os.environ.setdefault("MKL_NUM_THREADS", "1")
 
-    m = load_module(ELASTIC_MODEL, "inv_mr_model")
+    m = worker_elastic_model()
     t0 = time.time()
     X, tris, anchor_right = m.structured_square_mesh(nx, ny)
     fixed = m.corner_fixed_dofs(X, boundary_condition)
@@ -203,6 +225,9 @@ def one_run(args):
                 C10,
                 C01,
                 kappa,
+                material,
+                mu,
+                lame_lambda,
                 Jc,
                 Jmin,
                 elastic_stage_max_iter,
@@ -249,6 +274,9 @@ def one_run(args):
             Jmin,
             mesh_data=mesh_data,
             use_numba=use_numba,
+            material=material,
+            mu=mu,
+            lame_lambda=lame_lambda,
         )
         free = np.setdiff1d(np.arange(2 * len(X)), fixed)
         gnorm = float(np.linalg.norm(g[free]))
@@ -275,6 +303,7 @@ def one_run(args):
             mode = "other"
         row = dict(
             solver=solver,
+            material=material,
             boundary_condition=boundary_condition,
             fixed_dofs=len(fixed),
             seed=seed,
@@ -287,6 +316,8 @@ def one_run(args):
             C10=C10,
             C01=C01,
             kappa=kappa,
+            mu=mu,
+            lame_lambda=lame_lambda,
             eta_s=eta_s if solver == "kelvin-voigt" else 0.0,
             eta_b=eta_b if solver == "kelvin-voigt" else 0.0,
             dt=dt if solver == "kelvin-voigt" else 0.0,
@@ -315,6 +346,7 @@ def one_run(args):
     except RunTimeout:
         row = dict(
             solver=solver,
+            material=material,
             boundary_condition=boundary_condition,
             fixed_dofs=len(fixed),
             seed=seed,
@@ -327,6 +359,8 @@ def one_run(args):
             C10=C10,
             C01=C01,
             kappa=kappa,
+            mu=mu,
+            lame_lambda=lame_lambda,
             eta_s=eta_s if solver == "kelvin-voigt" else 0.0,
             eta_b=eta_b if solver == "kelvin-voigt" else 0.0,
             dt=dt if solver == "kelvin-voigt" else 0.0,
@@ -355,6 +389,7 @@ def one_run(args):
     except Exception as exc:
         row = dict(
             solver=solver,
+            material=material,
             boundary_condition=boundary_condition,
             fixed_dofs=len(fixed),
             seed=seed,
@@ -367,6 +402,8 @@ def one_run(args):
             C10=C10,
             C01=C01,
             kappa=kappa,
+            mu=mu,
+            lame_lambda=lame_lambda,
             eta_s=eta_s if solver == "kelvin-voigt" else 0.0,
             eta_b=eta_b if solver == "kelvin-voigt" else 0.0,
             dt=dt if solver == "kelvin-voigt" else 0.0,
@@ -583,7 +620,8 @@ def write_plot(path, rows, bins):
         ax.grid(True, alpha=0.35)
 
     axs[0].legend(loc="upper left")
-    fig.suptitle("Mooney-Rivlin inversion-recovery outcomes")
+    material_label = rows[0].get("material", "mooney-rivlin").replace("-", " ").title()
+    fig.suptitle(f"{material_label} inversion-recovery outcomes")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -619,6 +657,9 @@ def main():
     ap.add_argument("--C10", type=float, default=0.35)
     ap.add_argument("--C01", type=float, default=0.15)
     ap.add_argument("--kappa", type=float, default=500.0)
+    ap.add_argument("--material", choices=["mooney-rivlin", "stable-neo-hookean"], default="mooney-rivlin")
+    ap.add_argument("--mu", type=float, default=None)
+    ap.add_argument("--lame-lambda", type=float, default=None)
     ap.add_argument("--eta-s", type=float, default=0.05)
     ap.add_argument("--eta-b", type=float, default=0.005)
     ap.add_argument("--dt", type=float, default=0.25)
@@ -659,6 +700,12 @@ def main():
         help="cap the initial fraction of inverted elements; use 1 to disable",
     )
     args = ap.parse_args()
+    if args.solver == "kelvin-voigt" and args.material != "mooney-rivlin":
+        raise SystemExit("Kelvin-Voigt currently supports only --material mooney-rivlin")
+    m_for_parameters = load_module(ELASTIC_MODEL, "inv_mr_parameter_model")
+    mu, lame_lambda = m_for_parameters.resolve_material_parameters(
+        args.C10, args.C01, args.kappa, args.material, args.mu, args.lame_lambda
+    )
 
     bins = sorted(args.inversion_bins)
     if len(bins) < 2 or bins[0] > 0.0 or bins[-1] < 1.0:
@@ -686,6 +733,9 @@ def main():
             args.C10,
             args.C01,
             args.kappa,
+            args.material,
+            mu,
+            lame_lambda,
             args.Jc,
             args.Jmin,
             args.eta_s,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Tether-free inversion recovery test for a nearly incompressible
-plane-strain Mooney-Rivlin material.
+Tether-free inversion recovery test for nearly incompressible plane-strain
+Mooney-Rivlin and Stable Neo-Hookean materials.
 
 Physical branch, J >= Jc:
     W(F) = C10 * (J^(-2/3) * I1 - 3)
@@ -14,6 +14,8 @@ with a 3D plane-strain embedding F3 = diag(F, 1):
 
 For J < Jc, both singular powers J^(-2/3) and J^(-4/3) are replaced by
 globally C2 quartic continuations with constant extension for J <= Jmin.
+The Stable Neo-Hookean option uses the polynomial Smith--de Goes--Kim energy,
+which is defined for every real determinant without a continuation.
 The nonlinear solve uses absolute-eigenvalue projected Newton and an Armijo
 line search with no inversion barrier.
 """
@@ -48,6 +50,23 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+
+MOONEY_RIVLIN = "mooney-rivlin"
+STABLE_NEO_HOOKEAN = "stable-neo-hookean"
+MATERIAL_CHOICES = (MOONEY_RIVLIN, STABLE_NEO_HOOKEAN)
+
+
+def resolve_material_parameters(C10, C01, kappa, material, mu=None, lame_lambda=None):
+    if material not in MATERIAL_CHOICES:
+        raise ValueError(f"unknown material: {material}")
+    if mu is None:
+        mu = 2.0 * (C10 + C01)
+    if lame_lambda is None:
+        lame_lambda = kappa
+    if mu <= 0.0 or lame_lambda <= 0.0:
+        raise ValueError("Stable Neo-Hookean parameters mu and lambda must be positive")
+    return float(mu), float(lame_lambda)
 
 
 def continued_power_coeffs(Jc, Jmin, m):
@@ -270,6 +289,51 @@ def _mooney_rivlin_numba(Fv, C10, C01, kappa, Jc, Jmin):
 
 
 @njit
+def _stable_neo_hookean_numba(Fv, mu, lame_lambda):
+    F00 = Fv[0]
+    F01 = Fv[1]
+    F10 = Fv[2]
+    F11 = Fv[3]
+    J = F00 * F11 - F01 * F10
+    I = F00 * F00 + F01 * F01 + F10 * F10 + F11 * F11
+    alpha = 1.0 + mu / lame_lambda
+    q = lame_lambda * (J - alpha)
+
+    # The constant makes the plane-strain reference state have zero energy.
+    W = 0.5 * mu * (I - 2.0)
+    W += 0.5 * lame_lambda * (J - alpha) * (J - alpha)
+    W -= 0.5 * mu * mu / lame_lambda
+
+    Gv = np.empty(4, dtype=np.float64)
+    Gv[0] = F11
+    Gv[1] = -F10
+    Gv[2] = -F01
+    Gv[3] = F00
+
+    P = np.empty(4, dtype=np.float64)
+    for i in range(4):
+        P[i] = mu * Fv[i] + q * Gv[i]
+
+    HF = np.empty((4, 4), dtype=np.float64)
+    for j in range(4):
+        dJ = Gv[j]
+        for i in range(4):
+            dF = 1.0 if i == j else 0.0
+            dG = 0.0
+            if j == 0 and i == 3:
+                dG = 1.0
+            elif j == 1 and i == 2:
+                dG = -1.0
+            elif j == 2 and i == 1:
+                dG = -1.0
+            elif j == 3 and i == 0:
+                dG = 1.0
+            HF[i, j] = mu * dF + lame_lambda * (dJ * Gv[i] + (J - alpha) * dG)
+
+    return W, P, HF, J
+
+
+@njit
 def _projected_hessian_numba(He):
     lam, Q = np.linalg.eigh(He)
     Hp = np.zeros((6, 6), dtype=np.float64)
@@ -285,7 +349,7 @@ def _projected_hessian_numba(He):
 
 
 @njit
-def _assemble_numba(x_flat, areas, Bs, dofs, C10, C01, kappa, Jc, Jmin):
+def _assemble_mooney_rivlin_numba(x_flat, areas, Bs, dofs, C10, C01, kappa, Jc, Jmin):
     ndof = x_flat.shape[0]
     ne = areas.shape[0]
     E = 0.0
@@ -302,6 +366,59 @@ def _assemble_numba(x_flat, areas, Bs, dofs, C10, C01, kappa, Jc, Jmin):
             Fv[a] = s
 
         W, P, HF, J = _mooney_rivlin_numba(Fv, C10, C01, kappa, Jc, Jmin)
+        A0 = areas[e]
+        E += A0 * W
+        Js[e] = J
+
+        ge = np.zeros(6, dtype=np.float64)
+        He = np.zeros((6, 6), dtype=np.float64)
+        for i in range(6):
+            s = 0.0
+            for a in range(4):
+                s += Bs[e, a, i] * P[a]
+            ge[i] = A0 * s
+
+            for j in range(6):
+                hij = 0.0
+                for a in range(4):
+                    for b in range(4):
+                        hij += Bs[e, a, i] * HF[a, b] * Bs[e, b, j]
+                He[i, j] = A0 * hij
+
+        Hp = _projected_hessian_numba(He)
+        for i in range(6):
+            ii = dofs[e, i]
+            g[ii] += ge[i]
+            for j in range(6):
+                H[ii, dofs[e, j]] += Hp[i, j]
+
+    for i in range(ndof):
+        for j in range(i + 1, ndof):
+            hij = 0.5 * (H[i, j] + H[j, i])
+            H[i, j] = hij
+            H[j, i] = hij
+
+    return E, g, H, Js
+
+
+@njit
+def _assemble_stable_neo_hookean_numba(x_flat, areas, Bs, dofs, mu, lame_lambda):
+    ndof = x_flat.shape[0]
+    ne = areas.shape[0]
+    E = 0.0
+    g = np.zeros(ndof, dtype=np.float64)
+    H = np.zeros((ndof, ndof), dtype=np.float64)
+    Js = np.empty(ne, dtype=np.float64)
+
+    for e in range(ne):
+        Fv = np.zeros(4, dtype=np.float64)
+        for a in range(4):
+            s = 0.0
+            for j in range(6):
+                s += Bs[e, a, j] * x_flat[dofs[e, j]]
+            Fv[a] = s
+
+        W, P, HF, J = _stable_neo_hookean_numba(Fv, mu, lame_lambda)
         A0 = areas[e]
         E += A0 * W
         Js[e] = J
@@ -379,11 +496,51 @@ def mooney_rivlin_energy_gradient_hessian(F, C10, C01, kappa, Jc, Jmin):
     return W, P, 0.5 * (HF + HF.T), J
 
 
-def element_energy_gradient_hessian(xe, Xe, C10, C01, kappa, Jc, Jmin):
+def stable_neo_hookean_energy_gradient_hessian(F, mu, lame_lambda):
+    J = np.linalg.det(F)
+    I = np.sum(F * F)
+    alpha = 1.0 + mu / lame_lambda
+    q = lame_lambda * (J - alpha)
+    W = 0.5 * mu * (I - 2.0)
+    W += 0.5 * lame_lambda * (J - alpha) ** 2
+    W -= 0.5 * mu * mu / lame_lambda
+
+    G = cofactor_2d(F)
+    P = mu * F + q * G
+    HF = np.zeros((4, 4))
+    for j in range(4):
+        dF = np.zeros((2, 2))
+        dF.flat[j] = 1.0
+        dJ = np.sum(G * dF)
+        dG = cofactor_2d(dF)
+        HF[:, j] = (mu * dF + lame_lambda * (dJ * G + (J - alpha) * dG)).ravel()
+    return W, P, 0.5 * (HF + HF.T), J
+
+
+def element_energy_gradient_hessian(
+    xe,
+    Xe,
+    C10,
+    C01,
+    kappa,
+    Jc,
+    Jmin,
+    material=MOONEY_RIVLIN,
+    mu=None,
+    lame_lambda=None,
+):
     F, inv_Dm, A0 = element_kinematics(xe, Xe)
-    W, P, HF, J = mooney_rivlin_energy_gradient_hessian(
-        F, C10, C01, kappa, Jc, Jmin
-    )
+    if material == MOONEY_RIVLIN:
+        W, P, HF, J = mooney_rivlin_energy_gradient_hessian(
+            F, C10, C01, kappa, Jc, Jmin
+        )
+    else:
+        mu, lame_lambda = resolve_material_parameters(
+            C10, C01, kappa, material, mu, lame_lambda
+        )
+        W, P, HF, J = stable_neo_hookean_energy_gradient_hessian(
+            F, mu, lame_lambda
+        )
     B = element_B(inv_Dm)
     ge = A0 * (B.T @ P.ravel())
     He = A0 * (B.T @ HF @ B)
@@ -396,12 +553,36 @@ def projected_hessian(H, floor=1e-10):
     return (Q * lam_mod) @ Q.T
 
 
-def assemble(x, X, triangles, C10, C01, kappa, Jc, Jmin, mesh_data=None, use_numba=True):
+def assemble(
+    x,
+    X,
+    triangles,
+    C10,
+    C01,
+    kappa,
+    Jc,
+    Jmin,
+    mesh_data=None,
+    use_numba=True,
+    material=MOONEY_RIVLIN,
+    mu=None,
+    lame_lambda=None,
+):
+    mu, lame_lambda = resolve_material_parameters(
+        C10, C01, kappa, material, mu, lame_lambda
+    )
     if use_numba and NUMBA_AVAILABLE:
         if mesh_data is None:
             mesh_data = prepare_mesh_data(X, triangles)
         areas, Bs, dofs = mesh_data
-        return _assemble_numba(np.ascontiguousarray(x.ravel()), areas, Bs, dofs, C10, C01, kappa, Jc, Jmin)
+        x_flat = np.ascontiguousarray(x.ravel())
+        if material == MOONEY_RIVLIN:
+            return _assemble_mooney_rivlin_numba(
+                x_flat, areas, Bs, dofs, C10, C01, kappa, Jc, Jmin
+            )
+        return _assemble_stable_neo_hookean_numba(
+            x_flat, areas, Bs, dofs, mu, lame_lambda
+        )
 
     ndof = 2 * len(X)
     E = 0.0
@@ -409,15 +590,35 @@ def assemble(x, X, triangles, C10, C01, kappa, Jc, Jmin, mesh_data=None, use_num
     H = np.zeros((ndof, ndof))
     Js = []
 
-    for tri in triangles:
-        Ee, ge, He, J = element_energy_gradient_hessian(
-            x[tri], X[tri], C10, C01, kappa, Jc, Jmin
-        )
-        E += Ee
-        Js.append(J)
-        idx = np.array([[2 * i, 2 * i + 1] for i in tri]).ravel()
-        g[idx] += ge
-        H[np.ix_(idx, idx)] += projected_hessian(He)
+    if material == MOONEY_RIVLIN:
+        for tri in triangles:
+            Ee, ge, He, J = element_energy_gradient_hessian(
+                x[tri], X[tri], C10, C01, kappa, Jc, Jmin
+            )
+            E += Ee
+            Js.append(J)
+            idx = np.array([[2 * i, 2 * i + 1] for i in tri]).ravel()
+            g[idx] += ge
+            H[np.ix_(idx, idx)] += projected_hessian(He)
+    else:
+        for tri in triangles:
+            Ee, ge, He, J = element_energy_gradient_hessian(
+                x[tri],
+                X[tri],
+                C10,
+                C01,
+                kappa,
+                Jc,
+                Jmin,
+                material=material,
+                mu=mu,
+                lame_lambda=lame_lambda,
+            )
+            E += Ee
+            Js.append(J)
+            idx = np.array([[2 * i, 2 * i + 1] for i in tri]).ravel()
+            g[idx] += ge
+            H[np.ix_(idx, idx)] += projected_hessian(He)
 
     return E, g, 0.5 * (H + H.T), np.asarray(Js)
 
@@ -437,6 +638,9 @@ def solve_stage(
     mesh_data=None,
     use_numba=True,
     verbose=True,
+    material=MOONEY_RIVLIN,
+    mu=None,
+    lame_lambda=None,
 ):
     ndof = 2 * len(X)
     free = np.setdiff1d(np.arange(ndof), fixed)
@@ -456,6 +660,9 @@ def solve_stage(
             Jmin,
             mesh_data=mesh_data,
             use_numba=use_numba,
+            material=material,
+            mu=mu,
+            lame_lambda=lame_lambda,
         )
         gf = g[free]
         Hf = H[np.ix_(free, free)]
@@ -499,6 +706,9 @@ def solve_stage(
                 Jmin,
                 mesh_data=mesh_data,
                 use_numba=use_numba,
+                material=material,
+                mu=mu,
+                lame_lambda=lame_lambda,
             )
             if np.isfinite(Et) and Et <= E + 1.0e-4 * alpha * gd:
                 x = xt
@@ -525,11 +735,16 @@ def run_homotopy(
     fixed=None,
     use_numba=True,
     verbose=True,
+    material=MOONEY_RIVLIN,
+    mu=None,
+    lame_lambda=None,
 ):
     if fixed is None:
         fixed = corner_fixed_dofs(X)
     x = x0.copy()
-    stages = [0.50, 0.35, 0.25, max(Jc_target, 0.20), Jc_target]
+    stages = []
+    if material == MOONEY_RIVLIN:
+        stages = [0.50, 0.35, 0.25, max(Jc_target, 0.20), Jc_target]
     all_hist = []
     mesh_data = None
     if use_numba and NUMBA_AVAILABLE:
@@ -553,6 +768,9 @@ def run_homotopy(
             mesh_data=mesh_data,
             use_numba=use_numba,
             verbose=verbose,
+            material=material,
+            mu=mu,
+            lame_lambda=lame_lambda,
         )
         all_hist.append((Jc, hist))
         if not ok:
@@ -575,6 +793,9 @@ def run_homotopy(
         mesh_data=mesh_data,
         use_numba=use_numba,
         verbose=verbose,
+        material=material,
+        mu=mu,
+        lame_lambda=lame_lambda,
     )
     all_hist.append((Jc_target, hist))
     return x, all_hist, ok
@@ -878,27 +1099,37 @@ def folded_random_initial_state(
     return x0, Js
 
 
-def check_material_derivatives(C10, C01, kappa, Jc, Jmin):
+def check_material_derivatives(
+    C10, C01, kappa, Jc, Jmin, material=MOONEY_RIVLIN, mu=None, lame_lambda=None
+):
     rng = np.random.default_rng(13)
-    F = np.array([[1.10, 0.08], [-0.04, 0.93]])
-    W, P, HF, _ = mooney_rivlin_energy_gradient_hessian(
-        F, C10, C01, kappa, Jc, Jmin
+    mu, lame_lambda = resolve_material_parameters(
+        C10, C01, kappa, material, mu, lame_lambda
     )
 
-    dF = rng.standard_normal((2, 2))
-    dF /= np.linalg.norm(dF)
-    eps = 1e-6
-    Wp, Pp, _, _ = mooney_rivlin_energy_gradient_hessian(
-        F + eps * dF, C10, C01, kappa, Jc, Jmin
-    )
-    Wm, Pm, _, _ = mooney_rivlin_energy_gradient_hessian(
-        F - eps * dF, C10, C01, kappa, Jc, Jmin
-    )
-    dW_fd = (Wp - Wm) / (2.0 * eps)
-    dW = float(np.sum(P * dF))
-    dP_fd = ((Pp - Pm) / (2.0 * eps)).ravel()
-    dP = HF @ dF.ravel()
-    return abs(dW - dW_fd), np.linalg.norm(dP - dP_fd)
+    def evaluate(F):
+        if material == MOONEY_RIVLIN:
+            return mooney_rivlin_energy_gradient_hessian(F, C10, C01, kappa, Jc, Jmin)
+        return stable_neo_hookean_energy_gradient_hessian(F, mu, lame_lambda)
+
+    gradient_error = 0.0
+    hessian_error = 0.0
+    for F in (
+        np.array([[1.10, 0.08], [-0.04, 0.93]]),
+        np.array([[-0.72, 0.08], [0.03, 0.91]]),
+    ):
+        W, P, HF, _ = evaluate(F)
+        dF = rng.standard_normal((2, 2))
+        dF /= np.linalg.norm(dF)
+        eps = 1e-6
+        Wp, Pp, _, _ = evaluate(F + eps * dF)
+        Wm, Pm, _, _ = evaluate(F - eps * dF)
+        gradient_error = max(gradient_error, abs(float(np.sum(P * dF)) - (Wp - Wm) / (2.0 * eps)))
+        hessian_error = max(
+            hessian_error,
+            float(np.linalg.norm(HF @ dF.ravel() - ((Pp - Pm) / (2.0 * eps)).ravel())),
+        )
+    return gradient_error, hessian_error
 
 
 def main():
@@ -908,6 +1139,9 @@ def main():
     ap.add_argument("--C10", type=float, default=0.35)
     ap.add_argument("--C01", type=float, default=0.15)
     ap.add_argument("--kappa", type=float, default=500.0)
+    ap.add_argument("--material", choices=MATERIAL_CHOICES, default=MOONEY_RIVLIN)
+    ap.add_argument("--mu", type=float, default=None)
+    ap.add_argument("--lame-lambda", type=float, default=None)
     ap.add_argument("--Jc", type=float, default=0.2)
     ap.add_argument("--Jmin", type=float, default=-1.0)
     ap.add_argument("--seed", type=int, default=7)
@@ -922,10 +1156,20 @@ def main():
     ap.add_argument("--check-derivatives", action="store_true")
     args = ap.parse_args()
     use_numba = (not args.no_numba) and NUMBA_AVAILABLE
+    mu, lame_lambda = resolve_material_parameters(
+        args.C10, args.C01, args.kappa, args.material, args.mu, args.lame_lambda
+    )
 
     if args.check_derivatives:
         egrad, ehess = check_material_derivatives(
-            args.C10, args.C01, args.kappa, args.Jc, args.Jmin
+            args.C10,
+            args.C01,
+            args.kappa,
+            args.Jc,
+            args.Jmin,
+            material=args.material,
+            mu=mu,
+            lame_lambda=lame_lambda,
         )
         print(f"material_gradient_directional_error: {egrad:.6e}")
         print(f"material_hessian_directional_error: {ehess:.6e}")
@@ -940,11 +1184,14 @@ def main():
     print(f"Initial random deformation: seed={args.seed}, amplitude={args.amplitude}")
     print(f"Initial J range: [{Js0.min():.6f}, {Js0.max():.6f}]")
     print(f"Initially inverted elements: {n_inv0}/{len(Js0)}")
-    print(
-        "Material: "
-        f"C10={args.C10:g}, C01={args.C01:g}, kappa={args.kappa:g}, "
-        f"Jc={args.Jc:g}, Jmin={args.Jmin:g}"
-    )
+    if args.material == MOONEY_RIVLIN:
+        print(
+            "Material: "
+            f"{args.material}, C10={args.C10:g}, C01={args.C01:g}, kappa={args.kappa:g}, "
+            f"Jc={args.Jc:g}, Jmin={args.Jmin:g}"
+        )
+    else:
+        print(f"Material: {args.material}, mu={mu:g}, lambda={lame_lambda:g}")
     print(f"Assembly backend: {'numba' if use_numba else 'python'}")
 
     x, hist, ok = run_homotopy(
@@ -960,6 +1207,9 @@ def main():
         fixed=fixed,
         use_numba=use_numba,
         verbose=True,
+        material=args.material,
+        mu=mu,
+        lame_lambda=lame_lambda,
     )
 
     mesh_data = prepare_mesh_data(X, tris) if use_numba else None
@@ -974,6 +1224,9 @@ def main():
         args.Jmin,
         mesh_data=mesh_data,
         use_numba=use_numba,
+        material=args.material,
+        mu=mu,
+        lame_lambda=lame_lambda,
     )
     free = np.setdiff1d(np.arange(2 * len(X)), fixed)
 

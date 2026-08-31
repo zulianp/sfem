@@ -6,11 +6,11 @@
 #include "sfem_macros.hpp"
 #include "smesh_mesh.hpp"
 
-#include "smesh_env.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
+#include "smesh_env.hpp"
 
 #include "smesh_glob.hpp"
 
@@ -236,10 +236,10 @@ namespace sfem {
         bool use_AoS              = smesh::Env::read("SFEM_NEOHOOKEAN_OGDEN_USE_AOS", false);
 
         for (auto &domain : impl_->domains->domains()) {
-            auto ua = std::make_shared<struct ElasticityAssemblyData>();
-            ua->use_partial_assembly =
-                    use_partial_assembly || domain.second.element_type == smesh::HEX8 ||
-                    domain.second.element_type == smesh::TET10 || is_semistructured_type(domain.second.element_type);
+            auto ua                  = std::make_shared<struct ElasticityAssemblyData>();
+            ua->use_partial_assembly = use_partial_assembly || domain.second.element_type == smesh::HEX8 ||
+                                       domain.second.element_type == smesh::TET10 ||
+                                       is_semistructured_type(domain.second.element_type);
             ua->use_compression     = use_compression;
             ua->use_AoS             = use_AoS;
             ua->elements            = domain.second.block->elements();
@@ -271,8 +271,8 @@ namespace sfem {
 
             const int pa_cols = neohookean_partial_assembly_metric_cols(element_type);
             if (!assembly_data->partial_assembly_buffer) {
-                assembly_data->partial_assembly_buffer = sfem::create_host_buffer<metric_tensor_t>(
-                        domain.second.block->n_elements() * (ptrdiff_t)pa_cols);
+                assembly_data->partial_assembly_buffer =
+                        sfem::create_host_buffer<metric_tensor_t>(domain.second.block->n_elements() * (ptrdiff_t)pa_cols);
             }
 
             int ok = neohookean_ogden_hessian_partial_assembly(domain.second.element_type,
@@ -353,9 +353,9 @@ namespace sfem {
         auto ret            = std::make_shared<NeoHookeanOgden>(space);
         ret->impl_->domains = impl_->domains->lor_op(space, {});
         neo_copy_material(*impl_->domains, *ret->impl_->domains);
-        ret->impl_->mu                        = impl_->mu;
-        ret->impl_->lambda                    = impl_->lambda;
-        ret->impl_->use_affine_approximation  = impl_->use_affine_approximation;
+        ret->impl_->mu                       = impl_->mu;
+        ret->impl_->lambda                   = impl_->lambda;
+        ret->impl_->use_affine_approximation = impl_->use_affine_approximation;
         return ret;
     }
 
@@ -488,4 +488,3 @@ namespace sfem {
     }
 
 }  // namespace sfem
-

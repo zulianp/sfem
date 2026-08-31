@@ -273,6 +273,25 @@ int neohookean_ogden_diag_aos(const smesh::ElemType               element_type,
                               const real_t                      lambda,
                               const real_t *const SFEM_RESTRICT u,
                               real_t *const SFEM_RESTRICT       values) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        return sshex8_neohookean_ogden_diag(level,
+                                            nelements,
+                                            stride,
+                                            nnodes,
+                                            elements,
+                                            points,
+                                            mu,
+                                            lambda,
+                                            3,
+                                            &u[0],
+                                            &u[1],
+                                            &u[2],
+                                            3,
+                                            &values[0],
+                                            &values[1],
+                                            &values[2]);
+    }
     switch (element_type) {
         case smesh::HEX8: {
             return hex8_neohookean_ogden_elasticity_diag(nelements,

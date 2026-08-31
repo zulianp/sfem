@@ -137,6 +137,9 @@ namespace sfem {
 
         void describe(std::ostream &os) const;
 
+        /// True iff every attached Op is linear (empty ops count as linear).
+        bool is_linear() const;
+
     private:
         friend class ParallelMatrixFreeOperator;
 

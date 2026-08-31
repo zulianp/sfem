@@ -827,11 +827,12 @@ def solve_incremental_load(ps, args):
                 raise FloatingPointError(f"load step produced min J={j_min:.6e}")
             r_hist = np.asarray(result.get("r_hist", []), dtype=np.float64)
             final_residual = float(r_hist[-1]) if r_hist.size else float("inf")
-            if not np.isfinite(final_residual) or final_residual > float(args.atol):
-                raise RuntimeError(
-                    f"load step did not reach absolute residual tolerance: "
-                    f"||r||={final_residual:.6e}, atol={float(args.atol):.6e}"
-                )
+            if not bool(result.get("load_step_ok", False)):
+                if not np.isfinite(final_residual) or final_residual > float(args.atol):
+                    raise RuntimeError(
+                        f"load step did not reach absolute residual tolerance: "
+                        f"||r||={final_residual:.6e}, atol={float(args.atol):.6e}"
+                    )
         except (FloatingPointError, RuntimeError, ValueError) as exc:
             load_history.append(
                 {
