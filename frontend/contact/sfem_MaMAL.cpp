@@ -12,10 +12,13 @@
 #include "smesh_env.hpp"
 
 #include "sfem_API.hpp"
+#include "sfem_mask.hpp"
 #include "smesh_ssquad4_prolongation.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <string>
 #include <vector>
 
 namespace sfem {
@@ -35,24 +38,43 @@ namespace sfem {
         real_t tolerance{1e-6};
         real_t margin{1e-8};
         real_t search_radius{5e-2};
+        real_t penalty_scale{1};
+        real_t penalty_override{0};
         real_t correction_damping{1};
         real_t min_correction_damping{1e-2};
+        // Textbook multiplier update. This is only sound because the inner loop in
+        // MaMAL::solve drives the subproblem to the forcing tolerance first; updating
+        // from a half-solved state makes the multiplier swing and the iteration
+        // diverge. Lower this only if the inner loop is disabled.
         real_t augmentation_relaxation{1};
+        int    max_inner_iterations{5};
+        real_t inner_forcing{1e-1};
+        real_t inner_forcing_decrease{5e-1};
+        real_t stagnation_threshold{9e-1};
         int    contact_update_frequency{0};
         int    contact_jacobi_loops{10};
         bool   line_search_recompute_contact{false};
-        bool   enable_augmentation{false};
+        bool   enable_augmentation{true};
         bool   enable_self_contact{false};
         bool   contact_hessian_galerkin_assembly{true};
+        bool   jump_free_coarse{false};
+        bool        skip_coarse{false};
+        std::string output_dir;
 
         void from_env() {
             max_iterations           = smesh::Env::read("SFEM_MAMAL_MAX_ITERATIONS", max_iterations);
             tolerance                = smesh::Env::read("SFEM_MAMAL_TOLERANCE", tolerance);
             margin                   = smesh::Env::read("SFEM_MAMAL_MARGIN", margin);
             search_radius            = smesh::Env::read("SFEM_MAMAL_SEARCH_RADIUS", search_radius);
+            penalty_scale            = smesh::Env::read("SFEM_MAMAL_PENALTY_SCALE", penalty_scale);
+            penalty_override         = smesh::Env::read("SFEM_MAMAL_CONTACT_PENALTY", penalty_override);
             correction_damping       = smesh::Env::read("SFEM_MAMAL_CORRECTION_DAMPING", correction_damping);
             min_correction_damping   = smesh::Env::read("SFEM_MAMAL_MIN_CORRECTION_DAMPING", min_correction_damping);
             augmentation_relaxation  = smesh::Env::read("SFEM_MAMAL_AUGMENTATION_RELAXATION", augmentation_relaxation);
+            max_inner_iterations     = smesh::Env::read("SFEM_MAMAL_MAX_INNER_ITERATIONS", max_inner_iterations);
+            inner_forcing            = smesh::Env::read("SFEM_MAMAL_INNER_FORCING", inner_forcing);
+            inner_forcing_decrease   = smesh::Env::read("SFEM_MAMAL_INNER_FORCING_DECREASE", inner_forcing_decrease);
+            stagnation_threshold     = smesh::Env::read("SFEM_MAMAL_STAGNATION_THRESHOLD", stagnation_threshold);
             contact_update_frequency = smesh::Env::read("SFEM_MAMAL_CONTACT_UPDATE_FREQUENCY", contact_update_frequency);
             contact_jacobi_loops     = smesh::Env::read("SFEM_MAMAL_CONTACT_JACOBI_LOOPS", contact_jacobi_loops);
             line_search_recompute_contact =
@@ -61,6 +83,9 @@ namespace sfem {
             enable_self_contact = smesh::Env::read("SFEM_MAMAL_ENABLE_SELF_CONTACT", enable_self_contact);
             contact_hessian_galerkin_assembly =
                     smesh::Env::read("SFEM_MAMAL_CONTACT_HESSIAN_GALERKIN", contact_hessian_galerkin_assembly);
+            jump_free_coarse = smesh::Env::read("SFEM_MAMAL_JUMP_FREE_COARSE", jump_free_coarse);
+            skip_coarse      = smesh::Env::read("SFEM_MAMAL_SKIP_COARSE", skip_coarse);
+            output_dir       = smesh::Env::read_string("SFEM_MAMAL_OUTPUT_DIR", output_dir);
         }
 
 #ifdef SFEM_ENABLE_YAML
@@ -212,7 +237,7 @@ namespace sfem {
     }
 
     void compute_macaulay_term_from_global_displacement(ContactData&        cd,
-                                                        const real_t        penalty,
+                                                        const real_t* const penalty,
                                                         const real_t* const disp,
                                                         real_t* const       work,
                                                         real_t* const       macaulay) {
@@ -226,13 +251,15 @@ namespace sfem {
         ptrdiff_t n               = coupling_matrix->rows();
         assert(dim == 3);
 
+        const real_t* const ref = cd.reference_displacement ? cd.reference_displacement->data() : nullptr;
+
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; i++) {
             const ptrdiff_t global_dof = nm[i] * dim;
             const ptrdiff_t local_dof  = i * dim;
-            work[local_dof + 0]        = disp[global_dof + 0];
-            work[local_dof + 1]        = disp[global_dof + 1];
-            work[local_dof + 2]        = disp[global_dof + 2];
+            work[local_dof + 0]        = disp[global_dof + 0] - (ref ? ref[global_dof + 0] : 0);
+            work[local_dof + 1]        = disp[global_dof + 1] - (ref ? ref[global_dof + 1] : 0);
+            work[local_dof + 2]        = disp[global_dof + 2] - (ref ? ref[global_dof + 2] : 0);
         }
 
         const real_t* const local_disp[3] = {work + 0, work + 1, work + 2};
@@ -265,13 +292,15 @@ namespace sfem {
         ptrdiff_t n               = coupling_matrix->rows();
         assert(dim == 3);
 
+        const real_t* const ref = cd.reference_displacement ? cd.reference_displacement->data() : nullptr;
+
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; i++) {
             const ptrdiff_t global_dof = nm[i] * dim;
             const ptrdiff_t local_dof  = i * dim;
-            work[local_dof + 0]        = disp[global_dof + 0];
-            work[local_dof + 1]        = disp[global_dof + 1];
-            work[local_dof + 2]        = disp[global_dof + 2];
+            work[local_dof + 0]        = disp[global_dof + 0] - (ref ? ref[global_dof + 0] : 0);
+            work[local_dof + 1]        = disp[global_dof + 1] - (ref ? ref[global_dof + 1] : 0);
+            work[local_dof + 2]        = disp[global_dof + 2] - (ref ? ref[global_dof + 2] : 0);
         }
 
         const real_t* const local_disp[3] = {work + 0, work + 1, work + 2};
@@ -279,7 +308,7 @@ namespace sfem {
     }
 
     void assemble_contact_hessian_block_diag(ContactData&                                     cd,
-                                             const real_t                                     penalty,
+                                             const real_t* const                              penalty,
                                              const real_t* const                              macaulay,
                                              real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values) {
         SFEM_TRACE_SCOPE("assemble_contact_hessian_block_diag");
@@ -305,7 +334,7 @@ namespace sfem {
                                const SharedBuffer<real_t*>&        normals,
                                const SharedBuffer<real_t>&         mass_vector,
                                const SharedBuffer<real_t>&         active,
-                               const real_t                        penalty,
+                               const SharedBuffer<real_t>&         penalty,
                                const real_t* const                 x,
                                real_t* const                       y) {
         SFEM_TRACE_SCOPE("apply_contact_hessian");
@@ -322,7 +351,7 @@ namespace sfem {
                                     normals->data(),
                                     mass_vector->data(),
                                     active->data(),
-                                    penalty,
+                                    penalty->data(),
                                     x,
                                     y);
     }
@@ -496,6 +525,7 @@ namespace sfem {
         std::vector<SharedBuffer<idx_t>>                        contact_block_idx;
         std::vector<std::shared_ptr<SparseBlockVector<real_t>>> contact_block_diag;
         std::vector<SharedBuffer<mask_t>>                       level_constraints_mask;
+        std::vector<SharedBuffer<real_t>>                       level_filter_real;
         SharedBuffer<real_t>                                    contact_grad;
         SharedBuffer<real_t>                                    contact_local_grad;
         SharedBuffer<real_t>                                    macaulay;
@@ -508,7 +538,9 @@ namespace sfem {
         std::shared_ptr<ContactJacobi>     contact_jacobi;
         SharedBuffer<mask_t>               constraints_mask;
         SharedBuffer<real_t>               agumentation;
-        real_t                             contact_penalty{1000};
+        SharedBuffer<real_t>               contact_reference_displacement;
+        std::vector<SharedBuffer<real_t>>  contact_penalties;
+        SharedBuffer<real_t>               elasticity_block_diag;
 
         Impl(const std::shared_ptr<Function>& f) : f(f) {}
 
@@ -605,6 +637,7 @@ namespace sfem {
             contact_block_idx.resize(n_levels());
             contact_block_diag.resize(n_levels());
             level_constraints_mask.resize(n_levels());
+            level_filter_real.resize(n_levels());
             contact_active.resize(n_levels());
             contact_hessian_local_x.resize(n_levels());
             contact_hessian_local_y.resize(n_levels());
@@ -626,7 +659,9 @@ namespace sfem {
                 contact_hessian_local_y[i] = create_buffer<real_t>(n_contact * spatial_dim, es);
 
                 level_constraints_mask[i] = sfem::create_buffer<mask_t>(mask_count(n), es);
+                level_filter_real[i]      = sfem::create_buffer<real_t>(n, es);
                 contact_active[i]         = sfem::create_buffer<real_t>(n_contact, es);
+                sfem::blas<real_t>(es)->zeros(contact_block_diag_aos[i]->size(), contact_block_diag_aos[i]->data());
             }
 
             configure_coarse_solver_preconditioner();
@@ -654,6 +689,15 @@ namespace sfem {
 
         void resample_contact_conditions(const smesh::SharedBuffer<real_t>& displacement) {
             contact->recompute(displacement);
+
+            // `recompute` measures the gap in the deformed configuration X + u, so
+            // from here on the constraint must be evaluated on (u - u_ref). Without
+            // this the resampling displacement is counted twice.
+            if (!contact_reference_displacement) {
+                contact_reference_displacement = sfem::create_buffer<real_t>(displacement->size(), f->execution_space());
+            }
+            sfem::blas<real_t>(f->execution_space())
+                    ->copy(displacement->size(), displacement->data(), contact_reference_displacement->data());
             coupling_matrices.clear();
             galerkin_contact_hessian_bsr.clear();
             coupling_matrices.push_back(h_crs_spmv(contact->graph()->n_nodes(),
@@ -662,6 +706,46 @@ namespace sfem {
                                                    contact->graph()->colidx(),
                                                    contact->values(),
                                                    real_t(0)));
+
+            {  // A resample that finds no candidate pairs silently removes every
+               // constraint, after which the solver converges cleanly to the
+               // unconstrained solution. Always report it.
+                const auto      cm      = coupling_matrices[0];
+                const count_t*  rp      = cm->row_ptr->data();
+                const ptrdiff_t nrow    = cm->rows();
+                ptrdiff_t       coupled = 0;
+                for (ptrdiff_t i = 0; i < nrow; ++i) {
+                    if (rp[i + 1] > rp[i]) ++coupled;
+                }
+
+                if (!coupled) {
+                    fprintf(stderr,
+                            "[warning] MaMAL: contact resampling found no coupled nodes (search_radius %g). "
+                            "All contact constraints are gone; the solve will converge to the unconstrained "
+                            "solution. Increase SFEM_MAMAL_SEARCH_RADIUS.\n",
+                            (double)params.search_radius);
+                    fflush(stderr);
+                } else if (smesh::Env::read("SFEM_MAMAL_VERBOSE", 0)) {
+                    const real_t* const d     = contact->distances()->data();
+                    real_t              dmin  = 0, dmax = 0;
+                    bool                first = true;
+                    for (ptrdiff_t i = 0; i < nrow; ++i) {
+                        if (rp[i + 1] == rp[i]) continue;
+                        if (first) {
+                            dmin  = dmax = d[i];
+                            first = false;
+                        }
+                        dmin = std::min(dmin, d[i]);
+                        dmax = std::max(dmax, d[i]);
+                    }
+                    printf("MaMAL::resample coupled_rows %ld / %ld  gap [%e, %e]\n",
+                           (long)coupled,
+                           (long)nrow,
+                           (double)dmin,
+                           (double)dmax);
+                    fflush(stdout);
+                }
+            }
 
             const int spatial_dim = contact_eval_surface->spatial_dimension();
             const int nlevels     = data->semistructured_levels.size();
@@ -734,6 +818,15 @@ namespace sfem {
                 }
             }
 
+            // Diagnostic: the multiplier is carried across resamples, but the coupled
+            // set and the mortar pairing both change, so lambda_i can end up attached
+            // to a different constraint than the one it was built for.
+            if (smesh::Env::read("SFEM_MAMAL_RESET_AUGMENTATION_ON_RESAMPLE", 0) && !contact_penalties.empty()) {
+                sfem::blas<real_t>(f->execution_space())->zeros(agumentation->size(), agumentation->data());
+            }
+
+            estimate_contact_penalty(displacement);
+
             if (!contact_jacobi_data) {
                 contact_jacobi_data = std::make_shared<ContactData>();
             }
@@ -746,18 +839,242 @@ namespace sfem {
                                     .normals          = contact->normals(),
                                     .distances        = contact->distances(),
                                     .constraints_mask = constraints_mask,
-                                    .agumentation     = agumentation};
+                                    .agumentation     = agumentation,
+                                    .reference_displacement = contact_reference_displacement};
 
             if (!contact_jacobi) {
                 contact_jacobi = std::make_shared<ContactJacobi>(contact_jacobi_data);
             }
 
-            contact_jacobi->set_penalty(contact_penalty);
+            contact_jacobi->set_penalty(contact_penalties[0]);
             contact_jacobi->set_n_loops(params.contact_jacobi_loops);
             contact_jacobi->set_enable_augmentation(false);
         }
 
+
+        // Penalty stiffness matched to the elastic stiffness the constraint has to
+        // fight, node by node: p_i = scale * (n^T K_ii n) / m_i. The contact term
+        // enters the energy as (1/2) p_i m_i <g_i>^2, so p_i m_i is the stiffness
+        // added along n_i and this makes it comparable to the elasticity block
+        // diagonal there. A penalty far above that scale wrecks the level
+        // smoothers: their relaxation is fixed at 1/block_size, while the stable
+        // bound is 2/lambda_max(D^-1 A), and lambda_max grows with the penalty.
+        void estimate_contact_penalty(const smesh::SharedBuffer<real_t>& displacement) {
+            SFEM_TRACE_SCOPE("MaMAL::estimate_contact_penalty");
+
+            const int       dim  = contact_eval_surface->spatial_dimension();
+            const auto      es   = f->execution_space();
+            auto            blas = sfem::blas<real_t>(es);
+            const ptrdiff_t n0   = mass_vectors[0]->size();
+
+            const bool first_call = contact_penalties.empty();
+            if (first_call) {
+                contact_penalties.resize(n_levels());
+                for (int l = 0; l < n_levels(); ++l) {
+                    contact_penalties[l] = create_buffer<real_t>(mass_vectors[l]->size(), es);
+                }
+            }
+
+            real_t* const p0 = contact_penalties[0]->data();
+
+            // The fine penalty is estimated once and then held fixed. The augmented
+            // Lagrangian stores the multiplier as a force density and reads it back
+            // as `agumentation / penalty`, so re-estimating mid-solve would silently
+            // rescale every stored multiplier. Coarse levels are still re-restricted
+            // below, because the mortar masses they average against do change.
+            if (!first_call) {
+                // keep p0
+            } else if (params.penalty_override > 0) {
+                blas->values(n0, params.penalty_override, p0);
+            } else {
+                if (!elasticity_block_diag) {
+                    elasticity_block_diag = create_buffer<real_t>(f->space()->n_dofs() / dim * 6, es);
+                }
+
+                blas->zeros(elasticity_block_diag->size(), elasticity_block_diag->data());
+                f->hessian_block_diag_sym(displacement->data(), elasticity_block_diag->data());
+
+                const real_t* const  kd = elasticity_block_diag->data();
+                const idx_t* const   nm = contact_eval_surface->node_mapping()->data();
+                const real_t* const  m  = mass_vectors[0]->data();
+                real_t* const* const nr = normals[0]->data();
+
+                assert(dim == 3);
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n0; ++i) {
+                    const real_t* const b  = &kd[nm[i] * 6];
+                    const real_t        d0 = nr[0][i];
+                    const real_t        d1 = nr[1][i];
+                    const real_t        d2 = nr[2][i];
+
+                    const real_t knn = b[0] * d0 * d0 + b[3] * d1 * d1 + b[5] * d2 * d2 +
+                                       2 * (b[1] * d0 * d1 + b[2] * d0 * d2 + b[4] * d1 * d2);
+
+                    p0[i] = (m[i] > 0 && knn > 0) ? params.penalty_scale * knn / m[i] : real_t(0);
+                }
+
+                // Nodes off the contact trace carry no mortar mass and never
+                // contribute a contact term, but the kernels still divide by the
+                // penalty, so they get the median rather than zero.
+                fill_non_positive_with_median(contact_penalties[0]);
+            }
+
+            // Coarse levels: mass-weighted average, the same coarsening the normals
+            // get, so that p_c m_c reproduces the fine penalty stiffness.
+            for (int l = 0; l < n_levels() - 1; ++l) {
+                const ptrdiff_t nf = mass_vectors[l]->size();
+                auto            wp = create_host_buffer<real_t>(nf);
+
+                const real_t* const pf = contact_penalties[l]->data();
+                const real_t* const mf = mass_vectors[l]->data();
+                real_t* const       w  = wp->data();
+
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < nf; ++i) {
+                    w[i] = pf[i] * mf[i];
+                }
+
+                galerkin_restrictions[l].R->apply(w, contact_penalties[l + 1]->data());
+
+                const ptrdiff_t     nc = mass_vectors[l + 1]->size();
+                const real_t* const mc = mass_vectors[l + 1]->data();
+                real_t* const       pc = contact_penalties[l + 1]->data();
+
+#pragma omp parallel for
+                for (ptrdiff_t k = 0; k < nc; ++k) {
+                    pc[k] = mc[k] > 0 ? pc[k] / mc[k] : real_t(0);
+                }
+
+                fill_non_positive_with_median(contact_penalties[l + 1]);
+            }
+
+            if (smesh::Env::read("SFEM_MAMAL_VERBOSE", 0)) {
+                for (int l = 0; l < n_levels(); ++l) {
+                    std::vector<real_t> v(contact_penalties[l]->data(),
+                                          contact_penalties[l]->data() + contact_penalties[l]->size());
+                    std::sort(v.begin(), v.end());
+                    printf("MaMAL::contact_penalty L%d n %ld min %e median %e max %e\n",
+                           l,
+                           (long)v.size(),
+                           (double)v.front(),
+                           (double)v[v.size() / 2],
+                           (double)v.back());
+                }
+                fflush(stdout);
+            }
+        }
+
+        static void fill_non_positive_with_median(const SharedBuffer<real_t>& p) {
+            const ptrdiff_t     n = p->size();
+            real_t* const       d = p->data();
+            std::vector<real_t> positive;
+            positive.reserve(n);
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                if (d[i] > 0) positive.push_back(d[i]);
+            }
+
+            if (positive.empty()) {
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    d[i] = 1;
+                }
+                return;
+            }
+
+            const size_t mid = positive.size() / 2;
+            std::nth_element(positive.begin(), positive.begin() + mid, positive.end());
+            const real_t median = positive[mid];
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                if (d[i] <= 0) d[i] = median;
+            }
+        }
+
         void nonlinear_smooth(const SharedBuffer<real_t>& x) { contact_jacobi->smooth(x); }
+
+        void zero_masked_dofs(const int level, real_t* const x) {
+            const mask_t* const mask = level_constraints_mask[level]->data();
+            const ptrdiff_t     n    = memory[level]->solution->size();
+#pragma omp parallel for
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                if (mask_get(i, mask)) x[i] = 0;
+            }
+        }
+
+        void mark_surface_node_dofs(const idx_t node, const int dim, real_t* const dof_mask) {
+            const ptrdiff_t base = static_cast<ptrdiff_t>(node) * dim;
+            for (int d = 0; d < dim; ++d) {
+                dof_mask[base + d] = real_t(1);
+            }
+        }
+
+        void build_jump_free_masks() {
+            SFEM_TRACE_SCOPE("MaMAL::build_jump_free_masks");
+
+            const int dim  = f->space()->block_size();
+            auto      blas = sfem::blas<real_t>(f->execution_space());
+
+            for (int l = 0; l < n_levels(); ++l) {
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < level_constraints_mask[l]->size(); ++i) {
+                    level_constraints_mask[l]->data()[i] = 0;
+                }
+                data->functions[l]->constraints_mask(level_constraints_mask[l]->data());
+                blas->zeros(level_filter_real[l]->size(), level_filter_real[l]->data());
+            }
+
+            if (coupling_matrices.empty() || !coupling_matrices[0]) return;
+
+            const auto         cm        = coupling_matrices[0];
+            const ptrdiff_t    n_contact = cm->rows();
+            const count_t*     rowptr    = cm->row_ptr->data();
+            const idx_t*       colidx    = cm->col_idx->data();
+            const idx_t* const nm        = contact_eval_surface->node_mapping()->data();
+            const real_t*      m         = macaulay->data();
+            real_t* const      fine_dof  = level_filter_real[0]->data();
+
+            for (ptrdiff_t i = 0; i < n_contact; ++i) {
+                if (!(m[i] > 0 || rowptr[i + 1] > rowptr[i])) continue;
+                mark_surface_node_dofs(nm[i], dim, fine_dof);
+                for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k) {
+                    mark_surface_node_dofs(nm[colidx[k]], dim, fine_dof);
+                }
+            }
+
+            for (int l = 0; l < n_levels() - 1; ++l) {
+                blas->zeros(level_filter_real[l + 1]->size(), level_filter_real[l + 1]->data());
+                data->restrictions[l]->apply(level_filter_real[l]->data(), level_filter_real[l + 1]->data());
+            }
+
+            // Jump-free filtering is coarse-only. Level 0 keeps Dirichlet so the
+            // fine ContactJacobi / GMG Jacobi are not frozen on the contact trace.
+            for (int l = 1; l < n_levels(); ++l) {
+                const real_t* const touched = level_filter_real[l]->data();
+                mask_t* const       mask    = level_constraints_mask[l]->data();
+                const ptrdiff_t     ndofs   = level_filter_real[l]->size();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                    if (touched[i] != real_t(0)) mask_set(i, mask);
+                }
+            }
+        }
+
+        std::shared_ptr<Operator<real_t>> masked_elasticity_op(const int level) {
+            auto            op   = operators[level];
+            auto            mask = level_constraints_mask[level];
+            const ptrdiff_t n    = op->rows();
+            const auto      es   = f->execution_space();
+            return sfem::make_op<real_t>(
+                    n,
+                    n,
+                    [=](const real_t* const x, real_t* const y) {
+                        op->apply(x, y);
+                        const mask_t* const m = mask->data();
+#pragma omp parallel for
+                        for (ptrdiff_t i = 0; i < n; ++i) {
+                            if (mask_get(i, m)) y[i] = x[i];
+                        }
+                    },
+                    es);
+        }
 
         void pack_contact_block_diag(const int level) {
             auto            src = contact_block_diag_soa[level]->data();
@@ -843,7 +1160,7 @@ namespace sfem {
                     }
 
                     ContactData cd = linearized_contact_data(l);
-                    assemble_contact_hessian_block_diag(cd, contact_penalty, contact_active[l]->data(), diag);
+                    assemble_contact_hessian_block_diag(cd, contact_penalties[l]->data(), contact_active[l]->data(), diag);
                     pack_contact_block_diag(l);
                 }
             }
@@ -889,7 +1206,7 @@ namespace sfem {
                                 coupling_matrices[0]->values->data(),
                                 normals[0]->data(),
                                 mass_vectors[0]->data(),
-                                contact_penalty,
+                                contact_penalties[0]->data(),
                                 contact_active[0]->data(),
                                 fine->row_ptr->data(),
                                 fine->col_idx->data(),
@@ -925,7 +1242,7 @@ namespace sfem {
             auto            level_normals   = normals[level];
             auto            level_mass      = mass_vectors[level];
             auto            active          = contact_active[level];
-            const real_t    penalty         = contact_penalty;
+            auto            penalty         = contact_penalties[level];
             const ptrdiff_t n               = operators[level]->rows();
             auto            es              = f->execution_space();
 
@@ -961,12 +1278,12 @@ namespace sfem {
             assert(dim == 3);
 
             compute_macaulay_term_from_global_displacement(
-                    *contact_jacobi_data, contact_penalty, x->data(), contact_local_grad->data(), macaulay->data());
+                    *contact_jacobi_data, contact_penalties[0]->data(), x->data(), contact_local_grad->data(), macaulay->data());
 
             blas->values(contact_local_grad->size(), 0, contact_local_grad->data());
             assemble_contact_gradient(dim,
                                       n_contact,
-                                      contact_penalty,
+                                      contact_penalties[0]->data(),
                                       cm->row_ptr->data(),
                                       cm->col_idx->data(),
                                       cm->values->data(),
@@ -987,6 +1304,7 @@ namespace sfem {
                 cg[global_dof + 2]         = lcg[local_dof + 2];
             }
             blas->axpy(ndofs, -1, contact_grad->data(), residual->data());
+            f->apply_zero_constraints(residual->data());
 
             return blas->norm2(residual->size(), residual->data());
         }
@@ -996,28 +1314,31 @@ namespace sfem {
 
             const real_t grad_norm = eval_fine_residual(memory[0]->solution, memory[0]->work);
             restrict_contact_active_set();
-
-            assemble_level_contact_hessian_block_diag();
+            if (params.jump_free_coarse) {
+                build_jump_free_masks();
+            } else {
+                assemble_level_contact_hessian_block_diag();
+            }
             return grad_norm;
         }
 
         void update_augmentation() {
             compute_macaulay_term_from_global_displacement(*contact_jacobi_data,
-                                                           contact_penalty,
+                                                           contact_penalties[0]->data(),
                                                            memory[0]->solution->data(),
                                                            contact_local_grad->data(),
                                                            macaulay->data());
 
             real_t* const       aug = agumentation->data();
             const real_t* const m   = macaulay->data();
-            const real_t        p   = contact_penalty;
+            const real_t* const p   = contact_penalties[0]->data();
             const real_t        r   = params.augmentation_relaxation;
             const real_t        c   = real_t(1) - r;
             const ptrdiff_t     n   = agumentation->size();
 
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n; ++i) {
-                aug[i] = c * aug[i] + r * p * m[i];
+                aug[i] = c * aug[i] + r * p[i] * m[i];
             }
         }
 
@@ -1039,15 +1360,18 @@ namespace sfem {
             const idx_t* const  nm         = contact_jacobi_data->surface->node_mapping()->data();
             const real_t* const disp       = x->data();
             real_t* const       local_disp = contact_hessian_local_x[0]->data();
+            const real_t* const ref        = contact_jacobi_data->reference_displacement
+                                                     ? contact_jacobi_data->reference_displacement->data()
+                                                     : nullptr;
 
             assert(dim == 3);
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_contact; ++i) {
                 const ptrdiff_t global_dof = nm[i] * dim;
                 const ptrdiff_t local_dof  = i * dim;
-                local_disp[local_dof + 0]  = disp[global_dof + 0];
-                local_disp[local_dof + 1]  = disp[global_dof + 1];
-                local_disp[local_dof + 2]  = disp[global_dof + 2];
+                local_disp[local_dof + 0]  = disp[global_dof + 0] - (ref ? ref[global_dof + 0] : 0);
+                local_disp[local_dof + 1]  = disp[global_dof + 1] - (ref ? ref[global_dof + 1] : 0);
+                local_disp[local_dof + 2]  = disp[global_dof + 2] - (ref ? ref[global_dof + 2] : 0);
             }
 
             contact_objective_steps(dim,
@@ -1059,7 +1383,7 @@ namespace sfem {
                                     contact_jacobi_data->agumentation->data(),
                                     contact_jacobi_data->normals->data(),
                                     contact_jacobi_data->mass_vector->data(),
-                                    contact_penalty,
+                                    contact_penalties[0]->data(),
                                     local_disp,
                                     local_disp,
                                     1,
@@ -1091,14 +1415,18 @@ namespace sfem {
             real_t*         local_disp = contact_hessian_local_x[0]->data();
             real_t*         local_inc  = contact_hessian_local_y[0]->data();
 
+            const real_t* const ref = contact_jacobi_data->reference_displacement
+                                              ? contact_jacobi_data->reference_displacement->data()
+                                              : nullptr;
+
             assert(dim == 3);
 #pragma omp parallel for
             for (ptrdiff_t i = 0; i < n_contact; ++i) {
                 const ptrdiff_t global_dof = nm[i] * dim;
                 const ptrdiff_t local_dof  = i * dim;
-                local_disp[local_dof + 0]  = disp[global_dof + 0];
-                local_disp[local_dof + 1]  = disp[global_dof + 1];
-                local_disp[local_dof + 2]  = disp[global_dof + 2];
+                local_disp[local_dof + 0]  = disp[global_dof + 0] - (ref ? ref[global_dof + 0] : 0);
+                local_disp[local_dof + 1]  = disp[global_dof + 1] - (ref ? ref[global_dof + 1] : 0);
+                local_disp[local_dof + 2]  = disp[global_dof + 2] - (ref ? ref[global_dof + 2] : 0);
                 local_inc[local_dof + 0]   = inc[global_dof + 0];
                 local_inc[local_dof + 1]   = inc[global_dof + 1];
                 local_inc[local_dof + 2]   = inc[global_dof + 2];
@@ -1113,7 +1441,7 @@ namespace sfem {
                                     contact_jacobi_data->agumentation->data(),
                                     contact_jacobi_data->normals->data(),
                                     contact_jacobi_data->mass_vector->data(),
-                                    contact_penalty,
+                                    contact_penalties[0]->data(),
                                     local_disp,
                                     local_inc,
                                     n_line_search_steps,
@@ -1163,40 +1491,71 @@ namespace sfem {
             auto                    blas = sfem::blas<real_t>(f->execution_space());
             std::shared_ptr<Memory> mem  = memory[0];
 
-            if (n_levels() > 1) {
+            if (n_levels() > 1 && !params.skip_coarse) {
                 auto mem_coarse = memory[1];
 
                 {  // Restrict residual
+                    if (params.jump_free_coarse) {
+                        f->apply_zero_constraints(mem->work->data());
+                    }
                     blas->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                     data->restrictions[0]->apply(mem->work->data(), mem_coarse->rhs->data());
+                    if (params.jump_free_coarse) {
+                        zero_masked_dofs(1, mem_coarse->rhs->data());
+                    }
                 }
                 linear_cycle(1);
 
                 {  // Prolongate and correct
                     blas->zeros(mem->correction->size(), mem->correction->data());
                     data->prolongations[1]->apply(mem_coarse->solution->data(), mem->correction->data());
+                    if (params.jump_free_coarse) {
+                        f->apply_zero_constraints(mem->correction->data());
+                        const real_t* const touched = level_filter_real[0]->data();
+                        real_t* const       du      = mem->correction->data();
+                        const ptrdiff_t     n       = mem->correction->size();
+#pragma omp parallel for
+                        for (ptrdiff_t i = 0; i < n; ++i) {
+                            if (touched[i] != real_t(0)) du[i] = 0;
+                        }
+                    }
 
-                    // smooth_candidate_correction(mem);
-                    // const real_t current_energy        = augmented_lagrangian_value(mem->solution);
-                    // const real_t candidate_energy      = augmented_lagrangian_value(mem->work);
-                    // const real_t current_penetration   = contact_penetration_norm(mem->solution);
-                    // const real_t candidate_penetration = contact_penetration_norm(mem->work);
-                    // printf("MaMAL::nonlinear_cycle candidate energy %e -> %e penetration %e -> %e\n",
-                    //        (double)current_energy,
-                    //        (double)candidate_energy,
-                    //        (double)current_penetration,
-                    //        (double)candidate_penetration);
-
-                    // const real_t step = augmented_lagrangian_line_search_step(mem);
-
-                    const real_t step = smesh::Env::read("SFEM_MAMAL_LINE_SEARCH_STEP", real_t(1.0));
+                    real_t step = smesh::Env::read("SFEM_MAMAL_LINE_SEARCH_STEP",
+                                                   params.jump_free_coarse ? real_t(0) : real_t(1));
+                    if (step <= 0) {
+                        step = augmented_lagrangian_line_search_step(mem);
+                    }
+                    {
+                        const real_t* const du   = mem->correction->data();
+                        const mask_t* const mask = constraints_mask->data();
+                        const ptrdiff_t     n    = mem->correction->size();
+                        real_t              du_max = 0;
+                        real_t              du_bc  = 0;
+                        ptrdiff_t           n_active = 0;
+                        for (ptrdiff_t i = 0; i < macaulay->size(); ++i) {
+                            if (macaulay->data()[i] > 0) ++n_active;
+                        }
+                        for (ptrdiff_t i = 0; i < n; ++i) {
+                            const real_t a = du[i] < 0 ? -du[i] : du[i];
+                            if (a > du_max) du_max = a;
+                            if (mask_get(i, mask) && a > du_bc) du_bc = a;
+                        }
+                        printf("MaMAL::nonlinear_cycle active %ld du_norm %e du_max %e du_bc %e coarse_step %e\n",
+                               (long)n_active,
+                               (double)blas->norm2(n, du),
+                               (double)du_max,
+                               (double)du_bc,
+                               (double)step);
+                        fflush(stdout);
+                    }
                     blas->axpy(mem->solution->size(), step, mem->correction->data(), mem->solution->data());
+                    if (params.jump_free_coarse) {
+                        f->apply_constraints(mem->solution->data());
+                    }
                 }
             }
 
             nonlinear_smooth(memory[0]->solution);
-
-            if (params.enable_augmentation) update_augmentation();
         }
 
         void linear_cycle(int level) {
@@ -1205,31 +1564,39 @@ namespace sfem {
             auto blas     = sfem::blas<real_t>(f->execution_space());
             auto mem      = memory[level];
             auto smoother = smoothers[level];
-            auto cop      = combined_op(level);
+            auto cop      = params.jump_free_coarse ? masked_elasticity_op(level) : combined_op(level);
+
+            if (params.jump_free_coarse) {
+                zero_masked_dofs(level, mem->rhs->data());
+                smoother->set_op(cop);
+            } else {
+                smoother->set_op_and_diag_shift(cop, contact_block_diag[level], memory[level]->diag);
+            }
 
             if (level == n_levels() - 1) {
-                // Coarse grid solve
-                smoother->set_op_and_diag_shift(cop, contact_block_diag[level], memory[level]->diag);
                 blas->zeros(mem->solution->size(), mem->solution->data());
                 smoother->apply(mem->rhs->data(), mem->solution->data());
+                if (params.jump_free_coarse) zero_masked_dofs(level, mem->solution->data());
                 return;
             }
 
             auto mem_coarse = memory[level + 1];
 
             {  // Pre-smooth
-                smoother->set_op_and_diag_shift(cop, contact_block_diag[level], memory[level]->diag);
                 blas->zeros(mem->solution->size(), mem->solution->data());
                 smoother->apply(mem->rhs->data(), mem->solution->data());
+                if (params.jump_free_coarse) zero_masked_dofs(level, mem->solution->data());
             }
 
             {  // Restrict residual
                 blas->zeros(mem->work->size(), mem->work->data());
                 cop->apply(mem->solution->data(), mem->work->data());
                 blas->axpby(mem->work->size(), 1, mem->rhs->data(), -1, mem->work->data());
+                if (params.jump_free_coarse) zero_masked_dofs(level, mem->work->data());
 
                 blas->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
                 data->restrictions[level]->apply(mem->work->data(), mem_coarse->rhs->data());
+                if (params.jump_free_coarse) zero_masked_dofs(level + 1, mem_coarse->rhs->data());
             }
 
             linear_cycle(level + 1);
@@ -1237,12 +1604,36 @@ namespace sfem {
             {  // Prolongate and correct
                 blas->zeros(mem->work->size(), mem->work->data());
                 data->prolongations[level + 1]->apply(mem_coarse->solution->data(), mem->work->data());
+                if (params.jump_free_coarse) zero_masked_dofs(level, mem->work->data());
                 blas->axpy(mem->solution->size(), 1, mem->work->data(), mem->solution->data());
             }
 
             {  // Post-smooth
                 smoother->apply(mem->rhs->data(), mem->solution->data());
+                if (params.jump_free_coarse) zero_masked_dofs(level, mem->solution->data());
             }
+        }
+
+        void write_vcycle_solution(const int iter) {
+            if (params.output_dir.empty()) return;
+
+            auto out = f->output();
+            out->write_time_step("disp", real_t(iter), memory[0]->solution->data());
+            out->log_time(real_t(iter));
+        }
+
+        void setup_vcycle_output() {
+            if (params.output_dir.empty()) return;
+
+            const smesh::Path root(params.output_dir);
+            smesh::create_directory(root);
+            smesh::create_directory(root / "out");
+            smesh::semistructured_export_as_standard(f->space()->mesh_ptr(), root / "mesh");
+
+            auto out = f->output();
+            out->enable_AoS_to_SoA(true);
+            out->set_output_dir(root / "out");
+            out->clear();
         }
 
         ~Impl() = default;
@@ -1275,28 +1666,111 @@ namespace sfem {
         blas->copy(x->size(), x->data(), mem->solution->data());
         impl_->f->apply_constraints(mem->solution->data());
 
+        impl_->setup_vcycle_output();
+        impl_->write_vcycle_solution(0);
+
+        // Outer / inner split, following ShiftedPenaltyMultigrid: the inner loop
+        // drives the augmented-Lagrangian subproblem down with the multiplier and
+        // the contact geometry both held fixed, and only once that subproblem has
+        // reached the forcing tolerance do we update the multiplier and resample.
+        // Updating the multiplier from a half-solved state is what makes it swing.
+        const auto&  p_        = impl_->params;
+        real_t       forcing   = -1;
+        int          cycles    = 0;
+
         int iter = 0;
-        for (; iter < impl_->params.max_iterations; ++iter) {
-            if (iter == 0 || (impl_->params.contact_update_frequency > 0 && iter % impl_->params.contact_update_frequency == 0)) {
+        for (; iter < p_.max_iterations; ++iter) {
+            if (iter == 0 || (p_.contact_update_frequency > 0 && iter % p_.contact_update_frequency == 0)) {
                 impl_->resample_contact_conditions(mem->solution);
             }
 
-            impl_->nonlinear_cycle();
+            real_t grad_norm     = 0;
+            real_t previous_norm = std::numeric_limits<real_t>::max();
+            int    inner         = 0;
+            for (; inner < std::max(1, p_.max_inner_iterations); ++inner) {
+                impl_->nonlinear_cycle();
+                ++cycles;
 
-            const real_t grad_norm = impl_->eval_fine_residual(mem->solution, mem->work);
+                grad_norm = impl_->eval_fine_residual(mem->solution, mem->work);
+                if (forcing < 0) forcing = p_.inner_forcing * grad_norm;
+
+                if (grad_norm < p_.tolerance) break;
+                if (inner != 0 && grad_norm <= forcing) break;
+
+                // Extra cycles buy nothing once the subproblem stops moving; stop and
+                // let the multiplier update supply the progress instead.
+                const bool stagnation = grad_norm / previous_norm > p_.stagnation_threshold;
+                previous_norm         = grad_norm;
+                if (inner != 0 && stagnation) break;
+            }
+
+            if (p_.enable_augmentation) impl_->update_augmentation();
+            forcing = std::max(p_.tolerance, forcing * p_.inner_forcing_decrease);
+
+            impl_->write_vcycle_solution(iter + 1);
             compute_penetration_from_global_displacement(*impl_->contact_jacobi_data,
                                                          mem->solution->data(),
                                                          impl_->contact_local_grad->data(),
                                                          impl_->macaulay->data());
             const real_t penetration_norm = blas->norm2(impl_->macaulay->size(), impl_->macaulay->data());
 
-            printf("MaMAL::solve %d gradient_norm %e penetration_norm %e\n", iter, (double)grad_norm, (double)penetration_norm);
+            if (impl_->params.jump_free_coarse && !impl_->level_filter_real.empty() && impl_->level_filter_real[0]) {
+                const real_t* const touched = impl_->level_filter_real[0]->data();
+                real_t* const       r       = mem->work->data();
+                const ptrdiff_t     n       = mem->work->size();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    if (touched[i] != real_t(0)) r[i] = 0;
+                }
+                const real_t filtered_norm = blas->norm2(n, r);
+                printf("MaMAL::solve %d gradient_norm %e filtered_norm %e penetration_norm %e\n",
+                       iter,
+                       (double)grad_norm,
+                       (double)filtered_norm,
+                       (double)penetration_norm);
+            } else {
+                printf("MaMAL::solve %d gradient_norm %e penetration_norm %e cycles %d\n",
+                       iter,
+                       (double)grad_norm,
+                       (double)penetration_norm,
+                       cycles);
+            }
             fflush(stdout);
 
             if (grad_norm < impl_->params.tolerance) {
                 ++iter;
                 break;
             }
+        }
+
+        if (smesh::Env::read("SFEM_MAMAL_VERBOSE", 0)) {
+            // Geometric truth, independent of whichever configuration the constraint
+            // was linearised about: re-measure the gap at the final solution. Without
+            // resampling `penetration_norm` above is the violation of the *initial*
+            // linearised constraint, which flatters a solution whose interface has
+            // actually moved.
+            impl_->contact->recompute(mem->solution);
+
+            const real_t* const d       = impl_->contact->distances()->data();
+            const auto          cm      = impl_->coupling_matrices[0];
+            const count_t*      rp      = cm->row_ptr->data();
+            const ptrdiff_t     nrow    = cm->rows();
+            real_t              sq      = 0;
+            real_t              worst   = 0;
+            ptrdiff_t           coupled = 0;
+            for (ptrdiff_t i = 0; i < nrow; ++i) {
+                if (rp[i + 1] == rp[i]) continue;
+                ++coupled;
+                const real_t pen = d[i] < 0 ? -d[i] : real_t(0);
+                sq += pen * pen;
+                worst = std::max(worst, pen);
+            }
+
+            printf("MaMAL::solve final true_penetration_norm %e worst %e over %ld coupled nodes\n",
+                   (double)std::sqrt(sq),
+                   (double)worst,
+                   (long)coupled);
+            fflush(stdout);
         }
 
         blas->copy(mem->solution->size(), mem->solution->data(), x->data());

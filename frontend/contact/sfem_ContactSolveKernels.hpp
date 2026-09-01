@@ -19,14 +19,14 @@ namespace sfem {
                                const real_t* const SFEM_RESTRICT                      agumentation,
                                const real_t* const* const SFEM_RESTRICT               normals,
                                const real_t* const SFEM_RESTRICT                      mass,
-                               const real_t                                           penalty,
+                               const real_t* const SFEM_RESTRICT penalty,
                                const ptrdiff_t                                        in_stride,
                                const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
                                real_t* const                                          macaulay);
 
     void assemble_contact_gradient(const int                                dim,
                                    const ptrdiff_t                          nnodes,
-                                   const real_t                             penalty,
+                                   const real_t* const SFEM_RESTRICT penalty,
                                    const count_t* const SFEM_RESTRICT       cm_rowptr,
                                    const idx_t* const SFEM_RESTRICT         cm_colidx,
                                    const real_t* const SFEM_RESTRICT        cm_vals,
@@ -46,7 +46,7 @@ namespace sfem {
                                              const real_t* const SFEM_RESTRICT                agumentation,
                                              const real_t* const* const SFEM_RESTRICT         normals,
                                              const real_t* const SFEM_RESTRICT                mass,
-                                             const real_t                                     penalty,
+                                             const real_t* const SFEM_RESTRICT penalty,
                                              const real_t* const SFEM_RESTRICT                macaulay,
                                              const ptrdiff_t                                  diag_stride,
                                              real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values);
@@ -58,7 +58,7 @@ namespace sfem {
                                              const real_t* const SFEM_RESTRICT                cm_vals,
                                              const real_t* const* const SFEM_RESTRICT         normals,
                                              const real_t* const SFEM_RESTRICT                mass,
-                                             const real_t                                     penalty,
+                                             const real_t* const SFEM_RESTRICT penalty,
                                              const real_t* const SFEM_RESTRICT                active,
                                              const ptrdiff_t                                  diag_stride,
                                              real_t* const SFEM_RESTRICT* const SFEM_RESTRICT diag_values);
@@ -70,7 +70,7 @@ namespace sfem {
                                const real_t* const SFEM_RESTRICT                      cm_vals,
                                const real_t* const* const SFEM_RESTRICT               normals,
                                const real_t* const SFEM_RESTRICT                      mass,
-                               const real_t                                           penalty,
+                               const real_t* const SFEM_RESTRICT penalty,
                                const real_t* const SFEM_RESTRICT                      macaulay,
                                const ptrdiff_t                                        in_stride,
                                const real_t* const SFEM_RESTRICT* const SFEM_RESTRICT in,
@@ -84,7 +84,7 @@ namespace sfem {
                              const real_t* const SFEM_RESTRICT        cm_vals,
                              const real_t* const* const SFEM_RESTRICT normals,
                              const real_t* const SFEM_RESTRICT        mass,
-                             const real_t                             penalty,
+                             const real_t* const SFEM_RESTRICT penalty,
                              const real_t* const SFEM_RESTRICT        macaulay,
                              const count_t* const SFEM_RESTRICT       rowptr,
                              const idx_t* const SFEM_RESTRICT         colidx,
@@ -99,7 +99,7 @@ namespace sfem {
                                  const real_t* const SFEM_RESTRICT        agumentation,
                                  const real_t* const* const SFEM_RESTRICT normals,
                                  const real_t* const SFEM_RESTRICT        mass,
-                                 const real_t                             penalty,
+                                 const real_t* const SFEM_RESTRICT penalty,
                                  const real_t* const SFEM_RESTRICT        disp,
                                  const real_t* const SFEM_RESTRICT        inc,
                                  const int                                nsteps,
@@ -115,7 +115,7 @@ namespace sfem {
                                const real_t* const* const SFEM_RESTRICT normals,
                                const real_t* const SFEM_RESTRICT        mass,
                                const real_t* const SFEM_RESTRICT        active,
-                               const real_t                             penalty,
+                               const real_t* const SFEM_RESTRICT penalty,
                                const real_t* const SFEM_RESTRICT        x,
                                real_t* const SFEM_RESTRICT              y);
 
@@ -150,6 +150,10 @@ namespace sfem {
         smesh::SharedBuffer<real_t>     distances;
         SharedBuffer<mask_t>            constraints_mask;
         smesh::SharedBuffer<real_t>     agumentation;
+        // Configuration the gap in `distances` was measured at. The constraint is
+        // evaluated on (u - reference_displacement); null means the reference is
+        // the undeformed configuration.
+        smesh::SharedBuffer<real_t>     reference_displacement;
     };
 
     class ContactJacobi {
@@ -160,7 +164,10 @@ namespace sfem {
         void smooth(const SharedBuffer<real_t>& x);
         void contact_data_changed();
 
-        void set_penalty(real_t penalty);
+        // Per-node penalty, one entry per contact-surface node.
+        void set_penalty(const SharedBuffer<real_t>& penalty);
+        // Convenience: uniform penalty over the whole contact surface.
+        void set_penalty(const real_t penalty);
         void set_n_loops(int n_loops);
         void set_enable_augmentation(bool enable_augmentation);
         void set_relaxation_parameter(real_t relaxation_parameter);
