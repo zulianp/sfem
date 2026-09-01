@@ -44,6 +44,7 @@ using scalar_t = double;
 static constexpr int N_FIELDS = 4;
 
 #include "cvfem_hex8_ns_upwind_kernels.hpp"
+#include "cvfem_pack_coloring.hpp"
 
 enum class GeomKind { Affine, Isoparam };
 enum class FlowCase { Poiseuille, Couette };
@@ -67,6 +68,7 @@ struct MeshData {
     std::vector<scalar_t> jacobian_adjugate[9];
     std::vector<scalar_t> jacobian_determinant;
     PackedData           *packed{nullptr};
+    const PackColoring   *coloring{nullptr};
     scalar_t              rhie_chow_scale{1};
 };
 
@@ -699,6 +701,52 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
     }
 }
 
+// Colored assembly. Packs sharing a color touch no common node, so the element
+// kernels can accumulate straight into the global BSR with plain (non-atomic)
+// updates. Compared with the atomic sweep this drops ~1024 atomic
+// read-modify-writes per element and keeps each pack's rows cache-resident.
+static SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &d,
+                                                            const PackedData   &p,
+                                                            const PackColoring &c,
+                                                            BSR4               &b,
+                                                            const scalar_t      rho,
+                                                            const scalar_t      mu) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_colored_sumfact");
+    zero_bsr4(b);
+    scalar_t *const SFEM_RESTRICT             values = b.values->data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+#pragma omp parallel
+    {
+        for (int color = 0; color < c.n_colors; ++color) {
+            const ptrdiff_t cbegin = c.color_ptr[(size_t)color];
+            const ptrdiff_t cend   = c.color_ptr[(size_t)color + 1];
+#pragma omp for schedule(dynamic, 1)
+            for (ptrdiff_t i = cbegin; i < cend; ++i) {
+                const ptrdiff_t pack    = c.pack_order[(size_t)i];
+                const ptrdiff_t e_start = pack * p.n_elements_per_pack;
+                const ptrdiff_t e_end   = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+                for (ptrdiff_t e = e_start; e < e_end; ++e) {
+                    scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], pp[8];
+                    gather_element_coords(d, e, x, y, z);
+                    gather_element_fields(d, e, ux, uy, uz, pp);
+                    scalar_t pgx[8], pgy[8], pgz[8];
+                    gather_element_pgrad(d, e, pgx, pgy, pgz);
+                    const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                    scalar_t           adj[9], det;
+                    cvfem_hex8_load_adj(d, e, adj, &det);
+                    const smesh::count_t *const SFEM_RESTRICT es = slots + (size_t)e * 64;
+                    cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(
+                            rho, mu, adj, det, ux, uy, uz, reinterpret_cast<const int *>(es), values);
+                    cvfem_hex8_ns_upwind_jacobian_add_rhie_chow<false>(rho, mu, adj, rc, ux, uy, uz, pp, es, values);
+                    boundary_scs_add_jacobian<false>(
+                            rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, es, values);
+                }
+            }
+        }
+    }
+}
+
 static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_sumfact");
     zero_bsr4(b);
@@ -765,6 +813,8 @@ static void assemble_jacobian(MeshData &d, BSR4 &b, const scalar_t rho, const sc
     assemble_nodal_p_grad(d, geom);
     if (geom == GeomKind::Isoparam)
         assemble_jacobian_atomic_isoparam(d, b, rho, mu);
+    else if (d.packed && d.coloring)
+        assemble_jacobian_colored_sumfact(d, *d.packed, *d.coloring, b, rho, mu);
     else
         assemble_jacobian_atomic_sumfact(d, b, rho, mu);
 }
@@ -1361,10 +1411,16 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    PackedData packed_storage;
+    PackedData   packed_storage;
+    PackColoring coloring_storage;
     if (geom == GeomKind::Affine && pack_size > 0) {
         packed_storage = cvfem_hex8_make_packed(d.mesh, pack_size);
         d.packed       = &packed_storage;
+        coloring_storage = cvfem_build_pack_coloring(packed_storage.n_packs,
+                                                    packed_storage.owned_nodes_ptr,
+                                                    packed_storage.ghost_ptr,
+                                                    packed_storage.ghost_idx);
+        d.coloring = &coloring_storage;
     }
 
     d.nnodes    = d.mesh->n_nodes();

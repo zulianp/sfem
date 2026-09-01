@@ -139,6 +139,11 @@ static constexpr scalar_t CVFEM_HEX8_SCS_XI[CVFEM_HEX8_N_SCS][3] = {
 static constexpr double CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT = 754.0;
 static constexpr double CVFEM_HEX8_JAC_ACTION_FLOPS_PER_ELEMENT =
         CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT + 12.0 * 8.0;
+// NOTE: this is an idealised work model, not the arithmetic the kernels actually
+// issue. Counting operators in the emitted code gives ~2900 flops/element for
+// cvfem_hex8_ns_upwind_jacobian_add_slots and ~5471 for the SymPy
+// add_local_slots variant, so GFLOP/s_assemble_model understates the SymPy
+// assembly rate by roughly 2.4x. Compare assembly variants with MELEM/s.
 static constexpr double CVFEM_HEX8_ASSEMBLE_FLOPS_PER_ELEMENT = 2304.0;
 
 // 12 SCS: dN (27) + J (144) + cof/det (33) + A (3) + ∇_ref u (144) + push (55)
