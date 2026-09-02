@@ -193,7 +193,7 @@
   <p class="standfirst">The layer graph is now clean and enforced. The layers themselves are not yet doing the jobs they are named for — one of them holds 22,970 lines that should be a printer.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 13 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 17 commits from 060684ff</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
     <span><b>Date</b> 2026-09-02</span>
   </div>
@@ -344,7 +344,7 @@
       <tr>
         <td><b>One dispatch axis</b></td>
         <td>A layer may branch on the concept it owns and on nothing a layer above owns. No <code>if kind == "energy_soa"</code> in a backend, no <code>if "crs" in formats</code> in a printer.</td>
-        <td class="m">partly: tests/test_plans_are_consumed.py pins the structural plans no emitter reads — 11 of 13, shrink-only in both directions — see open point 5</td>
+        <td class="m">partly: tests/test_plans_are_consumed.py pins the structural plans no emitter reads — 10 of 13, shrink-only in both directions — see open point 5</td>
       </tr>
     </tbody>
   </table>
@@ -461,9 +461,9 @@
         <text x="264" y="232" class="d-dim">BlockPlan</text>
         <text x="264" y="248" class="d-dim">GeometryPlan</text>
         <text x="264" y="264" class="d-okt">LocalKernelPlan · MeshKernelPlan  ✓ read</text>
-        <text x="264" y="288" class="d-dim">CRS / BSR / DIA / COO /</text>
+        <text x="264" y="288" class="d-dim">BSR / DIA / COO /  (CRS ✓ read)</text>
         <text x="264" y="304" class="d-dim">Patch / BlockDiagSym AssemblyPlan</text>
-        <text x="264" y="326" class="d-gapt">11 of 13 read by no emitter</text>
+        <text x="264" y="326" class="d-gapt">10 of 13 read by no emitter</text>
         <path d="M350,140 L350,110" class="d-gline" stroke-dasharray="4 4"/>
 
         <!-- what the emitter re-derives -->
@@ -511,8 +511,8 @@
       <p><b>Done: the layout family.</b> <code>plans/layout.py</code> takes 17 more functions — which shape function maps to which stream, where a field's components sit in a packed lane buffer, how tensor-product elements reorder into Cartesian order, and the mixed-order variants for Taylor–Hood. These decide the memory access pattern of every generated loop, and so whether the loads are unit stride.</p>
       <p>Measured effect: <b>the largest emitter contains zero free-symbol analysis</b>, down from six references, and its text-free helper count has fallen from 32 to 18. <code>residual_codegen.py</code> is 9,875 lines, from 10,074. The boundary emitter is down from eight symbol scans to two, both argument validation rather than planning.</p>
       <p><b>Done: kernel file naming.</b> Which files a kernel produces and what they are called — <code>LocalKernelPlan.name</code>/<code>.header</code> and <code>MeshKernelPlan.name</code>/<code>.source</code> were already the definition, and the emitters rebuilt both from format strings. The idempotence rule the emitter carried privately (a prefix already naming its element does not get a second one) moved into the plan factory with it. <b>This is the first move that changes the plan-consumption count: 13 unread, now 11.</b></p>
-      <p><b>Remaining: the rest of the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, geometry mode, and the six assembly plans. These are harder because they are not analysis or arithmetic that lifts out whole but structure interleaved with printing, and they are what OP 2 and OP 4 wait on.</p>
-      <div class="op-facts"><span><i>emitters</i> 18,344 LOC in two modules</span><span><i>plans unread</i> 13 → 11</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP2, OP3, OP4</span></div>
+      <p><b>Remaining: the rest of the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, and geometry mode. These are the genuinely hard ones: unlike everything moved so far, they are not code that lifts out whole but structure that exists only as the shape of the emitter's control flow. The mesh phases, for instance, are spread across six large emission functions, each interleaving gather and scatter with buffer declarations that depend on the dependency set. They are what OP 2 and OP 4 wait on.</p>
+      <div class="op-facts"><span><i>emitters</i> 18,344 LOC in two modules</span><span><i>plans unread</i> 13 → 10</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP2, OP3, OP4</span></div>
     </div>
   </div>
 
@@ -526,13 +526,14 @@
     </div>
   </div>
 
-  <div class="op blocked">
+  <div class="op decide">
     <div class="rail"></div><div class="num">OP 3</div>
     <div class="body">
-      <div class="op-title">Make the six assembly plans drive assembly <span class="chip c-gap">blocked by OP 1</span></div>
-      <p><code>CRSAssemblyPlan</code>, <code>BSRAssemblyPlan</code>, <code>DIAAssemblyPlan</code>, <code>COOAssemblyPlan</code>, <code>PatchAssemblyPlan</code> and <code>BlockDiagSymAssemblyPlan</code> describe row pointers, column indices, block layout and accumulation policy. They are referenced in exactly three places: their definition, the facade re-export, and their own test. Meanwhile the real CRS scatter is a string template selected by a substring test on a tuple of names.</p>
-      <p>Worth doing in two stages: first make emission consume the plans while producing byte-identical output — which proves the plans describe what is actually emitted — and only then change what the plans say.</p>
-      <div class="op-facts"><span><i>evidence</i> emitters/energy_codegen.py:6132, 6199</span><span><i>stage 1 gate</i> byte-identity</span><span><i>stage 2 gate</i> OP 6</span></div>
+      <div class="op-title">Make the six assembly plans drive assembly <span class="chip c-part">1 of 6 done</span></div>
+      <p><code>CRSAssemblyPlan</code>, <code>BSRAssemblyPlan</code>, <code>DIAAssemblyPlan</code>, <code>COOAssemblyPlan</code>, <code>PatchAssemblyPlan</code> and <code>BlockDiagSymAssemblyPlan</code> describe row pointers, column indices, block layout and accumulation policy. They were referenced in exactly three places: their definition, the facade re-export, and their own test.</p>
+      <p><b>CRS is converted.</b> <code>_scalar_crs_matrix_scatter_lines</code> takes the plan and spells what it defines; the plan's defaults are the names the kernels have always used, so the text is unchanged, but changing the plan now changes the kernel. The reduction policy goes through a helper that raises on a policy it cannot spell rather than silently emitting a plain add. The other five have the same shape.</p>
+      <p>The two-stage approach holds: consume the plans at byte-identical output first, which proves they describe what is actually emitted, and only then change what they say — which is where OP 6 becomes the blocker.</p>
+      <div class="op-facts"><span><i>done</i> CRS</span><span><i>remaining</i> BSR · DIA · COO · Patch · BlockDiagSym</span><span><i>stage 2 gate</i> OP 6</span></div>
     </div>
   </div>
 
