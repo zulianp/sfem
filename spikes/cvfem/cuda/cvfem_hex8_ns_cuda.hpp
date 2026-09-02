@@ -70,6 +70,27 @@ int cvfem_cuda_download_r(cvfem_cuda_ctx *ctx, double *r);
 int cvfem_cuda_residual(cvfem_cuda_ctx *ctx, double rho, double mu,
                         int flush_mode, int block_size, void *stream);
 
+// Residual with the Rhie-Chow mass-flux interpolation active. Stages six more arrays per
+// node (coordinates and the nodal pressure gradient), so 112 B/node instead of 64 --
+// this is the case that most constrains pack size. Call cvfem_cuda_nodal_p_grad first.
+size_t cvfem_cuda_residual_rc_shmem_bytes(ptrdiff_t max_pack_nodes);
+int    cvfem_cuda_residual_rc(cvfem_cuda_ctx *ctx, double rho, double mu, double rc_scale,
+                              int flush_mode, int block_size, void *stream);
+
+// ---- matrix-free Jacobian action, y = J(u) v -------------------------------
+//
+// Same block-per-pack shape as the residual, with a third staged array for v. Shared
+// memory therefore goes from 8 arrays per node to 12 (96 B/node in fp64).
+size_t cvfem_cuda_jacobian_action_shmem_bytes(ptrdiff_t max_pack_nodes);
+
+int cvfem_cuda_upload_v(cvfem_cuda_ctx *ctx, const double *v);
+
+int cvfem_cuda_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu,
+                               int flush_mode, int block_size, void *stream);
+
+double cvfem_cuda_time_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                       int flush_mode, int block_size, int repeat);
+
 // ---- assembled BSR Jacobian ------------------------------------------------
 //
 // Assembly is element-parallel with global atomicAdd, NOT block-per-pack. A single
@@ -91,15 +112,75 @@ const char *cvfem_cuda_jac_variant_name(int variant);
 // element_slots is [64 * nelements] precomputed global BSR block ids.
 int cvfem_cuda_bsr_attach(cvfem_cuda_ctx *ctx, ptrdiff_t nnz,
                           const int32_t *elements_global_flat,
-                          const int32_t *element_slots);
+                          const int32_t *element_slots,
+                          const int32_t *rowptr, const int32_t *colidx);
 
 int cvfem_cuda_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
                         int variant, int block_size, void *stream);
 
 int cvfem_cuda_download_values(cvfem_cuda_ctx *ctx, double *values);
 
+// ---- cuSPARSE BSR SpMV -------------------------------------------------------
+//
+// y = J v using the assembled matrix, as the reference point for the matrix-free
+// Jacobian action. The layouts already line up: the BSR blocks are row-major 4x4 (so
+// CUSPARSE_DIRECTION_ROW) and the vectors are interleaved node-major, which is exactly
+// what bsrmv wants for a block dimension of 4.
+//
+// Call cvfem_cuda_assemble first; this multiplies whatever is in the values array.
+// Result goes to the same device residual buffer the other operators write.
+int cvfem_cuda_spmv(cvfem_cuda_ctx *ctx, void *stream);
+
+double cvfem_cuda_time_spmv(cvfem_cuda_ctx *ctx, int repeat);
+
+// Coloured assembly: one kernel launch per colour, no atomics anywhere.
+//
+// Two packs of the same colour share no nodes (that is what the colouring guarantees),
+// so they can never write the same BSR block (i,j) -- a block is written only by an
+// element containing both i and j. This exists to answer one question: is assembly
+// limited by atomic throughput? Compare it against the atomic variants.
+int cvfem_cuda_coloring_attach(cvfem_cuda_ctx *ctx, int n_colors,
+                               const ptrdiff_t *pack_order, const ptrdiff_t *color_ptr);
+
+int cvfem_cuda_assemble_colored(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                int use_sympy, int block_size, void *stream);
+
+double cvfem_cuda_time_assemble_colored(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                        int use_sympy, int block_size, int repeat);
+
 double cvfem_cuda_time_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
                                 int variant, int block_size, int repeat);
+
+// ---- boundary sub-control-surface terms -------------------------------------
+//
+// Element-parallel over a HOST-BUILT list of boundary elements. The host predicate
+// hex8_face_on_domain is false for essentially every interior element, so launching
+// over all elements would waste almost the whole grid; the list is built once.
+int cvfem_cuda_boundary_attach(cvfem_cuda_ctx *ctx, ptrdiff_t n_boundary,
+                               const int32_t *boundary_elems,
+                               const double *px, const double *py, const double *pz,
+                               double Lx, double Ly, double Lz);
+
+// Adds the boundary contribution into the residual already in the context, so call it
+// after cvfem_cuda_residual.
+int cvfem_cuda_boundary_residual(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                 int block_size, void *stream);
+
+// Adds the boundary contribution to y = J v already in the context.
+int cvfem_cuda_boundary_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                        int block_size, void *stream);
+
+// Adds the boundary contribution into the assembled BSR values.
+int cvfem_cuda_boundary_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                 int block_size, void *stream);
+
+// ---- Rhie-Chow: nodal pressure gradient -------------------------------------
+//
+// Volume-weighted average of the element pressure gradient at each node, in two passes:
+// accumulate, then divide by the accumulated volume. Needs cvfem_cuda_boundary_attach
+// for the coordinates. Writes into device buffers the context owns.
+int cvfem_cuda_nodal_p_grad(cvfem_cuda_ctx *ctx, int block_size, void *stream);
+int cvfem_cuda_download_p_grad(cvfem_cuda_ctx *ctx, double *pgx, double *pgy, double *pgz);
 
 int cvfem_cuda_synchronize(void);
 

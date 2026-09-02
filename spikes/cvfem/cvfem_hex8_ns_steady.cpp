@@ -76,6 +76,7 @@ struct MeshData {
 
 #include "cvfem_hex8_ns_packed.hpp"
 #include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "cvfem_hex8_boundary_scs.hpp"
 
 struct BSR4 {
     std::shared_ptr<smesh::Mesh::NodeToNodeGraph> graph;
@@ -139,10 +140,6 @@ static bool parse_case(const std::string &name, FlowCase &out) {
     return false;
 }
 
-static SFEM_INLINE bool on_plane(const scalar_t c, const scalar_t value, const scalar_t L) {
-    const scalar_t tol = scalar_t(1e-8) * std::max(L, scalar_t(1));
-    return std::fabs(c - value) <= tol;
-}
 
 static void exact_state(const FlowCase flow,
                         const scalar_t mu,
@@ -264,13 +261,6 @@ static SFEM_INLINE void gather_element_coords(const MeshData               &d,
     }
 }
 
-static SFEM_INLINE void cvfem_hex8_grad_scalar(const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
-                                               const scalar_t *const SFEM_RESTRICT p, scalar_t &gx, scalar_t &gy,
-                                               scalar_t &gz) {
-    scalar_t dr, ds, dt;
-    cvfem_hex8_face_diff(p, dr, ds, dt);
-    cvfem_hex8_pushforward(adj, scalar_t(1) / det, dr, ds, dt, gx, gy, gz);
-}
 
 /* Nodal ∇p (volume-weighted element gradients). Element-local ∇p makes
    (p_j-p_i)-∇p_el·Δx vanish for any field that is linear on a HEX8, including the
@@ -341,256 +331,6 @@ static SFEM_INLINE void gather_element_pgrad(const MeshData               &d,
     }
 }
 
-static constexpr int CVFEM_HEX8_BFACE_NODES[6][4] = {{0, 3, 7, 4},
-                                                     {1, 2, 6, 5},
-                                                     {0, 1, 5, 4},
-                                                     {3, 2, 6, 7},
-                                                     {0, 1, 2, 3},
-                                                     {4, 5, 6, 7}};
-static constexpr int CVFEM_HEX8_BFACE_AXIS[6]     = {0, 0, 1, 1, 2, 2};
-static constexpr scalar_t CVFEM_HEX8_BFACE_OUT[6] = {-1, 1, -1, 1, -1, 1};
-static constexpr scalar_t CVFEM_HEX8_BFACE_XI[6][4][3] = {
-        {{0, scalar_t(0.25), scalar_t(0.25)},
-         {0, scalar_t(0.75), scalar_t(0.25)},
-         {0, scalar_t(0.75), scalar_t(0.75)},
-         {0, scalar_t(0.25), scalar_t(0.75)}},
-        {{1, scalar_t(0.25), scalar_t(0.25)},
-         {1, scalar_t(0.75), scalar_t(0.25)},
-         {1, scalar_t(0.75), scalar_t(0.75)},
-         {1, scalar_t(0.25), scalar_t(0.75)}},
-        {{scalar_t(0.25), 0, scalar_t(0.25)},
-         {scalar_t(0.75), 0, scalar_t(0.25)},
-         {scalar_t(0.75), 0, scalar_t(0.75)},
-         {scalar_t(0.25), 0, scalar_t(0.75)}},
-        {{scalar_t(0.25), 1, scalar_t(0.25)},
-         {scalar_t(0.75), 1, scalar_t(0.25)},
-         {scalar_t(0.75), 1, scalar_t(0.75)},
-         {scalar_t(0.25), 1, scalar_t(0.75)}},
-        {{scalar_t(0.25), scalar_t(0.25), 0},
-         {scalar_t(0.75), scalar_t(0.25), 0},
-         {scalar_t(0.75), scalar_t(0.75), 0},
-         {scalar_t(0.25), scalar_t(0.75), 0}},
-        {{scalar_t(0.25), scalar_t(0.25), 1},
-         {scalar_t(0.75), scalar_t(0.25), 1},
-         {scalar_t(0.75), scalar_t(0.75), 1},
-         {scalar_t(0.25), scalar_t(0.75), 1}}};
-
-static SFEM_INLINE int hex8_face_on_domain(const int f, const scalar_t *const SFEM_RESTRICT x,
-                                           const scalar_t *const SFEM_RESTRICT y, const scalar_t *const SFEM_RESTRICT z,
-                                           const scalar_t Lx, const scalar_t Ly, const scalar_t Lz) {
-    const int      axis  = CVFEM_HEX8_BFACE_AXIS[f];
-    const scalar_t L     = axis == 0 ? Lx : (axis == 1 ? Ly : Lz);
-    const scalar_t plane = CVFEM_HEX8_BFACE_OUT[f] < 0 ? scalar_t(0) : L;
-    for (int k = 0; k < 4; ++k) {
-        const int      a = CVFEM_HEX8_BFACE_NODES[f][k];
-        const scalar_t c = axis == 0 ? x[a] : (axis == 1 ? y[a] : z[a]);
-        if (!on_plane(c, plane, L)) return 0;
-    }
-    return 1;
-}
-
-template <bool Atomic>
-static SFEM_INLINE void hex8_visc_jac_row(const scalar_t mu, const scalar_t ax, const scalar_t ay, const scalar_t az,
-                                          const scalar_t w[][3], const int row, const smesh::count_t *const SFEM_RESTRICT slots,
-                                          scalar_t *const SFEM_RESTRICT values) {
-    for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
-        const scalar_t wx  = w[k][0];
-        const scalar_t wy  = w[k][1];
-        const scalar_t wz  = w[k][2];
-        const scalar_t d00 = -(scalar_t(2) * wx * ax + wy * ay + wz * az) * mu;
-        const scalar_t d01 = -(wx * ay) * mu;
-        const scalar_t d02 = -(wx * az) * mu;
-        const scalar_t d10 = -(wy * ax) * mu;
-        const scalar_t d11 = -(wx * ax + scalar_t(2) * wy * ay + wz * az) * mu;
-        const scalar_t d12 = -(wy * az) * mu;
-        const scalar_t d20 = -(wz * ax) * mu;
-        const scalar_t d21 = -(wz * ay) * mu;
-        const scalar_t d22 = -(wx * ax + wy * ay + scalar_t(2) * wz * az) * mu;
-        cvfem_hex8_bsr_acc_mom<Atomic>(values, slots[row * 8 + k], d00, d01, d02, d10, d11, d12, d20, d21, d22);
-    }
-}
-
-static SFEM_INLINE void boundary_scs_add_residual(const scalar_t rho, const scalar_t mu, const int isoparam, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
-                                                  const scalar_t Lx, const scalar_t Ly, const scalar_t Lz,
-                                                  const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
-                                                  const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
-                                                  const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
-                                                  const scalar_t *const SFEM_RESTRICT p, scalar_t *const SFEM_RESTRICT r) {
-    scalar_t grad_el[9];
-    scalar_t A[3][3];
-    if (!isoparam) {
-        if (std::fabs(det) < scalar_t(1e-30)) return;
-        cvfem_hex8_grad_sumfact(adj, det, ux, uy, uz, grad_el);
-        cvfem_hex8_dir_areas(adj, A);
-    }
-
-    for (int f = 0; f < 6; ++f) {
-        if (!hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)) continue;
-        const int      axis = CVFEM_HEX8_BFACE_AXIS[f];
-        const scalar_t out  = CVFEM_HEX8_BFACE_OUT[f];
-        for (int k = 0; k < 4; ++k) {
-            const int i = CVFEM_HEX8_BFACE_NODES[f][k];
-            scalar_t  ax, ay, az, grad[9];
-            if (isoparam) {
-                scalar_t dN[CVFEM_HEX8_N_NODES][3];
-                cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
-                scalar_t adj[9], det;
-                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
-                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
-                if (std::fabs(det) < scalar_t(1e-30)) continue;
-                cvfem_hex8_area_dir(adj, axis, ax, ay, az);
-                ax *= out;
-                ay *= out;
-                az *= out;
-                cvfem_hex8_grad_at(adj, det, dN, ux, uy, uz, grad);
-            } else {
-                ax = out * A[axis][0];
-                ay = out * A[axis][1];
-                az = out * A[axis][2];
-                for (int c = 0; c < 9; ++c) grad[c] = grad_el[c];
-            }
-            scalar_t tau_x, tau_y, tau_z;
-            cvfem_hex8_traction(mu, grad[0], grad[1], grad[2], grad[3], grad[4], grad[5], grad[6], grad[7], grad[8], ax, ay, az,
-                                tau_x, tau_y, tau_z);
-            const scalar_t mdot = rho * (ux[i] * ax + uy[i] * ay + uz[i] * az);
-            r[i * 4 + 0] += mdot * ux[i] + p[i] * ax - tau_x;
-            r[i * 4 + 1] += mdot * uy[i] + p[i] * ay - tau_y;
-            r[i * 4 + 2] += mdot * uz[i] + p[i] * az - tau_z;
-            r[i * 4 + 3] += mdot;
-        }
-    }
-}
-
-template <bool Atomic>
-static SFEM_INLINE void boundary_scs_add_jacobian(const scalar_t rho, const scalar_t mu, const int isoparam, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
-                                                 const scalar_t Lx, const scalar_t Ly, const scalar_t Lz,
-                                                 const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
-                                                 const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
-                                                 const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
-                                                 const smesh::count_t *const SFEM_RESTRICT slots, scalar_t *const SFEM_RESTRICT values) {
-    scalar_t A[3][3];
-    scalar_t w_el[CVFEM_HEX8_N_NODES][3];
-    if (!isoparam) {
-        if (std::fabs(det) < scalar_t(1e-30)) return;
-        cvfem_hex8_dir_areas(adj, A);
-        const scalar_t inv_det = scalar_t(1) / det;
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            cvfem_hex8_pushforward(adj, inv_det, CVFEM_HEX8_DN_REF[a][0], CVFEM_HEX8_DN_REF[a][1], CVFEM_HEX8_DN_REF[a][2],
-                                   w_el[a][0], w_el[a][1], w_el[a][2]);
-        }
-    }
-
-    for (int f = 0; f < 6; ++f) {
-        if (!hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)) continue;
-        const int      axis = CVFEM_HEX8_BFACE_AXIS[f];
-        const scalar_t out  = CVFEM_HEX8_BFACE_OUT[f];
-        for (int k = 0; k < 4; ++k) {
-            const int i = CVFEM_HEX8_BFACE_NODES[f][k];
-            scalar_t  ax, ay, az;
-            scalar_t  w[CVFEM_HEX8_N_NODES][3];
-            if (isoparam) {
-                scalar_t dN[CVFEM_HEX8_N_NODES][3];
-                cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
-                scalar_t adj[9], det;
-                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
-                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
-                if (std::fabs(det) < scalar_t(1e-30)) continue;
-                cvfem_hex8_area_dir(adj, axis, ax, ay, az);
-                ax *= out;
-                ay *= out;
-                az *= out;
-                const scalar_t inv_det = scalar_t(1) / det;
-                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    cvfem_hex8_pushforward(adj, inv_det, dN[a][0], dN[a][1], dN[a][2], w[a][0], w[a][1], w[a][2]);
-                }
-            } else {
-                ax = out * A[axis][0];
-                ay = out * A[axis][1];
-                az = out * A[axis][2];
-                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    w[a][0] = w_el[a][0];
-                    w[a][1] = w_el[a][1];
-                    w[a][2] = w_el[a][2];
-                }
-            }
-
-            hex8_visc_jac_row<Atomic>(mu, ax, ay, az, w, i, slots, values);
-
-            const scalar_t un   = ux[i] * ax + uy[i] * ay + uz[i] * az;
-            const scalar_t mdot = rho * un;
-            const smesh::count_t sii = slots[i * 8 + i];
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 0, rho * ax * ux[i] + mdot);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 1, rho * ay * ux[i]);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 2, rho * az * ux[i]);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 0, 3, ax);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 0, rho * ax * uy[i]);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 1, rho * ay * uy[i] + mdot);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 2, rho * az * uy[i]);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 1, 3, ay);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 0, rho * ax * uz[i]);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 1, rho * ay * uz[i]);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 2, rho * az * uz[i] + mdot);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 2, 3, az);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 0, rho * ax);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 1, rho * ay);
-            cvfem_hex8_bsr_acc<Atomic>(values, sii, 3, 2, rho * az);
-        }
-    }
-}
-
-static SFEM_INLINE void boundary_scs_add_jacobian_action(const scalar_t rho, const scalar_t mu, const int isoparam,
-                                                         const scalar_t *const SFEM_RESTRICT adj, const scalar_t det, const scalar_t Lx, const scalar_t Ly,
-                                                         const scalar_t Lz, const scalar_t *const SFEM_RESTRICT x,
-                                                         const scalar_t *const SFEM_RESTRICT y, const scalar_t *const SFEM_RESTRICT z,
-                                                         const scalar_t *const SFEM_RESTRICT ux, const scalar_t *const SFEM_RESTRICT uy,
-                                                         const scalar_t *const SFEM_RESTRICT uz, const scalar_t *const SFEM_RESTRICT vx,
-                                                         const scalar_t *const SFEM_RESTRICT vy, const scalar_t *const SFEM_RESTRICT vz,
-                                                         const scalar_t *const SFEM_RESTRICT q, scalar_t *const SFEM_RESTRICT r) {
-    scalar_t dgrad_el[9];
-    scalar_t A[3][3];
-    if (!isoparam) {
-        if (std::fabs(det) < scalar_t(1e-30)) return;
-        cvfem_hex8_grad_sumfact(adj, det, vx, vy, vz, dgrad_el);
-        cvfem_hex8_dir_areas(adj, A);
-    }
-
-    for (int f = 0; f < 6; ++f) {
-        if (!hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)) continue;
-        const int      axis = CVFEM_HEX8_BFACE_AXIS[f];
-        const scalar_t out  = CVFEM_HEX8_BFACE_OUT[f];
-        for (int k = 0; k < 4; ++k) {
-            const int i = CVFEM_HEX8_BFACE_NODES[f][k];
-            scalar_t  ax, ay, az, dgrad[9];
-            if (isoparam) {
-                scalar_t dN[CVFEM_HEX8_N_NODES][3];
-                cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
-                scalar_t adj[9], det;
-                cvfem_hex8_geom_at(x, y, z, CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1],
-                                   CVFEM_HEX8_BFACE_XI[f][k][2], adj, &det);
-                if (std::fabs(det) < scalar_t(1e-30)) continue;
-                cvfem_hex8_area_dir(adj, axis, ax, ay, az);
-                ax *= out;
-                ay *= out;
-                az *= out;
-                cvfem_hex8_grad_at(adj, det, dN, vx, vy, vz, dgrad);
-            } else {
-                ax = out * A[axis][0];
-                ay = out * A[axis][1];
-                az = out * A[axis][2];
-                for (int c = 0; c < 9; ++c) dgrad[c] = dgrad_el[c];
-            }
-            scalar_t dtx, dty, dtz;
-            cvfem_hex8_traction(mu, dgrad[0], dgrad[1], dgrad[2], dgrad[3], dgrad[4], dgrad[5], dgrad[6], dgrad[7], dgrad[8], ax,
-                                ay, az, dtx, dty, dtz);
-            const scalar_t mdot  = rho * (ux[i] * ax + uy[i] * ay + uz[i] * az);
-            const scalar_t dmdot = rho * (vx[i] * ax + vy[i] * ay + vz[i] * az);
-            r[i * 4 + 0] += dmdot * ux[i] + mdot * vx[i] + q[i] * ax - dtx;
-            r[i * 4 + 1] += dmdot * uy[i] + mdot * vy[i] + q[i] * ay - dty;
-            r[i * 4 + 2] += dmdot * uz[i] + mdot * vz[i] + q[i] * az - dtz;
-            r[i * 4 + 3] += dmdot;
-        }
-    }
-}
 
 static SFEM_INLINE void gather_element_dir(const MeshData &d, const ptrdiff_t e, const scalar_t *const SFEM_RESTRICT dir,
                                            scalar_t *const SFEM_RESTRICT vx, scalar_t *const SFEM_RESTRICT vy,
@@ -690,7 +430,7 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r, rc);
-        boundary_scs_add_residual(rho, mu, 1, nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
+        boundary_scs_add_residual(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -788,7 +528,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values, rc,
                                                               p);
-        boundary_scs_add_jacobian<true>(rho, mu, 1, nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64,
+        boundary_scs_add_jacobian<true>(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64,
                                         values);
     }
 }
@@ -873,7 +613,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, x, y, z, ux, uy, uz, vx, vy, vz, q, r, rc, p);
-        boundary_scs_add_jacobian_action(rho, mu, 1, nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r);
+        boundary_scs_add_jacobian_action(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
@@ -1151,10 +891,10 @@ static void mark_constraints(const MeshData        &d,
         bc[(size_t)i * 4 + 2] = uz;
         bc[(size_t)i * 4 + 3] = p;
 
-        const bool wall_y = on_plane(y, 0, d.Ly) || on_plane(y, d.Ly, d.Ly);
-        const bool inlet  = on_plane(x, 0, d.Lx);
+        const bool wall_y = on_plane(y, scalar_t(0), d.Ly) || on_plane(y, d.Ly, d.Ly);
+        const bool inlet  = on_plane(x, scalar_t(0), d.Lx);
         const bool outlet = on_plane(x, d.Lx, d.Lx);
-        const bool span   = on_plane(z, 0, d.Lz) || on_plane(z, d.Lz, d.Lz);
+        const bool span   = on_plane(z, scalar_t(0), d.Lz) || on_plane(z, d.Lz, d.Lz);
 
         if (wall_y) {
             constrained[(size_t)i * 4 + 0] = 1;
