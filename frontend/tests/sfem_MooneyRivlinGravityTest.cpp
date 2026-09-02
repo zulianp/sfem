@@ -684,6 +684,14 @@ int test_mooney_rivlin_gravity() {
 
     // Operator
     auto op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
+    int SFEM_ENABLE_HISTORY_REPLAY = 0;
+    SFEM_READ_ENV(SFEM_ENABLE_HISTORY_REPLAY, atoi);
+    std::shared_ptr<sfem::MooneyRivlinVisco> replay_op;
+    if (SFEM_ENABLE_HISTORY_REPLAY) {
+        replay_op = std::make_shared<sfem::MooneyRivlinVisco>(fs);
+        op->set_history_storage(smesh::TypeToEnum<real_t>::value());
+        op->set_history_scaling(false);
+    }
 
     // LumpedMass
     auto mass_op = sfem::create_op(fs, "LumpedMass", es);
@@ -702,9 +710,15 @@ int test_mooney_rivlin_gravity() {
     op->set_C10(SFEM_C10);
     op->set_C01(SFEM_C01);
     op->set_K(SFEM_BULK_MODULUS);
+    if (replay_op) {
+        replay_op->set_C10(SFEM_C10);
+        replay_op->set_C01(SFEM_C01);
+        replay_op->set_K(SFEM_BULK_MODULUS);
+    }
 
     real_t dt = SFEM_DT;
     op->set_dt(dt);
+    if (replay_op) replay_op->set_dt(dt);
 
     int SFEM_ENABLE_CONTACT = false;
     SFEM_READ_ENV(SFEM_ENABLE_CONTACT, atoi);
@@ -726,6 +740,11 @@ int test_mooney_rivlin_gravity() {
         op->set_wlf_params(SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF);
         op->set_temperature(SFEM_TEMPERATURE);
         op->enable_wlf(true);
+        if (replay_op) {
+            replay_op->set_wlf_params(SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF);
+            replay_op->set_temperature(SFEM_TEMPERATURE);
+            replay_op->enable_wlf(true);
+        }
         printf("WLF enabled: C1=%.4f, C2=%.4f, T_ref=%.2f, T=%.2f\n", SFEM_WLF_C1, SFEM_WLF_C2, SFEM_WLF_T_REF, SFEM_TEMPERATURE);
         fflush(stdout);
     }
@@ -776,6 +795,11 @@ int test_mooney_rivlin_gravity() {
     op->initialize();
     op->initialize_history();
     f->add_operator(op);
+    if (replay_op) {
+        replay_op->set_prony_terms((int)g_prony.size(), g_prony.data(), tau_prony.data());
+        replay_op->initialize();
+        replay_op->initialize_history();
+    }
 
     // Read contact direction early (needed for BC selection)
     int SFEM_CONTACT_DIR = 2;  // Contact direction: 0=x, 1=y, 2=z
@@ -914,6 +938,61 @@ int test_mooney_rivlin_gravity() {
     bool SFEM_ENABLE_OUTPUT = false;
     SFEM_READ_ENV(SFEM_ENABLE_OUTPUT, atoi);
     auto output = create_output(f, smesh::Path("test_mooney_rivlin_gravity"));
+
+    FILE *replay_csv = nullptr;
+    std::vector<real_t> reference_history;
+    std::vector<real_t> candidate_history;
+    std::vector<real_t> previous_history_error;
+    auto record_replay = [&](const real_t replay_time) {
+        op->copy_history(reference_history.data());
+        replay_op->copy_history(candidate_history.data());
+
+        real_t max_abs_error = 0;
+        real_t error_l2_sq = 0;
+        real_t reference_l2_sq = 0;
+        real_t max_abs_quantization_forcing = 0;
+        real_t quantization_forcing_l2_sq = 0;
+        const auto &alpha = op->get_prony_alpha();
+
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)reference_history.size(); ++i) {
+            const real_t error = candidate_history[i] - reference_history[i];
+            const real_t forcing = error - alpha[(i / 6) % alpha.size()] * previous_history_error[i];
+            max_abs_error = std::max(max_abs_error, std::abs(error));
+            max_abs_quantization_forcing = std::max(max_abs_quantization_forcing, std::abs(forcing));
+            error_l2_sq += error * error;
+            reference_l2_sq += reference_history[i] * reference_history[i];
+            quantization_forcing_l2_sq += forcing * forcing;
+            previous_history_error[i] = error;
+        }
+
+        const real_t relative_l2_error = reference_l2_sq > 0 ? std::sqrt(error_l2_sq / reference_l2_sq) : 0;
+        fprintf(replay_csv,
+                "%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n",
+                (double)replay_time,
+                (double)max_abs_error,
+                (double)std::sqrt(error_l2_sq),
+                (double)relative_l2_error,
+                (double)max_abs_quantization_forcing,
+                (double)std::sqrt(quantization_forcing_l2_sq));
+        fflush(replay_csv);
+    };
+
+    if (replay_op) {
+        const ptrdiff_t history_size = op->get_history_size();
+        if (history_size != replay_op->get_history_size()) return SFEM_TEST_FAILURE;
+        reference_history.resize(history_size);
+        candidate_history.resize(history_size);
+        previous_history_error.assign(history_size, 0);
+        replay_csv = fopen("test_mooney_rivlin_gravity/history_replay.csv", "w");
+        if (!replay_csv) return SFEM_TEST_FAILURE;
+        fprintf(replay_csv,
+                "time,max_abs_error,l2_error,relative_l2_error,max_abs_quantization_forcing,quantization_forcing_l2\n");
+        record_replay(0);
+        printf("History replay enabled: reference=%s, candidate=%s, scaling=%s\n",
+               smesh::to_string(op->get_history_storage()).data(),
+               smesh::to_string(replay_op->get_history_storage()).data(),
+               replay_op->get_history_scaling_mode().c_str());
+    }
 
     // Newmark state
     auto v      = sfem::create_buffer<real_t>(ndofs, es);
@@ -1413,8 +1492,12 @@ int test_mooney_rivlin_gravity() {
             v->data()[i] = v_pred->data()[i] + gamma_nm * dt * a->data()[i];
         }
 
-        // Update history
+        // Update the coupled reference, then replay the same converged displacement in the shadow history.
         op->update_history(x->data());
+        if (replay_op) {
+            replay_op->update_history(x->data());
+            record_replay(t + dt);
+        }
 
         t += dt;
         steps++;
@@ -1430,6 +1513,7 @@ int test_mooney_rivlin_gravity() {
 
     printf("===== Test Completed =====\n");
     printf("Total Hessian assembly time: %.3f s\n", total_hessian_time);
+    if (replay_csv) fclose(replay_csv);
     return SFEM_TEST_SUCCESS;
 }
 

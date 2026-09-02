@@ -598,6 +598,50 @@ namespace sfem {
         return impl_->history_n_qp;
     }
 
+    ptrdiff_t MooneyRivlinVisco::get_history_size() const {
+        return impl_->history_buffer ? impl_->history_buffer->size() : 0;
+    }
+
+    int MooneyRivlinVisco::copy_history(real_t *out) const {
+        if (!impl_->history_buffer) return SFEM_FAILURE;
+
+        const ptrdiff_t n = impl_->history_buffer->size();
+        const int n_terms = impl_->num_active_terms;
+        const int n_qp = impl_->history_n_qp;
+        const float *scales = impl_->history_scale_buffer ? impl_->history_scale_buffer->data() : nullptr;
+
+        auto copy = [&](const auto *history) {
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                real_t scale = 1;
+                if (scales) {
+                    const ptrdiff_t tensor = i / 6;
+                    const ptrdiff_t element = tensor / (n_qp * n_terms);
+                    const ptrdiff_t qp = (tensor / n_terms) % n_qp;
+                    const ptrdiff_t prony = tensor % n_terms;
+                    const ptrdiff_t scale_idx = impl_->history_scaling_mode == "element_prony"
+                                                        ? element * n_terms + prony
+                                                        : (element * n_qp + qp) * n_terms + prony;
+                    scale = scales[scale_idx];
+                }
+                out[i] = scale * static_cast<real_t>(history[i]);
+            }
+        };
+
+        if (impl_->history_storage == smesh::SMESH_FLOAT16) {
+            copy(static_cast<const smesh::f16 *>(impl_->history_buffer->void_data()));
+        } else if (impl_->history_storage == smesh::SMESH_FLOAT32) {
+            copy(static_cast<const float *>(impl_->history_buffer->void_data()));
+        } else {
+            copy(static_cast<const real_t *>(impl_->history_buffer->void_data()));
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    const std::vector<real_t> &MooneyRivlinVisco::get_prony_alpha() const {
+        return impl_->prony_alpha;
+    }
+
     smesh::PrimitiveType MooneyRivlinVisco::get_history_storage() const {
         return impl_->history_storage;
     }

@@ -59,6 +59,9 @@ namespace sfem {
         real_t get_gamma() const;
         int get_num_active_terms() const;
         int get_history_n_qp() const;
+        ptrdiff_t get_history_size() const;
+        int copy_history(real_t *out) const;
+        const std::vector<real_t> &get_prony_alpha() const;
         smesh::PrimitiveType get_history_storage() const;
         bool get_history_scaling() const;
         const std::string &get_history_scaling_mode() const;
