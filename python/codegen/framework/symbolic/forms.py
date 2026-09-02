@@ -156,6 +156,18 @@ class FormCollection(FormCollectionMixin):
     qualifiers: tuple = ()
     dependencies: object = None
     blocks: tuple = ()
+    # The lowered residual field records, carrying the value, gradient, test,
+    # previous and direction symbols that downstream planning needs.  These used
+    # to be reached through `source`, i.e. by holding on to the pre-lowering
+    # system; carrying them explicitly is what lets the planning layer stop
+    # doing that.
+    residual_fields: tuple = ()
+    parameters: tuple = ()
+    # Back-pointer to the system this collection was lowered from.  Only the
+    # emission path still reads it, because the residual emitters take a
+    # CoupledResidualSystem as their argument.  Inverting that interface (S5)
+    # removes the last reader and this field goes with it.  Nothing in the
+    # planning layer may use it.
     source: object = None
     metadata: tuple = ()
 
@@ -211,6 +223,8 @@ class FormCollection(FormCollectionMixin):
         qualifiers=(),
         dependencies=None,
         blocks=(),
+        residual_fields=(),
+        parameters=(),
         source=None,
         metadata=(),
     ):
@@ -226,6 +240,8 @@ class FormCollection(FormCollectionMixin):
             tuple(qualifiers),
             dependencies,
             tuple(blocks),
+            tuple(residual_fields),
+            tuple(parameters),
             source,
             tuple(metadata),
         )

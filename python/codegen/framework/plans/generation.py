@@ -914,14 +914,14 @@ def _specialize_local_phase_for_context(phase, block, collection, context, basis
 def _local_phase_transformations(phase, block, collection, context):
     if phase.phase is not LocalPhase.TRANSFORM_REFERENCE:
         return ()
-    system = getattr(collection, "source", None)
-    if system is None:
+    residual_fields = getattr(collection, "residual_fields", ())
+    if not residual_fields:
         return ()
     form_block = _form_block_for_plan(collection, block)
     if form_block is None:
         return ()
     transform = simplex_gradient_metric_transformation(
-        system,
+        residual_fields,
         context.affine_specialization.quadrature_rule,
         form_block.coefficients,
         form_block.dependencies,

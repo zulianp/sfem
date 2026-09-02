@@ -676,6 +676,8 @@ def _build_form_collection(system, equation, orders):
             else None,
             blocks=blocks,
             qualifiers=_equation_qualifiers(equation),
+            residual_fields=tuple(residual_system.fields),
+            parameters=tuple(residual_system.parameters or ()),
             source=residual_system,
             metadata=tuple(residual_metadata),
         )

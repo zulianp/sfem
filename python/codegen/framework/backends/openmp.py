@@ -775,9 +775,14 @@ def _diagonal_block_model(unit, collection, context):
     )
     specialization = emission_plan.isoparametric_specialization
     affine_specialization = emission_plan.affine_specialization
-    system = CoupledResidualSystem(collection.source.dim)
-    if collection.source.parameters:
-        system.add_parameters(*collection.source.parameters)
+    # A residual emitter takes a CoupledResidualSystem, so a diagonal block has
+    # to be handed one.  Building it from the collection's own lowered data --
+    # rather than from a back-pointer to the system the collection came from --
+    # is what closes this boundary.  The synthetic system itself only disappears
+    # once the emitter takes a plan instead (S5).
+    system = CoupledResidualSystem(_collection_dim(collection))
+    if collection.parameters:
+        system.add_parameters(*collection.parameters)
     for component, component_name in enumerate(_component_field_names(field)):
         lowered = system.add_field(
             component_name,
@@ -819,13 +824,47 @@ def _coefficients_for_unit(unit, collection, order):
     if not unit.is_block:
         return expression_plan.coefficients
     if unit.block.form_order is not order:
-        return _zero_coefficients(collection.source)
+        return _zero_coefficients_for_collection(collection)
     if not expression_plan.coefficients:
         raise ValueError(
             "block kernel '%s' has no coefficient sets for '%s'"
             % (unit.name, unit.block.name)
         )
-    return _selected_row_coefficients(collection.source, expression_plan.coefficients)
+    return _selected_row_coefficients_for_collection(collection, expression_plan.coefficients)
+
+
+def _collection_dim(collection):
+    """Spatial dimension of a lowered residual collection."""
+    for field in collection.residual_fields:
+        return field.dim
+    raise ValueError(
+        "form collection '%s' carries no lowered residual fields" % collection.equation_name
+    )
+
+
+def _zero_coefficients_for_collection(collection):
+    dim = _collection_dim(collection)
+    return tuple(
+        WeakResidualCoefficients(
+            field.name,
+            sp.S.Zero,
+            tuple(sp.S.Zero for _ in range(dim)),
+        )
+        for field in collection.residual_fields
+    )
+
+
+def _selected_row_coefficients_for_collection(collection, coefficients):
+    selected = list(_zero_coefficients_for_collection(collection))
+    by_name = {field.name: index for index, field in enumerate(collection.residual_fields)}
+    for coefficient in coefficients:
+        try:
+            selected[by_name[coefficient.row_field]] = coefficient
+        except KeyError:
+            raise ValueError(
+                "row field '%s' is not in residual system" % coefficient.row_field
+            )
+    return tuple(selected)
 
 
 def _zero_coefficients(system):
@@ -839,14 +878,3 @@ def _zero_coefficients(system):
     )
 
 
-def _selected_row_coefficients(system, coefficients):
-    ret = list(_zero_coefficients(system))
-    by_name = {field.name: index for index, field in enumerate(system.fields)}
-    for coefficient in coefficients:
-        try:
-            ret[by_name[coefficient.row_field]] = coefficient
-        except KeyError:
-            raise ValueError(
-                "row field '%s' is not in residual system" % coefficient.row_field
-            )
-    return tuple(ret)

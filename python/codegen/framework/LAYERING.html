@@ -725,7 +725,8 @@
   <h3>The three rules that make the boundaries real</h3>
   <div class="col">
   <p><b>One direction.</b> Imports point up only. Enforced by a <code>tests/test_layering.py</code> that walks the AST of every module, maps it to a layer, and fails on any downward edge. This is roughly thirty lines and would fail today on six package pairs — which is exactly why it is worth having before any relocation starts.</p>
-  <p><b>Closed handoffs.</b> Every boundary artifact must survive a round trip: dump to JSON, discard the layers above it, reconstruct, run the layers below, get byte-identical output. No back-pointers, no <code>getattr(x, "source", None)</code>, no plan carrying <code>unit</code> and <code>context</code> so the consumer can reach back through it — which <code>EnergySoAKernelEmissionPlan</code> does today. This property is testable, and passing it is the definition of “the layer above is finished.”</p>
+  <p><b>Closed handoffs.</b> No back-pointers, no <code>getattr(x, "source", None)</code>, no plan carrying <code>unit</code> and <code>context</code> so the consumer can reach back through it — which <code>EnergySoAKernelEmissionPlan</code> does today.</p>
+  <p>The original wording of this rule asked every boundary artifact to survive a JSON round trip. That is wrong above L3, and S4 is where it broke: <code>FormCollection</code> carries SymPy expressions by design, and L3 is defined as the last layer permitted to hold them, so a JSON round trip is not available at the L1 boundary and never was. The rule splits in two. Above L3 the testable property is <b>severability</b>: cut the back-pointer, re-run the layers below, and get an identical result — which is exactly what <code>tests/test_form_collection_boundary.py</code> does. From L3 downward, where SymPy has ended, the JSON round trip applies as originally written.</p>
   <p><b>One dispatch axis per layer.</b> A layer may branch on the concept it owns and on nothing a layer above owns. No <code>if kind == "energy_soa"</code> in a backend; no <code>if "crs" in formats</code> in a printer; no <code>if material.name != "linear_elasticity"</code> anywhere.</p>
   </div>
 </section>
@@ -877,9 +878,12 @@
     </div></div>
 
     <div class="row"><div class="g-key">S4</div><div class="g-body">
-      <div class="g-title">Close <code>FormCollection</code></div>
-      <p>Delete <code>.source</code>. Promote what downstream actually reads off <code>CoupledResidualSystem</code> — fields, parameters, per-block coefficients — onto <code>FormCollection</code> and <code>FormBlock</code>. This deletes the fabricated system at <code>backends/openmp.py:776</code> and is the first step that makes a boundary genuinely closed. Add the JSON round-trip test for <code>FormCollection</code> here.</p>
-      <div class="evidence"><b>gate</b> byte-identical output + round-trip identity</div>
+      <div class="g-title">Close <code>FormCollection</code> <span class="tag t-ok">done for the planning layer</span></div>
+      <p><code>FormCollection</code> now carries <code>residual_fields</code> — the lowered field records with their value, gradient, test, previous and direction symbols — and <code>parameters</code>, both populated at lowering time. Everything the planning layer used to reach through the back-pointer for is now first-class data on the artifact itself.</p>
+      <p>Three reach-throughs are gone. <code>plans/generation.py</code> and <code>plans/diagnostics.py</code> no longer call <code>getattr(collection, "source", None)</code>; <code>simplex_gradient_metric_transformation</code> takes the field records instead of the whole system, which is what had forced the planning layer to hold the pointer at all; and the synthetic <code>CoupledResidualSystem</code> in <code>backends/openmp.py</code> is now built from the collection's own data rather than from the system the collection came from.</p>
+      <p><b>What is not done, and why.</b> <code>.source</code> still exists and still has one reader: the residual emitters take a <code>CoupledResidualSystem</code> as their argument, so the emission path needs it until that interface is inverted. Deleting the field is S5's to finish, not S4's — the two were more coupled than the plan assumed. What S4 can claim is that <b>the planning layer no longer reaches through it</b>, and that this is now enforced rather than asserted.</p>
+      <p><code>tests/test_form_collection_boundary.py</code> enforces it two ways: behaviourally, by building the real plans twice — once normally, once from a collection with <code>source</code> severed — and requiring identical results through the backend the generators actually use; and statically, by parsing every module under <code>plans/</code> and failing on any mention of <code>source</code> on a collection. Both were negative-tested by reintroducing the reach-through, and both caught it.</p>
+      <div class="evidence"><b>gate</b> byte-identical output (520 files) · 200 tests, failure set unchanged from S3</div>
     </div></div>
 
     <div class="row"><div class="g-key">S5</div><div class="g-body">
