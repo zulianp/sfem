@@ -14,6 +14,11 @@ from codegen.framework.plans.generation import (
 )
 from codegen.framework.plans.matrix_formats import CRSAssemblyPlan
 from codegen.framework.plans.apply_variants import precision_axis
+from codegen.framework.plans.diagnostics import (
+    jacobian_action_diagnostic_cost,
+    jacobian_block_diagnostic_cost,
+    residual_diagnostic_cost,
+)
 from codegen.framework.plans.layout import (
     _compatible_matrix_stream_indices,
     _compatible_stream_component_offsets,
@@ -4928,33 +4933,23 @@ def _residual_diagnostics_lines(system, prefix, specialization):
     diagnostics = [
         (
             "%s_residual_element_soa" % prefix,
-            build_residual_graph(system, "residual_diagnostics_tmp").cost,
+            residual_diagnostic_cost(system),
             system.residual_dependencies(),
         )
     ]
     block_expressions = system.jacobian_blocks()
     for block in block_expressions:
-        graph = (
-            build_expression_graph(
-                KernelExpressions()
-                .jacobian_action(block.expression, block.name),
-                data_symbols=system.jacobian_action_data_symbols(),
-                temporary_prefix="%s_diagnostics_tmp" % block.name,
-            )
-        )
         diagnostics.append(
             (
                 "%s_%s" % (prefix, block.name),
-                graph.cost,
+                jacobian_block_diagnostic_cost(system, block),
                 system.dependencies_for_expressions((block.expression,)),
             )
         )
     diagnostics.append(
         (
             "%s_jacobian_action_element_soa" % prefix,
-            build_jacobian_action_graph(system, 
-                temporary_prefix="jacobian_action_diagnostics_tmp"
-            ).cost,
+            jacobian_action_diagnostic_cost(system),
             system.jacobian_action_dependencies(),
         )
     )
@@ -4987,7 +4982,7 @@ def _mixed_residual_diagnostics_lines(
     diagnostics = (
         (
             "%s_%s_residual_element_soa" % (prefix, element),
-            build_residual_graph(system, "residual_diagnostics_tmp").cost,
+            residual_diagnostic_cost(system),
             residual_codegen_dependencies(
                 system,
                 residual_coeffs,
@@ -4996,9 +4991,7 @@ def _mixed_residual_diagnostics_lines(
         ),
         (
             "%s_%s_jacobian_action_element_soa" % (prefix, element),
-            build_jacobian_action_graph(system, 
-                temporary_prefix="jacobian_action_diagnostics_tmp"
-            ).cost,
+            jacobian_action_diagnostic_cost(system),
             residual_codegen_dependencies(
                 system,
                 action_coeffs,

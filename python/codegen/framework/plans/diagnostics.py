@@ -332,3 +332,51 @@ def _entry_from_expression_plan(
         reference_dataset=reference_dataset,
         block_name=block_name,
     )
+
+
+# ---------------------------------------------------------------------------
+# Cost of a residual kernel's diagnostic entries.
+#
+# Every generated kernel carries FLOP and arithmetic-intensity reporting, which
+# the PRD asks for so performance analyses can be produced automatically.  The
+# numbers come from the scheduling layer's cost model, and choosing which
+# kernels are measured and under which temporary naming is a planning decision.
+#
+# Both residual emitters computed these inline, with the same three call shapes
+# written out twice -- once in the coupled path and once in the mixed one.  The
+# temporary prefixes matter: they name the intermediates in the scheduled graph
+# and so feed into the cost, which is why they are fixed here rather than left
+# to each caller.
+# ---------------------------------------------------------------------------
+
+
+def residual_diagnostic_cost(system):
+    """Cost of evaluating the residual for one element."""
+    from codegen.framework.plans.scheduling import build_residual_graph
+
+    return build_residual_graph(system, "residual_diagnostics_tmp").cost
+
+
+def jacobian_action_diagnostic_cost(system):
+    """Cost of applying the Jacobian to one element's worth of data.
+
+    This is the matrix-free apply, the kernel the framework exists to make
+    fast, so its cost is the number most worth reporting accurately.
+    """
+    from codegen.framework.plans.scheduling import build_jacobian_action_graph
+
+    return build_jacobian_action_graph(
+        system, temporary_prefix="jacobian_action_diagnostics_tmp"
+    ).cost
+
+
+def jacobian_block_diagnostic_cost(system, block):
+    """Cost of one row/column block of the Jacobian action."""
+    from codegen.framework.symbolic.core import KernelExpressions
+    from codegen.framework.plans.scheduling import build_expression_graph
+
+    return build_expression_graph(
+        KernelExpressions().jacobian_action(block.expression, block.name),
+        data_symbols=system.jacobian_action_data_symbols(),
+        temporary_prefix="%s_diagnostics_tmp" % block.name,
+    ).cost
