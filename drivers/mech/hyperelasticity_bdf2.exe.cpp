@@ -569,6 +569,14 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
                 break;
             }
 
+            if (env.linear_op_type != sfem::op_type::MATRIX_FREE) {
+                linear_op = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
+                if (!linear_op) {
+                    SFEM_ERROR("Failed to update linear operator %s\n", env.linear_op_type.c_str());
+                    return SFEM_FAILURE;
+                }
+            }
+
             blas->zeros(ndofs, incr->data());
             f->copy_constrained_dofs(rhs->data(), incr->data());
             cg->set_op(linear_op);
