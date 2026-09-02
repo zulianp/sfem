@@ -177,3 +177,33 @@ def apply_variant_plan(
             for precision in PRECISIONS
         )
     )
+
+
+#: The scalar type each precision is emitted with.  ``double`` is the default
+#: kernel scalar type; the ``float`` variants exist so a solver can apply the
+#: operator in reduced precision, which is a bandwidth decision and therefore
+#: this layer's to make.
+PRECISION_SCALAR_TYPES = {
+    Precision.SCALAR: "double",
+    Precision.FLOAT: "float",
+}
+
+#: The name fragment each precision contributes.
+PRECISION_SUFFIXES = {
+    Precision.SCALAR: "",
+    Precision.FLOAT: "_float",
+}
+
+
+def precision_axis():
+    """``(scalar_type, name_suffix)`` for each emitted precision, in order.
+
+    Every matrix-free apply kernel is emitted once per entry.  The emitters
+    used to carry this as a literal tuple, repeated seventeen times in the
+    residual emitter alone, so adding or removing a precision meant editing
+    seventeen places and hoping none was missed.
+    """
+    return tuple(
+        (PRECISION_SCALAR_TYPES[precision], PRECISION_SUFFIXES[precision])
+        for precision in PRECISIONS
+    )
