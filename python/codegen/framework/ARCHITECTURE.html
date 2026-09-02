@@ -193,7 +193,7 @@
   <p class="standfirst">The layer graph is now clean and enforced. The layers themselves are not yet doing the jobs they are named for — one of them holds 22,970 lines that should be a printer.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 10 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 11 commits from 060684ff</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
     <span><b>Date</b> 2026-09-02</span>
   </div>
@@ -344,7 +344,7 @@
       <tr>
         <td><b>One dispatch axis</b></td>
         <td>A layer may branch on the concept it owns and on nothing a layer above owns. No <code>if kind == "energy_soa"</code> in a backend, no <code>if "crs" in formats</code> in a printer.</td>
-        <td class="m">not yet enforced — see open point 5</td>
+        <td class="m">partly: tests/test_plans_are_consumed.py pins the 13 structural plans no emitter reads, shrink-only in both directions — see open point 5</td>
       </tr>
     </tbody>
   </table>
@@ -507,10 +507,11 @@
     <div class="body">
       <div class="op-title">Move the emitters' decisions into L3 <span class="chip c-part">under way — dependency analysis done</span></div>
       <p>The root open point. <code>residual_codegen.py</code> (10,074 lines) and <code>energy_codegen.py</code> (8,483) decide loop structure, scope placement, stream layout, gather and scatter shape and geometry policy while building strings. The plan types for all of it already exist and are unread.</p>
-      <p><b>Done: the dependency-analysis family.</b> Three decisions moved up, output unchanged at each. <code>plans/streams.py</code> owns which field stream groups a kernel needs — the emitter keeps only how each is spelled in C. <code>plans/dependencies.py</code> owns dependency pruning: which roles are touched, which parameters survive, which coefficient entries are structurally zero. <code>plans/boundary_usage.py</code> owns whether a boundary form's coefficients reach for coordinates or current values, a question the emitter had been asking four times in two different shapes.</p>
-      <p>Measured effect: <b>the largest emitter now contains zero free-symbol analysis</b>, down from six references; the boundary emitter is down from eight to two, both argument validation rather than planning. <code>tests/test_emitters_do_not_analyse.py</code> pins the remainder shrink-only, with the reason each is allowed.</p>
+      <p><b>Done: the analysis family.</b> <code>plans/streams.py</code> owns which field stream groups a kernel needs — the emitter keeps only how each is spelled in C. <code>plans/dependencies.py</code> owns dependency pruning: which roles are touched, which parameters survive, which coefficient entries are structurally zero. <code>plans/boundary_usage.py</code> owns whether a boundary form's coefficients reach for coordinates or current values, a question the emitter had been asking four times in two different shapes.</p>
+      <p><b>Done: the layout family.</b> <code>plans/layout.py</code> takes 17 more functions — which shape function maps to which stream, where a field's components sit in a packed lane buffer, how tensor-product elements reorder into Cartesian order, and the mixed-order variants for Taylor–Hood. These decide the memory access pattern of every generated loop, and so whether the loads are unit stride.</p>
+      <p>Measured effect: <b>the largest emitter contains zero free-symbol analysis</b>, down from six references, and its text-free helper count has fallen from 32 to 18. <code>residual_codegen.py</code> is 9,875 lines, from 10,074. The boundary emitter is down from eight symbol scans to two, both argument validation rather than planning.</p>
       <p><b>Remaining: the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, geometry mode. These are harder because they are not analysis that can be lifted whole but structure interleaved with printing, and they are what OP 2 and OP 4 wait on.</p>
-      <div class="op-facts"><span><i>emitters</i> 18,557 LOC in two modules</span><span><i>gate</i> byte-identity holds throughout</span><span><i>still blocks</i> OP2, OP3, OP4</span></div>
+      <div class="op-facts"><span><i>emitters</i> 18,358 LOC in two modules</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP2, OP3, OP4</span></div>
     </div>
   </div>
 
