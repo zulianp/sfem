@@ -1,18 +1,11 @@
 from .symbolic import (
     DeformationGradient,
     DisplacementGradient,
-    ExpressionCost,
-    ExpressionGraph,
     ExpressionPattern,
     ExpressionRole,
-    EvaluationMetrics,
-    EvaluationPlan,
-    EvaluationStatement,
     FirstPiolaStress,
     GeometricAdjugate,
     GeometricJacobian,
-    GeneratedKernelCode,
-    GeneratedKernelFile,
     KernelExpression,
     KernelExpressions,
     KernelTemplateParameter,
@@ -20,18 +13,14 @@ from .symbolic import (
     DimensionSpecialization,
     LayoutKind,
     LinearizedTransformedFirstPiola,
-    LivenessState,
     PatternKind,
     ReferenceShapeGradient,
     ReferenceShapeGradients,
     ReferenceShapeValues,
     ExecutionScope,
     ScopeKind,
-    SfemSoAKernelForm,
-    SfemSoAWeakForm,
     SymbolicObject,
     TransformedFirstPiola,
-    build_expression_graph,
     data_layout,
     dimension_specialization,
     displacement_gradient_from_reference,
@@ -49,16 +38,29 @@ from .symbolic import (
     matrix_inner,
     matrix_symbols,
     residual_from_energy,
-    sfem_soa_adjugate_geometry_inputs,
-    sfem_soa_kernel_form,
-    sfem_soa_weak_form,
     small_strain,
     transformed_first_piola,
     vector_symbols,
     weak_gradient_from_transformed_first_piola,
     weak_hessian_action_from_linearized_transformed_first_piola,
 )
+from .plans.scheduling import (
+    EvaluationMetrics,
+    EvaluationPlan,
+    EvaluationStatement,
+    ExpressionCost,
+    ExpressionGraph,
+    LivenessState,
+    build_expression_graph,
+)
+from .emitters.artifacts import GeneratedKernelCode
+from .emitters.artifacts import GeneratedKernelFile
+from .symbolic.weak_forms import SfemSoAKernelForm
+from .symbolic.weak_forms import SfemSoAWeakForm
+from .symbolic.weak_forms import sfem_soa_kernel_form
+from .symbolic.weak_forms import sfem_soa_weak_form
 from .fem import (
+    sfem_soa_adjugate_geometry_inputs,
     SfemCompatibleElement,
     SfemElementQuadratureRule,
     SfemElementBasisPolicy,

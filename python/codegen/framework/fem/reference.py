@@ -268,17 +268,35 @@ class SfemSoAElementSpecialization:
         adjugate_name="jacobian_adjugate",
         determinant_name="jacobian_determinant",
     ):
-        try:
-            from codegen.framework.symbolic import sfem_soa_adjugate_geometry_inputs
-        except ImportError:
-            from symbolic import sfem_soa_adjugate_geometry_inputs
-
         return sfem_soa_adjugate_geometry_inputs(
             self,
             grad_ref_name=grad_ref_name,
             adjugate_name=adjugate_name,
             determinant_name=determinant_name,
         )
+
+
+def sfem_soa_adjugate_geometry_inputs(
+    specialization,
+    grad_ref_name="grad_ref",
+    adjugate_name="jacobian_adjugate",
+    determinant_name="jacobian_determinant",
+):
+    if isinstance(specialization, SfemSoAElementSpecialization):
+        dim = specialization.dim
+        n_qp = specialization.n_qp
+        n_shape = specialization.n_shape
+    elif isinstance(specialization, SfemElementQuadratureRule):
+        dim = specialization.dim
+        n_qp = specialization.n_qp
+        n_shape = specialization.n_shape
+    else:
+        raise TypeError("specialization must be SfemSoAElementSpecialization or SfemElementQuadratureRule")
+    return (
+        sfem_soa_reference_input(grad_ref_name, n_qp, n_shape, dim),
+        sfem_soa_array_input(adjugate_name, dim * dim),
+        sfem_soa_array_input(determinant_name, 1),
+    )
 
 
 def _has_mixed_order_fields(cell_element_type, field_element_types):

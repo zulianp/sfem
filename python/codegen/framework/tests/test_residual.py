@@ -17,7 +17,12 @@ from codegen.framework.emitters.residual_codegen import (
     weak_residual_coefficients,
 )
 from codegen.framework.plans.emission import emission_plan_for_element
-from codegen.framework.symbolic import ExpressionRole, sfem_element_quadrature_rule
+from codegen.framework.symbolic import ExpressionRole
+from codegen.framework.fem.reference import sfem_element_quadrature_rule
+from codegen.framework.plans.scheduling import (
+    build_jacobian_action_graph,
+    build_residual_graph,
+)
 
 
 def _element_emission_plan(element, vector_size=16, quadrature_order=None):
@@ -337,8 +342,8 @@ class CoupledResidualSystemTest(unittest.TestCase):
 
     def test_preserves_residual_and_block_identity(self):
         system, _, _ = two_field_diffusion_system()
-        residual_graph = system.build_residual_graph()
-        action_graph = system.build_jacobian_action_graph(include_blocks=True)
+        residual_graph = build_residual_graph(system)
+        action_graph = build_jacobian_action_graph(system, include_blocks=True)
 
         self.assertEqual(
             tuple(output.name for output in residual_graph.outputs),
@@ -558,7 +563,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     tuple(file.source for file in files),
                     tuple(file.source for file in regenerated),
                 )
-                residual_cost = system.build_residual_graph().cost
+                residual_cost = build_residual_graph(system).cost
                 diagnostic_match = re.search(
                     r"coupled_diffusion_%s_residual_element_soa_diagnostics_data = \{"
                     r".*?\"%s\",\s*%d,\s*\d+,\s*\d+,\s*16,\s*\d+,"
@@ -1030,7 +1035,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unregistered symbols"):
             system.add_residual(u, u.value + unknown)
         with self.assertRaisesRegex(ValueError, "missing residual equations"):
-            system.build_residual_graph()
+            build_residual_graph(system)
 
 
 if __name__ == "__main__":

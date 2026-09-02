@@ -12,39 +12,52 @@ from codegen.framework.ir.kernel_ast import (
 )
 from codegen.framework.emitters.ast_printer import CLikeKernelASTPrinter, render_kernel_ast_lines
 from codegen.framework.symbolic.core import (
-    ExpressionCost,
     ExpressionRole,
-    GeneratedKernelFile,
     KernelExpressions,
-    SfemElementQuadratureRule,
-    SfemSoAElementSpecialization,
+    _validate_diagnostics_plan_names,
+)
+from codegen.framework.plans.scheduling import (
+    ExpressionCost,
+    _prune_dead_cse_intermediates,
+)
+from codegen.framework.emitters.artifacts import (
+    GeneratedKernelFile,
+)
+from codegen.framework.emitters.cprinter import (
     _component_name,
     _cpp_argument_name,
     _cpp_macro_name,
-    _prune_dead_cse_intermediates,
     _sfem_ccode,
     _sfem_math_header_source,
-    _validate_diagnostics_plan_names,
-    isoparametric_adjugate_call_lines,
-    isoparametric_adjugate_stream_array_lines,
-    quadrature_reference_accessor,
-    quadrature_reference_struct_lines,
+)
+from codegen.framework.fem.reference import (
+    SfemElementQuadratureRule,
+    SfemSoAElementSpecialization,
     sfem_element_quadrature_rule,
     sfem_mesh_reference_data,
     sfem_soa_element_specialization,
     sfem_soa_reference_input,
     sfem_tensor_product_hex_uses_cartesian_ordering,
     sfem_tensor_product_quad_uses_cartesian_ordering,
+)
+from codegen.framework.fem.tensor_product_geometry import (
+    isoparametric_adjugate_call_lines,
+    isoparametric_adjugate_stream_array_lines,
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
     tensor_product_coordinate_gradient_lines,
     tensor_product_current_q_isoparametric_geometry_lines,
     tensor_product_gradient_isoparametric_geometry_lines,
-    validate_reference_data_plan,
 )
+from codegen.framework.emitters.quadrature_codegen import (
+    quadrature_reference_accessor,
+    quadrature_reference_struct_lines,
+)
+from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.form_transformations import (
     constant_p1_simplex_reference_gradients,
 )
+from codegen.framework.plans.scheduling import build_expression_graph
 
 
 def _default_openmp_energy_source_builder():
@@ -7360,9 +7373,9 @@ def _sfem_soa_diagnostics_lines(
                 )
             )
         diagnostic_graph = (
-            KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, diagnostic_expressions)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .add(ExpressionRole.OPERATOR_EVALUATION, diagnostic_expressions),
                 data_symbols=tuple(diagnostic_deformation_substitutions.values()),
                 temporary_prefix="weak_diag_tmp",
             )

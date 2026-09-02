@@ -15,9 +15,11 @@ from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 from codegen.framework.emitters.energy import OpenMPEnergySoAEmitter
 from codegen.framework.plans.reference_data import reference_data_plan_from_emission_plan
 from codegen.framework.emitters.boundary_codegen import generate_boundary_residual_sfem_files
-from codegen.framework.symbolic.residual import CoupledResidualSystem
-from codegen.framework.emitters.residual_codegen import (
+from codegen.framework.symbolic.residual import (
+    CoupledResidualSystem,
     WeakResidualCoefficients,
+)
+from codegen.framework.emitters.residual_codegen import (
     generate_coupled_residual_sfem_files,
     generate_mixed_residual_sfem_files,
 )

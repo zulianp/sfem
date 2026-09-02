@@ -2,7 +2,12 @@ from dataclasses import dataclass
 
 import sympy as sp
 
-from codegen.framework.symbolic.residual import CoupledResidualSystem
+from codegen.framework.symbolic.residual import (
+    CoupledResidualSystem,
+    WeakResidualCoefficients,
+    coupled_residual_weak_coefficients,
+    weak_residual_coefficients,
+)
 from codegen.framework.fem.tensor_product_geometry import (
     isoparametric_adjugate_call_lines,
     isoparametric_adjugate_stream_array_lines,
@@ -41,9 +46,15 @@ from codegen.framework.plans.form_transformations import (
     symmetric_metric_storage_component_index,
 )
 from codegen.framework.symbolic.core import (
-    GeneratedKernelFile,
     KernelExpressions,
+)
+from codegen.framework.plans.scheduling import (
     _prune_dead_cse_intermediates,
+)
+from codegen.framework.emitters.artifacts import (
+    GeneratedKernelFile,
+)
+from codegen.framework.emitters.cprinter import (
     _sfem_ccode,
     _sfem_math_header_source,
 )
@@ -51,6 +62,11 @@ from codegen.framework.emitters.energy_codegen import (
     _sfem_soa_diagnostic_print_wrapper_lines,
     _sfem_soa_diagnostics_header,
     _sfem_packed_thread_scratch_header_source,
+)
+from codegen.framework.plans.scheduling import build_expression_graph
+from codegen.framework.plans.scheduling import (
+    build_jacobian_action_graph,
+    build_residual_graph,
 )
 
 
@@ -980,11 +996,6 @@ def _field_atomic_scatter_lines(system, indent, element_array="elements"):
     ]
 
 
-@dataclass(frozen=True)
-class WeakResidualCoefficients:
-    row_field: str
-    value: sp.Expr
-    gradient: tuple
 
 
 @dataclass(frozen=True)
@@ -1626,54 +1637,8 @@ def _mixed_field_atomic_scatter_lines(system, layout, indent, field_element_arra
     return lines
 
 
-def weak_residual_coefficients(system, expression, row_field):
-    field = system.field(row_field)
-    expression = sp.sympify(expression)
-    value = sp.diff(expression, field.test_value)
-    gradient = tuple(
-        sp.diff(expression, symbol) for symbol in field.test_gradient
-    )
-    test_symbols = set(field.test_symbols)
-    if value.free_symbols.intersection(test_symbols) or any(
-        coefficient.free_symbols.intersection(test_symbols)
-        for coefficient in gradient
-    ):
-        raise ValueError(
-            "residual for field '%s' must be linear in its test value and gradient"
-            % field.name
-        )
-    if expression.xreplace({symbol: sp.S.Zero for symbol in test_symbols}) != 0:
-        raise ValueError(
-            "residual for field '%s' must not contain a test-independent term"
-            % field.name
-        )
-    return WeakResidualCoefficients(field.name, value, gradient)
 
 
-def coupled_residual_weak_coefficients(system, jacobian_action=False):
-    coefficients = []
-    if jacobian_action:
-        blocks = {
-            (block.row_field, block.column_field): block.expression
-            for block in system.jacobian_blocks()
-        }
-        for row in system.fields:
-            expression = sum(
-                blocks[(row.name, column.name)] for column in system.fields
-            )
-            coefficients.append(
-                weak_residual_coefficients(system, expression, row.name)
-            )
-    else:
-        for row in system.fields:
-            coefficients.append(
-                weak_residual_coefficients(
-                    system,
-                    system.residual_expression(row),
-                    row.name,
-                )
-            )
-    return tuple(coefficients)
 
 
 def _codegen_dependencies(system, coefficients, dependencies):
@@ -5133,16 +5098,16 @@ def _residual_diagnostics_lines(system, prefix, specialization):
     diagnostics = [
         (
             "%s_residual_element_soa" % prefix,
-            system.build_residual_graph("residual_diagnostics_tmp").cost,
+            build_residual_graph(system, "residual_diagnostics_tmp").cost,
             system.residual_dependencies(),
         )
     ]
     block_expressions = system.jacobian_blocks()
     for block in block_expressions:
         graph = (
-            KernelExpressions()
-            .jacobian_action(block.expression, block.name)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .jacobian_action(block.expression, block.name),
                 data_symbols=system.jacobian_action_data_symbols(),
                 temporary_prefix="%s_diagnostics_tmp" % block.name,
             )
@@ -5157,7 +5122,7 @@ def _residual_diagnostics_lines(system, prefix, specialization):
     diagnostics.append(
         (
             "%s_jacobian_action_element_soa" % prefix,
-            system.build_jacobian_action_graph(
+            build_jacobian_action_graph(system, 
                 temporary_prefix="jacobian_action_diagnostics_tmp"
             ).cost,
             system.jacobian_action_dependencies(),
@@ -5192,7 +5157,7 @@ def _mixed_residual_diagnostics_lines(
     diagnostics = (
         (
             "%s_%s_residual_element_soa" % (prefix, element),
-            system.build_residual_graph("residual_diagnostics_tmp").cost,
+            build_residual_graph(system, "residual_diagnostics_tmp").cost,
             _codegen_dependencies(
                 system,
                 residual_coeffs,
@@ -5201,7 +5166,7 @@ def _mixed_residual_diagnostics_lines(
         ),
         (
             "%s_%s_jacobian_action_element_soa" % (prefix, element),
-            system.build_jacobian_action_graph(
+            build_jacobian_action_graph(system, 
                 temporary_prefix="jacobian_action_diagnostics_tmp"
             ).cost,
             _codegen_dependencies(
