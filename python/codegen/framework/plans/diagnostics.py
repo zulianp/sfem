@@ -281,9 +281,21 @@ def _boundary_diagnostics_entries(unit, operator_prefix, mesh_signature, local_b
 
 
 def _diagnostic_block_names(unit, action_plan):
-    system = getattr(unit.form_collection, "source", None)
-    if system is not None and hasattr(system, "jacobian_blocks"):
-        return tuple(block.name for block in system.jacobian_blocks())
+    """Names of the Jacobian-action blocks, in field order.
+
+    Read from the form collection's own 2-form block metadata.  This used to
+    call `jacobian_blocks()` on the pre-lowering system through
+    `FormCollection.source`; the blocks carry the same names and are already
+    part of the lowered collection.
+    """
+    collection = unit.form_collection
+    try:
+        blocks = collection.blocks_for(FormOrder.TWO)
+    except (AttributeError, ValueError):
+        blocks = ()
+    names = tuple(block.name for block in blocks if getattr(block, "name", ""))
+    if names:
+        return names
     names = tuple(getattr(block, "name", str(block)) for block in action_plan.blocks)
     if names:
         return names

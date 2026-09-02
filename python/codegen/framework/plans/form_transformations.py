@@ -49,11 +49,18 @@ class GradientMetricTransformation:
         }
 
 
-def simplex_gradient_metric_transformation(system, rule, coefficients, dependencies):
+def simplex_gradient_metric_transformation(fields, rule, coefficients, dependencies):
+    """Detect the constant-P1 simplex gradient-metric specialization.
+
+    Takes the lowered residual field records directly.  It used to take the
+    whole pre-lowering system, which is what forced the planning layer to hold
+    a back-pointer to it.
+    """
     if not _is_constant_p1_simplex_rule(rule):
         return None
-    dependencies = _gradient_metric_dependencies(system, coefficients, dependencies)
-    if len(system.fields) != 1 or len(coefficients) != 1:
+    fields = tuple(fields)
+    dependencies = _gradient_metric_dependencies(fields, coefficients, dependencies)
+    if len(fields) != 1 or len(coefficients) != 1:
         return None
     if any(dependencies.value_coefficients):
         return None
@@ -63,7 +70,7 @@ def simplex_gradient_metric_transformation(system, rule, coefficients, dependenc
         return None
 
     stream_group_name = "current" if dependencies.current_gradient else "direction"
-    field = system.fields[0]
+    field = fields[0]
     gradient_symbols = (
         field.gradient
         if stream_group_name == "current"
@@ -89,7 +96,7 @@ def simplex_gradient_metric_transformation(system, rule, coefficients, dependenc
     )
 
 
-def _gradient_metric_dependencies(system, coefficients, dependencies):
+def _gradient_metric_dependencies(fields, coefficients, dependencies):
     if hasattr(dependencies, "value_coefficients"):
         return dependencies
     free_symbols = set()
@@ -97,22 +104,22 @@ def _gradient_metric_dependencies(system, coefficients, dependencies):
         free_symbols.update(sp.sympify(coefficient.value).free_symbols)
         for expression in coefficient.gradient:
             free_symbols.update(sp.sympify(expression).free_symbols)
-    current_value = any(field.value in free_symbols for field in system.fields)
+    current_value = any(field.value in free_symbols for field in fields)
     current_gradient = any(
-        free_symbols.intersection(field.gradient) for field in system.fields
+        free_symbols.intersection(field.gradient) for field in fields
     )
     previous_value = any(
         field.previous_value is not None and field.previous_value in free_symbols
-        for field in system.fields
+        for field in fields
     )
     previous_gradient = any(
-        free_symbols.intersection(field.previous_gradient) for field in system.fields
+        free_symbols.intersection(field.previous_gradient) for field in fields
     )
     direction_value = any(
-        field.direction_value in free_symbols for field in system.fields
+        field.direction_value in free_symbols for field in fields
     )
     direction_gradient = any(
-        free_symbols.intersection(field.direction_gradient) for field in system.fields
+        free_symbols.intersection(field.direction_gradient) for field in fields
     )
     return SimpleNamespace(
         current=current_value or current_gradient,

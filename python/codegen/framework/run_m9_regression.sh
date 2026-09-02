@@ -18,7 +18,8 @@ unittest_status=0
     python.codegen.framework.tests.test_neohookean_ogden \
     python.codegen.framework.tests.test_m9_regression \
     python.codegen.framework.tests.test_layering \
-    python.codegen.framework.tests.test_module_imports || unittest_status=$?
+    python.codegen.framework.tests.test_module_imports \
+    python.codegen.framework.tests.test_form_collection_boundary || unittest_status=$?
 
 if command -v mpic++ >/dev/null 2>&1 || command -v mpicxx >/dev/null 2>&1 || command -v c++ >/dev/null 2>&1; then
     echo "Generated OpenMP compile checks: covered by test_m9_regression and existing unittest gates"

@@ -2750,7 +2750,7 @@ def _local_function(
     gradient_metric = (
         None
         if tensor_product or not allow_simplex_gradient_metric
-        else simplex_gradient_metric_transformation(system, rule, coefficients, dependencies)
+        else simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
     )
     omit_simplex_reference_basis_inputs = gradient_metric is not None
     params = [
@@ -2880,7 +2880,7 @@ def _simplex_local_body(
     constant_p1_gradient_expansion=True,
 ):
     if gradient_metric is None and allow_gradient_metric:
-        gradient_metric = simplex_gradient_metric_transformation(system, rule, coefficients, dependencies)
+        gradient_metric = simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
     if gradient_metric is not None:
         return _simplex_gradient_metric_body(system, rule, dependencies, gradient_metric)
     reference_gradients = constant_p1_simplex_reference_gradients(rule)
@@ -5376,7 +5376,7 @@ def _mesh_operator_source(
         None
         if tensor_product or specialized_prefix is None
         else simplex_gradient_metric_transformation(
-            system,
+            system.fields,
             rule,
             coefficients,
             dependencies,
@@ -9521,7 +9521,7 @@ def _scalar_packed_affine_jacobian_action_source(
         None
         if tensor_product or specialized_prefix is None
         else simplex_gradient_metric_transformation(
-            system,
+            system.fields,
             rule,
             coefficients,
             dependencies,
