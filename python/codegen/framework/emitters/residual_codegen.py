@@ -13,6 +13,7 @@ from codegen.framework.plans.generation import (
     mesh_kernel_plan_for_element,
 )
 from codegen.framework.plans.matrix_formats import CRSAssemblyPlan
+from codegen.framework.plans.apply_variants import precision_axis
 from codegen.framework.plans.layout import (
     _compatible_matrix_stream_indices,
     _compatible_stream_component_offsets,
@@ -552,7 +553,7 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
     output_name = "%s_out" % field.name
     scale = _sfem_ccode(gradient_metric.scale)
     lines = []
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         params = [
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
@@ -724,7 +725,7 @@ def _affine_mesh_public_wrapper_lines(
     dim,
 ):
     lines = []
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
             for param in params
@@ -3602,7 +3603,7 @@ def _operator_source(
         gradient_metric = None
         function = "%s_%s_element_soa" % (prefix, form)
         block = "%s_%s_block" % (local_prefix, form)
-        for scalar_type, suffix in (("double", ""), ("float", "_float")):
+        for scalar_type, suffix in precision_axis():
             params = [
                 "const int nelems",
                 "const ptrdiff_t geometry_stride",
@@ -4233,7 +4234,7 @@ def _mixed_affine_function(
     )
 
     function = "%s_%s_%s_affine_mesh_soa" % (prefix, element, form)
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
             for param in params
@@ -4501,7 +4502,7 @@ def _mixed_isoparametric_function(
         ]
     )
     function = "%s_%s_%s_isoparametric_mesh_soa" % (prefix, element, form)
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [param.replace("scalar_t", scalar_type) for param in params]
         lines.append('extern "C" int %s%s(' % (function, suffix))
         for index, param in enumerate(typed_params):
@@ -4893,7 +4894,7 @@ def _mixed_coo_triplet_matrix_assembly_source(
             "",
         ]
     )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [param.replace("scalar_t", scalar_type) for param in params]
         lines.append('extern "C" int %s%s(' % (function_base, suffix))
         for index, param in enumerate(typed_params):
@@ -5565,7 +5566,7 @@ def _mesh_operator_source(
         ]
     )
     function = "%s_%s_affine_mesh_soa" % (prefix, form)
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
             for param in params
@@ -5682,7 +5683,7 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
     function = "%s_%s_isoparametric_mesh_aos" % (prefix, form)
     n_fields = len(system.fields)
     lines = []
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         params = [
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
@@ -6941,7 +6942,7 @@ def _scalar_crs_matrix_assembly_source(
             "",
         ]
     )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("scalar_t", scalar_type) for param in params
         ]
@@ -7551,7 +7552,7 @@ def _scalar_coo_triplet_matrix_assembly_source(
             "",
         ]
     )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("scalar_t", scalar_type) for param in params
         ]
@@ -7898,7 +7899,7 @@ def _scalar_dia_matrix_assembly_source(
             "",
         ]
     )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("scalar_t", scalar_type) for param in params
         ]
@@ -8232,7 +8233,7 @@ def _isoparametric_mesh_operator_source(
         ]
     )
     function = "%s_%s_isoparametric_mesh_soa" % (prefix, form)
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("scalar_t", scalar_type) for param in params
         ]
@@ -8697,7 +8698,7 @@ def _scalar_packed_jacobian_action_source(
                 "",
             ]
         )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [param.replace("scalar_t", scalar_type) for param in params]
         lines.append('extern "C" int %s%s(' % (function, suffix))
         for index, param in enumerate(typed_params):
@@ -8893,7 +8894,7 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "",
         ]
     )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
             for param in params
@@ -9097,7 +9098,7 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "",
         ]
     )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
             for param in params
@@ -9311,7 +9312,7 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "",
         ]
     )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [p.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type) for p in params]
         lines.append('extern "C" int %s%s(' % (function, suffix))
         for i, param in enumerate(typed_params):
@@ -9824,7 +9825,7 @@ def _scalar_packed_affine_jacobian_action_source(
             "",
         ]
     )
-    for scalar_type, suffix in (("double", ""), ("float", "_float")):
+    for scalar_type, suffix in precision_axis():
         typed_params = [
             param.replace("jacobian_t", "geom_t").replace("scalar_t", scalar_type)
             for param in params
