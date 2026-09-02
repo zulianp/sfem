@@ -162,13 +162,13 @@ class FormCollection(FormCollectionMixin):
     # system; carrying them explicitly is what lets the planning layer stop
     # doing that.
     residual_fields: tuple = ()
+    # The per-field residual expressions and the per-component Jacobian-action
+    # blocks, aligned with `residual_fields`.  These cannot be inferred from the
+    # 1-/2-form blocks: for mixed formulations those are keyed by assembled field
+    # name (`u`), while the lowered fields are per component (`u0`, `u1`).
+    residual_expressions: tuple = ()
+    jacobian_action_blocks: tuple = ()
     parameters: tuple = ()
-    # Back-pointer to the system this collection was lowered from.  Only the
-    # emission path still reads it, because the residual emitters take a
-    # CoupledResidualSystem as their argument.  Inverting that interface (S5)
-    # removes the last reader and this field goes with it.  Nothing in the
-    # planning layer may use it.
-    source: object = None
     metadata: tuple = ()
 
     def form_metadata(self, order):
@@ -224,8 +224,9 @@ class FormCollection(FormCollectionMixin):
         dependencies=None,
         blocks=(),
         residual_fields=(),
+        residual_expressions=(),
+        jacobian_action_blocks=(),
         parameters=(),
-        source=None,
         metadata=(),
     ):
         return cls(
@@ -241,8 +242,9 @@ class FormCollection(FormCollectionMixin):
             dependencies,
             tuple(blocks),
             tuple(residual_fields),
+            tuple(residual_expressions),
+            tuple(jacobian_action_blocks),
             tuple(parameters),
-            source,
             tuple(metadata),
         )
 

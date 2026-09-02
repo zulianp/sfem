@@ -844,7 +844,7 @@ class GenApiTest(unittest.TestCase):
             sp.Matrix([p.value * q.value]),
         )
         self.assertEqual(
-            residual_forms.source.residual_expression(residual_forms.source.fields[0]),
+            residual_forms.residual_expressions[0],
             p.value * q.value,
         )
         residual_metadata = residual_forms.form_metadata(gen.FormOrder.ONE)

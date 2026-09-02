@@ -1443,13 +1443,12 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         dependencies = dependencies_by_dim.get(dim)
         if dependencies is None:
             collection = form_collections[dim]
-            system = collection.source
             dependencies = (
                 collection.form_metadata(_form_order_one()).dependencies,
                 collection.form_metadata(_form_order_two()).dependencies,
             )
             dependencies_by_dim[dim] = dependencies
-            parameter_names_by_dim[dim] = tuple(str(symbol) for symbol in system.parameters)
+            parameter_names_by_dim[dim] = tuple(str(symbol) for symbol in collection.parameters)
             fields_by_dim[dim] = tuple(collection.fields)
             block_size_by_dim[dim] = sum(int(field.components) for field in collection.fields)
         residual_dependencies, action_dependencies = dependencies
@@ -4099,7 +4098,7 @@ def _boundary_residual_parameter_names(collection, available_parameters):
     }
     return tuple(
         str(symbol)
-        for symbol in collection.source.parameters
+        for symbol in collection.parameters
         if str(symbol) in used
     )
 

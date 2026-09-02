@@ -37,9 +37,14 @@ def _plan_and_context():
 
 
 def _sever_source(unit):
-    """The same unit, with the collection's back-pointer removed."""
-    severed = replace(unit.form_collection, source=None)
-    return replace(unit, form_collection=severed)
+    """Kept as the identity now that the back-pointer no longer exists.
+
+    The comparisons below used to run against a collection with ``source``
+    severed.  S5 deleted the field, so severing is a no-op and the equality
+    checks now simply assert the plans are stable.  The static check further
+    down is what keeps the field from coming back.
+    """
+    return unit
 
 
 def _action_expression_plan(unit):
@@ -63,7 +68,7 @@ class FormCollectionBoundaryTest(unittest.TestCase):
         """The data planning needs is on the collection, not behind the pointer."""
         for unit in self.units:
             collection = unit.form_collection
-            if collection.source is None:
+            if not collection.residual_fields:
                 continue
             self.assertTrue(
                 collection.residual_fields,
@@ -71,9 +76,9 @@ class FormCollectionBoundaryTest(unittest.TestCase):
                 % collection.equation_name,
             )
             self.assertEqual(
-                tuple(field.name for field in collection.residual_fields),
-                tuple(field.name for field in collection.source.fields),
-                "promoted residual fields disagree with the system they came from",
+                len(collection.residual_expressions),
+                len(collection.residual_fields),
+                "residual expressions are not aligned with the lowered fields",
             )
 
     def test_element_emission_plans_do_not_depend_on_the_back_pointer(self):
@@ -93,7 +98,7 @@ class FormCollectionBoundaryTest(unittest.TestCase):
 
         checked = 0
         for unit in self.units:
-            if unit.form_collection.source is None:
+            if not unit.form_collection.residual_fields:
                 continue
             action_plan = _action_expression_plan(unit)
             if action_plan is None:
@@ -124,6 +129,17 @@ class FormCollectionBoundaryTest(unittest.TestCase):
                 "diagnostics plan for '%s' changed when FormCollection.source was removed"
                 % unit.name,
             )
+
+    def test_form_collection_has_no_back_pointer(self):
+        """The field itself is gone; this fails if anyone reintroduces it."""
+        from codegen.framework.symbolic.forms import FormCollection
+
+        self.assertNotIn(
+            "source",
+            FormCollection.__dataclass_fields__,
+            "FormCollection.source is back; downstream must read the collection's "
+            "own data, not the system it was lowered from",
+        )
 
     def test_planning_layer_never_reads_the_back_pointer(self):
         """Static check: no module under plans/ may mention `source` on a collection."""

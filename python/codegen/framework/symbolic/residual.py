@@ -97,6 +97,39 @@ class ResidualDependencies:
         object.__setattr__(self, "direction", bool(self.direction or direction_symbols))
 
 
+def residual_dependencies_for(fields, parameters, expressions):
+    """Which field and parameter symbols a set of expressions actually uses.
+
+    A free function so that both ``CoupledResidualSystem`` and the planning
+    layer's residual model compute this the same way; duplicating it would let
+    the two drift apart silently.
+    """
+    fields = tuple(fields)
+    parameters = tuple(parameters)
+    free_symbols = set()
+    for expression in expressions:
+        free_symbols.update(sp.sympify(expression).free_symbols)
+    current_symbols = tuple(
+        symbol for field in fields for symbol in field.current_symbols if symbol in free_symbols
+    )
+    previous_symbols = tuple(
+        symbol for field in fields for symbol in field.previous_symbols if symbol in free_symbols
+    )
+    direction_symbols = tuple(
+        symbol for field in fields for symbol in field.direction_symbols if symbol in free_symbols
+    )
+    used_parameters = tuple(parameter for parameter in parameters if parameter in free_symbols)
+    return ResidualDependencies(
+        current=bool(current_symbols),
+        previous=bool(previous_symbols),
+        direction=bool(direction_symbols),
+        parameters=used_parameters,
+        current_symbols=current_symbols,
+        previous_symbols=previous_symbols,
+        direction_symbols=direction_symbols,
+    )
+
+
 class CoupledResidualSystem:
     def __init__(self, dim):
         self.dim = int(dim)
@@ -302,41 +335,7 @@ class CoupledResidualSystem:
         return self._dependencies(tuple(expressions))
 
     def _dependencies(self, expressions):
-        free_symbols = set()
-        for expression in expressions:
-            free_symbols.update(sp.sympify(expression).free_symbols)
-        current_symbols = tuple(
-            symbol
-            for field in self._fields
-            for symbol in field.current_symbols
-            if symbol in free_symbols
-        )
-        previous_symbols = tuple(
-            symbol
-            for field in self._fields
-            for symbol in field.previous_symbols
-            if symbol in free_symbols
-        )
-        direction_symbols = tuple(
-            symbol
-            for field in self._fields
-            for symbol in field.direction_symbols
-            if symbol in free_symbols
-        )
-        parameters = tuple(
-            parameter
-            for parameter in self._parameters
-            if parameter in free_symbols
-        )
-        return ResidualDependencies(
-            current=bool(current_symbols),
-            previous=bool(previous_symbols),
-            direction=bool(direction_symbols),
-            parameters=parameters,
-            current_symbols=current_symbols,
-            previous_symbols=previous_symbols,
-            direction_symbols=direction_symbols,
-        )
+        return residual_dependencies_for(self._fields, self._parameters, expressions)
 
     def _validate_complete(self):
         if not self._fields:

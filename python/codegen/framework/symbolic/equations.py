@@ -677,8 +677,12 @@ def _build_form_collection(system, equation, orders):
             blocks=blocks,
             qualifiers=_equation_qualifiers(equation),
             residual_fields=tuple(residual_system.fields),
+            residual_expressions=tuple(
+                residual_system.residual_expression(field)
+                for field in residual_system.fields
+            ),
+            jacobian_action_blocks=tuple(residual_system.jacobian_blocks()),
             parameters=tuple(residual_system.parameters or ()),
-            source=residual_system,
             metadata=tuple(residual_metadata),
         )
     raise TypeError("unsupported equation form %s" % equation.form)

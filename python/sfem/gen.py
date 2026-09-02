@@ -559,15 +559,14 @@ def _value_residual_integration_case(system):
     for equation in system.equations:
         if not equation.is_residual:
             continue
-        residual_system = system.form_collection(equation, orders=(FormOrder.ONE,)).source
+        collection = system.form_collection(equation, orders=(FormOrder.ONE,))
         value_symbols = set()
-        for field in residual_system.fields:
+        for field in collection.residual_fields:
             value_symbols.add(field.value)
             value_symbols.add(field.direction_value)
             if field.previous_value is not None:
                 value_symbols.add(field.previous_value)
-        for field in residual_system.fields:
-            expression = residual_system.residual_expression(field)
+        for expression in collection.residual_expressions:
             expression = sp.sympify(expression)
             expression_values = expression.free_symbols.intersection(value_symbols)
             if not expression_values:

@@ -23,6 +23,7 @@ from codegen.framework.plans.scheduling import (
     build_jacobian_action_graph,
     build_residual_graph,
 )
+from codegen.framework.plans.residual_model import residual_emission_model_from_system
 
 
 def _element_emission_plan(element, vector_size=16, quadrature_order=None):
@@ -308,7 +309,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
 
         for element, family in (("TRI3", "simplex"), ("QUAD4", "tensor_product")):
             files = generate_coupled_residual_sfem_files(
-                system,
+                residual_emission_model_from_system(system),
                 prefix="value_only",
                 emission_plan=_element_emission_plan(element),
             )
@@ -434,7 +435,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             ):
                 system, _, _ = two_field_diffusion_system(dim)
                 files = generate_coupled_residual_sfem_files(
-                    system,
+                    residual_emission_model_from_system(system),
                     prefix="coupled_diffusion",
                     emission_plan=_element_emission_plan(element),
                 )
@@ -555,7 +556,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 regenerated = generate_coupled_residual_sfem_files(
-                    system,
+                    residual_emission_model_from_system(system),
                     prefix="coupled_diffusion",
                     emission_plan=_element_emission_plan(element),
                 )
@@ -671,7 +672,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
 
         system, _, _ = two_field_diffusion_system(3)
         files = generate_coupled_residual_sfem_files(
-            system,
+            residual_emission_model_from_system(system),
             prefix="coupled_diffusion_hex27",
             emission_plan=_element_emission_plan("HEX27"),
         )
@@ -743,7 +744,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             rule = sfem_element_quadrature_rule(element)
             system, _, _ = two_field_diffusion_system(rule.dim)
             files = generate_coupled_residual_sfem_files(
-                system,
+                residual_emission_model_from_system(system),
                 prefix="coupled_diffusion",
                 emission_plan=_element_emission_plan(element),
             )

@@ -19,6 +19,7 @@ from codegen.framework.fem.reference import (
     _tri6_reference_gradients,
 )
 from codegen.framework.backends.targets import OpenMPTarget
+from codegen.framework.plans.residual_model import residual_emission_model
 
 
 def _target():
@@ -79,9 +80,7 @@ def generate_boundary_residual_sfem_files(
         raise ValueError("boundary residual codegen requires measure 'ds'")
     if len(tuple(collection.fields)) != 1:
         raise ValueError("boundary residual codegen currently supports one field")
-    system = collection.source
-    if system is None:
-        raise ValueError("boundary residual form collection requires a lowered residual system")
+    system = residual_emission_model(collection)
     field = tuple(collection.fields)[0]
     components = int(field.components)
     coefficients = _boundary_coefficients_from_expression_plan(system, expression_plan)
