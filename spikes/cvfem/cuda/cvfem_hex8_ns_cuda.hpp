@@ -120,6 +120,45 @@ int cvfem_cuda_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
 
 int cvfem_cuda_download_values(cvfem_cuda_ctx *ctx, double *values);
 
+// ---- isoparametric geometry ------------------------------------------------
+//
+// The affine path reads one precomputed adjugate and determinant per element. The
+// isoparametric path evaluates the trilinear Jacobian at each of the 12
+// sub-control-surface points from the element's node coordinates -- 12 3x3 inversions
+// per element rather than a lookup -- which is what a mesh with non-parallel faces
+// needs. The element kernels were already __host__ __device__ and templated, so these
+// entry points supply the geometry the device path did not previously have.
+//
+// Upload the coordinates once before calling any of them. This is a no-op if
+// cvfem_cuda_boundary_attach has already uploaded them.
+int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
+                             const double *px, const double *py, const double *pz);
+
+// Residual and J*v stage the coordinates per pack, so both need more shared memory than
+// their affine counterparts: 64 -> 88 B/node and 96 -> 120 B/node. On a pack of 1,377
+// nodes that is 121 KiB for J*v, still inside the 227 KiB opt-in but enough to matter
+// when choosing the pack size.
+size_t cvfem_cuda_residual_isoparam_shmem_bytes(ptrdiff_t max_pack_nodes);
+size_t cvfem_cuda_jacobian_action_isoparam_shmem_bytes(ptrdiff_t max_pack_nodes);
+
+int    cvfem_cuda_residual_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                    int flush_mode, int block_size, void *stream);
+double cvfem_cuda_time_residual_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                         int flush_mode, int block_size, int repeat);
+
+int    cvfem_cuda_jacobian_action_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                           int flush_mode, int block_size, void *stream);
+double cvfem_cuda_time_jacobian_action_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                int flush_mode, int block_size, int repeat);
+
+// Assembly gathers the coordinates from global memory instead: it is element-parallel
+// with no pack structure to stage against, and the 24 doubles it reads per element are
+// small against the 64 blocks x 16 doubles it writes.
+int    cvfem_cuda_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                    int block_size, void *stream);
+double cvfem_cuda_time_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                         int block_size, int repeat);
+
 // ---- block diagonal, for the block-Jacobi preconditioner --------------------
 //
 // The steady solver preconditions with a 4x4 block Jacobi, which needs only the diagonal

@@ -42,6 +42,13 @@ namespace smesh { using count_t = int32_t; }
 
 static constexpr int CVFEM_CUDA_NF = CVFEM_HEX8_N_FIELDS;  // 4
 
+// Geometry model, mirroring the host's GeomKind. Affine reads one precomputed adjugate
+// and determinant per element; isoparametric evaluates the trilinear Jacobian at each of
+// the 12 sub-control-surface points from the element's node coordinates, which is 12
+// 3x3 inversions per element instead of a lookup.
+static constexpr int CVFEM_CUDA_GEOM_AFFINE   = 0;
+static constexpr int CVFEM_CUDA_GEOM_ISOPARAM = 1;
+
 struct cvfem_cuda_ctx {
     ptrdiff_t nnodes{0}, nelements{0};
     ptrdiff_t n_packs{0}, n_elements_per_pack{0}, max_pack_nodes{0};
@@ -64,6 +71,10 @@ struct cvfem_cuda_ctx {
     double *v{nullptr};                     // [4 * nnodes] interleaved (J*v direction)
     size_t  jv_shmem_bytes{0};
     bool    jv_optin_done{false};
+    // Isoparametric needs three more doubles per node for the coordinates, in both the
+    // residual and the J*v kernel, so it carries its own sizes and its own opt-in.
+    size_t  iso_shmem_bytes{0}, iso_jv_shmem_bytes{0};
+    bool    iso_optin_done{false}, iso_jv_optin_done{false};
 
     // assembled BSR
     ptrdiff_t nnz{0};
@@ -113,7 +124,13 @@ int device_dup(T **dst, const T *src, size_t n) {
 
 // ---------------------------------------------------------------- residual kernel
 
-template <int FLUSH, bool WITH_RC>
+// GEOM selects the geometry model: CVFEM_CUDA_GEOM_AFFINE reads one precomputed
+// adjugate and determinant per element, CVFEM_CUDA_GEOM_ISOPARAM evaluates the
+// trilinear Jacobian at each of the 12 sub-control-surface points from the element's
+// node coordinates. Isoparametric therefore needs the coordinates staged per pack --
+// the same three arrays Rhie-Chow already stages, so when both are on they share one
+// buffer instead of holding two copies.
+template <int FLUSH, bool WITH_RC, int GEOM>
 __global__ void cvfem_hex8_residual_pack_kernel(
         const ptrdiff_t nelements, const ptrdiff_t n_elements_per_pack,
         const double rho, const double mu,
@@ -143,10 +160,15 @@ __global__ void cvfem_hex8_residual_pack_kernel(
     const ptrdiff_t n_ghost      = ghost_ptr[p + 1] - gbegin;
     const ptrdiff_t total_nodes  = n_contiguous + n_ghost;
 
+    constexpr bool NEED_XYZ = (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) || WITH_RC;
+
     double *const s_u   = smem;
     double *const s_out = smem + (ptrdiff_t)CVFEM_CUDA_NF * total_nodes;
-    // Rhie-Chow needs the coordinates and the nodal pressure gradient of every pack node.
-    double *const s_rc  = smem + 2 * (ptrdiff_t)CVFEM_CUDA_NF * total_nodes;
+    // Coordinates, staged when the geometry is isoparametric or Rhie-Chow needs them.
+    double *const s_xyz = smem + 2 * (ptrdiff_t)CVFEM_CUDA_NF * total_nodes;
+    // The nodal pressure gradient sits after them, so the coordinate block has the same
+    // address in both cases and one gather serves both consumers.
+    double *const s_pg  = s_xyz + (NEED_XYZ ? 3 * total_nodes : 0);
 
     // Stage the pack's fields, and zero the accumulator. Owned ids map to a contiguous
     // global window; ghosts resolve through ghost_idx (PACKED_FORMAT.md section 2).
@@ -158,10 +180,13 @@ __global__ void cvfem_hex8_residual_pack_kernel(
         double *const       acc = &s_out[i * CVFEM_CUDA_NF];
 #pragma unroll
         for (int f = 0; f < CVFEM_CUDA_NF; ++f) { dst[f] = src[f]; acc[f] = 0.0; }
-        if (WITH_RC) {
-            double *const q = &s_rc[i * 6];
+        if (NEED_XYZ) {
+            double *const q = &s_xyz[i * 3];
             q[0] = px[g]; q[1] = py[g]; q[2] = pz[g];
-            q[3] = pgx[g]; q[4] = pgy[g]; q[5] = pgz[g];
+        }
+        if (WITH_RC) {
+            double *const q = &s_pg[i * 3];
+            q[0] = pgx[g]; q[1] = pgy[g]; q[2] = pgz[g];
         }
     }
     __syncthreads();
@@ -181,24 +206,39 @@ __global__ void cvfem_hex8_residual_pack_kernel(
             ux[a] = node[0]; uy[a] = node[1]; uz[a] = node[2]; pe[a] = node[3];
         }
 
-        double adj_e[9];
+        // The kernels want element-local arrays of 8, so gather from shared.
+        double ex[8], ey[8], ez[8];
+        if (NEED_XYZ) {
 #pragma unroll
-        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const double *const q = &s_xyz[(ptrdiff_t)ev[a] * 3];
+                ex[a] = q[0]; ey[a] = q[1]; ez[a] = q[2];
+            }
+        }
+
+        double adj_e[9];
+        if (GEOM == CVFEM_CUDA_GEOM_AFFINE) {
+#pragma unroll
+            for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+        }
 
         double re[CVFEM_HEX8_N_DOF];
         if (WITH_RC) {
-            // The kernel wants element-local arrays of 8, so gather from shared.
-            double rx[8], ry[8], rz[8], rgx[8], rgy[8], rgz[8];
+            double rgx[8], rgy[8], rgz[8];
 #pragma unroll
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const double *const q = &s_rc[(ptrdiff_t)ev[a] * 6];
-                rx[a] = q[0]; ry[a] = q[1]; rz[a] = q[2];
-                rgx[a] = q[3]; rgy[a] = q[4]; rgz[a] = q[5];
+                const double *const q = &s_pg[(ptrdiff_t)ev[a] * 3];
+                rgx[a] = q[0]; rgy[a] = q[1]; rgz[a] = q[2];
             }
             Hex8RhieChowT<double> rc;
-            rc.x = rx; rc.y = ry; rc.z = rz;
+            rc.x = ex; rc.y = ey; rc.z = ez;
             rc.pgx = rgx; rc.pgy = rgy; rc.pgz = rgz; rc.scale = rc_scale;
-            cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj_e, det[e], ux, uy, uz, pe, re, rc);
+            if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM)
+                cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex, ey, ez, ux, uy, uz, pe, re, rc);
+            else
+                cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj_e, det[e], ux, uy, uz, pe, re, rc);
+        } else if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) {
+            cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex, ey, ez, ux, uy, uz, pe, re);
         } else {
             cvfem_hex8_ns_upwind_residual(rho, mu, adj_e, det[e], ux, uy, uz, pe, re);
         }
@@ -257,7 +297,7 @@ __global__ void cvfem_hex8_residual_pack_kernel(
 
 // y = J(u) v. Structurally the residual kernel with a third staged array; the flush is
 // identical, so the two share the same ghost-reduce pass.
-template <int FLUSH>
+template <int FLUSH, int GEOM>
 __global__ void cvfem_hex8_jacobian_action_pack_kernel(
         const ptrdiff_t nelements, const ptrdiff_t n_elements_per_pack,
         const double rho, const double mu,
@@ -271,7 +311,10 @@ __global__ void cvfem_hex8_jacobian_action_pack_kernel(
         const double    *const __restrict__ u,
         const double    *const __restrict__ vin,
         double *const __restrict__ r,
-        double *const __restrict__ ghost_buf) {
+        double *const __restrict__ ghost_buf,
+        const double    *const __restrict__ px,
+        const double    *const __restrict__ py,
+        const double    *const __restrict__ pz) {
     extern __shared__ double smem[];
 
     const ptrdiff_t p            = blockIdx.x;
@@ -282,9 +325,12 @@ __global__ void cvfem_hex8_jacobian_action_pack_kernel(
     const ptrdiff_t total_nodes  = n_contiguous + n_ghost;
     const ptrdiff_t stride       = (ptrdiff_t)CVFEM_CUDA_NF * total_nodes;
 
+    constexpr bool NEED_XYZ = (GEOM == CVFEM_CUDA_GEOM_ISOPARAM);
+
     double *const s_u   = smem;
     double *const s_v   = smem + stride;
     double *const s_out = smem + 2 * stride;
+    double *const s_xyz = smem + 3 * stride;
 
     for (ptrdiff_t i = threadIdx.x; i < total_nodes; i += blockDim.x) {
         const ptrdiff_t g = (i < n_contiguous) ? (owned + i)
@@ -296,6 +342,10 @@ __global__ void cvfem_hex8_jacobian_action_pack_kernel(
             s_u[i * CVFEM_CUDA_NF + f]   = su[f];
             s_v[i * CVFEM_CUDA_NF + f]   = sv[f];
             s_out[i * CVFEM_CUDA_NF + f] = 0.0;
+        }
+        if (NEED_XYZ) {
+            double *const c = &s_xyz[i * 3];
+            c[0] = px[g]; c[1] = py[g]; c[2] = pz[g];
         }
     }
     __syncthreads();
@@ -317,13 +367,23 @@ __global__ void cvfem_hex8_jacobian_action_pack_kernel(
             ux[a] = nu[0]; uy[a] = nu[1]; uz[a] = nu[2]; pe[a] = nu[3];
             vx[a] = nv[0]; vy[a] = nv[1]; vz[a] = nv[2]; q[a]  = nv[3];
         }
-        double adj_e[9];
-#pragma unroll
-        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
-
         double re[CVFEM_HEX8_N_DOF];
-        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj_e, det[e], ux, uy, uz,
-                                             vx, vy, vz, q, re);
+        if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) {
+            double ex[8], ey[8], ez[8];
+#pragma unroll
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const double *const c = &s_xyz[(ptrdiff_t)ev[a] * 3];
+                ex[a] = c[0]; ey[a] = c[1]; ez[a] = c[2];
+            }
+            cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, ex, ey, ez, ux, uy, uz,
+                                                          vx, vy, vz, q, re);
+        } else {
+            double adj_e[9];
+#pragma unroll
+            for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+            cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj_e, det[e], ux, uy, uz,
+                                                 vx, vy, vz, q, re);
+        }
 #pragma unroll
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             double *const acc = &s_out[(ptrdiff_t)ev[a] * CVFEM_CUDA_NF];
@@ -391,7 +451,7 @@ __global__ void cvfem_hex8_ghost_reduce_kernel(
 // Element-parallel, grid-stride, writing straight into the global BSR with atomicAdd.
 // Both kernel families already accumulate through CVFEM_ATOMIC_ADD, which expands to
 // atomicAdd under __CUDA_ARCH__, so the same source serves host and device.
-template <int VARIANT>
+template <int VARIANT, int GEOM = CVFEM_CUDA_GEOM_AFFINE>
 __global__ void cvfem_hex8_assemble_bsr_kernel(
         const ptrdiff_t nelements, const double rho, const double mu,
         const int32_t *const __restrict__ elements,
@@ -399,16 +459,27 @@ __global__ void cvfem_hex8_assemble_bsr_kernel(
         const double  *const __restrict__ adj,
         const double  *const __restrict__ det,
         const double  *const __restrict__ u,
-        double *const __restrict__ values) {
+        double *const __restrict__ values,
+        const double  *const __restrict__ px = nullptr,
+        const double  *const __restrict__ py = nullptr,
+        const double  *const __restrict__ pz = nullptr) {
     for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
          e += (ptrdiff_t)blockDim.x * gridDim.x) {
         double ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES];
         double uz[CVFEM_HEX8_N_NODES], pe[CVFEM_HEX8_N_NODES];
+        double ex[CVFEM_HEX8_N_NODES], ey[CVFEM_HEX8_N_NODES], ez[CVFEM_HEX8_N_NODES];
 #pragma unroll
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const ptrdiff_t g    = elements[(ptrdiff_t)a * nelements + e];
             const double *const n = &u[g * CVFEM_CUDA_NF];
             ux[a] = n[0]; uy[a] = n[1]; uz[a] = n[2]; pe[a] = n[3];
+            if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) { ex[a] = px[g]; ey[a] = py[g]; ez[a] = pz[g]; }
+        }
+        if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) {
+            const int32_t *const es = &slots[(ptrdiff_t)e * 64];
+            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
+                    rho, mu, ex, ey, ez, ux, uy, uz, es, values);
+            continue;
         }
         double adj_e[9];
 #pragma unroll
@@ -515,30 +586,56 @@ int launch_assemble_v(cvfem_cuda_ctx *ctx, double rho, double mu, int block, cud
     return 0;
 }
 
-int launch_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu, int flush_mode,
-                           int block_size, cudaStream_t s) {
+// Isoparametric assembly. Element-parallel like the affine path, but the coordinates are
+// gathered straight from global memory rather than staged: assembly is already
+// element-parallel with no pack structure to hang shared memory off, and the 24 extra
+// doubles per element are read once against the 64 blocks x 16 doubles it writes.
+int launch_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu, int block_size,
+                             cudaStream_t s) {
+    if (!ctx->px) return 1;  // coordinates were never uploaded
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
+                                     (size_t)ctx->nnz * 16 * sizeof(double), s));
+    cvfem_hex8_assemble_bsr_kernel<CVFEM_CUDA_JAC_HANDWRITTEN, CVFEM_CUDA_GEOM_ISOPARAM>
+            <<<grid, block, 0, s>>>(
+                    ctx->nelements, rho, mu, ctx->elements_global, ctx->element_slots,
+                    ctx->adj, ctx->det, ctx->u, ctx->values, ctx->px, ctx->py, ctx->pz);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+template <int GEOM>
+int launch_jacobian_action_geom(cvfem_cuda_ctx *ctx, double rho, double mu, int flush_mode,
+                                int block_size, cudaStream_t s) {
+    constexpr bool ISO   = (GEOM == CVFEM_CUDA_GEOM_ISOPARAM);
+    const size_t   shmem = ISO ? ctx->iso_jv_shmem_bytes : ctx->jv_shmem_bytes;
     if (!ctx->v) return 1;
-    if (!ctx->jv_optin_done) {
-        if (ctx->jv_shmem_bytes > 48u * 1024u) {
+    if (ISO && !ctx->px) return 1;  // coordinates were never uploaded
+
+    bool &done = ISO ? ctx->iso_jv_optin_done : ctx->jv_optin_done;
+    if (!done) {
+        if (shmem > 48u * 1024u) {
             CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
-                    cvfem_hex8_jacobian_action_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC>,
-                    cudaFuncAttributeMaxDynamicSharedMemorySize, (int)ctx->jv_shmem_bytes));
+                    cvfem_hex8_jacobian_action_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, GEOM>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize, (int)shmem));
             CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
-                    cvfem_hex8_jacobian_action_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS>,
-                    cudaFuncAttributeMaxDynamicSharedMemorySize, (int)ctx->jv_shmem_bytes));
+                    cvfem_hex8_jacobian_action_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, GEOM>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize, (int)shmem));
         }
-        ctx->jv_optin_done = true;
+        done = true;
     }
     const int block = block_size > 0 ? block_size : 128;
     const int grid  = (int)ctx->n_packs;
     CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->r, 0,
                                      (size_t)ctx->nnodes * CVFEM_CUDA_NF * sizeof(double), s));
     if (flush_mode == CVFEM_CUDA_FLUSH_TWO_PASS) {
-        cvfem_hex8_jacobian_action_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS>
-                <<<grid, block, ctx->jv_shmem_bytes, s>>>(
+        cvfem_hex8_jacobian_action_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, GEOM>
+                <<<grid, block, shmem, s>>>(
                         ctx->nelements, ctx->n_elements_per_pack, rho, mu, ctx->elems,
                         ctx->owned_nodes_ptr, ctx->n_shared, ctx->ghost_ptr, ctx->ghost_idx,
-                        ctx->adj, ctx->det, ctx->u, ctx->v, ctx->r, ctx->ghost_buf);
+                        ctx->adj, ctx->det, ctx->u, ctx->v, ctx->r, ctx->ghost_buf,
+                        ctx->px, ctx->py, ctx->pz);
         CVFEM_CUDA_CHECK(cudaGetLastError());
         if (ctx->n_ghost_reduce_rows > 0) {
             const int rb = 256, rg = (int)((ctx->n_ghost_reduce_rows + rb - 1) / rb);
@@ -548,14 +645,21 @@ int launch_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu, int flush
             CVFEM_CUDA_CHECK(cudaGetLastError());
         }
     } else {
-        cvfem_hex8_jacobian_action_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC>
-                <<<grid, block, ctx->jv_shmem_bytes, s>>>(
+        cvfem_hex8_jacobian_action_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, GEOM>
+                <<<grid, block, shmem, s>>>(
                         ctx->nelements, ctx->n_elements_per_pack, rho, mu, ctx->elems,
                         ctx->owned_nodes_ptr, ctx->n_shared, ctx->ghost_ptr, ctx->ghost_idx,
-                        ctx->adj, ctx->det, ctx->u, ctx->v, ctx->r, ctx->ghost_buf);
+                        ctx->adj, ctx->det, ctx->u, ctx->v, ctx->r, ctx->ghost_buf,
+                        ctx->px, ctx->py, ctx->pz);
         CVFEM_CUDA_CHECK(cudaGetLastError());
     }
     return 0;
+}
+
+int launch_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu, int flush_mode,
+                           int block_size, cudaStream_t s) {
+    return launch_jacobian_action_geom<CVFEM_CUDA_GEOM_AFFINE>(ctx, rho, mu, flush_mode,
+                                                               block_size, s);
 }
 
 int launch_assemble(cvfem_cuda_ctx *ctx, double rho, double mu, int variant,
@@ -987,24 +1091,27 @@ int launch_boundary(cvfem_cuda_ctx *ctx, double rho, double mu, int block_size,
     return 0;
 }
 
-int ensure_shmem_optin(cvfem_cuda_ctx *ctx) {
-    if (ctx->shmem_optin_done) return 0;
-    // Anything above the 48 KB default needs an explicit opt-in per kernel.
-    if (ctx->shmem_bytes > 48u * 1024u) {
-        CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
-                cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, false>,
-                cudaFuncAttributeMaxDynamicSharedMemorySize, (int)ctx->shmem_bytes));
-        CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
-                cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, false>,
-                cudaFuncAttributeMaxDynamicSharedMemorySize, (int)ctx->shmem_bytes));
-    }
-    ctx->shmem_optin_done = true;
-    return 0;
-}
+template <int GEOM>
+int launch_residual_geom(cvfem_cuda_ctx *ctx, double rho, double mu, int flush_mode,
+                         int block_size, cudaStream_t s) {
+    constexpr bool ISO = (GEOM == CVFEM_CUDA_GEOM_ISOPARAM);
+    const size_t   shmem = ISO ? ctx->iso_shmem_bytes : ctx->shmem_bytes;
 
-int launch_residual(cvfem_cuda_ctx *ctx, double rho, double mu, int flush_mode,
-                    int block_size, cudaStream_t s) {
-    if (ensure_shmem_optin(ctx) != 0) return 1;
+    bool &done = ISO ? ctx->iso_optin_done : ctx->shmem_optin_done;
+    if (!done) {
+        // Anything above the 48 KB default needs an explicit opt-in per kernel.
+        if (shmem > 48u * 1024u) {
+            CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
+                    cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, false, GEOM>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize, (int)shmem));
+            CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
+                    cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, false, GEOM>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize, (int)shmem));
+        }
+        done = true;
+    }
+    if (ISO && !ctx->px) return 1;  // coordinates were never uploaded
+
     const int block = block_size > 0 ? block_size : 128;
     const int grid  = (int)ctx->n_packs;
 
@@ -1013,12 +1120,12 @@ int launch_residual(cvfem_cuda_ctx *ctx, double rho, double mu, int flush_mode,
                                      (size_t)ctx->nnodes * CVFEM_CUDA_NF * sizeof(double), s));
 
     if (flush_mode == CVFEM_CUDA_FLUSH_TWO_PASS) {
-        cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, false>
-                <<<grid, block, ctx->shmem_bytes, s>>>(
+        cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, false, GEOM>
+                <<<grid, block, shmem, s>>>(
                         ctx->nelements, ctx->n_elements_per_pack, rho, mu, ctx->elems,
                         ctx->owned_nodes_ptr, ctx->n_shared, ctx->ghost_ptr, ctx->ghost_idx,
                         ctx->adj, ctx->det, ctx->u, ctx->r, ctx->ghost_buf,
-                        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0.0);
+                        ctx->px, ctx->py, ctx->pz, nullptr, nullptr, nullptr, 0.0);
         CVFEM_CUDA_CHECK(cudaGetLastError());
         if (ctx->n_ghost_reduce_rows > 0) {
             const int rblock = 256;
@@ -1029,15 +1136,20 @@ int launch_residual(cvfem_cuda_ctx *ctx, double rho, double mu, int flush_mode,
             CVFEM_CUDA_CHECK(cudaGetLastError());
         }
     } else {
-        cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, false>
-                <<<grid, block, ctx->shmem_bytes, s>>>(
+        cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, false, GEOM>
+                <<<grid, block, shmem, s>>>(
                         ctx->nelements, ctx->n_elements_per_pack, rho, mu, ctx->elems,
                         ctx->owned_nodes_ptr, ctx->n_shared, ctx->ghost_ptr, ctx->ghost_idx,
                         ctx->adj, ctx->det, ctx->u, ctx->r, ctx->ghost_buf,
-                        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0.0);
+                        ctx->px, ctx->py, ctx->pz, nullptr, nullptr, nullptr, 0.0);
         CVFEM_CUDA_CHECK(cudaGetLastError());
     }
     return 0;
+}
+
+int launch_residual(cvfem_cuda_ctx *ctx, double rho, double mu, int flush_mode,
+                    int block_size, cudaStream_t s) {
+    return launch_residual_geom<CVFEM_CUDA_GEOM_AFFINE>(ctx, rho, mu, flush_mode, block_size, s);
 }
 
 }  // namespace
@@ -1061,6 +1173,18 @@ extern "C" size_t cvfem_cuda_residual_shmem_bytes(ptrdiff_t max_pack_nodes) {
     return (size_t)2 * CVFEM_CUDA_NF * (size_t)max_pack_nodes * sizeof(double);
 }
 
+// Isoparametric stages the node coordinates as well: 64 B/node becomes 88 B/node.
+extern "C" size_t cvfem_cuda_residual_isoparam_shmem_bytes(ptrdiff_t max_pack_nodes) {
+    return cvfem_cuda_residual_shmem_bytes(max_pack_nodes)
+           + (size_t)3 * (size_t)max_pack_nodes * sizeof(double);
+}
+
+// 96 B/node becomes 120 B/node, which is what caps the isoparametric pack size.
+extern "C" size_t cvfem_cuda_jacobian_action_isoparam_shmem_bytes(ptrdiff_t max_pack_nodes) {
+    return cvfem_cuda_jacobian_action_shmem_bytes(max_pack_nodes)
+           + (size_t)3 * (size_t)max_pack_nodes * sizeof(double);
+}
+
 extern "C" int cvfem_cuda_create(cvfem_cuda_ctx **out_ctx,
                                  ptrdiff_t nnodes, ptrdiff_t nelements,
                                  ptrdiff_t n_packs, ptrdiff_t n_elements_per_pack,
@@ -1080,6 +1204,8 @@ extern "C" int cvfem_cuda_create(cvfem_cuda_ctx **out_ctx,
     c->n_ghost_entries = n_ghost_entries; c->n_ghost_reduce_rows = n_ghost_reduce_rows;
     c->shmem_bytes = cvfem_cuda_residual_shmem_bytes(max_pack_nodes);
     c->jv_shmem_bytes = cvfem_cuda_jacobian_action_shmem_bytes(max_pack_nodes);
+    c->iso_shmem_bytes = cvfem_cuda_residual_isoparam_shmem_bytes(max_pack_nodes);
+    c->iso_jv_shmem_bytes = cvfem_cuda_jacobian_action_isoparam_shmem_bytes(max_pack_nodes);
 
     if (device_dup(&c->elems, elems_flat, (size_t)8 * nelements) ||
         device_dup(&c->owned_nodes_ptr, owned_nodes_ptr, (size_t)n_packs + 1) ||
@@ -1250,6 +1376,94 @@ extern "C" int cvfem_cuda_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
                                    int variant, int block_size, void *stream) {
     cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
     return launch_assemble(ctx, rho, mu, variant, block_size, s);
+}
+
+// ---- isoparametric geometry -------------------------------------------------
+//
+// The element kernels were already __host__ __device__ and templated after the
+// portability phase, so these entry points wire up the geometry the device did not yet
+// have rather than introducing new math. Call cvfem_cuda_attach_coords first.
+
+extern "C" int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
+                                        const double *px, const double *py, const double *pz) {
+    if (ctx->px) return 0;  // already uploaded, by this or by boundary_attach
+    if (device_dup(&ctx->px, px, (size_t)ctx->nnodes) ||
+        device_dup(&ctx->py, py, (size_t)ctx->nnodes) ||
+        device_dup(&ctx->pz, pz, (size_t)ctx->nnodes))
+        return 1;
+    return 0;
+}
+
+extern "C" int cvfem_cuda_residual_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                            int flush_mode, int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_residual_geom<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, flush_mode, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_residual_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                    int flush_mode, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_residual_geom<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, flush_mode, block_size, 0) != 0)
+        return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_residual_geom<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, flush_mode, block_size, 0) != 0)
+            return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" int cvfem_cuda_jacobian_action_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                   int flush_mode, int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_jacobian_action_geom<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, flush_mode,
+                                                                 block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_jacobian_action_isoparam(cvfem_cuda_ctx *ctx, double rho,
+                                                           double mu, int flush_mode,
+                                                           int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_jacobian_action_geom<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, flush_mode, block_size, 0) != 0)
+        return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_jacobian_action_geom<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, flush_mode, block_size, 0) != 0)
+            return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" int cvfem_cuda_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                            int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_assemble_isoparam(ctx, rho, mu, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                    int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_assemble_isoparam(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_assemble_isoparam(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
 }
 
 extern "C" int cvfem_cuda_download_values(cvfem_cuda_ctx *ctx, double *values) {
@@ -1672,12 +1886,8 @@ extern "C" int cvfem_cuda_boundary_attach(cvfem_cuda_ctx *ctx, ptrdiff_t n_bound
                                           double Lx, double Ly, double Lz) {
     ctx->n_boundary = n_boundary;
     ctx->Lx = Lx; ctx->Ly = Ly; ctx->Lz = Lz;
-    if (device_dup(&ctx->boundary_elems, boundary_elems, (size_t)n_boundary) ||
-        device_dup(&ctx->px, px, (size_t)ctx->nnodes) ||
-        device_dup(&ctx->py, py, (size_t)ctx->nnodes) ||
-        device_dup(&ctx->pz, pz, (size_t)ctx->nnodes))
-        return 1;
-    return 0;
+    if (device_dup(&ctx->boundary_elems, boundary_elems, (size_t)n_boundary)) return 1;
+    return cvfem_cuda_attach_coords(ctx, px, py, pz);
 }
 
 extern "C" int cvfem_cuda_boundary_residual(cvfem_cuda_ctx *ctx, double rho, double mu,
@@ -1747,10 +1957,10 @@ extern "C" int cvfem_cuda_residual_rc(cvfem_cuda_ctx *ctx, double rho, double mu
     const size_t need = cvfem_cuda_residual_rc_shmem_bytes(ctx->max_pack_nodes);
     if (need > 48u * 1024u) {
         CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
-                cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, true>,
+                cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, true, CVFEM_CUDA_GEOM_AFFINE>,
                 cudaFuncAttributeMaxDynamicSharedMemorySize, (int)need));
         CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
-                cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, true>,
+                cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, true, CVFEM_CUDA_GEOM_AFFINE>,
                 cudaFuncAttributeMaxDynamicSharedMemorySize, (int)need));
     }
     const int block = block_size > 0 ? block_size : 128;
@@ -1758,7 +1968,7 @@ extern "C" int cvfem_cuda_residual_rc(cvfem_cuda_ctx *ctx, double rho, double mu
     CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->r, 0,
                                      (size_t)ctx->nnodes * CVFEM_CUDA_NF * sizeof(double), s));
     if (flush_mode == CVFEM_CUDA_FLUSH_TWO_PASS) {
-        cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, true><<<grid, block, need, s>>>(
+        cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_TWO_PASS, true, CVFEM_CUDA_GEOM_AFFINE><<<grid, block, need, s>>>(
                 ctx->nelements, ctx->n_elements_per_pack, rho, mu, ctx->elems,
                 ctx->owned_nodes_ptr, ctx->n_shared, ctx->ghost_ptr, ctx->ghost_idx,
                 ctx->adj, ctx->det, ctx->u, ctx->r, ctx->ghost_buf,
@@ -1772,7 +1982,7 @@ extern "C" int cvfem_cuda_residual_rc(cvfem_cuda_ctx *ctx, double rho, double mu
             CVFEM_CUDA_CHECK(cudaGetLastError());
         }
     } else {
-        cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, true><<<grid, block, need, s>>>(
+        cvfem_hex8_residual_pack_kernel<CVFEM_CUDA_FLUSH_ATOMIC, true, CVFEM_CUDA_GEOM_AFFINE><<<grid, block, need, s>>>(
                 ctx->nelements, ctx->n_elements_per_pack, rho, mu, ctx->elems,
                 ctx->owned_nodes_ptr, ctx->n_shared, ctx->ghost_ptr, ctx->ghost_idx,
                 ctx->adj, ctx->det, ctx->u, ctx->r, ctx->ghost_buf,
