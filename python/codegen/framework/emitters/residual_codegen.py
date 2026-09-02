@@ -12,6 +12,7 @@ from codegen.framework.plans.generation import (
     local_kernel_plan_for,
     mesh_kernel_plan_for_element,
 )
+from codegen.framework.plans.matrix_formats import CRSAssemblyPlan
 from codegen.framework.plans.layout import (
     _compatible_matrix_stream_indices,
     _compatible_stream_component_offsets,
@@ -5838,23 +5839,46 @@ def _crs_find_cols_lines(function_base, n_shape):
     return lines
 
 
-def _scalar_crs_matrix_scatter_lines(function_base, n_shape):
+def _crs_reduction_pragma(reduction_policy):
+    """How the plan's reduction policy is spelled for this target."""
+    if str(reduction_policy) != "atomic_add":
+        raise ValueError(
+            "unsupported CRS reduction policy '%s'; the emitter can spell "
+            "atomic_add only" % reduction_policy
+        )
+    return _atomic_update_pragma()
+
+
+def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
+    """Scatter one element matrix into CRS storage.
+
+    The stream names and the reduction come from ``CRSAssemblyPlan``, which is
+    where they are defined; this function spells them.  Its defaults are the
+    names the generated kernels have always used, so the emitted text is
+    unchanged, but changing the plan now changes the kernel rather than
+    requiring an edit here.
+    """
+    assembly = CRSAssemblyPlan() if assembly is None else assembly
+    row_pointer = assembly.row_pointer
+    column_index = assembly.column_index
+    value_stream = assembly.value_stream
+    reduction = _crs_reduction_pragma(assembly.reduction_policy)
     return _crs_find_cols_lines(function_base, n_shape) + [
         "template <typename scalar_t>",
         "static SFEM_INLINE int %s_scatter_crs(" % function_base,
         "        const idx_t *const SFEM_RESTRICT ev,",
         "        const scalar_t *const SFEM_RESTRICT element_matrix,",
-        "        const count_t *const SFEM_RESTRICT rowptr,",
-        "        const idx_t *const SFEM_RESTRICT colidx,",
+        "        const count_t *const SFEM_RESTRICT %s," % row_pointer,
+        "        const idx_t *const SFEM_RESTRICT %s," % column_index,
         "        scalar_t *const SFEM_RESTRICT values) {",
         "    static constexpr int N_SHAPE = %d;" % n_shape,
         "    count_t entries[N_SHAPE * N_SHAPE];",
         "    idx_t ks[N_SHAPE];",
         "    bool valid_graph = true;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        const count_t row_begin = rowptr[ev[i]];",
-        "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
-        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
+        "        const count_t row_begin = %s[ev[i]];" % row_pointer,
+        "        const int lenrow = (int)(%s[ev[i] + 1] - row_begin);" % row_pointer,
+        "        const idx_t *const SFEM_RESTRICT cols = &%s[row_begin];" % column_index,
         "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
         "        for (int j = 0; j < N_SHAPE; ++j) {",
         "            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {",
@@ -5872,8 +5896,8 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape):
         "    if (!valid_graph) return SFEM_FAILURE;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "#pragma omp atomic update",
-        "            values[entries[i * N_SHAPE + j]] += element_matrix[i * N_SHAPE + j];",
+        reduction,
+        "            %s[entries[i * N_SHAPE + j]] += element_matrix[i * N_SHAPE + j];" % value_stream,
         "        }",
         "    }",
         "    return SFEM_SUCCESS;",

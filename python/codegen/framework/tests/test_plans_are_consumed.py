@@ -60,8 +60,14 @@ STRUCTURAL_PLAN_TYPES = (
 #:   they are called, including the rule that a prefix already naming its
 #:   element does not get a second one.  The emitters had rebuilt both names
 #:   from format strings.
+#:
+#:   CRSAssemblyPlan -- the row-pointer, column-index and value stream names
+#:   and the reduction policy of the CRS scatter.  The emitter had them as
+#:   string literals; it now spells what the plan defines.  The other five
+#:   assembly plans follow the same shape and are the obvious next step.
 UNCONSUMED_PLAN_TYPES = frozenset(
-    set(STRUCTURAL_PLAN_TYPES) - {"LocalKernelPlan", "MeshKernelPlan"}
+    set(STRUCTURAL_PLAN_TYPES)
+    - {"LocalKernelPlan", "MeshKernelPlan", "CRSAssemblyPlan"}
 )
 
 
@@ -143,7 +149,7 @@ class PlansAreConsumedTest(unittest.TestCase):
         )
         self.assertEqual(
             unconsumed,
-            11,
+            10,
             "the number of unread structural plans changed to %d; update this "
             "expectation deliberately, and say why in the commit" % unconsumed,
         )
