@@ -19,6 +19,10 @@ from codegen.framework.fem.reference import (
     _tri6_reference_gradients,
 )
 from codegen.framework.targets import OpenMPTarget
+from codegen.framework.plans.boundary_usage import (
+    boundary_coefficient_usage,
+    coordinate_symbols as _coordinate_candidates,
+)
 from codegen.framework.plans.residual_model import residual_emission_model
 
 
@@ -309,14 +313,9 @@ def _boundary_source(function, element_type, surface, components, parameters, co
     extern_current_decls = _current_declarations(current_symbols, "real_t")
     extern_float_current_decls = _current_declarations(current_symbols, "float")
     current_args = "".join(", %s" % symbol for symbol in current_symbols)
-    component_uses_coordinates = tuple(
-        bool(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
-        for coefficient in coefficients
-    )
-    component_uses_current = tuple(
-        bool(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
-        for coefficient in coefficients
-    )
+    _usage = boundary_coefficient_usage(coefficients, coordinate_symbols, current_symbols)
+    component_uses_coordinates = _usage.component_uses_coordinates
+    component_uses_current = _usage.component_uses_current
     coeff_lines = [
         "        const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
@@ -601,11 +600,9 @@ def _coordinate_symbol_tuple(physical_dim):
 
 
 def _coefficient_coordinate_symbols(coefficients, physical_dim):
-    coordinate_symbols = set(_coordinate_symbol_tuple(physical_dim))
-    used = set()
-    for coefficient in coefficients:
-        used.update(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
-    return tuple(symbol for symbol in _coordinate_symbol_tuple(physical_dim) if symbol in used)
+    return boundary_coefficient_usage(
+        coefficients, _coordinate_candidates(physical_dim), ()
+    ).coordinates
 
 
 def _filter_coordinate_parameters(parameters, physical_dim):
@@ -614,11 +611,8 @@ def _filter_coordinate_parameters(parameters, physical_dim):
 
 
 def _coefficient_current_symbols(system, coefficients):
-    current_symbols = tuple(field.value for field in system.fields)
-    used = set()
-    for coefficient in coefficients:
-        used.update(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
-    return tuple(symbol for symbol in current_symbols if symbol in used)
+    candidates = tuple(field.value for field in system.fields)
+    return boundary_coefficient_usage(coefficients, (), candidates).current
 
 
 def _replace_current_symbols(coefficients, current_symbols):
@@ -739,14 +733,9 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
     extern_current_decls = _current_declarations(current_symbols, "real_t")
     extern_float_current_decls = _current_declarations(current_symbols, "float")
     current_args = "".join(", %s" % symbol for symbol in current_symbols)
-    component_uses_coordinates = tuple(
-        bool(sp.sympify(coefficient).free_symbols.intersection(coordinate_symbols))
-        for coefficient in coefficients
-    )
-    component_uses_current = tuple(
-        bool(sp.sympify(coefficient).free_symbols.intersection(current_symbols))
-        for coefficient in coefficients
-    )
+    _usage = boundary_coefficient_usage(coefficients, coordinate_symbols, current_symbols)
+    component_uses_coordinates = _usage.component_uses_coordinates
+    component_uses_current = _usage.component_uses_current
     coeff_lines = [
         "    const scalar_t coeff%d = %s;" % (i, _sfem_ccode(codegen_coefficients[i]))
         for i in range(components)
