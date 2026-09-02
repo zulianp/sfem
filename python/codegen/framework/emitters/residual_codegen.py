@@ -7,6 +7,11 @@ from codegen.framework.plans.dependencies import (
     ResidualCodegenDependencies,
     residual_codegen_dependencies,
 )
+from codegen.framework.plans.generation import (
+    MeshKernelPlan,
+    local_kernel_plan_for,
+    mesh_kernel_plan_for_element,
+)
 from codegen.framework.plans.layout import (
     _compatible_matrix_stream_indices,
     _compatible_stream_component_offsets,
@@ -1590,12 +1595,12 @@ def generate_coupled_residual_sfem_files(
         action_coeffs = coupled_residual_weak_coefficients(system, True)
     family = emission_plan.basis_family
     geometry_family = emission_plan.geometry_family
-    local_prefix = "%s_d%d_%s" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
-    element_prefix = (
-        _single_element_operator_prefix(prefix, element_type)
-        if operator_prefix is None
-        else str(operator_prefix)
-    )
+    # Which files exist and what they are called is a structural decision, so
+    # both names come from the plan rather than being rebuilt here.
+    local_kernel = local_kernel_plan_for(prefix, system.dim, family)
+    mesh_kernel = mesh_kernel_plan_for_element(prefix, element_type)
+    local_prefix = local_kernel.name if local_prefix is None else str(local_prefix)
+    element_prefix = mesh_kernel.name if operator_prefix is None else str(operator_prefix)
     if reference_data_plan is not None:
         validate_reference_data_plan(
             reference_data_plan,
@@ -1614,8 +1619,8 @@ def generate_coupled_residual_sfem_files(
         )
         expected_diagnostics.append("%s_jacobian_action_element_soa" % element_prefix)
         validate_diagnostics_plan_names(diagnostics_plan, expected_diagnostics)
-    local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
-    operator_name = "%s_operator.cpp" % element_prefix if operator_name is None else str(operator_name)
+    local_name = local_kernel.header if local_name is None else str(local_name)
+    operator_name = mesh_kernel.source if operator_name is None else str(operator_name)
     local_source = _local_header(
         system,
         local_prefix,
@@ -1662,12 +1667,6 @@ def generate_coupled_residual_sfem_files(
     )
 
 
-def _single_element_operator_prefix(prefix, element_type):
-    element = str(element_type).lower()
-    prefix = str(prefix)
-    if prefix.lower().endswith("_%s" % element):
-        return prefix
-    return "%s_%s" % (prefix, element)
 
 
 def generate_mixed_residual_sfem_files(
@@ -1724,8 +1723,14 @@ def generate_mixed_residual_sfem_files(
             cell_specialization.quadrature_rule,
             family,
         )
-    local_prefix = "%s_d%d_%s_mixed" % (prefix, system.dim, family) if local_prefix is None else str(local_prefix)
-    element_prefix = "%s_%s" % (prefix, compatible_element.name.lower()) if operator_prefix is None else str(operator_prefix)
+    # As in the coupled path, the names come from the plan.  The mixed path adds
+    # a "_mixed" suffix and labels the operator with the compatible element pair;
+    # it deliberately does not apply the coupled path's idempotence rule, because
+    # a Taylor-Hood label is never already present in the prefix.
+    local_kernel = local_kernel_plan_for(prefix, system.dim, family, suffix="_mixed")
+    mesh_kernel = MeshKernelPlan(prefix=prefix, element_label=compatible_element.name)
+    local_prefix = local_kernel.name if local_prefix is None else str(local_prefix)
+    element_prefix = mesh_kernel.name if operator_prefix is None else str(operator_prefix)
     if diagnostics_plan is not None:
         validate_diagnostics_plan_names(
             diagnostics_plan,
@@ -1734,8 +1739,8 @@ def generate_mixed_residual_sfem_files(
                 "%s_jacobian_action_element_soa" % element_prefix,
             ),
         )
-    local_name = "%s_local.hpp" % local_prefix if local_name is None else str(local_name)
-    operator_name = "%s_operator.cpp" % element_prefix if operator_name is None else str(operator_name)
+    local_name = local_kernel.header if local_name is None else str(local_name)
+    operator_name = mesh_kernel.source if operator_name is None else str(operator_name)
     local_source = _mixed_local_header(
         system,
         local_prefix,

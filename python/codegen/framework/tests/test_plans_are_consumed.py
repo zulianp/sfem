@@ -12,10 +12,12 @@ emitter or backend reads is pinned.  Entries may be removed as decisions move
 up, and never added -- so the list is a measure of how much of the emission
 layer's job is still misplaced, and it can only shrink.
 
-The check is deliberately shallow: does the type's name appear anywhere in an
-emitter or backend module.  That over-counts consumption if anything -- a
-mention is not the same as being driven by it -- which is the safe direction
-for a ratchet.
+The check counts a plan as consumed when an emitter or backend mentions either
+the type itself or one of the planning-layer factories that returns it.  A
+factory counts because consuming ``local_kernel_plan_for(...)`` is consuming the
+plan -- the first version of this test missed exactly that and under-reported.
+It over-counts if anything, since a mention is not the same as being driven by
+it, which is the safe direction for a ratchet.
 """
 
 import os
@@ -52,7 +54,23 @@ STRUCTURAL_PLAN_TYPES = (
 #:
 #: Removing an entry means that decision now comes from the plan.  See open
 #: points 1 and 3 in ARCHITECTURE.html.
-UNCONSUMED_PLAN_TYPES = frozenset(STRUCTURAL_PLAN_TYPES)
+#:
+#: Removed so far:
+#:   LocalKernelPlan, MeshKernelPlan -- which files a kernel produces and what
+#:   they are called, including the rule that a prefix already naming its
+#:   element does not get a second one.  The emitters had rebuilt both names
+#:   from format strings.
+UNCONSUMED_PLAN_TYPES = frozenset(
+    set(STRUCTURAL_PLAN_TYPES) - {"LocalKernelPlan", "MeshKernelPlan"}
+)
+
+
+#: Planning-layer factories that return one of the structural plans.  Consuming
+#: a factory is consuming the plan it returns.
+PLAN_FACTORIES = {
+    "LocalKernelPlan": ("local_kernel_plan_for",),
+    "MeshKernelPlan": ("mesh_kernel_plan_for_element", "mesh_kernel_plan_from_context"),
+}
 
 
 def _consumer_sources():
@@ -73,7 +91,12 @@ def consumed_plan_types():
     sources = list(_consumer_sources())
     consumed = {}
     for plan_type in STRUCTURAL_PLAN_TYPES:
-        readers = [name for name, source in sources if plan_type in source]
+        tokens = (plan_type,) + PLAN_FACTORIES.get(plan_type, ())
+        readers = [
+            name
+            for name, source in sources
+            if any(token in source for token in tokens)
+        ]
         if readers:
             consumed[plan_type] = readers
     return consumed
@@ -120,7 +143,7 @@ class PlansAreConsumedTest(unittest.TestCase):
         )
         self.assertEqual(
             unconsumed,
-            13,
+            11,
             "the number of unread structural plans changed to %d; update this "
             "expectation deliberately, and say why in the commit" % unconsumed,
         )
