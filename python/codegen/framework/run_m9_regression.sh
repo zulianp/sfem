@@ -8,12 +8,17 @@ cd "$ROOT"
 export PYTHONPATH="$ROOT/python${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "M9 required Python and generated-code regression tests"
+# Do not let `set -e` abort here: this suite has known pre-existing failures, and
+# the checks below still need to run.  The combined status is returned at the end.
+unittest_status=0
 "$PYTHON_BIN" -m unittest \
     python.codegen.framework.tests.test_symbolic \
     python.codegen.framework.tests.test_gen_api \
     python.codegen.framework.tests.test_residual \
     python.codegen.framework.tests.test_neohookean_ogden \
-    python.codegen.framework.tests.test_m9_regression
+    python.codegen.framework.tests.test_m9_regression \
+    python.codegen.framework.tests.test_layering \
+    python.codegen.framework.tests.test_module_imports || unittest_status=$?
 
 if command -v mpic++ >/dev/null 2>&1 || command -v mpicxx >/dev/null 2>&1 || command -v c++ >/dev/null 2>&1; then
     echo "Generated OpenMP compile checks: covered by test_m9_regression and existing unittest gates"
@@ -33,4 +38,12 @@ else
     echo "Optional CUDA checks: skipped because nvcc is unavailable"
 fi
 
+if [[ "${SFEM_CODEGEN_SNAPSHOT:-0}" == "1" ]]; then
+    echo "Generated-source snapshot gate: verifying against the committed manifest"
+    "$PYTHON_BIN" -m codegen.framework.tools.codegen_snapshot verify --quiet
+else
+    echo "Generated-source snapshot gate: skipped; set SFEM_CODEGEN_SNAPSHOT=1 to run it (~3 min)"
+fi
+
 echo "M9 regression entry point completed"
+exit "$unittest_status"
