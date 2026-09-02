@@ -1,0 +1,622 @@
+<title>SFEM Codegen Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
+<style>
+  :root {
+    --paper:      #f4f6f7;
+    --surface:    #ffffff;
+    --surface-2:  #e8edef;
+    --ink:        #12181c;
+    --ink-2:      #46545c;
+    --ink-3:      #74838b;
+    --rule:       #d0d9dd;
+    --rule-soft:  #e1e8ea;
+    /* Two views, two hues: the whole document is a comparison. */
+    --pre:        #2f5d7c;
+    --pre-soft:   #dde8ef;
+    --desc:       #86641b;
+    --desc-soft:  #f2e9d4;
+    --gap:        #a8452a;
+    --gap-soft:   #f5e0d9;
+    --ok:         #2f6a52;
+    --ok-soft:    #dcebe3;
+    --shadow:     0 1px 2px rgba(18,24,28,.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0d1214;
+      --surface:    #141b1e;
+      --surface-2:  #1a2327;
+      --ink:        #e3eaec;
+      --ink-2:      #a3b1b7;
+      --ink-3:      #78878e;
+      --rule:       #29343a;
+      --rule-soft:  #1f292e;
+      --pre:        #7cb3d4;
+      --pre-soft:   #16303f;
+      --desc:       #d4a94a;
+      --desc-soft:  #33280f;
+      --gap:        #e2906f;
+      --gap-soft:   #38211a;
+      --ok:         #6fbb98;
+      --ok-soft:    #16302479;
+      --shadow:     0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #0d1214;
+    --surface:    #141b1e;
+    --surface-2:  #1a2327;
+    --ink:        #e3eaec;
+    --ink-2:      #a3b1b7;
+    --ink-3:      #78878e;
+    --rule:       #29343a;
+    --rule-soft:  #1f292e;
+    --pre:        #7cb3d4;
+    --pre-soft:   #16303f;
+    --desc:       #d4a94a;
+    --desc-soft:  #33280f;
+    --gap:        #e2906f;
+    --gap-soft:   #38211a;
+    --ok:         #6fbb98;
+    --ok-soft:    #163024;
+    --shadow:     0 1px 2px rgba(0,0,0,.4);
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Newsreader, Georgia, serif;
+    font-size: 17.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1140px; margin: 0 auto; padding: 0 34px 96px; }
+  h1, h2, h3, .disp { font-family: Chivo, "Helvetica Neue", Arial, sans-serif; text-wrap: balance; margin: 0; }
+  code, .mono, figcaption, .chip { font-family: "JetBrains Mono", Menlo, Consolas, monospace; }
+  code {
+    font-size: .82em; background: var(--surface-2); border: 1px solid var(--rule-soft);
+    border-radius: 3px; padding: .06em .3em; word-break: break-word;
+  }
+  a { color: var(--pre); }
+
+  header.masthead { border-bottom: 2px solid var(--ink); padding: 54px 0 20px; margin-bottom: 40px; }
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-3); margin-bottom: 16px;
+  }
+  .eyebrow b { color: var(--pre); font-weight: 500; }
+  .eyebrow i { color: var(--desc); font-style: normal; font-weight: 500; }
+  h1 { font-size: clamp(33px, 5vw, 50px); font-weight: 700; letter-spacing: -.022em; line-height: 1.03; }
+  .standfirst { font-size: 20px; color: var(--ink-2); margin-top: 16px; max-width: 60ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 3px 26px; margin-top: 24px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-3); }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+
+  section { margin-top: 60px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; border-top: 1px solid var(--rule); padding-top: 13px; margin-bottom: 22px; }
+  .sec-num { font-family: "JetBrains Mono", monospace; font-size: 11.5px; letter-spacing: .1em; flex: none; }
+  .sec-num.p { color: var(--pre); }
+  .sec-num.d { color: var(--desc); }
+  .sec-num.g { color: var(--gap); }
+  h2 { font-size: 26px; font-weight: 600; letter-spacing: -.012em; }
+  h3 { font-size: 18.5px; font-weight: 600; margin-top: 32px; }
+  p { margin: .95em 0; max-width: 68ch; }
+  .lead { font-size: 18.5px; }
+
+  .chip {
+    font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 7px;
+    border-radius: 2px; font-weight: 500; border: 1px solid transparent; white-space: nowrap;
+  }
+  .c-ok   { color: var(--ok);   background: var(--ok-soft);   border-color: color-mix(in srgb, var(--ok) 28%, transparent); }
+  .c-part { color: var(--desc); background: var(--desc-soft); border-color: color-mix(in srgb, var(--desc) 32%, transparent); }
+  .c-gap  { color: var(--gap);  background: var(--gap-soft);  border-color: color-mix(in srgb, var(--gap) 30%, transparent); }
+  .c-pre  { color: var(--pre);  background: var(--pre-soft);  border-color: color-mix(in srgb, var(--pre) 28%, transparent); }
+
+  figure { margin: 34px 0; }
+  .fig-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 14px 10px; box-shadow: var(--shadow); }
+  figure svg { display: block; max-width: 100%; height: auto; min-width: 620px; margin: 0 auto; }
+  figcaption { font-size: 11.5px; color: var(--ink-3); margin-top: 11px; line-height: 1.65; max-width: 78ch; }
+  figcaption b { color: var(--ink-2); font-weight: 500; }
+
+  /* diagram tokens */
+  .d-band   { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1; }
+  .d-pre    { fill: var(--pre-soft);  stroke: var(--pre);  stroke-width: 1.2; }
+  .d-gapb   { fill: var(--gap-soft);  stroke: var(--gap);  stroke-width: 1.2; }
+  .d-okb    { fill: var(--ok-soft);   stroke: var(--ok);   stroke-width: 1.2; }
+  .d-partb  { fill: var(--desc-soft); stroke: var(--desc); stroke-width: 1.2; }
+  .d-plain  { fill: var(--surface);   stroke: var(--rule); stroke-width: 1; }
+  .d-name   { fill: var(--ink); font-family: Chivo, sans-serif; font-size: 14px; font-weight: 600; }
+  .d-sub    { fill: var(--ink-2); font-family: "JetBrains Mono", monospace; font-size: 10.5px; }
+  .d-dim    { fill: var(--ink-3); font-family: "JetBrains Mono", monospace; font-size: 10px; }
+  .d-key    { fill: var(--pre); font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; }
+  .d-keyd   { fill: var(--desc); font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; }
+  .d-gapt   { fill: var(--gap); font-family: "JetBrains Mono", monospace; font-size: 10.5px; }
+  .d-okt    { fill: var(--ok); font-family: "JetBrains Mono", monospace; font-size: 10.5px; }
+  .d-hdr    { fill: var(--ink); font-family: Chivo, sans-serif; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; }
+  .d-line   { stroke: var(--pre); stroke-width: 1.5; fill: none; }
+  .d-gline  { stroke: var(--gap); stroke-width: 1.5; fill: none; }
+  .d-rule   { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 3 4; }
+  .d-head   { fill: var(--pre); }
+  .d-ghead  { fill: var(--gap); }
+
+  .tbl-wrap { overflow-x: auto; margin: 24px 0; }
+  table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  th { font-family: Chivo, sans-serif; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; border-bottom: 1px solid var(--rule); }
+  td.m { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink-2); }
+  td.n { font-variant-numeric: tabular-nums; font-family: "JetBrains Mono", monospace; font-size: 12px; }
+
+  /* open points */
+  .op { display: grid; grid-template-columns: 4px 54px minmax(0,1fr); gap: 0 18px; margin-top: 4px; }
+  .op > .rail { background: var(--rule); border-radius: 2px; }
+  .op.blocked > .rail { background: var(--gap); }
+  .op.ready   > .rail { background: var(--ok); }
+  .op.decide  > .rail { background: var(--desc); }
+  .op > .num { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 500; color: var(--ink-3); padding-top: 20px; }
+  .op > .body { padding: 16px 0 22px; }
+  .op > .body > :first-child { margin-top: 0; }
+  .op-title { font-family: Chivo, sans-serif; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .op p { font-size: 16px; margin: .5em 0; max-width: 66ch; }
+  .op-facts { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-top: 10px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-2); }
+  .op-facts i { font-style: normal; color: var(--ink-3); }
+
+  .callout {
+    border-left: 3px solid var(--pre); background: var(--surface);
+    border-top: 1px solid var(--rule-soft); border-right: 1px solid var(--rule-soft); border-bottom: 1px solid var(--rule-soft);
+    padding: 20px 24px; margin: 30px 0; max-width: 72ch;
+  }
+  .callout.d { border-left-color: var(--desc); }
+  .callout p { margin: .35em 0; font-size: 17.5px; }
+  .callout .label { font-family: Chivo, sans-serif; font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--pre); margin-bottom: 7px; }
+  .callout.d .label { color: var(--desc); }
+
+  ul.tight { margin: .5em 0; padding-left: 1.15em; }
+  ul.tight li { margin: .3em 0; max-width: 66ch; }
+
+  footer { margin-top: 68px; border-top: 1px solid var(--rule); padding-top: 18px; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-3); }
+
+  @media (max-width: 640px) {
+    .page { padding: 0 18px 60px; }
+    .op { grid-template-columns: 3px 40px minmax(0,1fr); gap: 0 12px; }
+    body { font-size: 16.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  :focus-visible { outline: 2px solid var(--pre); outline-offset: 2px; }
+</style>
+
+<div class="page">
+
+<header class="masthead">
+  <div class="eyebrow"><b>Prescriptive</b> — what the layers must own &nbsp;·&nbsp; <i>Descriptive</i> — what is built today &nbsp;·&nbsp; Open points</div>
+  <h1>SFEM Codegen Architecture</h1>
+  <p class="standfirst">The layer graph is now clean and enforced. The layers themselves are not yet doing the jobs they are named for — one of them holds 22,970 lines that should be a printer.</p>
+  <div class="meta">
+    <span><b>Package</b> python/codegen/framework</span>
+    <span><b>Branch</b> codegen-layering, 7 commits from 060684ff</span>
+    <span><b>Out of scope</b> the mlir/ subtree</span>
+    <span><b>Date</b> 2026-09-02</span>
+  </div>
+</header>
+
+<p class="lead">This document separates two things that the previous analysis deliberately ran together: what the architecture <em>requires</em> of each layer, and what each layer currently <em>is</em>. They are drawn against the same eight rows so the difference can be pointed at rather than described. Everything after that is the list of decisions still open, with the cost of each and what it blocks.</p>
+
+<div class="callout">
+  <div class="label">Where things stand</div>
+  <p>Structure is done: every import in the framework points up the lowering order, zero violations, enforced by a test that fails on any new one. The specification layer has no outgoing edges at all. The planning layer exists. Nothing architectural lives outside the framework.</p>
+  <p>Behaviour is not. The emission layer still makes the decisions the planning layer is supposed to make — which loops exist, what hoists to which scope, which buffers are gathered, how a matrix scatters. Thirteen plan types and six assembly plans describe those decisions and <b>no emitter reads any of them</b>.</p>
+</div>
+
+<p>Put plainly: the boxes are in the right places and the arrows point the right way, but the work is still being done in the wrong box. Every open point in Part 3 is either that problem or a consequence of it.</p>
+
+<!-- ============================ PART 1 ============================ -->
+<section>
+  <div class="sec-head"><span class="sec-num p">PART 1 · PRESCRIPTIVE</span><h2>What each layer must own</h2></div>
+
+  <p>Eight layers. Each boundary is placed where a distinct kind of decision is finished, and the test of a boundary is that a concept is nameable above it and unnameable below it. The figure pairs each layer's requirement with what occupies it today, so the two readings share a row.</p>
+
+  <figure>
+    <div class="fig-wrap">
+      <svg viewBox="0 0 940 806" role="img" aria-label="Eight layers from specification to packaging. For each layer the left column states what it must own; the right column names the code that occupies it today with a conformance status. Specification, discretization and packaging conform; form lowering, kernel planning and target lowering are partial; the kernel IR is bypassed; the emission layer does not conform, holding 22,970 lines that still make planning decisions.">
+        <text x="24" y="26" class="d-hdr">THE EIGHT LAYERS — REQUIREMENT vs. OCCUPANT</text>
+        <text x="104" y="56" class="d-key">PRESCRIBED · what the layer must own</text>
+        <text x="514" y="56" class="d-keyd">AS BUILT · what is there today</text>
+        <line x1="90" y1="62" x2="916" y2="62" class="d-rule"/>
+
+        <!-- L0 -->
+        <text x="80" y="102" class="d-key" text-anchor="end">L0</text>
+        <rect x="90" y="70" width="380" height="78" class="d-band" rx="2"/>
+        <text x="106" y="94" class="d-name">Specification</text>
+        <text x="106" y="114" class="d-sub">fields · operators · equations · qualifiers</text>
+        <text x="106" y="132" class="d-sub">pure SymPy · names no other layer</text>
+        <rect x="500" y="70" width="416" height="78" class="d-okb" rx="2"/>
+        <text x="516" y="94" class="d-name">symbolic/</text>
+        <text x="516" y="114" class="d-sub">4,524 LOC · 11 modules</text>
+        <text x="516" y="132" class="d-okt">zero outgoing edges</text>
+        <text x="902" y="94" class="d-okt" text-anchor="end">CONFORMS</text>
+
+        <!-- L1 -->
+        <text x="80" y="188" class="d-key" text-anchor="end">L1</text>
+        <rect x="90" y="156" width="380" height="78" class="d-band" rx="2"/>
+        <text x="106" y="180" class="d-name">Form lowering</text>
+        <text x="106" y="200" class="d-sub">differentiation · 0/1/2-forms · pruning</text>
+        <text x="106" y="218" class="d-sub">block structure · provenance ends here</text>
+        <rect x="500" y="156" width="416" height="78" class="d-partb" rx="2"/>
+        <text x="516" y="180" class="d-name">symbolic/forms · equations · residual · weak_forms</text>
+        <text x="516" y="200" class="d-sub">FormCollection is closed; no back-pointer</text>
+        <text x="516" y="218" class="d-dim">not yet its own package — shares L0's</text>
+        <text x="902" y="180" class="d-keyd" text-anchor="end">PARTIAL</text>
+
+        <!-- L2 -->
+        <text x="80" y="274" class="d-key" text-anchor="end">L2</text>
+        <rect x="90" y="242" width="380" height="78" class="d-band" rx="2"/>
+        <text x="106" y="266" class="d-name">Discretization</text>
+        <text x="106" y="286" class="d-sub">element families · basis · quadrature</text>
+        <text x="106" y="304" class="d-sub">geometry mode · mixed order · emits nothing</text>
+        <rect x="500" y="242" width="416" height="78" class="d-okb" rx="2"/>
+        <text x="516" y="266" class="d-name">fem/</text>
+        <text x="516" y="286" class="d-sub">1,914 LOC · 5 modules</text>
+        <text x="516" y="304" class="d-okt">two emitter modules moved out</text>
+        <text x="902" y="266" class="d-okt" text-anchor="end">CONFORMS</text>
+
+        <!-- L3 -->
+        <text x="80" y="360" class="d-key" text-anchor="end">L3</text>
+        <rect x="90" y="328" width="380" height="78" class="d-band" rx="2"/>
+        <text x="106" y="352" class="d-name">Kernel planning</text>
+        <text x="106" y="372" class="d-sub">expression graph · CSE · scope hoisting</text>
+        <text x="106" y="390" class="d-sub">streams · phases · layouts · cost · SymPy ends</text>
+        <rect x="500" y="328" width="416" height="78" class="d-partb" rx="2"/>
+        <text x="516" y="352" class="d-name">plans/</text>
+        <text x="516" y="372" class="d-sub">4,699 LOC · 12 modules · scheduler landed</text>
+        <text x="516" y="390" class="d-gapt">13 plan types + 6 assembly plans unread</text>
+        <text x="902" y="352" class="d-keyd" text-anchor="end">PARTIAL</text>
+
+        <!-- L4 -->
+        <text x="80" y="446" class="d-key" text-anchor="end">L4</text>
+        <rect x="90" y="414" width="380" height="78" class="d-band" rx="2"/>
+        <text x="106" y="438" class="d-name">Kernel IR</text>
+        <text x="106" y="458" class="d-sub">loop nests · buffers · gather/scatter</text>
+        <text x="106" y="476" class="d-sub">AST passes · loop structure fixed here</text>
+        <rect x="500" y="414" width="416" height="78" class="d-gapb" rx="2"/>
+        <text x="516" y="438" class="d-name">ir/</text>
+        <text x="516" y="458" class="d-sub">930 LOC · complete and well formed</text>
+        <text x="516" y="476" class="d-gapt">0 nodes built on the residual path</text>
+        <text x="902" y="438" class="d-gapt" text-anchor="end">BYPASSED</text>
+
+        <!-- L5 -->
+        <text x="80" y="532" class="d-key" text-anchor="end">L5</text>
+        <rect x="90" y="500" width="380" height="78" class="d-band" rx="2"/>
+        <text x="106" y="524" class="d-name">Target lowering</text>
+        <text x="106" y="544" class="d-sub">OpenMP · CUDA/HIP · AVX512 · SVE/SME</text>
+        <text x="106" y="562" class="d-sub">atomics · widths · spaces · target ends here</text>
+        <rect x="500" y="500" width="416" height="78" class="d-partb" rx="2"/>
+        <text x="516" y="524" class="d-name">targets/</text>
+        <text x="516" y="544" class="d-sub">445 LOC · own layer since the split</text>
+        <text x="516" y="562" class="d-gapt">supplies dialect only; _target() hardcoded</text>
+        <text x="902" y="524" class="d-keyd" text-anchor="end">PARTIAL</text>
+
+        <!-- L6 -->
+        <text x="80" y="618" class="d-key" text-anchor="end">L6</text>
+        <rect x="90" y="586" width="380" height="78" class="d-band" rx="2"/>
+        <text x="106" y="610" class="d-name">Emission</text>
+        <text x="106" y="630" class="d-sub">AST + dialect → text · file assembly</text>
+        <text x="106" y="648" class="d-sub">mechanical · no policy · no decisions</text>
+        <rect x="500" y="586" width="416" height="78" class="d-gapb" rx="2"/>
+        <text x="516" y="610" class="d-name">emitters/</text>
+        <text x="516" y="630" class="d-sub">22,970 LOC · 13 modules</text>
+        <text x="516" y="648" class="d-gapt">still plans, schedules, lowers, and prints</text>
+        <text x="902" y="610" class="d-gapt" text-anchor="end">DOES NOT CONFORM</text>
+
+        <!-- L7 -->
+        <text x="80" y="704" class="d-key" text-anchor="end">L7</text>
+        <rect x="90" y="672" width="380" height="78" class="d-band" rx="2"/>
+        <text x="106" y="696" class="d-name">Packaging</text>
+        <text x="106" y="716" class="d-sub">shared headers · C ABI · sfem::Op · factory</text>
+        <text x="106" y="734" class="d-sub">FLOP/AI reports · never changes a kernel body</text>
+        <rect x="500" y="672" width="416" height="78" class="d-okb" rx="2"/>
+        <text x="516" y="696" class="d-name">package/</text>
+        <text x="516" y="716" class="d-sub">7,388 LOC · moved in from python/sfem/</text>
+        <text x="516" y="734" class="d-okt">inside the framework; shim kept for callers</text>
+        <text x="902" y="696" class="d-okt" text-anchor="end">CONFORMS</text>
+
+        <text x="24" y="782" class="d-dim">Driver (pipeline/, 2,342 LOC) calls each layer in sequence and is imported by none. Frontend (materials/, generators/) sits above the stack.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 1.</b> The same eight rows read twice. Three layers conform, three are partial, one is bypassed, and one — emission — is doing four layers' work at once. The line between the columns is the whole remaining project: <b>22,970 lines on the right of row L6 that belong distributed up rows L3 to L5.</b></figcaption>
+  </figure>
+
+  <h3>The rules that make a boundary real</h3>
+  <p>Three, each enforced by a test rather than asserted in prose. They are what stopped the layer graph regressing while 6,000 lines moved between packages.</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:20%">Rule</th><th style="width:46%">Statement</th><th style="width:34%">Enforced by</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>One direction</b></td>
+        <td>A layer may name the artifact it receives and never a layer that comes after it. Imports point up only.</td>
+        <td class="m">tests/test_layering.py — parses every module with <code>ast</code>, never imports one, so side effects can neither hide nor cause a failure</td>
+      </tr>
+      <tr>
+        <td><b>Closed handoffs</b></td>
+        <td>Above L3, severability: cut the back-pointer, re-run the layers below, get an identical result. From L3 down, where SymPy has ended, a JSON round trip.</td>
+        <td class="m">tests/test_form_collection_boundary.py — behavioural and static; the JSON half awaits a complete KernelPlan</td>
+      </tr>
+      <tr>
+        <td><b>One dispatch axis</b></td>
+        <td>A layer may branch on the concept it owns and on nothing a layer above owns. No <code>if kind == "energy_soa"</code> in a backend, no <code>if "crs" in formats</code> in a printer.</td>
+        <td class="m">not yet enforced — see open point 5</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============================ PART 2 ============================ -->
+<section>
+  <div class="sec-head"><span class="sec-num d">PART 2 · DESCRIPTIVE</span><h2>What is actually built</h2></div>
+
+  <p>Two facts about the current tree. The first is good and finished; the second is the reason this document exists.</p>
+
+  <h3>The import graph is clean</h3>
+  <p>Twelve layer-to-layer edges, every one pointing up the lowering order. It started at seventeen edges with six pointing the wrong way, including all four leaving the specification layer.</p>
+
+  <figure>
+    <div class="fig-wrap">
+      <svg viewBox="0 0 660 396" role="img" aria-label="A matrix of which layer imports which. Every filled cell lies below the diagonal, meaning every import points up the lowering order. Twelve edges, zero violations.">
+        <text x="20" y="24" class="d-hdr">WHO IMPORTS WHOM — 12 EDGES, ALL BELOW THE DIAGONAL</text>
+        <text x="20" y="44" class="d-dim">rows import columns · number = how many files · shaded band = the illegal half, empty by construction</text>
+
+        <!-- column headers -->
+        <text x="250" y="76" class="d-sub" text-anchor="middle">symbolic</text>
+        <text x="318" y="76" class="d-sub" text-anchor="middle">fem</text>
+        <text x="386" y="76" class="d-sub" text-anchor="middle">plans</text>
+        <text x="454" y="76" class="d-sub" text-anchor="middle">ir</text>
+        <text x="522" y="76" class="d-sub" text-anchor="middle">targets</text>
+        <text x="590" y="76" class="d-sub" text-anchor="middle">emitters</text>
+
+        <!-- illegal half shading: above/right of diagonal -->
+        <path d="M216,86 L624,86 L624,358 Z" fill="var(--gap-soft)" opacity="0.5"/>
+        <text x="556" y="150" class="d-gapt" text-anchor="middle">illegal half</text>
+        <text x="556" y="166" class="d-gapt" text-anchor="middle">(empty)</text>
+
+        <!-- grid -->
+        <g stroke="var(--rule)" stroke-width="1" fill="none">
+          <rect x="216" y="86" width="408" height="272"/>
+          <line x1="284" y1="86" x2="284" y2="358"/><line x1="352" y1="86" x2="352" y2="358"/>
+          <line x1="420" y1="86" x2="420" y2="358"/><line x1="488" y1="86" x2="488" y2="358"/>
+          <line x1="556" y1="86" x2="556" y2="358"/>
+          <line x1="216" y1="131" x2="624" y2="131"/><line x1="216" y1="176" x2="624" y2="176"/>
+          <line x1="216" y1="221" x2="624" y2="221"/><line x1="216" y1="266" x2="624" y2="266"/>
+          <line x1="216" y1="311" x2="624" y2="311"/>
+        </g>
+
+        <!-- row labels -->
+        <text x="206" y="114" class="d-sub" text-anchor="end">fem</text>
+        <text x="206" y="159" class="d-sub" text-anchor="end">plans</text>
+        <text x="206" y="204" class="d-sub" text-anchor="end">ir</text>
+        <text x="206" y="249" class="d-sub" text-anchor="end">targets</text>
+        <text x="206" y="294" class="d-sub" text-anchor="end">emitters</text>
+        <text x="206" y="339" class="d-sub" text-anchor="end">backends</text>
+
+        <!-- cells: plans row -->
+        <rect x="217" y="132" width="66" height="43" class="d-okb"/><text x="250" y="159" class="d-okt" text-anchor="middle">6</text>
+        <rect x="285" y="132" width="66" height="43" class="d-okb"/><text x="318" y="159" class="d-okt" text-anchor="middle">4</text>
+        <!-- emitters row -->
+        <rect x="217" y="267" width="66" height="43" class="d-okb"/><text x="250" y="294" class="d-okt" text-anchor="middle">3</text>
+        <rect x="285" y="267" width="66" height="43" class="d-okb"/><text x="318" y="294" class="d-okt" text-anchor="middle">4</text>
+        <rect x="353" y="267" width="66" height="43" class="d-okb"/><text x="386" y="294" class="d-okt" text-anchor="middle">5</text>
+        <rect x="421" y="267" width="66" height="43" class="d-okb"/><text x="454" y="294" class="d-okt" text-anchor="middle">3</text>
+        <rect x="489" y="267" width="66" height="43" class="d-okb"/><text x="522" y="294" class="d-okt" text-anchor="middle">6</text>
+        <!-- backends row -->
+        <rect x="217" y="312" width="66" height="45" class="d-okb"/><text x="250" y="339" class="d-okt" text-anchor="middle">2</text>
+        <rect x="353" y="312" width="66" height="45" class="d-okb"/><text x="386" y="339" class="d-okt" text-anchor="middle">2</text>
+        <rect x="421" y="312" width="66" height="45" class="d-okb"/><text x="454" y="339" class="d-okt" text-anchor="middle">1</text>
+        <rect x="489" y="312" width="66" height="45" class="d-okb"/><text x="522" y="339" class="d-okt" text-anchor="middle">2</text>
+        <rect x="557" y="312" width="66" height="45" class="d-okb"/><text x="590" y="339" class="d-okt" text-anchor="middle">2</text>
+
+        <text x="20" y="384" class="d-dim">Started at 17 edges, 6 illegal — all four out of symbolic, plus fem→backends and emitters→backends.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 2.</b> The descriptive graph. Two of the original six were never violations to repair but packages holding two unrelated things: <code>backends/</code> mixed target definitions with orchestrators, and <code>fem/</code> held two emitter modules. Splitting both emptied the illegal half.</figcaption>
+  </figure>
+
+  <h3>The decisions are still in the wrong layer</h3>
+  <p>What the clean graph does not show: the emission layer receives plan objects and ignores them, re-deriving the same decisions internally from SymPy and element metadata. The plan layer describes the kernel; the emitter builds a different description of the same kernel in control flow and strings.</p>
+
+  <figure>
+    <div class="fig-wrap">
+      <svg viewBox="0 0 940 470" role="img" aria-label="The residual generation path. Plan objects flow from kernel planning toward emission, but thirteen plan types and six assembly plans are never read; the emitter re-derives loop structure, scopes, streams, gather and scatter, geometry policy and matrix format internally, and hardcodes its target.">
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-ghead"/></marker>
+        </defs>
+        <text x="24" y="26" class="d-hdr">THE RESIDUAL PATH TODAY — WHAT IS PASSED, AND WHAT IS IGNORED</text>
+
+        <!-- chain -->
+        <rect x="24" y="52" width="180" height="52" class="d-plain" rx="2"/>
+        <text x="38" y="74" class="d-name">FormCollection</text>
+        <text x="38" y="92" class="d-sub">closed · no back-pointer</text>
+        <path d="M204,78 L246,78" class="d-line" marker-end="url(#a1)"/>
+
+        <rect x="250" y="52" width="200" height="52" class="d-pre" rx="2"/>
+        <text x="264" y="74" class="d-name">plans/ (L3)</text>
+        <text x="264" y="92" class="d-sub">scheduler · 4,699 LOC</text>
+        <path d="M450,78 L492,78" class="d-line" marker-end="url(#a1)"/>
+
+        <rect x="496" y="52" width="220" height="52" class="d-plain" rx="2"/>
+        <text x="510" y="74" class="d-name">ResidualEmissionModel</text>
+        <text x="510" y="92" class="d-sub">8 members · the only input used</text>
+        <path d="M716,78 L758,78" class="d-line" marker-end="url(#a1)"/>
+
+        <rect x="762" y="52" width="154" height="52" class="d-gapb" rx="2"/>
+        <text x="776" y="74" class="d-name">emitters/ (L6)</text>
+        <text x="776" y="92" class="d-sub">22,970 LOC</text>
+
+        <!-- what L3 produces but nobody reads -->
+        <rect x="250" y="140" width="200" height="196" class="d-plain" rx="2"/>
+        <text x="264" y="162" class="d-sub">L3 also produces:</text>
+        <text x="264" y="184" class="d-dim">LocalPhasePlan</text>
+        <text x="264" y="200" class="d-dim">MeshPhasePlan</text>
+        <text x="264" y="216" class="d-dim">DataStreamPlan</text>
+        <text x="264" y="232" class="d-dim">BlockPlan</text>
+        <text x="264" y="248" class="d-dim">GeometryPlan</text>
+        <text x="264" y="264" class="d-dim">LocalKernelPlan · MeshKernelPlan</text>
+        <text x="264" y="288" class="d-dim">CRS / BSR / DIA / COO /</text>
+        <text x="264" y="304" class="d-dim">Patch / BlockDiagSym AssemblyPlan</text>
+        <text x="264" y="326" class="d-gapt">defined, tested, read by no emitter</text>
+        <path d="M350,140 L350,110" class="d-gline" stroke-dasharray="4 4"/>
+
+        <!-- what the emitter re-derives -->
+        <rect x="600" y="140" width="316" height="196" class="d-gapb" rx="2"/>
+        <text x="616" y="162" class="d-name">decided inside the emitter</text>
+        <text x="616" y="186" class="d-sub">loop nest and bounds</text>
+        <text x="616" y="204" class="d-sub">scope hoisting and temporaries</text>
+        <text x="616" y="222" class="d-sub">data streams and their layouts</text>
+        <text x="616" y="240" class="d-sub">gather / scatter shape</text>
+        <text x="616" y="258" class="d-sub">affine vs. isoparametric geometry</text>
+        <text x="616" y="276" class="d-sub">matrix-format scatter (string templates)</text>
+        <text x="616" y="294" class="d-sub">target syntax — <tspan class="d-gapt">_target() → OpenMPTarget()</tspan></text>
+        <text x="616" y="322" class="d-gapt">each one belongs in L3, L4 or L5</text>
+        <path d="M840,140 L840,110" class="d-gline" marker-end="url(#a2)"/>
+
+        <!-- IR bypassed -->
+        <rect x="24" y="140" width="180" height="90" class="d-gapb" rx="2"/>
+        <text x="38" y="162" class="d-name">ir/ (L4)</text>
+        <text x="38" y="182" class="d-sub">KernelAST · 930 LOC</text>
+        <text x="38" y="202" class="d-gapt">0 nodes on this path</text>
+        <text x="38" y="220" class="d-dim">energy path uses 4 fragments</text>
+
+        <text x="24" y="376" class="d-dim">The chain along the top is correct and enforced. Everything below it is the gap: one layer describing the kernel, another re-deriving it.</text>
+        <line x1="24" y1="396" x2="916" y2="396" class="d-rule"/>
+        <text x="24" y="420" class="d-sub">Consequence: a CUDA residual kernel is a fork, not an argument; a new matrix format is a new string template;</text>
+        <text x="24" y="440" class="d-sub">a vectorization or blocking change has nowhere to live but inside 10,074 lines of print statements.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 3.</b> The top row is the architecture working: a closed collection, a planning layer, a narrow model, an emitter. Below it, the same kernel is described twice — once by plan objects nobody reads, once by control flow inside the emitter. <b>Closing that duplication is the whole of the remaining work.</b></figcaption>
+  </figure>
+</section>
+
+<!-- ============================ PART 3 ============================ -->
+<section>
+  <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
+
+  <p>Nine, ordered by what unblocks what. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op blocked">
+    <div class="rail"></div><div class="num">OP 1</div>
+    <div class="body">
+      <div class="op-title">Move the emitters' decisions into L3 <span class="chip c-gap">blocked by nothing — blocks 2, 3, 4, 5</span></div>
+      <p>The root open point. <code>residual_codegen.py</code> (10,074 lines) and <code>energy_codegen.py</code> (8,483) decide loop structure, scope placement, stream layout, gather and scatter shape and geometry policy while building strings. The plan types for all of it already exist and are unread.</p>
+      <p>This is not one change. A sane order is one decision family at a time — streams first, since <code>DataStreamPlan</code> is the most self-contained, then phases, then geometry, then loop structure — each gated on byte-identical output, so the emitter is progressively hollowed out rather than rewritten.</p>
+      <div class="op-facts"><span><i>size</i> 18,557 LOC across two modules</span><span><i>gate</i> byte-identity holds throughout</span><span><i>unblocks</i> OP2, OP3, OP4, OP5</span></div>
+    </div>
+  </div>
+
+  <div class="op blocked">
+    <div class="rail"></div><div class="num">OP 2</div>
+    <div class="body">
+      <div class="op-title">Delete <code>_target()</code> <span class="chip c-gap">blocked by OP 1</span></div>
+      <p><code>emitters/residual_codegen.py:74</code> is still <code>def _target(): return OpenMPTarget()</code>, with a twin in the boundary emitter — 14 call sites through eight zero-argument wrappers. It is no longer a layering violation, since an emitter may name a target, but it is what keeps a CUDA residual kernel a fork rather than an argument.</p>
+      <p>Threading a target parameter reaches <b>43 functions transitively</b>, every one of them emitter internals that OP 1 is meant to collapse into a printer. Doing it first is work OP 1 undoes. Deferred deliberately, not overlooked.</p>
+      <div class="op-facts"><span><i>cost now</i> 43 function signatures</span><span><i>cost after OP 1</i> one argument</span></div>
+    </div>
+  </div>
+
+  <div class="op blocked">
+    <div class="rail"></div><div class="num">OP 3</div>
+    <div class="body">
+      <div class="op-title">Make the six assembly plans drive assembly <span class="chip c-gap">blocked by OP 1</span></div>
+      <p><code>CRSAssemblyPlan</code>, <code>BSRAssemblyPlan</code>, <code>DIAAssemblyPlan</code>, <code>COOAssemblyPlan</code>, <code>PatchAssemblyPlan</code> and <code>BlockDiagSymAssemblyPlan</code> describe row pointers, column indices, block layout and accumulation policy. They are referenced in exactly three places: their definition, the facade re-export, and their own test. Meanwhile the real CRS scatter is a string template selected by a substring test on a tuple of names.</p>
+      <p>Worth doing in two stages: first make emission consume the plans while producing byte-identical output — which proves the plans describe what is actually emitted — and only then change what the plans say.</p>
+      <div class="op-facts"><span><i>evidence</i> emitters/energy_codegen.py:6132, 6199</span><span><i>stage 1 gate</i> byte-identity</span><span><i>stage 2 gate</i> OP 6</span></div>
+    </div>
+  </div>
+
+  <div class="op blocked">
+    <div class="rail"></div><div class="num">OP 4</div>
+    <div class="body">
+      <div class="op-title">Route the residual path through <code>KernelAST</code> <span class="chip c-gap">blocked by OP 1</span></div>
+      <p><code>ir/kernel_ast.py</code> is a complete, well-formed kernel IR: typed loops with vectorization and tabulation strategies, buffers, gather and scatter nodes, geometry nodes, plus <code>KernelASTPass</code> and <code>KernelASTPassPipeline</code>. The residual path builds <b>zero nodes</b>; the energy path uses four fragments; the pass pipeline is referenced only from tests.</p>
+      <p>Every optimization the PRD asks for — vectorization, unrolling, blocking, scratchpad packing, per-warp variants — is a pass over this IR. There is nowhere else for them to live, and today nothing to attach them to.</p>
+      <div class="op-facts"><span><i>IR</i> 930 LOC, ready</span><span><i>residual nodes built</i> 0</span></div>
+    </div>
+  </div>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 5</div>
+    <div class="body">
+      <div class="op-title">Enforce the one-dispatch-axis rule <span class="chip c-part">needs a decision</span></div>
+      <p>Two of the three architectural rules are enforced by tests. The third is not: nothing currently fails when a backend branches on <code>unit.kind</code> or a printer on <code>if "crs" in formats</code>. Both still happen.</p>
+      <p>A static check is feasible — flag string comparisons against a known vocabulary of upper-layer concepts inside lower-layer modules — but it will be noisy until OP 1 and OP 3 remove the real cases. The decision is whether to write it now as a failing ratchet with an allowlist, exactly as the layering test was written before the code moved, or wait.</p>
+      <div class="op-facts"><span><i>precedent</i> the layering ratchet worked</span><span><i>risk</i> a noisy allowlist ages badly</span></div>
+    </div>
+  </div>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 6</div>
+    <div class="body">
+      <div class="op-title">There is no performance gate <span class="chip c-part">needs a decision</span></div>
+      <p>Every step so far has been verified by byte-identical generated output across 11 materials — a stronger claim than a passing test suite, and one that settles performance by construction: identical emitted source compiles to identical kernels.</p>
+      <p>That gate stops applying the moment output changes on purpose, which is exactly what OP 3 stage 2 and most kernel-level optimization do. What replaces it is numerical parity plus throughput measured before and after, and that needs a compiled SFEM build and a benchmark harness. <b>This worktree has neither.</b> Nothing beyond the byte-identity frontier can be honestly verified until it exists.</p>
+      <div class="op-facts"><span><i>needed</i> compiled build + MDOF/s harness</span><span><i>blocks</i> every output-changing step</span></div>
+    </div>
+  </div>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 7</div>
+    <div class="body">
+      <div class="op-title">Triage the 23 pre-existing test failures <span class="chip c-ok">ready</span></div>
+      <p>The suite has run at 10 failures and 13 errors throughout, an identical set at every step, and identical to the same suite on <code>nonlinearspmg</code>. They predate this work entirely. That made them a usable baseline, but "unchanged" is a weaker guarantee than "passing", and a genuine regression hiding inside a known-failing test would not be visible.</p>
+      <p>Independent of the architecture, and can start immediately.</p>
+      <div class="op-facts"><span><i>10 failures · 13 errors · 8 skips</i></span><span><i>same on both branches</i></span></div>
+    </div>
+  </div>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 8</div>
+    <div class="body">
+      <div class="op-title">Finish the package boundaries <span class="chip c-ok">ready</span></div>
+      <p>Two tidy-ups the layering test cannot see. L1 has no package of its own — <code>forms.py</code>, <code>equations.py</code>, <code>residual.py</code> and <code>weak_forms.py</code> sit inside <code>symbolic/</code>, so the boundary where provenance dies is a convention rather than a structure. And the energy path carries two generations at once: <code>emitters/energy.py</code> is a plan-driven façade whose <code>emit_plan</code> immediately unpacks the plan and calls the 8,483-line direct emitter beneath it.</p>
+      <div class="op-facts"><span><i>cost</i> mechanical</span><span><i>gate</i> byte-identity</span></div>
+    </div>
+  </div>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 9</div>
+    <div class="body">
+      <div class="op-title">Untracked files the branch depends on <span class="chip c-part">needs a decision</span></div>
+      <p>Practical, not architectural. <code>KERNELS.md</code>, <code>M11.md</code>, <code>docs/</code>, <code>scripts/</code> and two <code>mooney_rivlin_kelvin_voigt_newmark</code> modules are untracked in your checkout, so they exist on no branch. I copied them into the worktree to make the tests runnable but deliberately did not commit them — they are your work in progress, and committing them would put unfinished files into this branch's history.</p>
+      <p>Either commit them on your branch, or say the word and I will add them here.</p>
+      <div class="op-facts"><span><i>affects</i> a fresh clone of this branch</span><span><i>tests needing them fail identically on main</i></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PART 4 ============================ -->
+<section>
+  <div class="sec-head"><span class="sec-num d">PART 4</span><h2>What changed, in numbers</h2></div>
+  <p>Seven commits from <code>060684ff</code>. Generated output is byte-identical across all 11 materials at every one of them.</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:40%"></th><th style="width:20%">At the start</th><th style="width:20%">Now</th><th style="width:20%"></th></tr></thead>
+    <tbody>
+      <tr><td>Downward import edges</td><td class="n">6</td><td class="n">0</td><td><span class="chip c-ok">enforced</span></td></tr>
+      <tr><td>Outgoing edges from <code>symbolic/</code></td><td class="n">4</td><td class="n">0</td><td><span class="chip c-ok">true bottom layer</span></td></tr>
+      <tr><td><code>symbolic/core.py</code></td><td class="n">2,556</td><td class="n">1,245</td><td class="m">split five ways</td></tr>
+      <tr><td>L3 kernel planning</td><td class="m">did not exist</td><td class="m">4,699 LOC</td><td><span class="chip c-part">unread by emitters</span></td></tr>
+      <tr><td>L5 targets</td><td class="m">inside backends/</td><td class="m">own layer</td><td><span class="chip c-part">dialect only</span></td></tr>
+      <tr><td><code>FormCollection.source</code></td><td class="m">read by 3 layers</td><td class="m">deleted</td><td><span class="chip c-ok">boundary closed</span></td></tr>
+      <tr><td>Emitter input</td><td class="m">a symbolic system</td><td class="m">an 8-member model</td><td><span class="chip c-ok">severed</span></td></tr>
+      <tr><td>Driver and packaging</td><td class="m">outside the framework</td><td class="m">pipeline/ · package/</td><td><span class="chip c-ok">inside</span></td></tr>
+      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">22,970</td><td><span class="chip c-gap">grew — OP 1</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The last row is honest rather than flattering: the emission layer grew, because two emitter modules misfiled under <code>fem/</code> moved into it. Nothing was removed from it. Every line of the reduction that matters is still ahead, in OP 1.</p>
+</section>
+
+<footer>
+  Measured against the working tree at <code>codegen-layering</code> @ 9917e4fc. Companion to the original analysis, <i>SFEM Codegen Layering</i>, which carries the findings and the migration record.
+</footer>
+
+</div>
