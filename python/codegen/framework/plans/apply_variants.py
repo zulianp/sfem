@@ -19,12 +19,31 @@ Not every combination is emitted, and the rule for which ones are is real:
     element coordinates to read in either layout -- an affine AoS variant would
     be the same kernel under a different name.
 
-    AoS only appears for equal-order formulations.  A mixed-order kernel
-    (Taylor-Hood: poro-hyperelasticity, Stokes) reads a different element type
-    per field, and the AoS coordinate path assumes one element type per cell.
+    AoS only appears for equal-order formulations.  This one is a capability
+    gap, not a design rule, and the distinction matters: the mixed-order
+    emitter (``generate_mixed_residual_sfem_files``) simply has no AoS code
+    path.  The two residual emitters share 419 of 9,290 lines -- 4.5% -- so the
+    mixed path is a parallel implementation that never grew several of the
+    coupled path's capabilities:
+
+        AoS dispatch    coupled only
+        packed apply    coupled only
+        CRS assembly    coupled only
+        DIA assembly    coupled only
+        COO assembly    both
+        BSR assembly    neither
+
+    An earlier version of this file asserted that AoS is meaningless for
+    mixed-order kernels because they read a different element type per field.
+    That was inferred from the emitted output, not established; the cell
+    geometry a mixed kernel reads is the high-order element's, so an AoS
+    coordinate path is not obviously impossible.  What is established is that
+    nobody wrote one.
 
     Packed traversal is Laplace-only today.  It is the nearly-optimal reference
-    implementation the PRD points at, not yet generalised.
+    implementation the PRD points at, not yet generalised.  Combined with the
+    line above, that means the Taylor-Hood formulations -- poro-hyperelasticity
+    and Stokes -- get no packed matrix-free apply at all.
 
     Packed applies to the Jacobian action only, never to the residual.  It is a
     matrix-free apply optimisation; there is nothing for it to do in a residual
