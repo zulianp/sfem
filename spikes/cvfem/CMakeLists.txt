@@ -135,6 +135,7 @@ if(CVFEM_ENABLE_CUDA)
         target_link_libraries(${tgt} PRIVATE
             SFEM::sfem
             CUDA::cudart
+            CUDA::cusparse
             $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
         set_target_properties(${tgt} PROPERTIES CUDA_SEPARABLE_COMPILATION OFF)
     endfunction()
