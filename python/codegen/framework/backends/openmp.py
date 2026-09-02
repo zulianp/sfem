@@ -15,10 +15,11 @@ from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 from codegen.framework.emitters.energy import OpenMPEnergySoAEmitter
 from codegen.framework.plans.reference_data import reference_data_plan_from_emission_plan
 from codegen.framework.emitters.boundary_codegen import generate_boundary_residual_sfem_files
-from codegen.framework.symbolic.residual import (
-    CoupledResidualSystem,
-    WeakResidualCoefficients,
+from codegen.framework.plans.residual_model import (
+    diagonal_block_emission_model,
+    residual_emission_model,
 )
+from codegen.framework.symbolic.residual import WeakResidualCoefficients
 from codegen.framework.emitters.residual_codegen import (
     generate_coupled_residual_sfem_files,
     generate_mixed_residual_sfem_files,
@@ -137,7 +138,7 @@ class OpenMPSoABackend:
     def _residual_traversal(self, unit, context):
         self._validate_residual_plan(unit)
         collection = unit.form_collection
-        system = collection.source
+        system = residual_emission_model(collection)
         residual_coeffs = _coefficients_for_unit(unit, collection, FormOrder.ONE)
         action_coeffs = _coefficients_for_unit(unit, collection, FormOrder.TWO)
         residual_plan = _expression_plan_for_order(unit, FormOrder.ONE)
@@ -775,22 +776,11 @@ def _diagonal_block_model(unit, collection, context):
     )
     specialization = emission_plan.isoparametric_specialization
     affine_specialization = emission_plan.affine_specialization
-    # A residual emitter takes a CoupledResidualSystem, so a diagonal block has
-    # to be handed one.  Building it from the collection's own lowered data --
-    # rather than from a back-pointer to the system the collection came from --
-    # is what closes this boundary.  The synthetic system itself only disappears
-    # once the emitter takes a plan instead (S5).
-    system = CoupledResidualSystem(_collection_dim(collection))
-    if collection.parameters:
-        system.add_parameters(*collection.parameters)
-    for component, component_name in enumerate(_component_field_names(field)):
-        lowered = system.add_field(
-            component_name,
-            field_name=field.name,
-            component=component,
-            components=field.components,
-        )
-        system.add_residual(lowered, sp.S.Zero)
+    system, _ = diagonal_block_emission_model(
+        collection,
+        field,
+        None,
+    )
     block = collection.block(FormOrder.TWO, unit.block.row_field, unit.block.column_field)
     return _DiagonalBlockModel(
         system,

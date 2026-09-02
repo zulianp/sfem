@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import sympy as sp
 
+from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.symbolic.residual import (
     CoupledResidualSystem,
     WeakResidualCoefficients,
@@ -1716,8 +1717,11 @@ def generate_coupled_residual_sfem_files(
     diagnostics_plan=None,
     matrix_format_plan=None,
 ):
-    if not isinstance(system, CoupledResidualSystem):
-        raise TypeError("system must be CoupledResidualSystem")
+    if not isinstance(system, ResidualEmissionModel):
+        raise TypeError(
+            "residual emission takes a ResidualEmissionModel built from a lowered "
+            "FormCollection, not a %s" % type(system).__name__
+        )
     if emission_plan is None:
         raise ValueError("residual code generation requires an ElementEmissionPlan")
     element_type = emission_plan.element_type
@@ -1831,8 +1835,11 @@ def generate_mixed_residual_sfem_files(
     reference_data_plan=None,
     diagnostics_plan=None,
 ):
-    if not isinstance(system, CoupledResidualSystem):
-        raise TypeError("system must be CoupledResidualSystem")
+    if not isinstance(system, ResidualEmissionModel):
+        raise TypeError(
+            "mixed residual emission takes a ResidualEmissionModel built from a "
+            "lowered FormCollection, not a %s" % type(system).__name__
+        )
     if emission_plan is None:
         raise ValueError("mixed residual code generation requires an ElementEmissionPlan")
     cell_specialization = emission_plan.isoparametric_specialization
