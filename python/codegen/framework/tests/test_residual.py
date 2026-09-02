@@ -12,8 +12,10 @@ from sfem import gen
 
 from codegen.framework.symbolic.residual import CoupledResidualSystem
 from codegen.framework.emitters.residual_codegen import (
-    coupled_residual_weak_coefficients,
     generate_coupled_residual_sfem_files,
+)
+from codegen.framework.symbolic.residual import (
+    coupled_residual_weak_coefficients,
     weak_residual_coefficients,
 )
 from codegen.framework.plans.emission import emission_plan_for_element

@@ -7,16 +7,30 @@ from codegen.framework.plans.dependencies import (
     ResidualCodegenDependencies,
     residual_codegen_dependencies,
 )
+from codegen.framework.plans.layout import (
+    _compatible_matrix_stream_indices,
+    _compatible_stream_component_offsets,
+    _compatible_stream_shape_offsets,
+    _field_element_type,
+    _field_n_shape_by_name,
+    _identity_order,
+    _is_tensor_product_family,
+    _linear_index_offset,
+    _mixed_field_shape_orders,
+    _mixed_stream_shape_offsets,
+    _mixed_tensor_product_field_stream_order,
+    _mixed_triplet_stream_indices,
+    _residual_parent_field_name,
+    _single_field_shape_order,
+    _stream_to_tensor_order,
+    _tensor_product_coordinate_shape_order,
+)
 from codegen.framework.plans.streams import field_stream_groups
 from codegen.framework.symbolic.residual import (
-    CoupledResidualSystem,
-    WeakResidualCoefficients,
     coupled_residual_weak_coefficients,
-    weak_residual_coefficients,
 )
 from codegen.framework.emitters.tensor_product_geometry import (
     isoparametric_adjugate_call_lines,
-    isoparametric_adjugate_stream_array_lines,
     sfem_geometry_kernels_header_source,
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
@@ -25,9 +39,6 @@ from codegen.framework.emitters.tensor_product_geometry import (
 from codegen.framework.emitters.tensor_product_kernels import sfem_tensor_product_kernels_header_source
 from codegen.framework.targets import OpenMPTarget
 from codegen.framework.fem.reference import (
-    sfem_element_quadrature_rule,
-    sfem_field_n_shape,
-    sfem_is_tensor_product_hex_element,
     sfem_mesh_reference_data,
     sfem_reference_data,
     sfem_simplex_grad_ref_name,
@@ -35,7 +46,6 @@ from codegen.framework.fem.reference import (
     sfem_soa_element_specialization,
     sfem_tensor_product_field_reference_data,
     sfem_tensor_product_hex_uses_cartesian_ordering,
-    sfem_tensor_product_quad_uses_cartesian_ordering,
     SfemReferenceData,
 )
 from codegen.framework.emitters.quadrature_codegen import (
@@ -80,35 +90,14 @@ def _target():
     return OpenMPTarget()
 
 
-def _tensor_product_coordinate_shape_order(dim, n_shape, element_type):
-    if sfem_tensor_product_hex_uses_cartesian_ordering(element_type) or sfem_tensor_product_quad_uses_cartesian_ordering(element_type):
-        return tuple(range(n_shape))
-    return tensor_product_cartesian_shape_order(dim, n_shape)
 
 
-def _identity_order(order):
-    return tuple(order) == tuple(range(len(order)))
 
 
-def _single_field_shape_order(n_shape, n_fields, field_stream_order):
-    return tuple(field_stream_order[shape * n_fields] // n_fields for shape in range(n_shape))
 
 
-def _stream_to_tensor_order(field_stream_order):
-    ordered = [0] * len(field_stream_order)
-    for tensor_stream, mesh_stream in enumerate(field_stream_order):
-        ordered[mesh_stream] = tensor_stream
-    return tuple(ordered)
 
 
-def _linear_index_offset(values):
-    values = tuple(values)
-    if not values:
-        return 0
-    offset = values[0]
-    if values == tuple(offset + i for i in range(len(values))):
-        return offset
-    return None
 
 
 def _local_index_mapping_expr(name, values, index_expr):
@@ -1348,57 +1337,8 @@ def _mixed_mesh_output_pointer(field):
     return "%s_out[%d]" % (name, int(getattr(field, "component", 0)))
 
 
-def _mixed_tensor_product_field_stream_order(
-    layout,
-    cell_rule,
-    field_element_types,
-    basis_family,
-):
-    if not _is_tensor_product_family(cell_rule, basis_family):
-        return tuple(range(layout.total_streams))
-
-    field_element_types = {} if field_element_types is None else field_element_types
-    order = []
-    for field_index, field in enumerate(layout.fields):
-        n_shape = layout.n_shape(field_index)
-        element_type = _field_element_type(
-            _residual_parent_field_name(field),
-            cell_rule,
-            field_element_types,
-        )
-        shape_order = (
-            tuple(range(n_shape))
-            if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
-            else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
-        )
-        order.extend(layout.stream_index(field_index, shape) for shape in shape_order)
-    return tuple(order)
 
 
-def _mixed_field_shape_orders(
-    layout,
-    cell_rule,
-    field_element_types,
-    basis_family,
-):
-    if not _is_tensor_product_family(cell_rule, basis_family):
-        return tuple(tuple(range(layout.n_shape(field_index))) for field_index in range(len(layout.fields)))
-
-    field_element_types = {} if field_element_types is None else field_element_types
-    orders = []
-    for field_index, field in enumerate(layout.fields):
-        n_shape = layout.n_shape(field_index)
-        element_type = _field_element_type(
-            _residual_parent_field_name(field),
-            cell_rule,
-            field_element_types,
-        )
-        orders.append(
-            tuple(range(n_shape))
-            if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
-            else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
-        )
-    return tuple(orders)
 
 
 def _mixed_field_element_alias_lines(
@@ -1611,10 +1551,6 @@ def _is_zero(expression):
     return expression == 0 or expression.is_zero is True
 
 
-def _is_tensor_product_family(rule, basis_family=None):
-    if basis_family is None:
-        raise ValueError("basis family must be provided by the emission plan")
-    return str(basis_family) == "tensor_product"
 
 
 def generate_coupled_residual_sfem_files(
@@ -4597,24 +4533,8 @@ def _mixed_stream_component_offsets(layout):
     return tuple(offsets)
 
 
-def _mixed_stream_shape_offsets(layout):
-    offsets = []
-    for field_index, _ in enumerate(layout.fields):
-        offsets.extend(range(layout.n_shape(field_index)))
-    return tuple(offsets)
 
 
-def _mixed_triplet_stream_indices(layout, group_names):
-    selected = set(group_names)
-    indices = []
-    for field_index, field in enumerate(layout.fields):
-        if _residual_parent_field_name(field) not in selected:
-            continue
-        indices.extend(
-            layout.stream_index(field_index, local_shape)
-            for local_shape in range(layout.n_shape(field_index))
-        )
-    return tuple(indices)
 
 
 def _mixed_triplet_group_names_from_prefix(prefix, layout):
@@ -4988,31 +4908,12 @@ def _mixed_coo_triplet_matrix_assembly_source(
     return lines
 
 
-def _field_n_shape(field, cell_rule, field_element_types):
-    return _field_n_shape_by_name(
-        _residual_parent_field_name(field),
-        cell_rule,
-        field_element_types,
-    )
 
 
-def _field_n_shape_by_name(field_name, cell_rule, field_element_types):
-    element_type = _field_element_type(field_name, cell_rule, field_element_types)
-    return sfem_field_n_shape(
-        element_type,
-        cell_rule.order
-        if element_type in ("QUAD4", "PROTEUS_QUAD4") or sfem_is_tensor_product_hex_element(element_type)
-        else None,
-    )
 
 
-def _field_element_type(field_or_name, cell_rule, field_element_types):
-    field_name = _residual_parent_field_name(field_or_name)
-    return str(field_element_types.get(field_name, cell_rule.element_type)).upper()
 
 
-def _residual_parent_field_name(field_or_name):
-    return str(getattr(field_or_name, "field_name", field_or_name))
 
 
 def _residual_diagnostics_lines(system, prefix, specialization):
@@ -5893,25 +5794,10 @@ def _compatible_matrix_field_indices_from_prefix(prefix, system, element_type):
     return all_indices, all_indices
 
 
-def _compatible_matrix_stream_indices(field_indices, n_shape):
-    streams = []
-    for field_index in field_indices:
-        streams.extend(field_index * n_shape + shape for shape in range(n_shape))
-    return tuple(streams)
 
 
-def _compatible_stream_component_offsets(n_fields, n_shape):
-    offsets = []
-    for field_index in range(n_fields):
-        offsets.extend(field_index for _ in range(n_shape))
-    return tuple(offsets)
 
 
-def _compatible_stream_shape_offsets(n_fields, n_shape):
-    offsets = []
-    for _ in range(n_fields):
-        offsets.extend(range(n_shape))
-    return tuple(offsets)
 
 
 def _crs_find_cols_lines(function_base, n_shape):
