@@ -115,6 +115,7 @@ void csv_write(const char *path, const char *tag, const char *device,
 }  // namespace
 
 int main(int argc, char **argv) {
+    double warp_amp = 0.05;  // sinusoidal shear; makes the isoparametric path non-trivial
     int mpi_ready = 0;
     MPI_Initialized(&mpi_ready);
     bool own_mpi = false;
@@ -130,6 +131,7 @@ int main(int argc, char **argv) {
         else if (a == "--pack-size" && i + 1 < argc) pack_size = std::atoi(argv[++i]);
         else if (a == "--block-size" && i + 1 < argc) block_size = std::atoi(argv[++i]);
         else if (a == "--repeat" && i + 1 < argc) repeat = std::atoi(argv[++i]);
+        else if (a == "--warp" && i + 1 < argc) warp_amp = std::atof(argv[++i]);
         else if (a == "--no-sfc") use_sfc = false;
         else if (a == "--csv" && i + 1 < argc) csv_path = argv[++i];
         else if (a == "--tag" && i + 1 < argc) csv_tag = argv[++i];
@@ -154,6 +156,17 @@ int main(int argc, char **argv) {
     d.nelements = d.mesh->n_elements(0);
     d.elems     = d.mesh->elements(0)->data();
     d.points    = d.mesh->points()->data();
+
+    // Shear the mesh before the geometry is precomputed. On a perfect box the
+    // isoparametric Jacobian is constant within an element and equal to the affine one,
+    // so an unwarped mesh would verify the isoparametric path against a degenerate case
+    // and catch nothing. This is the same warp the CPU benchmark applies.
+    if (warp_amp > 0) {
+        const scalar_t pi = std::acos(scalar_t(-1));
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+            d.points[0][i] += smesh::geom_t(warp_amp * std::sin(pi * scalar_t(d.points[1][i])));
+    }
+
     fill_fields(d);
     precompute_affine_geometry(d);
 
@@ -679,6 +692,139 @@ int main(int argc, char **argv) {
     }
 
     // ---- boundary sub-control-surface residual -------------------------------
+    // ---- isoparametric geometry ---------------------------------------------
+    //
+    // The affine path uses one precomputed adjugate and determinant per element; the
+    // isoparametric path rebuilds the trilinear Jacobian at each of the 12
+    // sub-control-surface points. On a sheared mesh the two give genuinely different
+    // answers, so each device kernel is checked against its own host counterpart rather
+    // than against the affine result.
+    std::printf("\n=== isoparametric geometry (warp = %.3f) ===\n", warp_amp);
+    {
+        std::vector<double> cx((size_t)d.nnodes), cy((size_t)d.nnodes), cz((size_t)d.nnodes);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            cx[i] = d.points[0][i]; cy[i] = d.points[1][i]; cz[i] = d.points[2][i];
+        }
+        if (cvfem_cuda_attach_coords(ctx, cx.data(), cy.data(), cz.data()) != 0) {
+            std::fprintf(stderr, "attach_coords failed\n");
+            return 1;
+        }
+
+        const size_t iso_r  = cvfem_cuda_residual_isoparam_shmem_bytes(packed.max_actual_nodes_per_pack);
+        const size_t iso_jv = cvfem_cuda_jacobian_action_isoparam_shmem_bytes(packed.max_actual_nodes_per_pack);
+        std::printf("shared memory: residual %zu B (%.0f%% of opt-in), J*v %zu B (%.0f%%)\n",
+                    iso_r, 100.0 * (double)iso_r / (double)optin,
+                    iso_jv, 100.0 * (double)iso_jv / (double)optin);
+        if (iso_jv > (size_t)optin) {
+            std::printf("  -- EXCEEDS OPT-IN LIMIT, reduce --pack-size\n");
+            return 1;
+        }
+
+        // --- residual -------------------------------------------------------
+        apply_residual_atomic_isoparam(d, rho, mu);
+        std::vector<double> iref;
+        residual_soa_to_interleaved(d, iref);
+        const double irefmax = max_abs(iref);
+
+        // Reported for information, not as an acceptance criterion. On an unwarped box
+        // the two formulations agree to rounding (1e-18); under this shear they separate
+        // to ~1e-9 and then stay there, essentially independent of the amplitude -- the
+        // deformation is smooth on the scale of an element, so each hex stays very nearly
+        // a parallelepiped however far the domain is sheared. Raising --warp does not
+        // widen the gap; it was measured on the host at 0.1 and 0.4 and does not move.
+        //
+        // So the check that has teeth is device-against-host below, not this number. What
+        // this number does confirm is that the isoparametric path is being taken at all:
+        // it is 1e-18 when the mesh is a box and 1e-9 when it is not.
+        const double vs_affine = max_abs_diff(ref, iref) / (refmax > 0 ? refmax : 1.0);
+        std::printf("isoparam vs affine on this mesh: rel = %.3e  (%s)\n", vs_affine,
+                    vs_affine > 1e-12 ? "isoparametric path active"
+                                      : "degenerate -- mesh is affine, pass --warp");
+
+        for (auto &m : modes) {
+            if (cvfem_cuda_residual_isoparam(ctx, rho, mu, m.mode, block_size, nullptr) != 0) {
+                std::fprintf(stderr, "residual_isoparam failed\n");
+                return 1;
+            }
+            if (cvfem_cuda_synchronize() != 0) return 1;
+            if (cvfem_cuda_download_r(ctx, dev.data()) != 0) return 1;
+            const double diff = max_abs_diff(iref, dev);
+            const double rel  = irefmax > 0 ? diff / irefmax : diff;
+            const bool   ok   = rel <= 1e-12;
+            fail |= !ok;
+            std::printf("residual isoparam %-9s vs host: max|diff| = %.3e  rel = %.3e  %s\n",
+                        m.name, diff, rel, ok ? "OK" : "FAIL");
+        }
+
+        // --- Jacobian action ------------------------------------------------
+        // Same structured direction the affine check uses, rebuilt here because that
+        // one is block-scoped.
+        std::vector<double> ivh((size_t)d.nnodes * 4), ijv_h((size_t)d.nnodes * 4, 0.0);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            ivh[i * 4 + 0] = 0.7 * std::sin(0.011 * (double)i);
+            ivh[i * 4 + 1] = 0.3 * std::cos(0.017 * (double)i);
+            ivh[i * 4 + 2] = 0.5 * std::sin(0.023 * (double)i + 1.0);
+            ivh[i * 4 + 3] = 0.9 * std::cos(0.007 * (double)i + 2.0);
+        }
+        apply_jacobian_action_atomic_isoparam(d, rho, mu, ivh.data(), ijv_h.data());
+        const double jrefmax = max_abs(ijv_h);
+        if (cvfem_cuda_upload_v(ctx, ivh.data()) != 0) return 1;
+        for (auto &m : modes) {
+            if (cvfem_cuda_jacobian_action_isoparam(ctx, rho, mu, m.mode, block_size, nullptr) != 0) {
+                std::fprintf(stderr, "jacobian_action_isoparam failed\n");
+                return 1;
+            }
+            if (cvfem_cuda_synchronize() != 0) return 1;
+            if (cvfem_cuda_download_r(ctx, dev.data()) != 0) return 1;
+            const double rel = max_abs_diff(ijv_h, dev) / (jrefmax > 0 ? jrefmax : 1.0);
+            const bool   ok  = rel <= 1e-12;
+            fail |= !ok;
+            std::printf("J*v isoparam %-9s vs host: rel = %.3e  %s\n",
+                        m.name, rel, ok ? "OK" : "FAIL");
+        }
+
+        // --- assembled Jacobian ---------------------------------------------
+        assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
+        std::vector<double> iso_vals(bsr.values->data(), bsr.values->data() + (size_t)bsr.nnz * 16);
+        const double        vmax = max_abs(iso_vals);
+        if (cvfem_cuda_assemble_isoparam(ctx, rho, mu, block_size, nullptr) != 0) {
+            std::fprintf(stderr, "assemble_isoparam failed\n");
+            return 1;
+        }
+        if (cvfem_cuda_synchronize() != 0) return 1;
+        std::vector<double> idvals(iso_vals.size());
+        if (cvfem_cuda_download_values(ctx, idvals.data()) != 0) return 1;
+        const double arel = max_abs_diff(iso_vals, idvals) / (vmax > 0 ? vmax : 1.0);
+        const bool   aok  = arel <= 1e-12;
+        fail |= !aok;
+        std::printf("assemble isoparam vs host: rel = %.3e  %s\n", arel, aok ? "OK" : "FAIL");
+
+        // --- throughput ------------------------------------------------------
+        std::printf("%-34s %12s %12s\n", "variant", "s/call", "MDOF/s");
+        struct { const char *name; double t; } iso_rows[] = {
+            {"residual isoparam two_pass",
+             cvfem_cuda_time_residual_isoparam(ctx, rho, mu, CVFEM_CUDA_FLUSH_TWO_PASS, block_size, repeat)},
+            {"residual isoparam atomic",
+             cvfem_cuda_time_residual_isoparam(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC, block_size, repeat)},
+            {"J*v isoparam two_pass",
+             cvfem_cuda_time_jacobian_action_isoparam(ctx, rho, mu, CVFEM_CUDA_FLUSH_TWO_PASS, block_size, repeat)},
+            {"J*v isoparam atomic",
+             cvfem_cuda_time_jacobian_action_isoparam(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC, block_size, repeat)},
+            {"assemble isoparam",
+             cvfem_cuda_time_assemble_isoparam(ctx, rho, mu, block_size, repeat)},
+        };
+        for (auto &r : iso_rows) {
+            std::printf("%-34s %12.3e %12.1f\n", r.name, r.t,
+                        r.t > 0 ? (double)(d.nnodes * 4) / r.t * 1e-6 : 0.0);
+            const char *op = (r.name[0] == 'r') ? "residual"
+                                                : (r.name[0] == 'J') ? "jac_action" : "assemble";
+            csv_rows.push_back(mkrow(op, "cuda_isoparam", "isoparam", r.t));
+        }
+
+        // Leave the affine matrix in place for anything downstream.
+        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+    }
+
     std::printf("\n=== boundary sub-control-surface residual ===\n");
     const scalar_t Lx = 1, Ly = 1, Lz = 1;   // create_hex8_cube(0,0,0 -> 1,1,1)
 
