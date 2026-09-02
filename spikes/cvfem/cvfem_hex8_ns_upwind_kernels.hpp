@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <cstdint>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -823,12 +824,18 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_acc(scalar_t &x, const scala
     }
 }
 
+// A negative slot means "this block is not being assembled" and the write is dropped.
+// That is what lets a diagonal-only assembly reuse the full element kernel unchanged:
+// pass a slot array with -1 everywhere off the diagonal and the same code produces the
+// block diagonal, with none of the off-diagonal write traffic. Slots are non-negative on
+// every other path, so the branch is perfectly predicted there.
 template <bool Atomic, typename Slot, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_bsr_acc(scalar_t *const SFEM_RESTRICT values,
                                            const Slot                   slot,
                                            const int                    rf,
                                            const int                    cf,
                                            const scalar_t               v) {
+    if (slot < 0) return;
     cvfem_hex8_acc<Atomic>(values[(ptrdiff_t)slot * 16 + rf * 4 + cf], v);
 }
 
@@ -844,6 +851,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_bsr_acc_mom(scalar_t *const 
                                                const scalar_t               d20,
                                                const scalar_t               d21,
                                                const scalar_t               d22) {
+    if (slot < 0) return;
     scalar_t *const SFEM_RESTRICT blk = values + (ptrdiff_t)slot * 16;
     cvfem_hex8_acc<Atomic>(blk[0], d00);
     cvfem_hex8_acc<Atomic>(blk[1], d01);
@@ -955,6 +963,264 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_conv_face(const scalar_t
                                                  const Slot *const SFEM_RESTRICT       slots,
                                                  scalar_t *const SFEM_RESTRICT         values,
                                                  const scalar_t                        mdot_rc = scalar_t(0));
+
+// ---------------------------------------------------------------------------
+// Split assembly: the Jacobian's viscous, geometry-only part does not change between
+// Newton iterations, so there is no reason to rebuild it every time.
+//
+//   d(viscous)/du  depends on adj, det and mu only -- constant for a fixed mesh.
+//   d(convection)/du and the Rhie-Chow terms depend on the current velocity.
+//
+// The viscous half writes all 64 blocks of the element matrix (the dense 8x8 node
+// coupling, momentum-momentum 3x3 each); the convective half writes only the blocks
+// touched by the 12 sub-control surfaces. So the constant half is also the larger half
+// of the write traffic, which is what makes this worth splitting.
+
+// The 32 element-local node pairs whose block the convection also writes, each with the
+// direction that makes it so: -1 for a diagonal pair, otherwise the axis of the hex edge.
+//
+// The direction matters because convection does not write the whole momentum 3x3 of an
+// edge block -- only column d, since the sub-control surface's area vector points along
+// d. Measured, per element: convection touches all 9 momentum entries of a diagonal
+// block but only 3 of an edge block. So the viscous half that must be rebuilt each
+// iteration is 8*9 + 24*3 = 144 entries, not 32*9 = 288.
+#define CVFEM_HEX8_RECOMPUTED_PAIRS_INIT { \
+        {0,0,-1},{1,1,-1},{2,2,-1},{3,3,-1},{4,4,-1},{5,5,-1},{6,6,-1},{7,7,-1}, \
+        {0,1,0},{1,0,0},{3,2,0},{2,3,0},{4,5,0},{5,4,0},{7,6,0},{6,7,0}, \
+        {0,3,1},{3,0,1},{1,2,1},{2,1,1},{4,7,1},{7,4,1},{5,6,1},{6,5,1}, \
+        {0,4,2},{4,0,2},{1,5,2},{5,1,2},{2,6,2},{6,2,2},{3,7,2},{7,3,2}}
+static constexpr int CVFEM_HEX8_N_RECOMPUTED_PAIRS = 32;
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE const int (&cvfem_hex8_recomputed_pairs_tbl())[32][3] {
+    static constexpr int t[32][3] = CVFEM_HEX8_RECOMPUTED_PAIRS_INIT;
+    return t;
+}
+#define CVFEM_HEX8_RECOMPUTED_PAIRS cvfem_hex8_recomputed_pairs_tbl()
+#else
+static constexpr int CVFEM_HEX8_RECOMPUTED_PAIRS[32][3] = CVFEM_HEX8_RECOMPUTED_PAIRS_INIT;
+#endif
+
+// Does the convection write momentum entry (r,c) of this pair? dir < 0 means a diagonal
+// pair, where it writes all nine.
+static SFEM_INLINE SFEM_HOST_DEVICE bool cvfem_hex8_conv_writes(const int dir, const int c) {
+    return dir < 0 || c == dir;
+}
+
+// Which element-local node pairs (i,k) land in a block the velocity-dependent half
+// also writes? Exactly the pairs the 12 sub-control surfaces couple: i == k, or (i,k) an
+// edge of the hex. 32 of the 64 local blocks.
+//
+// This is what lets the split work with ONE matrix instead of two: those blocks are
+// zeroed and fully recomputed each iteration (viscous + convection), while the other 32
+// keep the viscous values written once at setup and are never touched again.
+static SFEM_INLINE SFEM_HOST_DEVICE bool cvfem_hex8_pair_is_recomputed(const int i, const int k) {
+    if (i == k) return true;
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const int a = CVFEM_HEX8_SCS[s].i, b = CVFEM_HEX8_SCS[s].j;
+        if ((i == a && k == b) || (i == b && k == a)) return true;
+    }
+    return false;
+}
+
+// Viscous half restricted to one side of that split. RECOMPUTED == true emits only the
+// pairs that get rebuilt every iteration; false emits only the pairs written once.
+// Viscous half, split by entry rather than by block.
+//
+// RECOMPUTED == false emits every momentum entry the convection will NOT overwrite --
+// written once at setup and never touched again. RECOMPUTED == true emits exactly the
+// entries it will, which are the ones that get zeroed and rebuilt each iteration.
+// Together they reproduce the full viscous contribution exactly.
+// The viscous entries the mask does NOT cover: written once at setup, never rebuilt.
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots_static(
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+        const Slot *const SFEM_RESTRICT slots,
+        const uint16_t *const SFEM_RESTRICT block_mask,
+        scalar_t *const SFEM_RESTRICT values) {
+    scalar_t A[3][3];
+    cvfem_hex8_dir_areas(adj, A);
+    scalar_t w[CVFEM_HEX8_N_NODES][3];
+    const scalar_t inv_det = scalar_t(1) / det;
+    for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k)
+        cvfem_hex8_pushforward<scalar_t>(adj, inv_det, CVFEM_HEX8_DN_REF[k][0],
+                                         CVFEM_HEX8_DN_REF[k][1], CVFEM_HEX8_DN_REF[k][2],
+                                         w[k][0], w[k][1], w[k][2]);
+    scalar_t Anet[CVFEM_HEX8_N_NODES][3];
+    for (int i = 0; i < CVFEM_HEX8_N_NODES; ++i)
+        for (int c = 0; c < 3; ++c)
+            Anet[i][c] = CVFEM_HEX8_SNET[i][0] * A[0][c] + CVFEM_HEX8_SNET[i][1] * A[1][c] +
+                         CVFEM_HEX8_SNET[i][2] * A[2][c];
+
+    for (int i = 0; i < CVFEM_HEX8_N_NODES; ++i) {
+        const scalar_t Ax = Anet[i][0], Ay = Anet[i][1], Az = Anet[i][2];
+        for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
+            const Slot slot = slots[i * 8 + k];
+            const uint16_t m = block_mask[(ptrdiff_t)slot];
+            if (m == 0xFFFFu) continue;                 // nothing survives here
+            const scalar_t wx = w[k][0], wy = w[k][1], wz = w[k][2];
+            const scalar_t dm[3][3] = {
+                {-(scalar_t(2) * wx * Ax + wy * Ay + wz * Az) * mu, -(wx * Ay) * mu, -(wx * Az) * mu},
+                {-(wy * Ax) * mu, -(wx * Ax + scalar_t(2) * wy * Ay + wz * Az) * mu, -(wy * Az) * mu},
+                {-(wz * Ax) * mu, -(wz * Ay) * mu,
+                 -(wx * Ax + wy * Ay + scalar_t(2) * wz * Az) * mu}};
+            for (int r = 0; r < 3; ++r)
+                for (int c = 0; c < 3; ++c)
+                    if (!(m & (uint16_t)(1u << (r * 4 + c))))
+                        cvfem_hex8_bsr_acc<Atomic>(values, slot, r, c, dm[r][c]);
+        }
+    }
+}
+
+// Everything that is rebuilt each Newton iteration, in one pass.
+//
+// Fuses the recomputed viscous pairs with the convection so the element geometry -- the
+// area tensor A, the pushed-forward gradients w, and Anet -- is built once instead of
+// once per half. Iterates the 32 recomputed pairs directly rather than testing all 64.
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots_dynamic(
+        const scalar_t rho, const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        const Slot *const SFEM_RESTRICT slots,
+        const uint16_t *const SFEM_RESTRICT block_mask,
+        scalar_t *const SFEM_RESTRICT values,
+        const Hex8RhieChowT<scalar_t> &rc = {},
+        const scalar_t *const SFEM_RESTRICT p = nullptr) {
+    scalar_t A[3][3];
+    cvfem_hex8_dir_areas(adj, A);
+
+    scalar_t w[CVFEM_HEX8_N_NODES][3];
+    const scalar_t inv_det = scalar_t(1) / det;
+    for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k)
+        cvfem_hex8_pushforward<scalar_t>(adj, inv_det, CVFEM_HEX8_DN_REF[k][0],
+                                         CVFEM_HEX8_DN_REF[k][1], CVFEM_HEX8_DN_REF[k][2],
+                                         w[k][0], w[k][1], w[k][2]);
+    scalar_t Anet[CVFEM_HEX8_N_NODES][3];
+    for (int i = 0; i < CVFEM_HEX8_N_NODES; ++i)
+        for (int c = 0; c < 3; ++c)
+            Anet[i][c] = CVFEM_HEX8_SNET[i][0] * A[0][c] + CVFEM_HEX8_SNET[i][1] * A[1][c] +
+                         CVFEM_HEX8_SNET[i][2] * A[2][c];
+
+    // Rebuild exactly the entries the zeroing cleared -- read from the same mask, so the
+    // two can never disagree. Entries outside it keep the viscous value written at setup.
+    for (int t = 0; t < CVFEM_HEX8_N_RECOMPUTED_PAIRS; ++t) {
+        const int i = CVFEM_HEX8_RECOMPUTED_PAIRS[t][0];
+        const int k = CVFEM_HEX8_RECOMPUTED_PAIRS[t][1];
+        const Slot slot = slots[i * 8 + k];
+        const uint16_t m = block_mask[(ptrdiff_t)slot];
+        if (!m) continue;
+        const scalar_t Ax = Anet[i][0], Ay = Anet[i][1], Az = Anet[i][2];
+        const scalar_t wx = w[k][0], wy = w[k][1], wz = w[k][2];
+        const scalar_t dm[3][3] = {
+            {-(scalar_t(2) * wx * Ax + wy * Ay + wz * Az) * mu, -(wx * Ay) * mu, -(wx * Az) * mu},
+            {-(wy * Ax) * mu, -(wx * Ax + scalar_t(2) * wy * Ay + wz * Az) * mu, -(wy * Az) * mu},
+            {-(wz * Ax) * mu, -(wz * Ay) * mu,
+             -(wx * Ax + wy * Ay + scalar_t(2) * wz * Az) * mu}};
+        for (int r = 0; r < 3; ++r)
+            for (int c = 0; c < 3; ++c)
+                if (m & (uint16_t)(1u << (r * 4 + c)))
+                    cvfem_hex8_bsr_acc<Atomic>(values, slot, r, c, dm[r][c]);
+    }
+
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const int d = s >> 2;
+        const int i = CVFEM_HEX8_SCS[s].i;
+        const int j = CVFEM_HEX8_SCS[s].j;
+        const scalar_t mdot_rc =
+                p ? cvfem_hex8_rhie_chow_mdotc(rho, mu, rc, i, j, A[d][0], A[d][1], A[d][2], p[i], p[j])
+                  : scalar_t(0);
+        cvfem_hex8_jac_conv_face<Atomic>(rho, A[d][0], A[d][1], A[d][2], i, j, ux, uy, uz,
+                                         slots, values, mdot_rc);
+        cvfem_hex8_jac_rhie_chow_p<Atomic>(rho, mu, rc, A[d][0], A[d][1], A[d][2], i, j,
+                                           ux, uy, uz, p, slots, values);
+    }
+}
+
+// Geometry-only half. No velocity argument at all -- that is the point.
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots_linear(
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+        const Slot *const SFEM_RESTRICT slots,
+        scalar_t *const SFEM_RESTRICT values) {
+    scalar_t A[3][3];
+    cvfem_hex8_dir_areas(adj, A);
+
+    scalar_t w[CVFEM_HEX8_N_NODES][3];
+    const scalar_t inv_det = scalar_t(1) / det;
+    for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
+        cvfem_hex8_pushforward<scalar_t>(adj,
+                               inv_det,
+                               CVFEM_HEX8_DN_REF[k][0],
+                               CVFEM_HEX8_DN_REF[k][1],
+                               CVFEM_HEX8_DN_REF[k][2],
+                               w[k][0],
+                               w[k][1],
+                               w[k][2]);
+    }
+
+    scalar_t Anet[CVFEM_HEX8_N_NODES][3];
+    for (int i = 0; i < CVFEM_HEX8_N_NODES; ++i) {
+        Anet[i][0] = CVFEM_HEX8_SNET[i][0] * A[0][0] + CVFEM_HEX8_SNET[i][1] * A[1][0] +
+                     CVFEM_HEX8_SNET[i][2] * A[2][0];
+        Anet[i][1] = CVFEM_HEX8_SNET[i][0] * A[0][1] + CVFEM_HEX8_SNET[i][1] * A[1][1] +
+                     CVFEM_HEX8_SNET[i][2] * A[2][1];
+        Anet[i][2] = CVFEM_HEX8_SNET[i][0] * A[0][2] + CVFEM_HEX8_SNET[i][1] * A[1][2] +
+                     CVFEM_HEX8_SNET[i][2] * A[2][2];
+    }
+
+    for (int i = 0; i < CVFEM_HEX8_N_NODES; ++i) {
+        const scalar_t Ax = Anet[i][0];
+        const scalar_t Ay = Anet[i][1];
+        const scalar_t Az = Anet[i][2];
+        for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
+            const scalar_t wx   = w[k][0];
+            const scalar_t wy   = w[k][1];
+            const scalar_t wz   = w[k][2];
+            const scalar_t d00  = -(scalar_t(2) * wx * Ax + wy * Ay + wz * Az) * mu;
+            const scalar_t d01  = -(wx * Ay) * mu;
+            const scalar_t d02  = -(wx * Az) * mu;
+            const scalar_t d10  = -(wy * Ax) * mu;
+            const scalar_t d11  = -(wx * Ax + scalar_t(2) * wy * Ay + wz * Az) * mu;
+            const scalar_t d12  = -(wy * Az) * mu;
+            const scalar_t d20  = -(wz * Ax) * mu;
+            const scalar_t d21  = -(wz * Ay) * mu;
+            const scalar_t d22  = -(wx * Ax + wy * Ay + scalar_t(2) * wz * Az) * mu;
+            const Slot     slot = slots[i * 8 + k];
+            cvfem_hex8_bsr_acc_mom<Atomic>(values, slot, d00, d01, d02, d10, d11, d12, d20, d21, d22);
+        }
+    }
+
+}
+
+// Velocity-dependent half: convection across the 12 sub-control surfaces, plus the
+// Rhie-Chow pressure coupling when it is active.
+template <bool Atomic, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots_nonlinear(
+        const scalar_t rho, const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        const Slot *const SFEM_RESTRICT slots,
+        scalar_t *const SFEM_RESTRICT values,
+        const Hex8RhieChowT<scalar_t> &rc = {},
+        const scalar_t *const SFEM_RESTRICT p = nullptr) {
+    scalar_t A[3][3];
+    cvfem_hex8_dir_areas(adj, A);
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const int      d       = s >> 2;
+        const int      i       = CVFEM_HEX8_SCS[s].i;
+        const int      j       = CVFEM_HEX8_SCS[s].j;
+        const scalar_t mdot_rc = p ? cvfem_hex8_rhie_chow_mdotc(rho, mu, rc, i, j, A[d][0], A[d][1], A[d][2], p[i], p[j])
+                                   : scalar_t(0);
+        cvfem_hex8_jac_conv_face<Atomic>(rho, A[d][0], A[d][1], A[d][2], i, j, ux, uy, uz, slots, values, mdot_rc);
+        cvfem_hex8_jac_rhie_chow_p<Atomic>(rho, mu, rc, A[d][0], A[d][1], A[d][2], i, j, ux, uy, uz, p, slots, values);
+    }
+}
 
 template <bool Atomic, typename Slot, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots(const scalar_t                        rho,

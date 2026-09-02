@@ -120,6 +120,37 @@ int cvfem_cuda_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
 
 int cvfem_cuda_download_values(cvfem_cuda_ctx *ctx, double *values);
 
+// ---- block diagonal, for the block-Jacobi preconditioner --------------------
+//
+// The steady solver preconditions with a 4x4 block Jacobi, which needs only the diagonal
+// blocks -- one per node, not one per matrix nonzero. That is nnodes*16 doubles instead
+// of nnz*16: at n=64, 33.5 MiB against 877 MiB, and 8 of an element's 64 blocks instead
+// of all of them.
+//
+// The element kernel is the same one the full assembly uses. It is steered onto the
+// diagonal by passing a slot array that is -1 off the diagonal, which the accumulate
+// primitives drop -- so the values are identical to the diagonal of a full assembly by
+// construction, not by a second derivation.
+int cvfem_cuda_diag_alloc(cvfem_cuda_ctx *ctx);
+int cvfem_cuda_assemble_diag(cvfem_cuda_ctx *ctx, double rho, double mu,
+                             int block_size, void *stream);
+int cvfem_cuda_download_diag(cvfem_cuda_ctx *ctx, double *diag);
+double cvfem_cuda_time_assemble_diag(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                     int block_size, int repeat);
+
+// Same split as the full matrix: the viscous diagonal is constant, so build it once and
+// rebuild only the velocity-dependent part each Newton step.
+int cvfem_cuda_assemble_diag_static(cvfem_cuda_ctx *ctx, double mu, int block_size, void *stream);
+int cvfem_cuda_assemble_diag_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                     int block_size, void *stream);
+double cvfem_cuda_time_assemble_diag_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                             int block_size, int repeat);
+
+// In-place 4x4 inverse of every diagonal block, which is what the preconditioner applies.
+// Blocks that are singular to working precision are left as the identity so a bad node
+// degrades to no preconditioning rather than to NaNs.
+int cvfem_cuda_invert_diag(cvfem_cuda_ctx *ctx, int block_size, void *stream);
+
 // ---- cuSPARSE BSR SpMV -------------------------------------------------------
 //
 // y = J v using the assembled matrix, as the reference point for the matrix-free
@@ -132,6 +163,98 @@ int cvfem_cuda_download_values(cvfem_cuda_ctx *ctx, double *values);
 int cvfem_cuda_spmv(cvfem_cuda_ctx *ctx, void *stream);
 
 double cvfem_cuda_time_spmv(cvfem_cuda_ctx *ctx, int repeat);
+
+// ---- split assembly: reuse the terms that do not change ---------------------
+//
+// The Jacobian's viscous part depends only on the mesh and mu, so in a Newton loop it is
+// the same matrix every iteration. Assemble it once into a separate buffer; each
+// iteration then restores it with a fully coalesced device-to-device copy and adds only
+// the velocity-dependent convection and Rhie-Chow terms.
+//
+// Measured on one element: the constant half touches 528 of the element matrix's entries
+// and the velocity-dependent half 250, so the constant half is also the larger share of
+// the write traffic that the profiling showed to be the bottleneck.
+int cvfem_cuda_assemble_linear(cvfem_cuda_ctx *ctx, double mu, int block_size, void *stream);
+
+// Restores the stored linear part and adds the nonlinear terms. Call after
+// cvfem_cuda_assemble_linear; this is what a Newton iteration runs.
+int cvfem_cuda_assemble_nonlinear(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                  int block_size, void *stream);
+
+double cvfem_cuda_time_assemble_nonlinear(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                          int block_size, int repeat);
+
+// The restore alone, and the nonlinear kernel alone, so the split's cost can be
+// attributed. Useful for answering whether the restore is worth engineering away.
+// Restore only the blocks the nonlinear part actually writes.
+//
+// Measured on the assembled matrix: the velocity-dependent half touches 26.5% of blocks;
+// the other 73.5% are written once at setup and never change. Copying the whole matrix
+// back every iteration therefore moves ~4x more than necessary. A block is 16 contiguous
+// doubles, so a block-wise restore is still coalesced.
+// Attaching the block list also compacts the saved linear data: only the blocks that
+// will be overwritten need saving, so the side buffer holds 26.5% of the matrix rather
+// than a full duplicate. Call after cvfem_cuda_assemble_linear.
+// `block_masks[b]` marks which of the 16 entries of block_ids[b] the velocity-dependent
+// half writes. Zeroing only those, rather than whole blocks, is what lets the viscous
+// entries elsewhere in the block survive from setup and never be rebuilt.
+// `block_masks` is indexed by BLOCK ID over all nnz blocks (not by position in
+// block_ids), because both halves of the split read it: the setup pass writes the
+// entries it does not cover, the per-iteration pass rebuilds exactly the entries it
+// does. One mask, so the two can never disagree.
+int cvfem_cuda_nonlinear_blocks_attach(cvfem_cuda_ctx *ctx, ptrdiff_t n_blocks,
+                                       const int32_t *block_ids,
+                                       const uint16_t *block_masks_by_id);
+
+// Bytes the split currently holds aside, so the memory cost is visible.
+size_t cvfem_cuda_linear_side_bytes(cvfem_cuda_ctx *ctx);
+
+// ---- single-matrix split: zero and recompute, no side buffer ----------------
+//
+// Same idea as above without the second matrix. The viscous contribution splits by
+// element-local node pair: pairs with i == k or (i,k) a hex edge land in blocks the
+// convection also writes, the other 32 do not. So:
+//
+//   setup      : assemble the viscous half for the 32 write-once pairs. Never touched again.
+//   iteration  : zero the blocks convection writes, then recompute viscous(recomputed
+//                pairs) + convection into them.
+//
+// Costs recomputing half the viscous work each iteration; saves holding any copy of the
+// matrix aside.
+int cvfem_cuda_assemble_static(cvfem_cuda_ctx *ctx, double mu, int block_size, void *stream);
+int cvfem_cuda_assemble_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                int block_size, void *stream);
+double cvfem_cuda_time_assemble_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                        int block_size, int repeat);
+
+int cvfem_cuda_assemble_nonlinear_sparse(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                         int block_size, void *stream);
+
+double cvfem_cuda_time_assemble_nonlinear_sparse(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                 int block_size, int repeat);
+
+double cvfem_cuda_time_restore_only(cvfem_cuda_ctx *ctx, int repeat);
+double cvfem_cuda_time_nonlinear_only(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                      int block_size, int repeat);
+
+// ---- element-coloured assembly ----------------------------------------------
+//
+// One kernel launch per element colour, writing the matrix with a plain += instead of
+// atomicAdd. Profiling showed the atomic variants issue ~17.9 M thread-level atomics per
+// launch and sustain ~80 G atomics/s, at the L2 atomic-unit limit -- so removing the
+// atomics, not tuning the arithmetic, is the lever.
+//
+// Unlike the pack colouring below, this removes the intra-block race too: within one
+// element colour no two elements share a node, so no two threads target the same block.
+int cvfem_cuda_element_coloring_attach(cvfem_cuda_ctx *ctx, int n_colors,
+                                       const int32_t *element_order,
+                                       const ptrdiff_t *color_ptr);
+
+int cvfem_cuda_assemble_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                 int variant, int block_size, void *stream);
+
+double cvfem_cuda_time_assemble_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                         int variant, int block_size, int repeat);
 
 // Coloured assembly: one kernel launch per colour, no atomics anywhere.
 //
