@@ -149,6 +149,36 @@ class MeshKernelPlan:
         }
 
 
+def local_kernel_plan_for(prefix, dim, family, suffix=""):
+    """The element-local header a kernel of this dimension and family gets.
+
+    Naming is a structural decision -- it fixes which files exist and what each
+    includes -- so it belongs to the plan rather than to whichever emitter runs
+    first.  ``LocalKernelPlan.name`` and ``.header`` are the single definition.
+    """
+    return LocalKernelPlan(prefix=prefix, dim=dim, family=family, suffix=suffix)
+
+
+def mesh_kernel_plan_for_element(prefix, element_type):
+    """The mesh-level operator source for one element type.
+
+    Applies the idempotence rule the emitters carried privately: a prefix that
+    already ends in the element label is not given a second one, so
+    ``laplace_tet4`` stays ``laplace_tet4`` rather than becoming
+    ``laplace_tet4_tet4``.
+    """
+    element_label = str(element_type).lower()
+    prefix = str(prefix)
+    if prefix.lower().endswith("_%s" % element_label):
+        # The prefix already names the element; split it back apart so the plan
+        # still holds both parts rather than a pre-joined string.
+        return MeshKernelPlan(
+            prefix=prefix[: -(len(element_label) + 1)],
+            element_label=element_label,
+        )
+    return MeshKernelPlan(prefix=prefix, element_label=element_label)
+
+
 def mesh_kernel_plan_from_context(unit, context, prefix, *, element_label=None):
     label = _mesh_kernel_element_label(unit, context, element_label)
     return MeshKernelPlan(prefix, label)
