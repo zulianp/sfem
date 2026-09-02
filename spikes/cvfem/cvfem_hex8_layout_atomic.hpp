@@ -176,8 +176,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, cons
                 for (int rf = 0; rf < 4; ++rf) {
                     for (int cf = 0; cf < 4; ++cf) {
                         const scalar_t v = ke[(a * 4 + rf) * CVFEM_HEX8_N_DOF + (bnode * 4 + cf)];
-#pragma omp atomic update
-                        blk[rf * 4 + cf] += v;
+                        CVFEM_ATOMIC_ADD(blk[rf * 4 + cf], v);
                     }
                 }
             }

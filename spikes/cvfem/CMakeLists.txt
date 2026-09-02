@@ -89,3 +89,66 @@ target_include_directories(cvfem_hex8_ns_steady PRIVATE
 
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# ---------------------------------------------------------------------- CUDA
+# Off by default: the CPU targets above must keep building on a machine with no
+# CUDA toolkit, which is where most of this spike is developed.
+option(CVFEM_ENABLE_CUDA "Build the CVFEM HEX8 CUDA targets" OFF)
+
+if(CVFEM_ENABLE_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(NOT CMAKE_CUDA_COMPILER)
+        message(FATAL_ERROR "CVFEM_ENABLE_CUDA=ON but no CUDA compiler was found. "
+                            "On Alps, build inside the prgenv-gnu uenv (see alps_env.sh).")
+    endif()
+
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        # 90 = Hopper / GH200, matching cmake/SFEMDependencies.cmake in SFEM proper.
+        set(CMAKE_CUDA_ARCHITECTURES 90 CACHE STRING "CUDA architectures")
+    endif()
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+
+    message(STATUS "cvfem CUDA: arch ${CMAKE_CUDA_ARCHITECTURES}, "
+                   "nvcc ${CMAKE_CUDA_COMPILER_VERSION}")
+
+    # Host-side flags carry -march/-mcpu=native and -ffast-math, which nvcc rejects
+    # outright, so they must be scoped to CXX only. -Xptxas -v -warn-spills is kept
+    # because register spills are the main risk in the generated Jacobian kernels and
+    # this is how they get reported.
+    set(_cvfem_cuda_opts
+        -O3
+        -use_fast_math
+        --expt-relaxed-constexpr
+        -Xptxas=-O3,-v,-warn-spills)
+
+    function(cvfem_cuda_target tgt)
+        target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_CUDA)
+        target_include_directories(${tgt} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
+        target_compile_options(${tgt} PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:${_cvfem_perf_opts}>
+            $<$<COMPILE_LANGUAGE:CUDA>:${_cvfem_cuda_opts}>)
+        target_link_libraries(${tgt} PRIVATE
+            SFEM::sfem
+            CUDA::cudart
+            $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+        set_target_properties(${tgt} PROPERTIES CUDA_SEPARABLE_COMPILATION OFF)
+    endfunction()
+
+    # Smoke target: proves the toolchain, the device, and the C-ABI/stream convention
+    # before any real kernel depends on them.
+    add_executable(cvfem_cuda_smoke cuda/cvfem_cuda_smoke.cpp cuda/cvfem_cuda_smoke.cu)
+    cvfem_cuda_target(cvfem_cuda_smoke)
+
+    # Packed residual: verification against the CPU reference, plus timing. Kept as its
+    # own driver rather than folded into cvfem_hex8_ns_upwind_bench, so the CPU
+    # benchmark's build -- and therefore its measured baseline -- is left alone.
+    add_executable(cvfem_hex8_ns_cuda_verify
+        cuda/cvfem_hex8_ns_cuda_verify.cpp
+        cuda/cvfem_hex8_ns_cuda.cu)
+    cvfem_cuda_target(cvfem_hex8_ns_cuda_verify)
+endif()

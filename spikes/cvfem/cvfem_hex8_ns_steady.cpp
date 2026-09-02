@@ -43,6 +43,8 @@ using scalar_t = double;
 
 static constexpr int N_FIELDS = 4;
 
+#include "cvfem_portability.hpp"
+
 #include "cvfem_hex8_ns_upwind_kernels.hpp"
 #include "cvfem_pack_coloring.hpp"
 
@@ -191,8 +193,7 @@ static BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
 static void zero_bsr4(BSR4 &b) { cvfem_zero_scalars(b.values->data(), b.nnz * 16); }
 
 static SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f, const smesh::idx_t id, const scalar_t value) {
-#pragma omp atomic update
-    f[id] += value;
+    CVFEM_ATOMIC_ADD(f[id], value);
 }
 
 static SFEM_INLINE smesh::count_t find_bsr_slot(const smesh::count_t *const SFEM_RESTRICT rowptr,
@@ -1414,7 +1415,7 @@ int main(int argc, char **argv) {
     PackedData   packed_storage;
     PackColoring coloring_storage;
     if (geom == GeomKind::Affine && pack_size > 0) {
-        packed_storage = cvfem_hex8_make_packed(d.mesh, pack_size);
+        packed_storage = make_packed(d.mesh, pack_size);
         d.packed       = &packed_storage;
         coloring_storage = cvfem_build_pack_coloring(packed_storage.n_packs,
                                                     packed_storage.owned_nodes_ptr,

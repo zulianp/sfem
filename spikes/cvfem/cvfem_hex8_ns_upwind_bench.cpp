@@ -106,6 +106,83 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
     return max_er / std::max(max_fd, scalar_t(1.0e-30));
 }
 
+// One machine-readable row per run. The header is written when the file is new,
+// so a sweep can just append and the analysis scripts (plot_cvfem_bench.py,
+// report_cvfem_bench.py) read whatever accumulated.
+struct CsvRow {
+    const char *tag;
+    const char *operation;
+    const char *layout;
+    const char *kernel;
+    const char *geom;
+    int         threads;
+    int         pack_size;
+    int         cube_n;
+    ptrdiff_t   nodes;
+    ptrdiff_t   elements;
+    ptrdiff_t   dofs;
+    ptrdiff_t   bsr_nnz;
+    double      bsr_values_mib;
+    int         repeat;
+    double      seconds_per_call;
+    double      mdofs;
+    double      mdofs_element_visits;
+    double      melems;
+    double      gflops_model;
+    double      warp;
+    int         n_colors;
+    ptrdiff_t   packs_per_color_min;
+    ptrdiff_t   packs_per_color_max;
+    double      checksum;
+    const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
+};
+
+static void csv_write(const std::string &path, const CsvRow &r) {
+    if (path.empty()) return;
+
+    bool need_header = true;
+    if (FILE *probe = std::fopen(path.c_str(), "r")) {
+        std::fseek(probe, 0, SEEK_END);
+        need_header = std::ftell(probe) == 0;
+        std::fclose(probe);
+    }
+
+    FILE *f = std::fopen(path.c_str(), "a");
+    if (!f) {
+        std::fprintf(stderr, "warning: could not open csv '%s' for append\n", path.c_str());
+        return;
+    }
+
+    char host[256] = "unknown";
+    if (gethostname(host, sizeof(host) - 1) != 0) std::snprintf(host, sizeof(host), "unknown");
+    host[sizeof(host) - 1] = '\0';
+
+    if (need_header) {
+        std::fprintf(f,
+                     "tag,host,element,operation,layout,kernel,geom,warp,threads,pack_size,cube_n,"
+                     "nodes,elements,dofs,bsr_nnz,bsr_values_MiB,repeat,seconds_per_call,"
+                     "MDOF_s,MDOF_s_element_visits,MELEM_s,GFLOP_s_model,"
+                     "n_colors,packs_per_color_min,packs_per_color_max,checksum");
+        for (int i = 0; i < PH_N; ++i) std::fprintf(f, ",ms_%s", g_phase_name[i]);
+        std::fprintf(f, "\n");
+    }
+
+    std::fprintf(f,
+                 "%s,%s,hex8,%s,%s,%s,%s,%.6e,%d,%d,%d,%td,%td,%td,%td,%.4f,%d,%.9e,%.4f,%.4f,%.4f,%.4f,%d,%td,%td,%.12e",
+                 r.tag, host, r.operation, r.layout, r.kernel, r.geom, r.warp, r.threads, r.pack_size, r.cube_n,
+                 r.nodes, r.elements, r.dofs, r.bsr_nnz, r.bsr_values_mib, r.repeat, r.seconds_per_call,
+                 r.mdofs, r.mdofs_element_visits, r.melems, r.gflops_model,
+                 r.n_colors, r.packs_per_color_min, r.packs_per_color_max, r.checksum);
+    for (int i = 0; i < PH_N; ++i) {
+        if (r.phase)
+            std::fprintf(f, ",%.6f", 1000.0 * r.phase[i] / double(r.repeat));
+        else
+            std::fprintf(f, ",");
+    }
+    std::fprintf(f, "\n");
+    std::fclose(f);
+}
+
 int main(int argc, char **argv) {
     int own_mpi = 0;
     MPI_Initialized(&own_mpi);
@@ -126,6 +203,8 @@ int main(int argc, char **argv) {
     std::string layout     = "atomic";
     std::string kernel     = "sumfact";
     std::string geom       = "affine";
+    std::string csv_path;
+    std::string csv_tag    = "run";
     scalar_t    warp       = 0;
     int         pack_size  = 2048;
 
@@ -169,6 +248,10 @@ int main(int argc, char **argv) {
             g_kernel_only = 1;
         else if (arg == "--dense-flush")
             g_dense_flush = 1;
+        else if (arg == "--csv" && i + 1 < argc)
+            csv_path = argv[++i];
+        else if (arg == "--tag" && i + 1 < argc)
+            csv_tag = argv[++i];
         else if (arg == "--help") {
             std::printf(
                     "usage: %s [--n N] [--repeat N] [--warmup N] [--assemble] [--jac-action] [--bsr-apply]\n"
@@ -176,6 +259,7 @@ int main(int argc, char **argv) {
                     "          [--kernel sumfact|current|fd|sympy|sympy_block|sympy_row|sympy_face]\n"
                     "          [--geom affine|isoparam] [--warp EPS] [--pack-size N] [--no-sfc]\n"
                     "          [--breakdown] [--kernel-only] [--dense-flush]\n"
+                    "          [--csv FILE] [--tag NAME]\n"
                     "  --layout NAME  layout used by residual / jac-action / assemble (default atomic)\n"
                     "                 atomic  : flat element sweep, #pragma omp atomic per entry\n"
                     "                           (cvfem_hex8_layout_atomic.hpp)\n"
@@ -196,6 +280,9 @@ int main(int argc, char **argv) {
                     "                 measures the arithmetic floor of the element kernel\n"
                     "  --dense-flush  sumfact only: stage ke densely, then flush 64 contiguous\n"
                     "                 blocks (measured slower than direct scatter on Apple M1)\n"
+                    "  --csv FILE     append one machine-readable row per run (header written if\n"
+                    "                 the file is new); pairs with report_cvfem_bench.py\n"
+                    "  --tag NAME     free-form label carried into the csv (e.g. the machine)\n"
                     "  --kernel NAME  residual/Jacobian micro-kernel variant (default sumfact)\n"
                     "  --geom NAME    affine (constant J) or isoparam (12 SCS trilinear J)\n"
                     "  --warp EPS     x += EPS * sin(pi y) nodal perturbation\n"
@@ -617,6 +704,12 @@ int main(int argc, char **argv) {
         std::printf("  n_packs: %td\n", packed.n_packs);
         std::printf("  n_colors: %d\n", colors.n_colors);
         std::printf("  packs_per_color_min_max: %td %td\n", colors.min_packs_per_color, colors.max_packs_per_color);
+        if (colors.min_packs_per_color < threads_active()) {
+            std::printf("  WARNING: fewer packs per color (%td) than threads (%d); every color barrier\n"
+                        "           leaves threads idle. Reduce --pack-size until packs_per_color >= threads.\n",
+                        colors.min_packs_per_color,
+                        threads_active());
+        }
     }
     if (layout == "packed") {
         std::printf("  pack_size: %d\n", pack_size);
@@ -685,6 +778,41 @@ int main(int argc, char **argv) {
         std::printf("  GB/s_bsr_apply_model: %.3f\n", double(repeat) * bsr_apply_bytes / seconds / 1.0e9);
         std::printf("  flops_per_bsr_apply_model: %.1f\n", bsr_apply_flops);
         std::printf("  bytes_per_bsr_apply_model: %.1f\n", bsr_apply_bytes);
+    }
+
+    if (!csv_path.empty()) {
+        const double op_flops = bsr_apply       ? 0.0
+                                : jac_action    ? jac_action_flops
+                                : assemble      ? assemble_flops
+                                                : residual_flops;
+        CsvRow row{};
+        row.tag                  = csv_tag.c_str();
+        row.operation            = bsr_apply ? "bsr_apply"
+                                             : (jac_action ? "jac_action" : (assemble ? "assemble" : "residual"));
+        row.layout               = layout.c_str();
+        row.kernel               = kernel.c_str();
+        row.geom                 = geom.c_str();
+        row.threads              = threads_active();
+        row.pack_size            = (layout == "atomic") ? 0 : pack_size;
+        row.cube_n               = n;
+        row.nodes                = d.nnodes;
+        row.elements             = d.nelements;
+        row.dofs                 = n_dofs;
+        row.bsr_nnz              = (assemble || bsr_apply) ? bsr.nnz : 0;
+        row.bsr_values_mib       = (assemble || bsr_apply) ? double(bsr.nnz) * 16.0 * 8.0 / (1024.0 * 1024.0) : 0.0;
+        row.repeat               = repeat;
+        row.seconds_per_call     = seconds_per_call;
+        row.mdofs                = mdofs;
+        row.mdofs_element_visits = bsr_apply ? 0.0 : visit_mdofs;
+        row.melems               = bsr_apply ? 0.0 : melems;
+        row.gflops_model         = op_flops * elem_apps / seconds / 1.0e9;
+        row.warp                 = warp;
+        row.n_colors             = colors.n_colors;
+        row.packs_per_color_min  = colors.min_packs_per_color;
+        row.packs_per_color_max  = colors.max_packs_per_color;
+        row.checksum             = checksum;
+        row.phase                = g_breakdown ? g_phase : nullptr;
+        csv_write(csv_path, row);
     }
 
     d.mesh.reset();
