@@ -23,6 +23,7 @@
 #include "cvfem_pack_coloring.hpp"
 #include "cvfem_hex8_layout_store.hpp"
 #include "cvfem_hex8_boundary_scs.hpp"
+#include "cvfem_element_coloring.hpp"
 
 #include "cvfem_hex8_ns_cuda.hpp"
 
@@ -399,6 +400,233 @@ int main(int argc, char **argv) {
         std::printf("%-13s %12.3e %12.3e %14.3e %12.1f  %s\n",
                     us ? "col/sympy" : "col/hand", dmax, rel, t,
                     t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0, ok ? "OK" : "FAIL");
+    }
+
+    // ---- split assembly: do not rebuild the terms that did not change ---------
+    std::printf("\n=== split assembly (linear part reused) ===\n");
+    {
+        // The reference is the full hand-written assembly: linear + nonlinear must
+        // reproduce it, because they are the two halves of the same kernel.
+        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        std::vector<double> ref2((size_t)bsr.nnz * 16);
+        std::memcpy(ref2.data(), bsr.values->data(), ref2.size() * sizeof(double));
+        double r2max = 0;
+        for (double v : ref2) r2max = std::fmax(r2max, std::fabs(v));
+
+        if (cvfem_cuda_assemble_linear(ctx, mu, block_size, nullptr) != 0 ||
+            cvfem_cuda_assemble_nonlinear(ctx, rho, mu, block_size, nullptr) != 0 ||
+            cvfem_cuda_synchronize() != 0) {
+            std::printf("split assembly failed\n"); fail = 1;
+        } else {
+            if (cvfem_cuda_download_values(ctx, dvals.data()) != 0) return 1;
+            double dm = 0;
+            for (size_t i = 0; i < ref2.size(); ++i)
+                dm = std::fmax(dm, std::fabs(ref2[i] - dvals[i]));
+            const double rel = r2max > 0 ? dm / r2max : dm;
+            const bool   ok  = rel <= 1e-12;
+            fail |= !ok;
+
+            const double t_full = cvfem_cuda_time_assemble(ctx, rho, mu,
+                                        CVFEM_CUDA_JAC_HANDWRITTEN, block_size, 10);
+            const double t_nl   = cvfem_cuda_time_assemble_nonlinear(ctx, rho, mu,
+                                        block_size, 10);
+            std::printf("linear+nonlinear vs full assembly: rel = %.3e  %s\n",
+                        rel, ok ? "OK" : "FAIL");
+            std::printf("%-34s %12s %12s\n", "", "s/assemble", "MDOF/s");
+            std::printf("%-34s %12.3e %12.1f\n", "full assembly (every iteration)", t_full,
+                        t_full > 0 ? (double)(d.nnodes * 4) / t_full * 1e-6 : 0.0);
+            std::printf("%-34s %12.3e %12.1f\n", "restore linear + nonlinear only", t_nl,
+                        t_nl > 0 ? (double)(d.nnodes * 4) / t_nl * 1e-6 : 0.0);
+            // Which blocks does the nonlinear half write? Determined once, from two
+            // different velocity fields, so a value that happens to vanish for one of
+            // them does not drop a block from the list.
+            std::vector<int32_t>  nl_blocks;
+            std::vector<uint16_t> nl_masks;
+            {
+                std::vector<double> probe((size_t)bsr.nnz * 16, 0.0), acc((size_t)bsr.nnz * 16, 0.0);
+                const std::vector<scalar_t> saved_ux = d.ux, saved_uy = d.uy, saved_uz = d.uz;
+                for (int trial = 0; trial < 2; ++trial) {
+                    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                        const double t = 0.3 + 0.7 * std::sin(0.013 * (double)(i + 7 * trial));
+                        d.ux[i] = t; d.uy[i] = 0.5 * t + 0.2 * trial; d.uz[i] = 0.25 - 0.4 * t;
+                    }
+                    assemble_jacobian_atomic_nonlinear(d, bsr, rho, mu, probe);  // probe is all zeros
+                    const scalar_t *pv = bsr.values->data();
+                    for (size_t i = 0; i < acc.size(); ++i) acc[i] += std::fabs(pv[i]);
+                }
+                d.ux = saved_ux; d.uy = saved_uy; d.uz = saved_uz;
+                nl_masks.assign((size_t)bsr.nnz, 0);
+                for (ptrdiff_t b = 0; b < bsr.nnz; ++b) {
+                    uint16_t m = 0;
+                    for (int k = 0; k < 16; ++k)
+                        if (acc[(size_t)b * 16 + k] != 0.0) m |= (uint16_t)(1u << k);
+                    nl_masks[(size_t)b] = m;
+                    if (m) nl_blocks.push_back((int32_t)b);
+                }
+                size_t changed = 0;
+                for (uint16_t m : nl_masks) changed += (size_t)__builtin_popcount(m);
+                std::printf("entries that change per iteration: %zu of %td (%.1f%%)\n",
+                            changed, bsr.nnz * 16,
+                            100.0 * (double)changed / (double)(bsr.nnz * 16));
+                std::printf("blocks written by the nonlinear half: %zu of %td (%.1f%%)\n",
+                            nl_blocks.size(), bsr.nnz,
+                            100.0 * (double)nl_blocks.size() / (double)bsr.nnz);
+            }
+            double t_sparse = -1.0;
+            if (cvfem_cuda_nonlinear_blocks_attach(ctx, (ptrdiff_t)nl_blocks.size(),
+                                                   nl_blocks.data(), nl_masks.data()) == 0) {
+                if (cvfem_cuda_assemble_linear(ctx, mu, block_size, nullptr) == 0 &&
+                    cvfem_cuda_assemble_nonlinear_sparse(ctx, rho, mu, block_size, nullptr) == 0 &&
+                    cvfem_cuda_synchronize() == 0 &&
+                    cvfem_cuda_download_values(ctx, dvals.data()) == 0) {
+                    double dm2 = 0;
+                    for (size_t i = 0; i < ref2.size(); ++i)
+                        dm2 = std::fmax(dm2, std::fabs(ref2[i] - dvals[i]));
+                    const double rel2 = r2max > 0 ? dm2 / r2max : dm2;
+                    const bool ok2 = rel2 <= 1e-12;
+                    fail |= !ok2;
+                    t_sparse = cvfem_cuda_time_assemble_nonlinear_sparse(ctx, rho, mu, block_size, 10);
+                    std::printf("sparse-restore vs full assembly: rel = %.3e  %s\n",
+                                rel2, ok2 ? "OK" : "FAIL");
+                }
+            }
+            const double t_restore = cvfem_cuda_time_restore_only(ctx, 10);
+            const double t_nlonly   = cvfem_cuda_time_nonlinear_only(ctx, rho, mu, block_size, 10);
+            std::printf("%-34s %12.3e %12.1f\n", "  ...of which: restore copy", t_restore,
+                        t_restore > 0 ? (double)(d.nnodes * 4) / t_restore * 1e-6 : 0.0);
+            std::printf("%-34s %12.3e %12.1f\n", "  ...of which: nonlinear kernel", t_nlonly,
+                        t_nlonly > 0 ? (double)(d.nnodes * 4) / t_nlonly * 1e-6 : 0.0);
+            if (t_nl > 0 && t_restore > 0)
+                std::printf("restore is %.0f%% of the split's cost; without it the ceiling is %.1f MDOF/s\n",
+                            100.0 * t_restore / t_nl,
+                            t_nlonly > 0 ? (double)(d.nnodes * 4) / t_nlonly * 1e-6 : 0.0);
+            // Single-matrix variant: no side buffer at all.
+            double t_dyn = -1.0;
+            if (cvfem_cuda_assemble_static(ctx, mu, block_size, nullptr) == 0 &&
+                cvfem_cuda_assemble_dynamic(ctx, rho, mu, block_size, nullptr) == 0 &&
+                cvfem_cuda_synchronize() == 0 &&
+                cvfem_cuda_download_values(ctx, dvals.data()) == 0) {
+                double dm3 = 0;
+                for (size_t i = 0; i < ref2.size(); ++i)
+                    dm3 = std::fmax(dm3, std::fabs(ref2[i] - dvals[i]));
+                const double rel3 = r2max > 0 ? dm3 / r2max : dm3;
+                const bool ok3 = rel3 <= 1e-12;
+                fail |= !ok3;
+                t_dyn = cvfem_cuda_time_assemble_dynamic(ctx, rho, mu, block_size, 10);
+                std::printf("zero+recompute (one matrix) vs full: rel = %.3e  %s\n",
+                            rel3, ok3 ? "OK" : "FAIL");
+            }
+            std::printf("side buffer held: %.1f MiB\n",
+                        (double)cvfem_cuda_linear_side_bytes(ctx) / (1024.0 * 1024.0));
+            if (t_dyn > 0)
+                std::printf("%-34s %12.3e %12.1f\n", "zero + recompute, ONE matrix", t_dyn,
+                            (double)(d.nnodes * 4) / t_dyn * 1e-6);
+            if (t_sparse > 0)
+                std::printf("%-34s %12.3e %12.1f\n", "restore touched blocks only", t_sparse,
+                            (double)(d.nnodes * 4) / t_sparse * 1e-6);
+            if (t_full > 0 && t_nl > 0)
+                std::printf("per Newton iteration: full->split %.2fx", t_full / t_nl);
+            if (t_full > 0 && t_sparse > 0)
+                std::printf(", full->sparse-restore %.2fx", t_full / t_sparse);
+            std::printf("\n");
+        }
+    }
+
+    // ---- element-coloured assembly: remove the atomics ------------------------
+    std::printf("\n=== element-coloured assembly (no atomics) ===\n");
+    {
+        ElementColoring ec = cvfem_build_element_coloring(d.nelements, d.nnodes, d.elems);
+        std::printf("element colours: %d   elements/colour min=%td max=%td\n",
+                    ec.n_colors, ec.min_per_color, ec.max_per_color);
+        if (cvfem_cuda_element_coloring_attach(ctx, ec.n_colors, ec.element_order.data(),
+                                               ec.color_ptr.data()) != 0) {
+            std::printf("element_coloring_attach failed\n"); fail = 1;
+        } else {
+            std::printf("%-13s %12s %14s %12s %10s\n", "variant", "rel", "s/assemble",
+                        "MDOF/s", "vs atomic");
+            for (int v = 0; v < CVFEM_CUDA_JAC_N_VARIANTS; ++v) {
+                if (cvfem_cuda_assemble_ecolored(ctx, rho, mu, v, block_size, nullptr) != 0 ||
+                    cvfem_cuda_synchronize() != 0) {
+                    std::printf("%-13s launch failed\n", cvfem_cuda_jac_variant_name(v));
+                    fail = 1; continue;
+                }
+                if (cvfem_cuda_download_values(ctx, dvals.data()) != 0) return 1;
+                double dm = 0;
+                for (size_t i = 0; i < href.size(); ++i)
+                    dm = std::fmax(dm, std::fabs(href[i] - dvals[i]));
+                const double rel = hmax > 0 ? dm / hmax : dm;
+                const bool   ok  = rel <= 1e-12;
+                fail |= !ok;
+                const double t  = cvfem_cuda_time_assemble_ecolored(ctx, rho, mu, v, block_size, 10);
+                const double ta = cvfem_cuda_time_assemble(ctx, rho, mu, v, block_size, 10);
+                std::printf("%-13s %12.3e %14.3e %12.1f %9.2fx  %s\n",
+                            cvfem_cuda_jac_variant_name(v), rel, t,
+                            t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0,
+                            (t > 0 && ta > 0) ? ta / t : 0.0, ok ? "OK" : "FAIL");
+            }
+        }
+    }
+
+    // ---- block diagonal for the block-Jacobi preconditioner -------------------
+    std::printf("\n=== block diagonal (block-Jacobi preconditioner) ===\n");
+    {
+        // Reference: the diagonal blocks of the full assembly.
+        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        const scalar_t *hv = bsr.values->data();
+        std::vector<double> ref_diag((size_t)d.nnodes * 16, 0.0);
+        for (ptrdiff_t r = 0; r < d.nnodes; ++r)
+            for (smesh::count_t j = bsr.rowptr[r]; j < bsr.rowptr[r + 1]; ++j)
+                if (bsr.colidx[j] == (smesh::idx_t)r)
+                    std::memcpy(&ref_diag[(size_t)r * 16], &hv[(size_t)j * 16], 16 * sizeof(double));
+        double dmax = 0;
+        for (double v : ref_diag) dmax = std::fmax(dmax, std::fabs(v));
+
+        std::vector<double> dev_diag((size_t)d.nnodes * 16);
+        const double mib = (double)d.nnodes * 16 * sizeof(double) / (1024.0 * 1024.0);
+        const double full_mib = (double)bsr.nnz * 16 * sizeof(double) / (1024.0 * 1024.0);
+        std::printf("diagonal is %.1f MiB against the full matrix's %.1f MiB (%.0fx smaller)\n",
+                    mib, full_mib, full_mib / mib);
+
+        if (cvfem_cuda_assemble_diag(ctx, rho, mu, block_size, nullptr) == 0 &&
+            cvfem_cuda_synchronize() == 0 &&
+            cvfem_cuda_download_diag(ctx, dev_diag.data()) == 0) {
+            const double rel = dmax > 0 ? max_abs_diff(ref_diag, dev_diag) / dmax : 0.0;
+            const bool ok = rel <= 1e-12;
+            fail |= !ok;
+            const double t = cvfem_cuda_time_assemble_diag(ctx, rho, mu, block_size, 10);
+            std::printf("%-30s rel = %.3e  %10.3e s  %10.1f MDOF/s  %s\n",
+                        "diagonal, full rebuild", rel, t,
+                        t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0, ok ? "OK" : "FAIL");
+        }
+        if (cvfem_cuda_assemble_diag_static(ctx, mu, block_size, nullptr) == 0 &&
+            cvfem_cuda_assemble_diag_dynamic(ctx, rho, mu, block_size, nullptr) == 0 &&
+            cvfem_cuda_synchronize() == 0 &&
+            cvfem_cuda_download_diag(ctx, dev_diag.data()) == 0) {
+            const double rel = dmax > 0 ? max_abs_diff(ref_diag, dev_diag) / dmax : 0.0;
+            const bool ok = rel <= 1e-12;
+            fail |= !ok;
+            const double t = cvfem_cuda_time_assemble_diag_dynamic(ctx, rho, mu, block_size, 10);
+            std::printf("%-30s rel = %.3e  %10.3e s  %10.1f MDOF/s  %s\n",
+                        "diagonal, split rebuild", rel, t,
+                        t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0, ok ? "OK" : "FAIL");
+        }
+        // The preconditioner block, against the same routine applied on the host.
+        if (cvfem_cuda_assemble_diag(ctx, rho, mu, block_size, nullptr) == 0 &&
+            cvfem_cuda_invert_diag(ctx, block_size, nullptr) == 0 &&
+            cvfem_cuda_synchronize() == 0 &&
+            cvfem_cuda_download_diag(ctx, dev_diag.data()) == 0) {
+            std::vector<double> host_inv((size_t)d.nnodes * 16);
+            for (ptrdiff_t n2 = 0; n2 < d.nnodes; ++n2)
+                cvfem_hex8_block_jacobi_block(&ref_diag[(size_t)n2 * 16], (const unsigned char *)nullptr,
+                                              &host_inv[(size_t)n2 * 16]);
+            double hm = 0;
+            for (double v : host_inv) hm = std::fmax(hm, std::fabs(v));
+            const double rel = hm > 0 ? max_abs_diff(host_inv, dev_diag) / hm : 0.0;
+            const bool ok = rel <= 1e-12;
+            fail |= !ok;
+            std::printf("%-30s rel = %.3e  %s   (3x3 velocity inverse + scalar pressure)\n",
+                        "block-Jacobi block", rel, ok ? "OK" : "FAIL");
+        }
     }
 
     // ---- cuSPARSE BSR SpMV vs the matrix-free Jacobian action ----------------

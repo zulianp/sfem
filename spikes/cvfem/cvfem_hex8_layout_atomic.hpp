@@ -247,6 +247,54 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(MeshData &d, BSR4 
     }
 }
 
+// Split assembly: the viscous part of the Jacobian depends only on the mesh and mu, so
+// in a Newton loop it is the same matrix every iteration. Build it once, then each
+// iteration restore it and add only the velocity-dependent terms.
+//
+// `linear` is a buffer of the same shape as b.values. The pair is exact, not an
+// approximation: linear + nonlinear reproduces assemble_jacobian_atomic_sumfact
+// bit-for-bit, because they are the two halves of the same kernel.
+static SFEM_NOINLINE void assemble_jacobian_atomic_linear(MeshData             &d,
+                                                          BSR4                 &b,
+                                                          const scalar_t        mu,
+                                                          std::vector<scalar_t> &linear) {
+    linear.assign((size_t)b.nnz * 16, scalar_t(0));
+    scalar_t *const SFEM_RESTRICT             values = linear.data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_jacobian_add_slots_linear<true>(mu, adj, det,
+                                                             slots + (size_t)e * 64, values);
+    }
+}
+
+static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData                    &d,
+                                                             BSR4                        &b,
+                                                             const scalar_t               rho,
+                                                             const scalar_t               mu,
+                                                             const std::vector<scalar_t> &linear) {
+    scalar_t *const SFEM_RESTRICT             values = b.values->data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+    // Restore the constant part. A streaming copy, in place of the scattered
+    // accumulation it replaces.
+    std::memcpy(values, linear.data(), linear.size() * sizeof(scalar_t));
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t ux[8], uy[8], uz[8], p[8];
+        gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_jacobian_add_slots_nonlinear<true>(
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
+        (void)p;
+    }
+}
+
 static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT                 values = b.values->data();

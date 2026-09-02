@@ -76,6 +76,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     endif()
 endif()
 
+# How much of the matrix the velocity-dependent half ever touches.
+add_executable(nlcover nlcover.cpp)
+target_link_libraries(nlcover PRIVATE SFEM::sfem
+    $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+target_compile_options(nlcover PRIVATE ${_cvfem_perf_opts})
+target_include_directories(nlcover PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_executable(cvfem_hex8_ns_steady cvfem_hex8_ns_steady.cpp)
 target_link_libraries(cvfem_hex8_ns_steady
     PRIVATE

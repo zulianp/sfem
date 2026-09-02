@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
             std::printf(
                     "usage: %s [--n N] [--repeat N] [--warmup N] [--assemble] [--jac-action] [--bsr-apply]\n"
                     "          [--verify] [--verify-jac] [--layout packed|atomic|colored|store]\n"
-                    "          [--kernel sumfact|current|fd|sympy|sympy_block|sympy_row|sympy_face]\n"
+                    "          [--kernel sumfact|current|fd|sympy|sympy_block|sympy_row|sympy_face|split]\n"
                     "          [--geom affine|isoparam] [--warp EPS] [--pack-size N] [--no-sfc]\n"
                     "          [--breakdown] [--kernel-only] [--dense-flush]\n"
                     "          [--csv FILE] [--tag NAME]\n"
@@ -361,12 +361,18 @@ int main(int argc, char **argv) {
     fill_fields(d);
     precompute_affine_geometry(d);
 
-    BSR4 bsr;
+    BSR4                  bsr;
+    std::vector<scalar_t> jac_linear;
     if (assemble || verify_jac || bsr_apply) bsr = make_bsr4(d.mesh);
     if (assemble || verify_jac || bsr_apply) {
         if (layout == "packed" || verify_jac || bsr_apply)
             build_pack_local_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
         if (layout == "atomic" || layout == "colored") precompute_element_bsr_slots(d, bsr);
+        if (kernel_kind == KernelKind::Split) {
+            // One-time cost in a Newton loop, so it is built before the timed region.
+            precompute_element_bsr_slots(d, bsr);
+            assemble_jacobian_atomic_linear(d, bsr, mu, jac_linear);
+        }
         if (layout == "store") build_pack_store_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
     }
 

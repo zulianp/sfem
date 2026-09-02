@@ -33,6 +33,11 @@ export CVFEM_BUILD="${CVFEM_BUILD:-$CVFEM_SRC/build}"
 
 cvfem_uenv() { uenv run --view="$CVFEM_VIEW" "$CVFEM_UENV" -- "$@"; }
 
+# rsync -a preserves source mtimes, which are often older than the object files already
+# in the remote build tree -- make then decides everything is up to date and silently
+# runs a stale binary. Touch the sources after every sync.
+cvfem_touch() { touch "$CVFEM_SRC"/*.hpp "$CVFEM_SRC"/*.cpp "$CVFEM_SRC"/cuda/* 2>/dev/null; }
+
 cvfem_configure() {
     cvfem_uenv cmake -S "$CVFEM_SRC" -B "$CVFEM_BUILD" \
         -DCMAKE_CXX_COMPILER=mpicxx \
@@ -42,6 +47,7 @@ cvfem_configure() {
 }
 
 cvfem_build() {
+    cvfem_touch
     cvfem_uenv cmake --build "$CVFEM_BUILD" -j"${BUILD_JOBS:-16}" "$@"
 }
 

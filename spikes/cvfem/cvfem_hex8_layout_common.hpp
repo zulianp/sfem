@@ -77,7 +77,10 @@ enum class KernelKind {
     Sympy,
     SympyBlock,
     SympyRow,
-    SympyFace
+    SympyFace,
+    // Assembly only: rebuild just the velocity-dependent terms, reusing a viscous part
+    // assembled once. See assemble_jacobian_atomic_{linear,nonlinear}.
+    Split
 };
 
 static KernelKind parse_kernel(const std::string &name) {
@@ -88,6 +91,7 @@ static KernelKind parse_kernel(const std::string &name) {
     if (name == "sympy_block") return KernelKind::SympyBlock;
     if (name == "sympy_row") return KernelKind::SympyRow;
     if (name == "sympy_face") return KernelKind::SympyFace;
+    if (name == "split") return KernelKind::Split;
     return KernelKind::Sumfact;
 }
 
@@ -97,7 +101,7 @@ static bool kernel_uses_sympy_residual(const KernelKind k) {
 
 static bool kernel_is_valid(const std::string &name) {
     return name == "current" || name == "fd" || name == "sumfact" || name == "sympy" || name == "sympy_block" ||
-           name == "sympy_row" || name == "sympy_face";
+           name == "sympy_row" || name == "sympy_face" || name == "split";
 }
 
 enum class GeomKind { Affine, Isoparam };

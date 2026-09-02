@@ -70,6 +70,13 @@ struct cvfem_cuda_ctx {
     int32_t  *elements_global{nullptr};   // [8 * nelements], GLOBAL ids
     int32_t  *element_slots{nullptr};     // [64 * nelements]
     double   *values{nullptr};            // [16 * nnz]
+    double   *values_linear{nullptr};     // [16 * nnz], geometry-only, built once
+    double   *diag{nullptr};              // [16 * nnodes], block diagonal
+    double   *diag_static{nullptr};       // [16 * nnodes], its viscous part
+    int32_t  *nl_blocks{nullptr};         // block ids the nonlinear half writes
+    ptrdiff_t n_nl_blocks{0};
+    uint16_t *nl_masks{nullptr};          // [nnz], by block id: which entries change
+    double   *linear_compact{nullptr};    // [16 * n_nl_blocks], only what gets overwritten
     int32_t  *rowptr{nullptr};            // [nnodes + 1], block rows
     int32_t  *colidx{nullptr};            // [nnz]
     cusparseHandle_t      sp{nullptr};
@@ -80,6 +87,10 @@ struct cvfem_cuda_ctx {
     double    *px{nullptr}, *py{nullptr}, *pz{nullptr};
     double    *pgx{nullptr}, *pgy{nullptr}, *pgz{nullptr}, *pgw{nullptr};
     double     Lx{0}, Ly{0}, Lz{0};
+
+    int        n_ecolors{0};
+    int32_t   *element_order{nullptr};
+    std::vector<ptrdiff_t> h_ecolor_ptr;
 
     int        n_colors{0};
     ptrdiff_t *pack_order{nullptr};
@@ -418,6 +429,82 @@ __global__ void cvfem_hex8_assemble_bsr_kernel(
     }
 }
 
+// Same element kernel as the atomic version, but writing with a plain += because the
+// colouring guarantees no two threads in flight touch the same matrix block. VARIANT 0
+// is the hand-written kernel with Atomic=false; the SymPy *_local_slots family already
+// accumulates without atomics.
+template <int VARIANT>
+__global__ void cvfem_hex8_assemble_ecolored_kernel(
+        const ptrdiff_t n_in_color, const ptrdiff_t color_begin, const ptrdiff_t nelements,
+        const double rho, const double mu,
+        const int32_t *const __restrict__ order,
+        const int32_t *const __restrict__ elements,
+        const int32_t *const __restrict__ slots,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        const double  *const __restrict__ u,
+        double *const __restrict__ values) {
+    for (ptrdiff_t t = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; t < n_in_color;
+         t += (ptrdiff_t)blockDim.x * gridDim.x) {
+        const ptrdiff_t e = order[color_begin + t];
+        double ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES];
+        double uz[CVFEM_HEX8_N_NODES], pe[CVFEM_HEX8_N_NODES];
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const ptrdiff_t g     = elements[(ptrdiff_t)a * nelements + e];
+            const double *const n = &u[g * CVFEM_CUDA_NF];
+            ux[a] = n[0]; uy[a] = n[1]; uz[a] = n[2]; pe[a] = n[3];
+        }
+        double adj_e[9];
+#pragma unroll
+        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+
+        const int32_t *const es = &slots[e * 64];
+        if      constexpr (VARIANT == CVFEM_CUDA_JAC_HANDWRITTEN)
+            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+        else if constexpr (VARIANT == CVFEM_CUDA_JAC_SYMPY)
+            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+        else if constexpr (VARIANT == CVFEM_CUDA_JAC_SYMPY_BLOCK)
+            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_blockwise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+        else if constexpr (VARIANT == CVFEM_CUDA_JAC_SYMPY_ROW)
+            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+        else
+            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+        (void)pe;
+    }
+}
+
+template <int VARIANT>
+int launch_ecolored_v(cvfem_cuda_ctx *ctx, double rho, double mu, int block, cudaStream_t s) {
+    for (int c = 0; c < ctx->n_ecolors; ++c) {
+        const ptrdiff_t b = ctx->h_ecolor_ptr[c], e = ctx->h_ecolor_ptr[c + 1];
+        const ptrdiff_t n = e - b;
+        if (n <= 0) continue;
+        const int grid = (int)((n + block - 1) / block);
+        cvfem_hex8_assemble_ecolored_kernel<VARIANT><<<grid, block, 0, s>>>(
+                n, b, ctx->nelements, rho, mu, ctx->element_order, ctx->elements_global,
+                ctx->element_slots, ctx->adj, ctx->det, ctx->u, ctx->values);
+        CVFEM_CUDA_CHECK(cudaGetLastError());
+    }
+    return 0;
+}
+
+int launch_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu, int variant,
+                    int block_size, cudaStream_t s) {
+    if (!ctx->values || !ctx->element_order) return 1;
+    const int block = block_size > 0 ? block_size : 128;
+    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
+                                     (size_t)ctx->nnz * 16 * sizeof(double), s));
+    switch (variant) {
+        case CVFEM_CUDA_JAC_HANDWRITTEN: return launch_ecolored_v<CVFEM_CUDA_JAC_HANDWRITTEN>(ctx, rho, mu, block, s);
+        case CVFEM_CUDA_JAC_SYMPY:       return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY>(ctx, rho, mu, block, s);
+        case CVFEM_CUDA_JAC_SYMPY_BLOCK: return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY_BLOCK>(ctx, rho, mu, block, s);
+        case CVFEM_CUDA_JAC_SYMPY_ROW:   return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY_ROW>(ctx, rho, mu, block, s);
+        case CVFEM_CUDA_JAC_SYMPY_FACE:  return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY_FACE>(ctx, rho, mu, block, s);
+        default: return 1;
+    }
+}
+
 template <int VARIANT>
 int launch_assemble_v(cvfem_cuda_ctx *ctx, double rho, double mu, int block, cudaStream_t s) {
     const int grid = (int)((ctx->nelements + block - 1) / block);
@@ -611,6 +698,207 @@ __global__ void cvfem_hex8_nodal_p_grad_normalize_kernel(
          i += (ptrdiff_t)blockDim.x * gridDim.x) {
         const double wi = w[i];
         if (wi > 0.0) { pgx[i] /= wi; pgy[i] /= wi; pgz[i] /= wi; }
+    }
+}
+
+// Geometry-only assembly. Reads no velocity; run once per mesh.
+__global__ void cvfem_hex8_assemble_linear_kernel(
+        const ptrdiff_t nelements, const double mu,
+        const int32_t *const __restrict__ slots,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        double *const __restrict__ values) {
+    for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
+         e += (ptrdiff_t)blockDim.x * gridDim.x) {
+        double adj_e[9];
+#pragma unroll
+        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+        cvfem_hex8_ns_upwind_jacobian_add_slots_linear<true>(mu, adj_e, det[e],
+                                                             &slots[e * 64], values);
+    }
+}
+
+// Velocity-dependent assembly, added on top of the restored linear part.
+__global__ void cvfem_hex8_assemble_nonlinear_kernel(
+        const ptrdiff_t nelements, const double rho, const double mu,
+        const int32_t *const __restrict__ elements,
+        const int32_t *const __restrict__ slots,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        const double  *const __restrict__ u,
+        double *const __restrict__ values) {
+    for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
+         e += (ptrdiff_t)blockDim.x * gridDim.x) {
+        double ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES], uz[CVFEM_HEX8_N_NODES];
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const ptrdiff_t g     = elements[(ptrdiff_t)a * nelements + e];
+            const double *const n = &u[g * CVFEM_CUDA_NF];
+            ux[a] = n[0]; uy[a] = n[1]; uz[a] = n[2];
+        }
+        double adj_e[9];
+#pragma unroll
+        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+        cvfem_hex8_ns_upwind_jacobian_add_slots_nonlinear<true>(rho, mu, adj_e, det[e],
+                                                                ux, uy, uz,
+                                                                &slots[e * 64], values);
+    }
+}
+
+// Copy back only the blocks the nonlinear half will overwrite, from a COMPACT side
+// buffer holding just those blocks. Reads are contiguous, writes are block-scattered.
+__global__ void cvfem_hex8_restore_blocks_kernel(
+        const ptrdiff_t n_blocks,
+        const int32_t *const __restrict__ block_ids,
+        const double  *const __restrict__ compact,
+        double *const __restrict__ dst) {
+    for (ptrdiff_t t = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; t < n_blocks * 4;
+         t += (ptrdiff_t)blockDim.x * gridDim.x) {
+        const ptrdiff_t b = t >> 2, q = t & 3;
+        reinterpret_cast<double4 *>(&dst[(ptrdiff_t)block_ids[b] * 16])[q] =
+                reinterpret_cast<const double4 *>(&compact[b * 16])[q];
+    }
+}
+
+// Gather the touched blocks out of the full linear matrix into the compact buffer, once.
+__global__ void cvfem_hex8_compact_linear_kernel(
+        const ptrdiff_t n_blocks,
+        const int32_t *const __restrict__ block_ids,
+        const double  *const __restrict__ src,
+        double *const __restrict__ compact) {
+    for (ptrdiff_t t = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; t < n_blocks * 16;
+         t += (ptrdiff_t)blockDim.x * gridDim.x) {
+        const ptrdiff_t b = t >> 4, k = t & 15;
+        compact[t] = src[(ptrdiff_t)block_ids[b] * 16 + k];
+    }
+}
+
+__global__ void cvfem_hex8_zero_blocks_kernel(
+        const ptrdiff_t n_blocks,
+        const int32_t  *const __restrict__ block_ids,
+        const uint16_t *const __restrict__ masks,
+        double *const __restrict__ values) {
+    // One 32-byte store per thread instead of four 8-byte ones. A block's 16 doubles are
+    // 128 contiguous bytes starting at a 32-byte boundary, so four consecutive threads
+    // cover a block exactly. Measured earlier: vectorising this shape is worth ~1.2x.
+    // One thread per entry, but only the entries that will be rewritten. Zeroing whole
+    // blocks would clear viscous values that nothing recomputes.
+    for (ptrdiff_t t = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; t < n_blocks * 16;
+         t += (ptrdiff_t)blockDim.x * gridDim.x) {
+        const ptrdiff_t b  = t >> 4;
+        const int       k  = (int)(t & 15);
+        const ptrdiff_t id = (ptrdiff_t)block_ids[b];
+        if (masks[id] & (uint16_t)(1u << k)) values[id * 16 + k] = 0.0;
+    }
+}
+
+// The viscous half for the pairs that are written once and never revisited.
+__global__ void cvfem_hex8_assemble_static_kernel(
+        const ptrdiff_t nelements, const double mu,
+        const int32_t  *const __restrict__ slots,
+        const uint16_t *const __restrict__ masks,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        double *const __restrict__ values) {
+    for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
+         e += (ptrdiff_t)blockDim.x * gridDim.x) {
+        double adj_e[9];
+#pragma unroll
+        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+        cvfem_hex8_ns_upwind_jacobian_add_slots_static<true>(
+                mu, adj_e, det[e], &slots[e * 64], masks, values);
+    }
+}
+
+// Everything that is rebuilt each iteration: the viscous half for the recomputed pairs,
+// plus convection. Runs into blocks that were just zeroed.
+__global__ void cvfem_hex8_assemble_dynamic_kernel(
+        const ptrdiff_t nelements, const double rho, const double mu,
+        const int32_t  *const __restrict__ elements,
+        const int32_t  *const __restrict__ slots,
+        const uint16_t *const __restrict__ masks,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        const double  *const __restrict__ u,
+        double *const __restrict__ values) {
+    for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
+         e += (ptrdiff_t)blockDim.x * gridDim.x) {
+        double ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES], uz[CVFEM_HEX8_N_NODES];
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const ptrdiff_t g     = elements[(ptrdiff_t)a * nelements + e];
+            const double *const n = &u[g * CVFEM_CUDA_NF];
+            ux[a] = n[0]; uy[a] = n[1]; uz[a] = n[2];
+        }
+        double adj_e[9];
+#pragma unroll
+        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+        cvfem_hex8_ns_upwind_jacobian_add_slots_dynamic<true>(rho, mu, adj_e, det[e],
+                                                              ux, uy, uz, &slots[e * 64],
+                                                              masks, values);
+    }
+}
+
+// DIAG_MODE: 0 = everything, 1 = viscous only (constant), 2 = velocity-dependent only.
+template <int DIAG_MODE>
+__global__ void cvfem_hex8_assemble_diag_kernel(
+        const ptrdiff_t nelements, const double rho, const double mu,
+        const int32_t *const __restrict__ elements,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        const double  *const __restrict__ u,
+        double *const __restrict__ diag) {
+    for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
+         e += (ptrdiff_t)blockDim.x * gridDim.x) {
+        // -1 everywhere off the diagonal: those writes are dropped, so only the 8
+        // diagonal blocks of this element are touched.
+        int32_t sl[64];
+        double  ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES], uz[CVFEM_HEX8_N_NODES];
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const int32_t g = elements[(ptrdiff_t)a * nelements + e];
+#pragma unroll
+            for (int b = 0; b < CVFEM_HEX8_N_NODES; ++b) sl[a * 8 + b] = -1;
+            sl[a * 8 + a] = g;
+            const double *const n = &u[(ptrdiff_t)g * CVFEM_CUDA_NF];
+            ux[a] = n[0]; uy[a] = n[1]; uz[a] = n[2];
+        }
+        double adj_e[9];
+#pragma unroll
+        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+
+        if      constexpr (DIAG_MODE == 0)
+            cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj_e, det[e], ux, uy, uz, sl, diag);
+        else if constexpr (DIAG_MODE == 1)
+            cvfem_hex8_ns_upwind_jacobian_add_slots_linear<true>(mu, adj_e, det[e], sl, diag);
+        else
+            cvfem_hex8_ns_upwind_jacobian_add_slots_nonlinear<true>(rho, mu, adj_e, det[e],
+                                                                    ux, uy, uz, sl, diag);
+    }
+}
+
+// Restore the constant viscous diagonal, then the velocity-dependent part goes on top.
+__global__ void cvfem_hex8_diag_restore_kernel(const ptrdiff_t n, const double *const __restrict__ src,
+                                               double *const __restrict__ dst) {
+    for (ptrdiff_t t = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; t < n;
+         t += (ptrdiff_t)blockDim.x * gridDim.x)
+        dst[t] = src[t];
+}
+
+// The preconditioner block per node: 3x3 velocity inverse plus a scalar pressure
+// reciprocal, matching build_block_jacobi in the solver. A plain 4x4 inverse would be
+// wrong here -- the block is singular, because the pressure-pressure entry is zero.
+__global__ void cvfem_hex8_invert_diag_kernel(const ptrdiff_t nnodes,
+                                              const unsigned char *const __restrict__ constrained,
+                                              double *const __restrict__ diag) {
+    for (ptrdiff_t i = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; i < nnodes;
+         i += (ptrdiff_t)blockDim.x * gridDim.x) {
+        double blk[16], inv[16];
+#pragma unroll
+        for (int k = 0; k < 16; ++k) blk[k] = diag[i * 16 + k];
+        cvfem_hex8_block_jacobi_block(blk, constrained ? &constrained[i * 4] : nullptr, inv);
+#pragma unroll
+        for (int k = 0; k < 16; ++k) diag[i * 16 + k] = inv[k];
     }
 }
 
@@ -830,7 +1118,10 @@ extern "C" int cvfem_cuda_destroy(cvfem_cuda_ctx *ctx) {
     cudaFree(ctx->u); cudaFree(ctx->r); cudaFree(ctx->v); cudaFree(ctx->ghost_buf);
     cudaFree(ctx->elements_global); cudaFree(ctx->element_slots); cudaFree(ctx->values);
     cudaFree(ctx->pack_order); cudaFree(ctx->color_ptr);
-    cudaFree(ctx->rowptr); cudaFree(ctx->colidx);
+    cudaFree(ctx->rowptr); cudaFree(ctx->colidx); cudaFree(ctx->element_order);
+    cudaFree(ctx->values_linear); cudaFree(ctx->nl_blocks); cudaFree(ctx->linear_compact);
+    cudaFree(ctx->diag); cudaFree(ctx->diag_static);
+    cudaFree(ctx->nl_masks);
     if (ctx->spdesc) cusparseDestroyMatDescr(ctx->spdesc);
     if (ctx->sp) cusparseDestroy(ctx->sp);
     cudaFree(ctx->boundary_elems); cudaFree(ctx->px); cudaFree(ctx->py); cudaFree(ctx->pz);
@@ -976,6 +1267,365 @@ extern "C" double cvfem_cuda_time_assemble(cvfem_cuda_ctx *ctx, double rho, doub
     cudaEventRecord(a);
     for (int i = 0; i < repeat; ++i)
         if (launch_assemble(ctx, rho, mu, variant, block_size, 0) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" int cvfem_cuda_assemble_linear(cvfem_cuda_ctx *ctx, double mu, int block_size,
+                                          void *stream) {
+    if (!ctx->values) return 1;
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    const size_t nb = (size_t)ctx->nnz * 16 * sizeof(double);
+    if (!ctx->values_linear) CVFEM_CUDA_CHECK(cudaMalloc(&ctx->values_linear, nb));
+    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values_linear, 0, nb, s));
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    cvfem_hex8_assemble_linear_kernel<<<grid, block, 0, s>>>(
+            ctx->nelements, mu, ctx->element_slots, ctx->adj, ctx->det, ctx->values_linear);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+static int launch_assemble_nonlinear(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                     int block_size, cudaStream_t s) {
+    if (!ctx->values_linear) return 1;
+    // Restore the constant part. This is a fully coalesced device-to-device copy, which
+    // is a very different access pattern from the scattered accumulation it replaces.
+    CVFEM_CUDA_CHECK(cudaMemcpyAsync(ctx->values, ctx->values_linear,
+                                     (size_t)ctx->nnz * 16 * sizeof(double),
+                                     cudaMemcpyDeviceToDevice, s));
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    cvfem_hex8_assemble_nonlinear_kernel<<<grid, block, 0, s>>>(
+            ctx->nelements, rho, mu, ctx->elements_global, ctx->element_slots,
+            ctx->adj, ctx->det, ctx->u, ctx->values);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+extern "C" int cvfem_cuda_assemble_nonlinear(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                             int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_assemble_nonlinear(ctx, rho, mu, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_assemble_nonlinear(cvfem_cuda_ctx *ctx, double rho,
+                                                     double mu, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_assemble_nonlinear(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_assemble_nonlinear(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" int cvfem_cuda_nonlinear_blocks_attach(cvfem_cuda_ctx *ctx, ptrdiff_t n_blocks,
+                                                  const int32_t *block_ids,
+                                                  const uint16_t *block_masks_by_id) {
+    ctx->n_nl_blocks = n_blocks;
+    if (device_dup(&ctx->nl_blocks, block_ids, (size_t)n_blocks) != 0) return 1;
+    if (device_dup(&ctx->nl_masks, block_masks_by_id, (size_t)ctx->nnz) != 0) return 1;
+    if (!ctx->values_linear) return 1;   // needs cvfem_cuda_assemble_linear first
+
+    // Compact the saved linear data down to the blocks that will actually be
+    // overwritten, then release the full-size copy. The other 73.5% of blocks are
+    // already correct in `values` and are never written again, so nothing needs to hold
+    // a second copy of them.
+    CVFEM_CUDA_CHECK(cudaMalloc(&ctx->linear_compact, (size_t)n_blocks * 16 * sizeof(double)));
+    const int block = 256;
+    const int grid  = (int)((n_blocks * 16 + block - 1) / block);
+    cvfem_hex8_compact_linear_kernel<<<grid, block>>>(n_blocks, ctx->nl_blocks,
+                                                      ctx->values_linear, ctx->linear_compact);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    CVFEM_CUDA_CHECK(cudaDeviceSynchronize());
+    cudaFree(ctx->values_linear);
+    ctx->values_linear = nullptr;
+    return 0;
+}
+
+extern "C" int cvfem_cuda_assemble_static(cvfem_cuda_ctx *ctx, double mu, int block_size,
+                                          void *stream) {
+    if (!ctx->values) return 1;
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
+                                     (size_t)ctx->nnz * 16 * sizeof(double), s));
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    if (!ctx->nl_masks) return 1;
+    cvfem_hex8_assemble_static_kernel<<<grid, block, 0, s>>>(
+            ctx->nelements, mu, ctx->element_slots, ctx->nl_masks, ctx->adj, ctx->det,
+            ctx->values);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+static int launch_assemble_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                   int block_size, cudaStream_t s) {
+    if (!ctx->nl_blocks) return 1;
+    const int block = block_size > 0 ? block_size : 128;
+    {
+        const int grid = (int)((ctx->n_nl_blocks * 16 + block - 1) / block);
+        cvfem_hex8_zero_blocks_kernel<<<grid, block, 0, s>>>(ctx->n_nl_blocks, ctx->nl_blocks,
+                                                             ctx->nl_masks, ctx->values);
+        CVFEM_CUDA_CHECK(cudaGetLastError());
+    }
+    const int grid = (int)((ctx->nelements + block - 1) / block);
+    cvfem_hex8_assemble_dynamic_kernel<<<grid, block, 0, s>>>(
+            ctx->nelements, rho, mu, ctx->elements_global, ctx->element_slots,
+            ctx->nl_masks, ctx->adj, ctx->det, ctx->u, ctx->values);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+extern "C" int cvfem_cuda_assemble_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                           int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_assemble_dynamic(ctx, rho, mu, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_assemble_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                   int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_assemble_dynamic(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_assemble_dynamic(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" int cvfem_cuda_diag_alloc(cvfem_cuda_ctx *ctx) {
+    const size_t nb = (size_t)ctx->nnodes * 16 * sizeof(double);
+    if (!ctx->diag) CVFEM_CUDA_CHECK(cudaMalloc(&ctx->diag, nb));
+    return 0;
+}
+
+static int launch_diag(cvfem_cuda_ctx *ctx, double rho, double mu, int mode,
+                       double *dst, int block_size, cudaStream_t s, bool zero_first) {
+    if (cvfem_cuda_diag_alloc(ctx) != 0) return 1;
+    const size_t nb = (size_t)ctx->nnodes * 16 * sizeof(double);
+    if (zero_first) CVFEM_CUDA_CHECK(cudaMemsetAsync(dst, 0, nb, s));
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    switch (mode) {
+        case 0: cvfem_hex8_assemble_diag_kernel<0><<<grid, block, 0, s>>>(
+                    ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det, ctx->u, dst);
+                break;
+        case 1: cvfem_hex8_assemble_diag_kernel<1><<<grid, block, 0, s>>>(
+                    ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det, ctx->u, dst);
+                break;
+        default: cvfem_hex8_assemble_diag_kernel<2><<<grid, block, 0, s>>>(
+                    ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det, ctx->u, dst);
+                break;
+    }
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+extern "C" int cvfem_cuda_assemble_diag(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                        int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    // Allocate before reading ctx->diag: passing it as an argument would capture the
+    // null pointer from before launch_diag's own allocation runs.
+    if (cvfem_cuda_diag_alloc(ctx) != 0) return 1;
+    return launch_diag(ctx, rho, mu, 0, ctx->diag, block_size, s, true);
+}
+
+extern "C" int cvfem_cuda_assemble_diag_static(cvfem_cuda_ctx *ctx, double mu, int block_size,
+                                               void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    const size_t nb = (size_t)ctx->nnodes * 16 * sizeof(double);
+    if (!ctx->diag_static) CVFEM_CUDA_CHECK(cudaMalloc(&ctx->diag_static, nb));
+    return launch_diag(ctx, 0.0, mu, 1, ctx->diag_static, block_size, s, true);
+}
+
+static int launch_diag_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu, int block_size,
+                               cudaStream_t s) {
+    if (!ctx->diag_static) return 1;
+    if (cvfem_cuda_diag_alloc(ctx) != 0) return 1;
+    const ptrdiff_t n = ctx->nnodes * 16;
+    const int block = block_size > 0 ? block_size : 256;
+    const int grid  = (int)((n + block - 1) / block);
+    cvfem_hex8_diag_restore_kernel<<<grid, block, 0, s>>>(n, ctx->diag_static, ctx->diag);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return launch_diag(ctx, rho, mu, 2, ctx->diag, block_size, s, false);
+}
+
+extern "C" int cvfem_cuda_assemble_diag_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_diag_dynamic(ctx, rho, mu, block_size, s);
+}
+
+extern "C" int cvfem_cuda_download_diag(cvfem_cuda_ctx *ctx, double *diag) {
+    if (!ctx->diag) return 1;
+    CVFEM_CUDA_CHECK(cudaMemcpy(diag, ctx->diag, (size_t)ctx->nnodes * 16 * sizeof(double),
+                                cudaMemcpyDeviceToHost));
+    return 0;
+}
+
+extern "C" int cvfem_cuda_invert_diag(cvfem_cuda_ctx *ctx, int block_size, void *stream) {
+    if (!ctx->diag) return 1;
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nnodes + block - 1) / block);
+    cvfem_hex8_invert_diag_kernel<<<grid, block, 0, s>>>(ctx->nnodes, nullptr, ctx->diag);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+extern "C" double cvfem_cuda_time_assemble_diag(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (cvfem_cuda_assemble_diag(ctx, rho, mu, block_size, nullptr) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (cvfem_cuda_assemble_diag(ctx, rho, mu, block_size, nullptr) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" double cvfem_cuda_time_assemble_diag_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                        int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_diag_dynamic(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_diag_dynamic(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" size_t cvfem_cuda_linear_side_bytes(cvfem_cuda_ctx *ctx) {
+    if (ctx->linear_compact) return (size_t)ctx->n_nl_blocks * 16 * sizeof(double);
+    if (ctx->values_linear) return (size_t)ctx->nnz * 16 * sizeof(double);
+    return 0;
+}
+
+static int launch_assemble_nonlinear_sparse(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                            int block_size, cudaStream_t s) {
+    if (!ctx->linear_compact || !ctx->nl_blocks) return 1;
+    const int block = block_size > 0 ? block_size : 128;
+    {
+        const ptrdiff_t work = ctx->n_nl_blocks * 4;   // one double4 per thread
+        const int       grid = (int)((work + block - 1) / block);
+        cvfem_hex8_restore_blocks_kernel<<<grid, block, 0, s>>>(
+                ctx->n_nl_blocks, ctx->nl_blocks, ctx->linear_compact, ctx->values);
+        CVFEM_CUDA_CHECK(cudaGetLastError());
+    }
+    const int grid = (int)((ctx->nelements + block - 1) / block);
+    cvfem_hex8_assemble_nonlinear_kernel<<<grid, block, 0, s>>>(
+            ctx->nelements, rho, mu, ctx->elements_global, ctx->element_slots,
+            ctx->adj, ctx->det, ctx->u, ctx->values);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+extern "C" int cvfem_cuda_assemble_nonlinear_sparse(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                    int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_assemble_nonlinear_sparse(ctx, rho, mu, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_assemble_nonlinear_sparse(cvfem_cuda_ctx *ctx, double rho,
+                                                            double mu, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_assemble_nonlinear_sparse(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_assemble_nonlinear_sparse(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" double cvfem_cuda_time_restore_only(cvfem_cuda_ctx *ctx, int repeat) {
+    if (!ctx->values_linear) return -1.0;
+    const size_t nb = (size_t)ctx->nnz * 16 * sizeof(double);
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    cudaMemcpy(ctx->values, ctx->values_linear, nb, cudaMemcpyDeviceToDevice);
+    cudaDeviceSynchronize();
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        cudaMemcpyAsync(ctx->values, ctx->values_linear, nb, cudaMemcpyDeviceToDevice, 0);
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" double cvfem_cuda_time_nonlinear_only(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                 int block_size, int repeat) {
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    cudaDeviceSynchronize();
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        cvfem_hex8_assemble_nonlinear_kernel<<<grid, block>>>(
+                ctx->nelements, rho, mu, ctx->elements_global, ctx->element_slots,
+                ctx->adj, ctx->det, ctx->u, ctx->values);
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" int cvfem_cuda_element_coloring_attach(cvfem_cuda_ctx *ctx, int n_colors,
+                                                 const int32_t *element_order,
+                                                 const ptrdiff_t *color_ptr) {
+    ctx->n_ecolors = n_colors;
+    ctx->h_ecolor_ptr.assign(color_ptr, color_ptr + n_colors + 1);
+    return device_dup(&ctx->element_order, element_order, (size_t)ctx->nelements);
+}
+
+extern "C" int cvfem_cuda_assemble_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                            int variant, int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_ecolored(ctx, rho, mu, variant, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_assemble_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                    int variant, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_ecolored(ctx, rho, mu, variant, block_size, 0) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_ecolored(ctx, rho, mu, variant, block_size, 0) != 0) return -1.0;
     cudaEventRecord(b);
     if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
     float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
