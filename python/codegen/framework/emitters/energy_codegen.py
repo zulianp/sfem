@@ -40,7 +40,7 @@ from codegen.framework.fem.reference import (
     sfem_tensor_product_hex_uses_cartesian_ordering,
     sfem_tensor_product_quad_uses_cartesian_ordering,
 )
-from codegen.framework.fem.tensor_product_geometry import (
+from codegen.framework.emitters.tensor_product_geometry import (
     isoparametric_adjugate_call_lines,
     isoparametric_adjugate_stream_array_lines,
     streams_in_shape_order,

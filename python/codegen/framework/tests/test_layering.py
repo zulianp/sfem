@@ -7,12 +7,10 @@ earlier in the pipeline -- and must never name a layer that comes after it.
 Reading the stack top-down as specification to generated text, legal imports
 point up and illegal ones point down.
 
-The current tree breaks that rule on six package pairs.  Rather than assert a
-clean graph the tree does not yet have, this module pins the violations in
-``KNOWN_VIOLATIONS`` and fails on anything else.  Each migration step deletes
-entries; nothing may ever add one.  That makes the layering a ratchet instead of
-an intention, and it is why this test is written before the code moves rather
-than after.
+The tree started with six offending package pairs.  ``KNOWN_VIOLATIONS`` pinned
+them so the graph could only improve, and it is now empty: every import in the
+framework points up the lowering order.  Nothing may be added to that set
+without a migration step that removes it again.
 
 The test parses imports statically with ``ast`` -- it never imports the modules
 it inspects, so it cannot be fooled by, or fail because of, import side effects.
@@ -30,6 +28,7 @@ LAYER_ORDER = (
     "fem",
     "plans",
     "ir",
+    "targets",
     "emitters",
     "backends",
 )
@@ -37,28 +36,33 @@ LAYER_ORDER = (
 # Packages that sit outside the lowering stack.  Frontend packages sit above the
 # whole stack and may import anything; tooling and tests likewise.  ``mlir`` is
 # an experimental subtree that is explicitly out of scope for the layering work.
-UNRANKED_PACKAGES = ("materials", "generators", "mlir", "tests", "tools", "scripts", "twophaseflow")
+UNRANKED_PACKAGES = (
+    "materials",
+    "generators",
+    "mlir",
+    "tests",
+    "tools",
+    "scripts",
+    "twophaseflow",
+)
 
 # Violations present at the start of the layering work, as
-# ``(importing_layer, imported_layer)``.  Every entry has a migration step that
-# removes it; see the migration table in LAYERING.html.
+# ``(importing_layer, imported_layer)``.  The list has only ever shrunk:
 #
-#   symbolic -> fem, plans, emitters, backends   REMOVED by S2
+#   symbolic -> fem, plans, emitters, backends   removed by S2
 #   fem      -> backends                         removed by S6
 #   emitters -> backends                         removed by S6
 #
-# The two survivors are both the same underlying problem: `backends/` holds two
-# unrelated things.  `backends/targets.py` is the target-lowering layer, which
-# the target architecture places *before* emission -- so `emitters -> targets`
-# is an upward edge that should be legal.  `backends/openmp.py` and
-# `backends/cuda.py` are orchestrators that drive the emitters.  S6 splits them,
-# after which these two entries go away rather than being "fixed".
-KNOWN_VIOLATIONS = frozenset(
-    {
-        ("fem", "backends"),
-        ("emitters", "backends"),
-    }
-)
+# The last two were never really violations to repair.  ``backends/`` held two
+# unrelated things: the target definitions, which belong below emission, and the
+# orchestrators that drive the emitters.  S6 split ``targets/`` out into its own
+# layer, so an emitter naming a target is now the upward edge it always was.
+# ``fem/`` likewise held two emitter modules -- thirteen of eighteen functions in
+# ``tensor_product_geometry`` build C text -- which moved to ``emitters/``.
+#
+# The graph is clean.  Nothing may be added here without a migration step that
+# removes it again.
+KNOWN_VIOLATIONS = frozenset()
 
 FRAMEWORK_PACKAGE = "codegen.framework"
 

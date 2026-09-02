@@ -18,7 +18,7 @@ from codegen.framework.fem.reference import (
     _sfem_unit_interval_gauss_rule,
     _tri6_reference_gradients,
 )
-from codegen.framework.backends.targets import OpenMPTarget
+from codegen.framework.targets import OpenMPTarget
 from codegen.framework.plans.residual_model import residual_emission_model
 
 

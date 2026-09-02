@@ -5,7 +5,7 @@ from codegen.framework.symbolic.forms import FormOrder
 from codegen.framework.plans.energy import energy_soa_kernel_emission_plan
 from codegen.framework.emitters.energy import CUDAEnergySoAEmitter
 from codegen.framework.plans.generation import KernelTarget, MeshPhase
-from codegen.framework.backends.targets import CUDATarget, HIPTarget
+from codegen.framework.targets import CUDATarget, HIPTarget
 
 
 @dataclass(frozen=True)

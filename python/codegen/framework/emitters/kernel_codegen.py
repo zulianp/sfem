@@ -34,7 +34,7 @@ from codegen.framework.emitters.cprinter import (
     _sfem_math_function_lines,
 )
 from codegen.framework.emitters.artifacts import GeneratedKernelCode
-from codegen.framework.backends.targets import CUDATarget, OpenMPTarget
+from codegen.framework.targets import CUDATarget, OpenMPTarget
 
 
 

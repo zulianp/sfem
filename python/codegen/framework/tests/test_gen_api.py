@@ -58,7 +58,7 @@ from ..materials.poro_hyperelasticity import material as poro_hyperelasticity
 from ..materials.stokes import material as stokes
 from ..materials.two_phase_flow import material as two_phase_flow
 from ..generators.stokes import validate_m6_4 as validate_stokes_m6_4
-from ..fem.tensor_product_geometry import (
+from ..emitters.tensor_product_geometry import (
     tensor_product_evaluated_isoparametric_geometry_lines,
     tensor_product_gradient_isoparametric_geometry_lines,
     tensor_product_ordered_coordinate_streams,

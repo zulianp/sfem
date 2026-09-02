@@ -362,7 +362,7 @@
         <text x="96" y="576" class="dg-sub">Text emission (C/C++ line construction) occurs in four of the six packages: symbolic, fem, emitters, backends.</text>
       </svg>
     </div>
-    <figcaption><b>Figure 1.</b> Six import edges point against the declared lowering order. The four leaving <code>symbolic/</code> are the load-bearing ones: they mean the mathematical specification cannot be imported, tested or reused without dragging in element policy, target policy and a 10,102-line emitter.</figcaption>
+    <figcaption><b>Figure 1 — as it was at the start; all six edges are now gone.</b> Six import edges point against the declared lowering order. The four leaving <code>symbolic/</code> are the load-bearing ones: they mean the mathematical specification cannot be imported, tested or reused without dragging in element policy, target policy and a 10,102-line emitter.</figcaption>
   </figure>
 
   <h3>Findings</h3>
@@ -892,10 +892,13 @@
       <div class="evidence"><b>gate</b> byte-identical output (520 files) · 201 tests, failure set unchanged from S4</div>    </div></div>
 
     <div class="row"><div class="g-key">S6</div><div class="g-body">
-      <div class="g-title">Route through the IR and make the target an argument</div>
-      <p>With L3 owning the decisions, the emitters build a <code>KernelAST</code> and a printer walks it. Delete <code>_target()</code>. CUDA stops being a separate backend restricted to <code>energy_soa</code> and becomes a target pass over the same AST — one argument rather than one fork.</p>
-      <p>S2 sharpened what this step has to do. The two remaining allowlist entries — <code>fem → backends</code> and <code>emitters → backends</code> — are not really violations to fix but a package to split: <code>backends/targets.py</code> is the L5 target layer, which sits <em>before</em> emission, so importing it from an emitter is an upward edge that ought to be legal; <code>backends/openmp.py</code> and <code>backends/cuda.py</code> are orchestrators that drive emitters and belong with the driver. Once <code>targets/</code> is its own package ranked below <code>emitters</code>, both entries disappear rather than being repaired.</p>
-      <div class="evidence"><b>gate</b> byte-identical output for OpenMP; new-path parity tests for CUDA · <b>ratchet</b> all 6 edges removed</div>
+      <div class="g-title">Split <code>backends/</code>; route through the IR <span class="tag t-ok">split done — zero violations</span></div>
+      <p><b>The layer graph is clean.</b> Every import in the framework now points up the lowering order, and <code>KNOWN_VIOLATIONS</code> is empty.</p>
+      <p>Neither remaining entry was a violation to repair; both were packages holding two unrelated things. <code>backends/</code> held the target definitions, which belong <em>below</em> planning and <em>above</em> emission, alongside the orchestrators that drive the emitters — so <code>targets/</code> is now its own layer (L5) and an emitter naming a target is the upward edge it always was. <code>fem/</code> held two emitter modules: thirteen of the eighteen functions in <code>tensor_product_geometry</code> build C text, and every one of its importers was already in <code>emitters/</code>, so both modules moved there. Discretization no longer emits source.</p>
+      <p>The final graph is twelve edges, all upward:</p>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.85;color:var(--ink-2)">symbolic → fem → plans → ir → targets → emitters → backends</p>
+      <p><b>Still open: <code>_target()</code>.</b> <code>emitters/residual_codegen.py:74</code> is still <code>def _target(): return OpenMPTarget()</code>, and the boundary emitter has its twin. This is no longer a layering violation — the emitter may name a target — but it is still a hardcode, and it is what keeps a CUDA residual kernel a fork rather than an argument. Threading a target parameter through would touch <b>43 functions transitively</b> (31 calling a wrapper directly), all of them emitter internals that the AST migration is meant to collapse into a printer. Doing it now is work the next step undoes, so it is deliberately deferred to the AST migration rather than done twice.</p>
+      <div class="evidence"><b>gate</b> byte-identical output (520 files) · 201 tests, failure set unchanged · <b>ratchet</b> 6 edges → 0</div>
     </div></div>
 
     <div class="row"><div class="g-key">S7</div><div class="g-body">

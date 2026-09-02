@@ -9,7 +9,7 @@ from codegen.framework.symbolic.residual import (
     coupled_residual_weak_coefficients,
     weak_residual_coefficients,
 )
-from codegen.framework.fem.tensor_product_geometry import (
+from codegen.framework.emitters.tensor_product_geometry import (
     isoparametric_adjugate_call_lines,
     isoparametric_adjugate_stream_array_lines,
     sfem_geometry_kernels_header_source,
@@ -17,8 +17,8 @@ from codegen.framework.fem.tensor_product_geometry import (
     tensor_product_cartesian_shape_order,
     tensor_product_gradient_isoparametric_geometry_lines,
 )
-from codegen.framework.fem.tensor_product_kernels import sfem_tensor_product_kernels_header_source
-from codegen.framework.backends.targets import OpenMPTarget
+from codegen.framework.emitters.tensor_product_kernels import sfem_tensor_product_kernels_header_source
+from codegen.framework.targets import OpenMPTarget
 from codegen.framework.fem.reference import (
     sfem_element_quadrature_rule,
     sfem_field_n_shape,
