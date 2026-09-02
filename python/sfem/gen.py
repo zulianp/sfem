@@ -186,6 +186,7 @@ from codegen.framework.backends.targets import (
     ARMSVETarget,
     HIPTarget,
 )
+from codegen.framework.plans.scheduling import build_expression_graph
 
 
 DEFAULT_VECTOR_SIZE = 16
@@ -981,12 +982,13 @@ def _energy_codegen_unit(material_name, dim, evaluated):
     diagnostic_graph = None
     if evaluated.diagnostics:
         diagnostic_graph = (
-            KernelExpressions()
-            .add(
+            build_expression_graph(
+                KernelExpressions()
+                .add(
                 "operator_evaluation",
                 weak_form.diagnostic_expressions(has_direction=True),
-            )
-            .build_graph(
+            ),
+
                 data_symbols=weak_form.deformation_gradient,
                 temporary_prefix="%s_inspect_tmp" % material_name,
             )

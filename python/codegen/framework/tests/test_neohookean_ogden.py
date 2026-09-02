@@ -23,23 +23,28 @@ from codegen.framework.symbolic import (
     data_layout,
     displacement_gradient_from_reference,
     execution_scope,
-    generate_cpp_kernel,
-    generate_openmp_cpp_kernel,
     hessian_action_from_energy,
     matrix_inner,
     residual_from_energy,
-    sfem_element_quadrature_rule,
-    sfem_supported_element_types,
-    sfem_soa_element_specialization,
-    sfem_soa_element_specializations,
     sfem_soa_kernel_form,
     sfem_soa_weak_form,
     vector_symbols,
+)
+from codegen.framework.emitters.kernel_codegen import (
+    generate_cpp_kernel,
+    generate_openmp_cpp_kernel,
+)
+from codegen.framework.fem.reference import (
+    sfem_element_quadrature_rule,
+    sfem_soa_element_specialization,
+    sfem_soa_element_specializations,
+    sfem_supported_element_types,
 )
 from codegen.framework.emitters.energy_codegen import generate_sfem_soa_cpp_files_for_element
 from codegen.framework.emitters.energy_codegen import _sfem_soa_diagnostic_print_wrapper_lines
 from codegen.framework.emitters.energy_codegen import _sfem_soa_diagnostics_header
 from codegen.framework.fem import sfem_fem_policy, sfem_tensor_hex_shape_index
+from codegen.framework.plans.scheduling import build_expression_graph
 
 
 def neohookean_ogden_energy(F, mu, lmbda):
@@ -858,9 +863,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             for d in range(dim)
         )
         graph = (
-            KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, energy)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .add(ExpressionRole.OPERATOR_EVALUATION, energy),
                 data_symbols=tuple(displacement) + (qw,),
                 symbolic_objects=(grad_ref,),
                 temporary_prefix="quad4_tp_tmp",
@@ -957,9 +962,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             for d in range(dim)
         )
         graph = (
-            KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, energy)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .add(ExpressionRole.OPERATOR_EVALUATION, energy),
                 data_symbols=tuple(displacement) + (qw,),
                 symbolic_objects=(grad_ref,),
                 temporary_prefix="hex8_tp_tmp",
@@ -1781,11 +1786,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         hessian_action = hessian_action_from_energy(energy, variables, directions)
 
         graph = (
-            KernelExpressions()
-            .energy(energy)
-            .residual(residual)
-            .hessian_action(hessian_action)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .energy(energy)
+                .residual(residual)
+                .hessian_action(hessian_action),
                 symbolic_objects=(F_obj,),
                 scopes=(execution_scope(ScopeKind.QUADRATURE, (q,)),),
                 temporary_prefix="nh_tmp",
@@ -1859,11 +1864,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         )
 
         graph = (
-            KernelExpressions()
-            .energy(energy)
-            .residual(residual)
-            .hessian_action(hessian_action)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .energy(energy)
+                .residual(residual)
+                .hessian_action(hessian_action),
                 data_symbols=tuple(displacement) + tuple(trial_direction) + (mu, lmbda, qw),
                 symbolic_objects=(grad_ref,),
                 scopes=(execution_scope(ScopeKind.QUADRATURE, (qw, q)),),
@@ -1920,10 +1925,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         energy = neohookean_ogden_energy(sp.eye(dim) + disp_grad, mu, lmbda) * qw
         residual = residual_from_energy(energy, displacement)
         graph = (
-            KernelExpressions()
-            .energy(energy)
-            .residual(residual)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .energy(energy)
+                .residual(residual),
                 data_symbols=tuple(displacement) + (mu, lmbda, qw),
                 symbolic_objects=(grad_ref,),
                 temporary_prefix="nh_compile_tmp",
@@ -1983,10 +1988,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         energy = neohookean_ogden_energy(sp.eye(dim) + disp_grad, mu, lmbda) * qw
         residual = residual_from_energy(energy, displacement)
         graph = (
-            KernelExpressions()
-            .energy(energy)
-            .residual(residual)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .energy(energy)
+                .residual(residual),
                 data_symbols=tuple(displacement) + (mu, lmbda, qw),
                 symbolic_objects=(grad_ref,),
                 temporary_prefix="nh_omp_tmp",
@@ -2075,9 +2080,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
 
         def expression_graph(expression, data_symbols, prefix):
             return (
-                KernelExpressions()
-                .add(ExpressionRole.OPERATOR_EVALUATION, expression)
-                .build_graph(
+                build_expression_graph(
+                    KernelExpressions()
+                    .add(ExpressionRole.OPERATOR_EVALUATION, expression),
                     data_symbols=data_symbols,
                     symbolic_objects=(grad_ref,),
                     temporary_prefix=prefix,

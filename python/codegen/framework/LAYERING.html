@@ -1,0 +1,953 @@
+<title>SFEM Codegen Layering</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root {
+    --paper:      #f6f8fa;
+    --surface:    #ffffff;
+    --surface-2:  #eceff3;
+    --ink:        #131a21;
+    --ink-2:      #4b5865;
+    --ink-3:      #78848e;
+    --rule:       #d3dbe2;
+    --rule-soft:  #e3e9ee;
+    --accent:     #1f5f8b;
+    --accent-soft:#dde9f1;
+    --warn:       #a5401d;
+    --warn-soft:  #f5e2d9;
+    --ok:         #2b6a56;
+    --ok-soft:    #dcebe4;
+    --shadow:     0 1px 2px rgba(19,26,33,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0e141a;
+      --surface:    #151d25;
+      --surface-2:  #1b242d;
+      --ink:        #e2e9ef;
+      --ink-2:      #a5b3bf;
+      --ink-3:      #7d8b96;
+      --rule:       #2a353f;
+      --rule-soft:  #202b34;
+      --accent:     #7ab6df;
+      --accent-soft:#16303f;
+      --warn:       #e08e66;
+      --warn-soft:  #38221a;
+      --ok:         #74c0a4;
+      --ok-soft:    #16302a;
+      --shadow:     0 1px 2px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #0e141a;
+    --surface:    #151d25;
+    --surface-2:  #1b242d;
+    --ink:        #e2e9ef;
+    --ink-2:      #a5b3bf;
+    --ink-3:      #7d8b96;
+    --rule:       #2a353f;
+    --rule-soft:  #202b34;
+    --accent:     #7ab6df;
+    --accent-soft:#16303f;
+    --warn:       #e08e66;
+    --warn-soft:  #38221a;
+    --ok:         #74c0a4;
+    --ok-soft:    #16302a;
+    --shadow:     0 1px 2px rgba(0,0,0,.35);
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1120px; margin: 0 auto; padding: 0 32px 96px; }
+  .col  { max-width: 68ch; }
+
+  h1, h2, h3, .disp {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+    text-wrap: balance;
+    margin: 0;
+  }
+  code, .mono, .tag, figcaption {
+    font-family: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  code {
+    font-size: .84em;
+    background: var(--surface-2);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: .08em .32em;
+    word-break: break-word;
+  }
+  a { color: var(--accent); }
+
+  /* ---------- masthead ---------- */
+  header.masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 56px 0 22px;
+    margin-bottom: 44px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+  }
+  h1 { font-size: clamp(34px, 5.2vw, 52px); font-weight: 700; letter-spacing: -.02em; line-height: 1.04; }
+  .standfirst { font-size: 20px; color: var(--ink-2); margin-top: 18px; max-width: 62ch; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 4px 28px;
+    margin-top: 28px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px; color: var(--ink-3);
+  }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 64px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; border-top: 1px solid var(--rule); padding-top: 14px; margin-bottom: 26px; }
+  .sec-num { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent); letter-spacing: .08em; flex: none; }
+  h2 { font-size: 27px; font-weight: 600; letter-spacing: -.012em; }
+  h3 { font-size: 19px; font-weight: 600; margin-top: 34px; letter-spacing: -.008em; }
+  p { margin: 1em 0; }
+  .lead { font-size: 18.5px; }
+
+  /* ---------- gutter list (findings, layers, steps) ---------- */
+  .gutter { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 0 20px; }
+  .gutter > .row {
+    display: contents;
+  }
+  .g-key {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; font-weight: 500;
+    color: var(--accent);
+    padding-top: 22px;
+    border-top: 1px solid var(--rule-soft);
+  }
+  .g-body { padding: 18px 0 20px; border-top: 1px solid var(--rule-soft); }
+  .g-body > :first-child { margin-top: 0; }
+  .g-body > :last-child { margin-bottom: 0; }
+  .g-title { font-family: Archivo, sans-serif; font-size: 17px; font-weight: 600; letter-spacing: -.005em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .g-body p { font-size: 16px; margin: .55em 0; max-width: 66ch; }
+
+  .tag {
+    font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 2px; font-weight: 500;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .t-struct { color: var(--warn); background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 26%, transparent); }
+  .t-leak   { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 26%, transparent); }
+  .t-dead   { color: var(--ink-2); background: var(--surface-2); border-color: var(--rule); }
+  .t-ok     { color: var(--ok); background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 26%, transparent); }
+
+  .evidence {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px; line-height: 1.8; color: var(--ink-3);
+    margin-top: 10px;
+  }
+  .evidence b { color: var(--ink-2); font-weight: 500; }
+
+  ul.tight { margin: .6em 0; padding-left: 1.1em; }
+  ul.tight li { margin: .28em 0; max-width: 64ch; }
+
+  /* ---------- io strip inside layer rows ---------- */
+  .io {
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+    color: var(--ink-2); margin-top: 12px;
+  }
+  .io span i { font-style: normal; color: var(--ink-3); }
+  .forbid {
+    margin-top: 12px; padding: 9px 12px;
+    border-left: 2px solid var(--warn);
+    background: var(--warn-soft);
+    font-size: 14.5px; color: var(--ink-2); max-width: 64ch;
+  }
+  .forbid b { font-family: Archivo, sans-serif; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--warn); display: block; margin-bottom: 2px; }
+
+  /* ---------- figures ---------- */
+  figure { margin: 40px 0; }
+  .fig-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 14px 10px; box-shadow: var(--shadow); }
+  figure svg { display: block; max-width: 100%; height: auto; min-width: 640px; margin: 0 auto; }
+  figcaption { font-size: 12px; color: var(--ink-3); margin-top: 12px; line-height: 1.6; max-width: 74ch; }
+  figcaption b { color: var(--ink-2); font-weight: 500; }
+
+  .dg-band  { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1; }
+  .dg-band-hi { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  .dg-band-bad { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.2; }
+  .dg-name  { fill: var(--ink); font-family: Archivo, sans-serif; font-size: 15px; font-weight: 600; }
+  .dg-owns  { fill: var(--ink-2); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+  .dg-home  { fill: var(--ink-3); font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+  .dg-key   { fill: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; font-weight: 500; }
+  .dg-art   { fill: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500; }
+  .dg-stop  { fill: var(--ink-3); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+  .dg-bad   { fill: var(--warn); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+  .dg-line  { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .dg-badline { stroke: var(--warn); stroke-width: 1.4; fill: none; }
+  .dg-rule  { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 3 4; }
+  .dg-head  { fill: var(--accent); }
+  .dg-headbad { fill: var(--warn); }
+  .dg-title { fill: var(--ink); font-family: Archivo, sans-serif; font-size: 12.5px; font-weight: 600; letter-spacing: .06em; }
+  .dg-sub   { fill: var(--ink-3); font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+  .dg-plain { fill: var(--ink-2); font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+  .dg-boxn  { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+  .dg-greyline { stroke: var(--ink-3); stroke-width: 1.2; fill: none; }
+  .dg-headgrey { fill: var(--ink-3); }
+
+  /* ---------- callout ---------- */
+  .diagnosis {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-top: 1px solid var(--rule-soft);
+    border-right: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--rule-soft);
+    padding: 22px 26px;
+    margin: 34px 0;
+    max-width: 70ch;
+  }
+  .diagnosis p { margin: .4em 0; font-size: 18px; }
+  .diagnosis .label { font-family: Archivo, sans-serif; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+
+  /* ---------- counts strip ---------- */
+  .counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin: 30px 0; }
+  .counts div { background: var(--paper); padding: 14px 16px; }
+  .counts .n { font-family: Archivo, sans-serif; font-size: 26px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .counts .l { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-3); line-height: 1.45; margin-top: 4px; }
+
+  /* ---------- table ---------- */
+  .tbl-wrap { overflow-x: auto; margin: 26px 0; }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  th { font-family: Archivo, sans-serif; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; border-bottom: 1px solid var(--rule); }
+  td.m { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-2); }
+
+  footer { margin-top: 72px; border-top: 1px solid var(--rule); padding-top: 20px; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-3); }
+
+  @media (max-width: 640px) {
+    .page { padding: 0 20px 64px; }
+    .gutter { grid-template-columns: 46px minmax(0,1fr); gap: 0 14px; }
+    body { font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="page">
+
+<header class="masthead">
+  <div class="eyebrow">Analysis &amp; design · python/codegen/framework</div>
+  <h1>SFEM Codegen Layering</h1>
+  <p class="standfirst">The framework documents a four-stage lowering pipeline and ships a rich plan vocabulary. The code runs a two-stage pipeline in which two very large emitters do the planning, and the plans mostly watch.</p>
+  <div class="meta">
+    <span><b>Scope</b> 62,930 LOC Python across 12 packages</span>
+    <span><b>Out of scope</b> the mlir/ subtree</span>
+    <span><b>Prescriptive docs</b> PIPELINE · REFACTORING · REFACTORING_2 · PRD · KERNELS</span>
+    <span><b>Date</b> 2026-09-02</span>
+  </div>
+</header>
+
+<div class="col">
+<p class="lead">This document does two things. First it establishes, with citations, where the implementation departs from the architecture the framework's own documents prescribe — not as a style complaint, but by tracing which module actually decides each thing. Then it proposes an eight-layer target architecture, drawn as a stack, with an explicit contract at every boundary and a migration order in which each step is separately shippable behind a byte-identity gate.</p>
+</div>
+
+<div class="diagnosis">
+  <div class="label">Diagnosis</div>
+  <p>There is no kernel-level semantic model. Between <code>FormCollection</code> (symbolic, complete) and generated C++ text (concrete, complete) the framework has nothing that <em>decides</em>: no object that says which loops exist, which values are hoisted to which scope, which buffers are gathered, which scatter is used. Those decisions live inside <code>emitters/residual_codegen.py</code> and <code>emitters/energy_codegen.py</code> as control flow interleaved with string construction.</p>
+  <p>The <code>plans/</code> package is what that missing model <em>should</em> be. It is written, documented and unit-tested — and almost none of it reaches an emitter. The plan objects are handed to the emitters as optional keyword arguments and used to <em>validate</em> names the emitter already chose.</p>
+</div>
+
+<div class="col">
+<p>Everything else — the import cycles, the target hardcoded inside an emitter, the backend that fabricates a symbolic system to satisfy an emitter's signature, the six unused assembly plans — follows from that one gap. A layer that produces no artifact cannot be depended on, so the layers below it reach around it and take what they need from wherever it actually exists.</p>
+</div>
+
+<!-- =========================== PART 1 =========================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">PART 1</span><h2>What the code is actually shaped like</h2></div>
+
+  <div class="col">
+  <p>The <code>README.md</code> in the package states the intended order plainly: “This package is organized by lowering layer.” The order it lists is <code>symbolic → fem → plans → ir → emitters → backends</code>. Read as a lowering pipeline, imports should point <em>upward</em>, toward the specification: a later stage names the types of the artifact it receives, and an earlier stage never names a later one.</p>
+  <p>Of the 17 directed package pairs that exist in the import graph, 11 point the right way and 6 point the wrong way — including all four of <code>symbolic</code>'s outgoing edges.</p>
+  </div>
+
+  <figure>
+    <div class="fig-wrap">
+      <svg viewBox="0 0 900 588" role="img" aria-label="The six declared layer packages in lowering order, with six import edges that point the wrong way: symbolic imports fem, plans, emitters and backends; fem imports backends; and emitters and backends import each other, forming a cycle.">
+        <defs>
+          <marker id="f1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-headbad"/></marker>
+          <marker id="f1b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-headgrey"/></marker>
+        </defs>
+
+        <text x="24" y="26" class="dg-title">AS BUILT — DECLARED LOWERING ORDER vs. ACTUAL IMPORTS</text>
+        <text x="24" y="44" class="dg-sub">grey = imports that point up, as intended · orange = imports that point down or complete a cycle</text>
+
+        <!-- legal flow spine -->
+        <line x1="60" y1="82" x2="60" y2="530" class="dg-greyline" marker-end="url(#f1b)"/>
+        <text x="46" y="300" class="dg-sub" text-anchor="middle" transform="rotate(-90 46 300)">lowering direction</text>
+
+        <!-- bands -->
+        <g>
+          <rect x="96" y="70" width="330" height="54" class="dg-band-bad" rx="2"/>
+          <text x="112" y="92" class="dg-name">symbolic/</text>
+          <text x="112" y="110" class="dg-owns">fields · forms · equations · a C99 printer</text>
+          <text x="418" y="92" class="dg-home" text-anchor="end">5,679 LOC</text>
+        </g>
+        <g>
+          <rect x="96" y="152" width="330" height="54" class="dg-band-bad" rx="2"/>
+          <text x="112" y="174" class="dg-name">fem/</text>
+          <text x="112" y="192" class="dg-owns">basis · quadrature · geometry · tensor product</text>
+          <text x="418" y="174" class="dg-home" text-anchor="end">3,533 LOC</text>
+        </g>
+        <g>
+          <rect x="96" y="234" width="330" height="54" class="dg-band" rx="2"/>
+          <text x="112" y="256" class="dg-name">plans/</text>
+          <text x="112" y="274" class="dg-owns">the kernel model — largely unconsumed</text>
+          <text x="418" y="256" class="dg-home" text-anchor="end">3,644 LOC</text>
+        </g>
+        <g>
+          <rect x="96" y="316" width="330" height="54" class="dg-band" rx="2"/>
+          <text x="112" y="338" class="dg-name">ir/</text>
+          <text x="112" y="356" class="dg-owns">KernelAST + pass pipeline — 4 call sites</text>
+          <text x="418" y="338" class="dg-home" text-anchor="end">930 LOC</text>
+        </g>
+        <g>
+          <rect x="96" y="398" width="330" height="54" class="dg-band-bad" rx="2"/>
+          <text x="112" y="420" class="dg-name">emitters/</text>
+          <text x="112" y="438" class="dg-owns">plans, schedules, lowers, and prints</text>
+          <text x="418" y="420" class="dg-home" text-anchor="end">20,761 LOC</text>
+        </g>
+        <g>
+          <rect x="96" y="480" width="330" height="54" class="dg-band" rx="2"/>
+          <text x="112" y="502" class="dg-name">backends/</text>
+          <text x="112" y="520" class="dg-owns">dispatch on energy_soa / residual_soa</text>
+          <text x="418" y="502" class="dg-home" text-anchor="end">1,707 LOC</text>
+        </g>
+
+        <!-- wrong-way edges, right lanes -->
+        <!-- symbolic -> fem  (lane 1, x=452) -->
+        <path d="M426,84 L452,84 L452,166 L426,166" class="dg-badline" marker-end="url(#f1a)"/>
+        <!-- symbolic -> plans (lane 2, x=480) -->
+        <path d="M426,94 L480,94 L480,248 L426,248" class="dg-badline" marker-end="url(#f1a)"/>
+        <!-- symbolic -> emitters (lane 3, x=512) -->
+        <path d="M426,104 L512,104 L512,412 L426,412" class="dg-badline" marker-end="url(#f1a)"/>
+        <!-- symbolic -> backends (lane 4, x=544) -->
+        <path d="M426,116 L544,116 L544,494 L426,494" class="dg-badline" marker-end="url(#f1a)"/>
+        <!-- fem -> backends (lane 5, x=574) -->
+        <path d="M426,186 L574,186 L574,506 L426,506" class="dg-badline" marker-end="url(#f1a)"/>
+        <!-- emitters <-> backends cycle (lane 6, x=452) -->
+        <path d="M426,440 L452,440 L452,518 L426,518" class="dg-badline" marker-end="url(#f1a)"/>
+
+        <!-- annotations -->
+        <text x="600" y="88" class="dg-bad">symbolic/core.py:82,93 · equations.py:19</text>
+        <text x="600" y="106" class="dg-plain">the bottom layer imports four layers below it</text>
+        <text x="600" y="124" class="dg-plain">and subclasses C99CodePrinter (core.py:109)</text>
+
+        <text x="600" y="190" class="dg-bad">fem/tensor_product_geometry.py:1 · _kernels.py:1</text>
+        <text x="600" y="208" class="dg-plain">element policy imports OpenMPTarget</text>
+
+        <text x="600" y="430" class="dg-bad">emitters/*.py:15 → backends/openmp.py:19</text>
+        <text x="600" y="448" class="dg-plain">mutual import; residual_codegen.py:57 pins</text>
+        <text x="600" y="466" class="dg-plain">the target with `def _target(): OpenMPTarget()`</text>
+
+        <text x="600" y="512" class="dg-plain">backends/openmp.py:776 builds a symbolic</text>
+        <text x="600" y="530" class="dg-plain">CoupledResidualSystem to feed the emitter</text>
+
+        <line x1="96" y1="556" x2="876" y2="556" class="dg-rule"/>
+        <text x="96" y="576" class="dg-sub">Text emission (C/C++ line construction) occurs in four of the six packages: symbolic, fem, emitters, backends.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 1.</b> Six import edges point against the declared lowering order. The four leaving <code>symbolic/</code> are the load-bearing ones: they mean the mathematical specification cannot be imported, tested or reused without dragging in element policy, target policy and a 10,102-line emitter.</figcaption>
+  </figure>
+
+  <h3>Findings</h3>
+  <p class="col">Each finding names the mechanism, not the symptom. Evidence is given as <code>path:line</code> against the working tree.</p>
+
+  <div class="gutter">
+
+    <div class="row">
+      <div class="g-key">F1</div>
+      <div class="g-body">
+        <div class="g-title">The emitters take symbolic objects; the plans arrive sideways as validators <span class="tag t-struct">structural</span></div>
+        <p>The main residual entry point is <code>generate_coupled_residual_sfem_files(system, *, prefix, emission_plan, …, reference_data_plan=None, diagnostics_plan=None, matrix_format_plan=None)</code>. The required first argument is a <code>CoupledResidualSystem</code> — a symbolic object from stage 2. Every plan is optional, and where one is supplied the emitter calls <code>validate_reference_data_plan(...)</code> and <code>validate_diagnostics_plan_names(...)</code> against names it has already computed itself. The energy entry point has the same shape with <code>forms</code> in place of <code>system</code>.</p>
+        <p>This inverts the intended relationship. The plan should be the emitter's <em>only</em> input; instead the emitter re-derives the plan internally and the plan checks its homework.</p>
+        <div class="evidence"><b>emitters/residual_codegen.py:1739–1800</b> · <b>emitters/energy_codegen.py:560–590</b></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">F2</div>
+      <div class="g-body">
+        <div class="g-title">Most of the plan vocabulary has no consumer <span class="tag t-dead">dead layer</span></div>
+        <p><code>LocalPhasePlan</code>, <code>MeshPhasePlan</code>, <code>DataStreamPlan</code>, <code>BlockPlan</code>, <code>LocalKernelPlan</code>, <code>MeshKernelPlan</code> and <code>GeometryPlan</code> are referenced only inside <code>plans/</code> itself (plus <code>fem/geometry.py</code> for the last). No emitter reads them. The six matrix-assembly plans are worse: <code>CRSAssemblyPlan</code>, <code>BSRAssemblyPlan</code>, <code>DIAAssemblyPlan</code>, <code>COOAssemblyPlan</code>, <code>PatchAssemblyPlan</code> and <code>BlockDiagSymAssemblyPlan</code> appear in exactly three places — their definition, the flat re-export in <code>__init__.py</code>, and <code>tests/test_m11_matrix_formats.py</code>.</p>
+        <p>Meanwhile the actual CRS scatter is built from string literals inside the energy emitter, and format selection is a substring test on a tuple of names: <code>if "crs" in formats:</code>. The plan describes row pointers, column indices and accumulation policy; the emitter ignores it and hand-writes the loop.</p>
+        <div class="evidence"><b>plans/matrix_formats.py:46–295</b> defines them · <b>emitters/energy_codegen.py:6132, 6199</b> hand-rolls the scatter</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">F3</div>
+      <div class="g-body">
+        <div class="g-title"><code>symbolic/core.py</code> is a vertical slice of the whole pipeline <span class="tag t-struct">structural</span></div>
+        <p>One 2,556-line file named for the bottom layer contains, in order: a <code>C99CodePrinter</code> subclass and <code>_sfem_ccode</code>; SFEM math-header source strings; the symbolic objects proper (<code>DeformationGradient</code>, <code>FirstPiolaStress</code>, …); the SoA weak-form builders; and then the entire scheduling engine — <code>ExpressionGraph</code>, <code>ExpressionCost</code>, <code>EvaluationPlan</code>, <code>LivenessState</code>, <code>EvaluationMetrics</code>, scope hoisting, pattern detection, register-pressure estimation — followed by <code>generate_cpp_kernel</code>, <code>generate_openmp_cpp_kernel</code> and <code>generate_cuda_kernel</code>.</p>
+        <p>The scheduling engine is the most valuable code in the framework and is exactly what the PRD asks for in goals 2–4. It is sitting in the wrong layer, under a name that discourages anyone from calling it.</p>
+        <div class="evidence"><b>symbolic/core.py:109, 1123–1445, 1446–1625</b></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">F4</div>
+      <div class="g-body">
+        <div class="g-title"><code>FormCollection.source</code> is a back-pointer to the stage that was supposed to end <span class="tag t-leak">leak</span></div>
+        <p>PIPELINE.md declares <code>FormCollection</code> the standardized handoff: “once an equation has been lowered, downstream stages use only the resulting <code>FormCollection</code>.” It then blesses the escape hatch two paragraphs later — “<code>FormCollection.source</code> for the lowered <code>CoupledResidualSystem</code>” — and downstream duly uses it, in the planning layer, the backend layer and the emitters.</p>
+        <p>The consequence is visible at <code>backends/openmp.py:776</code>: to emit a diagonal block, the backend constructs a fresh <code>CoupledResidualSystem</code>, copies parameters off <code>collection.source</code>, adds one field per component and registers <code>sp.S.Zero</code> residuals — a synthetic symbolic system fabricated purely to satisfy the emitter's argument type. A backend is doing symbolic algebra because the emitter's interface has the wrong shape.</p>
+        <div class="evidence"><b>backends/openmp.py:138, 776–796, 820–826</b> · <b>plans/generation.py:917</b> · <b>plans/diagnostics.py:284</b> · <b>emitters/boundary_codegen.py:76</b></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">F5</div>
+      <div class="g-body">
+        <div class="g-title">The IR exists and is bypassed <span class="tag t-dead">dead layer</span></div>
+        <p><code>ir/kernel_ast.py</code> is a well-formed 573-line kernel IR: typed loops with vectorization and tabulation strategies, buffer declarations, gather and scatter nodes, geometry nodes, a partial-assembly strategy enum, plus <code>KernelASTPass</code> and <code>KernelASTPassPipeline</code> for transformations. The energy path uses it for four fragments (the outer loop and scatter shapes). The residual path — 10,102 lines, the main production path — never constructs a node. <code>KernelASTPass</code> and <code>KernelASTPassPipeline</code> are referenced only from <code>tests/test_gen_api.py</code>.</p>
+        <p>The whole transformation vocabulary the PRD asks for — vectorization, unrolling, packing, per-warp variants — has a home and no tenant.</p>
+        <div class="evidence"><b>ir/kernel_ast.py:430–495</b> · consumers: <b>emitters/energy.py</b>, <b>emitters/energy_codegen.py</b> (4 sites), <b>backends/pystencils_opencl.py</b></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">F6</div>
+      <div class="g-body">
+        <div class="g-title">Provenance survives all the way to the backend <span class="tag t-struct">structural</span></div>
+        <p>PIPELINE.md's stated core requirement is that “energy and residual models are not two separate code-generation pipelines … after that, the code-generation stage is one shared process.” In practice <code>OpenMPSoABackend._traversal</code> branches on <code>unit.kind</code> into <code>energy_soa</code>, <code>residual_soa</code> and <code>boundary_residual_soa</code>, and each branch reaches a different emitter module of 8,470, 10,102 and 1,214 lines. <code>CUDASoABackend</code> supports only <code>energy_soa</code> and raises on anything else.</p>
+        <p>Those three modules independently re-implement the same concerns. Counting identifier occurrences: adjugate geometry appears 87 / 161 / 0 times, scatter 56 / 51 / 22, packed layout 92 / 114 / 0, tensor-product handling 227 / 115 / 9. This is not shared code with three entry points; it is three parallel code generators.</p>
+        <div class="evidence"><b>backends/openmp.py:101–108</b> · <b>backends/cuda.py:31–36</b></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">F7</div>
+      <div class="g-body">
+        <div class="g-title">The target is a constant inside the emitter <span class="tag t-struct">structural</span></div>
+        <p><code>emitters/residual_codegen.py:57</code> reads, in full: <code>def _target(): return OpenMPTarget()</code>. Every pragma, inline qualifier, atomic form and work-item index in the residual path resolves through it. <code>emitters/boundary_codegen.py</code> does the same. The target layer that PRD M5 specifies therefore has no purchase on the residual path at all — a CUDA residual kernel is not a configuration change, it is a fork.</p>
+        <p>The energy path does better and shows what the seam should look like: <code>OpenMPEnergySoASourceBuilder</code> and <code>CUDAEnergySoASourceBuilder</code> inject header naming, inline qualifiers, preamble lines and geometry headers into one shared emitter. That strategy object is the right idea applied at one seam; it should be the whole target layer.</p>
+        <div class="evidence"><b>emitters/residual_codegen.py:57, 147–178</b> · working counter-example: <b>emitters/energy.py:151–408</b></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">F8</div>
+      <div class="g-body">
+        <div class="g-title">The orchestrator and the packaging layer live outside the framework <span class="tag t-leak">leak</span></div>
+        <p><code>UserInputStage</code>, <code>SpecializedFormManipulationStage</code>, <code>CodeGenerationStage</code>, <code>CodeGenerationUnit</code> and <code>generate(...)</code> — the four stages PIPELINE.md is about — are defined in <code>python/sfem/gen.py</code>, 2,287 lines in the runtime package. The C ABI, <code>sfem::Op</code> wrapper and factory generation that PRD M6 assigns to the framework live in <code>python/sfem/_gen_op.py</code>, 7,388 lines. Every material in the framework's own <code>materials/</code> package therefore opens with <code>from sfem import gen</code> — the framework reaching into the runtime package to find its own pipeline.</p>
+        <p>Compounding this, <code>codegen/framework/__init__.py</code> re-exports 262 names in one flat namespace, so <code>sfem/gen.py</code> imports ~120 symbols from every layer at once. There is no import through which a layering rule could be stated, let alone enforced.</p>
+        <div class="evidence"><b>python/sfem/gen.py:418–685</b> · <b>python/sfem/_gen_op.py</b> · <b>codegen/framework/__init__.py</b> (262 names in <code>__all__</code>)</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">F9</div>
+      <div class="g-body">
+        <div class="g-title">The safety net is 449 assertions on generated C text <span class="tag t-dead">test shape</span></div>
+        <p><code>tests/test_gen_api.py</code> alone contains 449 <code>assertIn</code> calls, many matching exact generated source lines such as <code>"for (int lane = 0; lane &lt; nelems; lane += 1)"</code>. This is genuinely valuable — it is what makes any refactor safe at all — but it tests the pipeline only end to end, at its most brittle surface, and it cannot distinguish “the plan is wrong” from “the printer is wrong”. It also makes the plan layer's tests misleading: <code>test_m11_matrix_formats.py</code> passes on plans nothing consumes.</p>
+        <div class="evidence"><b>tests/test_gen_api.py</b> (4,936 LOC) · <b>tests/test_neohookean_ogden.py</b> (2,248 LOC, 187 <code>assertIn</code>)</div>
+      </div>
+    </div>
+
+
+    <div class="row">
+      <div class="g-key">F10</div>
+      <div class="g-body">
+        <div class="g-title">Generated output depends on the name of the output directory <span class="tag t-leak">leak</span></div>
+        <p>Found while building the S0 gate, not by reading. <code>_uses_generated_shared_primitive_headers(out_dir, material_name)</code> decides whether the five shared primitive headers — <code>kernel_math.hpp</code>, <code>geometry_kernels.hpp</code>, <code>tensor_product_kernels.hpp</code>, <code>kernel_diagnostics.hpp</code>, <code>packed_thread_scratch.hpp</code> — are hoisted into one copy at the tree root or duplicated per material. It decides by taking <code>os.path.basename</code> of the output directory's <em>parent</em> and testing it against the literal string <code>"generated"</code>.</p>
+        <p>Generating into <code>&lt;anything&gt;/generated/laplace</code> emits 520 files with <code>#include "../../kernel_math.hpp"</code>; generating into <code>&lt;anything&gt;/reference/laplace</code> emits 559 files with <code>#include "../kernel_math.hpp"</code>. Same inputs, same code, different output — selected by a path string that no plan mentions and no caller passes deliberately.</p>
+        <p>This is packaging policy (L7) implemented as a string test inside the generation driver. It is also a live hazard for the migration: a gate that regenerates into a scratch directory silently compares the wrong tree, which is exactly what happened on the first attempt.</p>
+        <div class="evidence"><b>python/sfem/gen.py:1697–1704</b></div>
+      </div>
+    </div>
+  </div>
+
+
+    <div class="row">
+      <div class="g-key">F11</div>
+      <div class="g-body">
+        <div class="g-title">What the byte-identity gate cannot see <span class="tag t-dead">gate design</span></div>
+        <p>Two blind spots showed up while running S2 and S3, both worth stating because the migration leans on these gates.</p>
+        <p><b>A test module that stops loading is invisible to it.</b> After the weak-form relocation, <code>tests/test_neohookean_ogden.py</code> failed to import — <code>unittest</code> reported one <code>_FailedTest</code>, seventeen real tests silently stopped running, and both the snapshot check and the targeted unit tests stayed green. Only the test <em>count</em> moved, 193 to 176. The cause was <code>symbolic/__init__.py</code> re-exporting one module's namespace rather than the package's, so any relocation inside the layer removed names from the package surface. Fixed by aggregating, and guarded by <code>tests/test_module_imports.py</code>, which imports every test module and fails loudly.</p>
+        <p><b>And the regression script was not running its own later steps.</b> <code>run_m9_regression.sh</code> uses <code>set -e</code>, so it aborted at the unittest step — which fails on this tree for pre-existing reasons — and never reached the compile checks or the snapshot gate wired in at S0. The gate reported nothing because it never ran. The script now captures that status, runs everything, and exits with it at the end.</p>
+        <div class="evidence"><b>python/codegen/framework/symbolic/__init__.py</b> · <b>run_m9_regression.sh</b> · guard: <b>tests/test_module_imports.py</b></div>
+      </div>
+    </div>
+
+  <div class="counts">
+    <div><div class="n">19,786</div><div class="l">LOC in three emitter<br>modules that plan, schedule,<br>lower and print</div></div>
+    <div><div class="n">3,644</div><div class="l">LOC of plan vocabulary,<br>consumed almost entirely<br>by plans/ itself</div></div>
+    <div><div class="n">6</div><div class="l">assembly plans defined,<br>tested, and read by<br>no emitter</div></div>
+    <div><div class="n">4</div><div class="l">of six packages construct<br>C/C++ text</div></div>
+    <div><div class="n">0</div><div class="l">KernelAST nodes built by<br>the 10,102-line residual<br>emitter</div></div>
+  </div>
+</section>
+
+<!-- =========================== PART 2 =========================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">PART 2</span><h2>The target stack</h2></div>
+
+  <div class="col">
+  <p>Eight layers. The count is not arbitrary: each boundary is placed where a distinct <em>kind of decision</em> is finished, and the test of a boundary is that a concept can be named above it and is unnameable below it. Provenance (energy or residual) ends at L1. Element identity ends at L2. SymPy ends at L3. Loop structure is fixed at L4. Target ends at L5. Text begins at L6.</p>
+  <p>The two shaded layers, L3 and L4, are the ones the framework is missing. Everything else is present today and mostly needs relocating rather than rewriting.</p>
+  </div>
+
+  <figure>
+    <div class="fig-wrap">
+      <svg viewBox="0 0 940 802" role="img" aria-label="An eight-layer target architecture, top to bottom: symbolic specification, form lowering, discretization, kernel planning, kernel IR, target lowering, emission, and packaging. Each boundary names the artifact that crosses it and the concept that may not appear below it.">
+        <defs>
+          <marker id="f2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-head"/></marker>
+        </defs>
+
+        <text x="24" y="24" class="dg-title">TARGET ARCHITECTURE — ONE DIRECTION, EIGHT LAYERS</text>
+        <text x="24" y="42" class="dg-sub">above each dotted line: the artifact that crosses it · below and right: the concept that must not appear further down</text>
+
+        <!-- L0 -->
+        <g>
+          <text x="88" y="94" class="dg-key" text-anchor="end">L0</text>
+          <rect x="104" y="62" width="520" height="62" class="dg-band" rx="2"/>
+          <text x="120" y="88" class="dg-name">Specification</text>
+          <text x="120" y="108" class="dg-owns">fields · operators · equations · qualifiers · EquationSystem</text>
+          <text x="612" y="88" class="dg-home" text-anchor="end">symbolic/ (minus core.py)</text>
+        </g>
+        <line x1="88" y1="139" x2="916" y2="139" class="dg-rule"/>
+        <line x1="150" y1="128" x2="150" y2="152" class="dg-line" marker-end="url(#f2a)"/>
+        <text x="166" y="136" class="dg-art">EquationSystem</text>
+        <text x="916" y="156" class="dg-stop" text-anchor="end">no user notation below here</text>
+
+        <!-- L1 -->
+        <g>
+          <text x="88" y="186" class="dg-key" text-anchor="end">L1</text>
+          <rect x="104" y="154" width="520" height="62" class="dg-band" rx="2"/>
+          <text x="120" y="180" class="dg-name">Form lowering</text>
+          <text x="120" y="200" class="dg-owns">differentiation · 0/1/2-forms · pruning · block structure</text>
+          <text x="612" y="180" class="dg-home" text-anchor="end">symbolic/forms.py → forms/</text>
+        </g>
+        <line x1="88" y1="231" x2="916" y2="231" class="dg-rule"/>
+        <line x1="150" y1="220" x2="150" y2="244" class="dg-line" marker-end="url(#f2a)"/>
+        <text x="166" y="228" class="dg-art">FormCollection — closed, no .source</text>
+        <text x="916" y="248" class="dg-stop" text-anchor="end">energy vs. residual provenance ends here</text>
+
+        <!-- L2 -->
+        <g>
+          <text x="88" y="278" class="dg-key" text-anchor="end">L2</text>
+          <rect x="104" y="246" width="520" height="62" class="dg-band" rx="2"/>
+          <text x="120" y="272" class="dg-name">Discretization</text>
+          <text x="120" y="292" class="dg-owns">element families · basis · quadrature · geometry mode · mixed order</text>
+          <text x="612" y="272" class="dg-home" text-anchor="end">fem/</text>
+        </g>
+        <line x1="88" y1="323" x2="916" y2="323" class="dg-rule"/>
+        <line x1="150" y1="312" x2="150" y2="336" class="dg-line" marker-end="url(#f2a)"/>
+        <text x="166" y="320" class="dg-art">DiscretePlan</text>
+        <text x="916" y="340" class="dg-stop" text-anchor="end">element identity and quadrature end here</text>
+
+        <!-- L3 -->
+        <g>
+          <text x="88" y="370" class="dg-key" text-anchor="end">L3</text>
+          <rect x="104" y="338" width="520" height="62" class="dg-band-hi" rx="2"/>
+          <text x="120" y="364" class="dg-name">Kernel planning</text>
+          <text x="120" y="384" class="dg-owns">expression graph · CSE · scope hoisting · streams · phases · cost</text>
+          <text x="612" y="364" class="dg-home" text-anchor="end">plans/ + core.py:1123–1445</text>
+        </g>
+        <line x1="88" y1="415" x2="916" y2="415" class="dg-rule"/>
+        <line x1="150" y1="404" x2="150" y2="428" class="dg-line" marker-end="url(#f2a)"/>
+        <text x="166" y="412" class="dg-art">KernelPlan — complete, serializable</text>
+        <text x="916" y="432" class="dg-stop" text-anchor="end">SymPy ends here</text>
+
+        <!-- L4 -->
+        <g>
+          <text x="88" y="462" class="dg-key" text-anchor="end">L4</text>
+          <rect x="104" y="430" width="520" height="62" class="dg-band-hi" rx="2"/>
+          <text x="120" y="456" class="dg-name">Kernel IR</text>
+          <text x="120" y="476" class="dg-owns">loop nests · buffers · gather/scatter · AST passes</text>
+          <text x="612" y="456" class="dg-home" text-anchor="end">ir/kernel_ast.py</text>
+        </g>
+        <line x1="88" y1="507" x2="916" y2="507" class="dg-rule"/>
+        <line x1="150" y1="496" x2="150" y2="520" class="dg-line" marker-end="url(#f2a)"/>
+        <text x="166" y="504" class="dg-art">KernelAST</text>
+        <text x="916" y="524" class="dg-stop" text-anchor="end">loop structure is fixed here</text>
+
+        <!-- L5 -->
+        <g>
+          <text x="88" y="554" class="dg-key" text-anchor="end">L5</text>
+          <rect x="104" y="522" width="520" height="62" class="dg-band" rx="2"/>
+          <text x="120" y="548" class="dg-name">Target lowering</text>
+          <text x="120" y="568" class="dg-owns">OpenMP · CUDA/HIP · AVX512 · SVE/SME — atomics, widths, spaces</text>
+          <text x="612" y="548" class="dg-home" text-anchor="end">backends/targets.py → targets/</text>
+        </g>
+        <line x1="88" y1="599" x2="916" y2="599" class="dg-rule"/>
+        <line x1="150" y1="588" x2="150" y2="612" class="dg-line" marker-end="url(#f2a)"/>
+        <text x="166" y="596" class="dg-art">lowered KernelAST + TargetDialect</text>
+        <text x="916" y="616" class="dg-stop" text-anchor="end">target ends here · text begins below</text>
+
+        <!-- L6 -->
+        <g>
+          <text x="88" y="646" class="dg-key" text-anchor="end">L6</text>
+          <rect x="104" y="614" width="520" height="62" class="dg-band" rx="2"/>
+          <text x="120" y="640" class="dg-name">Emission</text>
+          <text x="120" y="660" class="dg-owns">AST → text · one printer · no policy, no branches on physics</text>
+          <text x="612" y="640" class="dg-home" text-anchor="end">emitters/ (printers only)</text>
+        </g>
+        <line x1="88" y1="691" x2="916" y2="691" class="dg-rule"/>
+        <line x1="150" y1="680" x2="150" y2="704" class="dg-line" marker-end="url(#f2a)"/>
+        <text x="166" y="688" class="dg-art">source files</text>
+        <text x="916" y="708" class="dg-stop" text-anchor="end">no decisions below here</text>
+
+        <!-- L7 -->
+        <g>
+          <text x="88" y="738" class="dg-key" text-anchor="end">L7</text>
+          <rect x="104" y="706" width="520" height="62" class="dg-band" rx="2"/>
+          <text x="120" y="732" class="dg-name">Packaging</text>
+          <text x="120" y="752" class="dg-owns">shared headers · C ABI · sfem::Op · factory · FLOP/AI reports</text>
+          <text x="612" y="732" class="dg-home" text-anchor="end">sfem/_gen_op.py → package/</text>
+        </g>
+
+        <!-- frontend + driver rails -->
+        <rect x="656" y="62" width="260" height="62" class="dg-boxn" rx="2"/>
+        <text x="672" y="88" class="dg-name">Frontend</text>
+        <text x="672" y="108" class="dg-owns">materials/ · generators/</text>
+        <path d="M656,94 L640,94" class="dg-line" marker-end="url(#f2a)"/>
+
+        <rect x="656" y="338" width="260" height="154" class="dg-boxn" rx="2"/>
+        <text x="672" y="364" class="dg-name">Driver</text>
+        <text x="672" y="384" class="dg-owns">pipeline/ — stage sequence,</text>
+        <text x="672" y="400" class="dg-owns">artifact dump/reload, nothing else</text>
+        <text x="672" y="428" class="dg-owns">today: sfem/gen.py (2,287 LOC),</text>
+        <text x="672" y="444" class="dg-owns">outside the framework entirely</text>
+        <text x="672" y="472" class="dg-owns">calls each layer; is called by none</text>
+
+        <text x="24" y="786" class="dg-sub">Imports may point only upward. Every artifact on a boundary must survive a JSON round-trip: dump it, drop the layers above, re-run the layers below, get identical output.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 2.</b> The target stack. Shaded layers <b>L3</b> and <b>L4</b> are the load-bearing additions — the kernel model that today exists only as control flow inside the emitters. The right-hand column names where each layer's code lives today; most of the work is relocation, not new code. The two rails to the right are the only components that legally reach across layers: the frontend, which sits above L0, and the driver, which calls each layer in sequence and is imported by none of them.</figcaption>
+  </figure>
+
+  <h3>Layer contracts</h3>
+  <p class="col">A layer boundary is real only if it is stated as a rule that can fail a test. Each layer below gives its input, its output, and the thing it is forbidden to name.</p>
+
+  <div class="gutter">
+
+    <div class="row">
+      <div class="g-key">L0</div>
+      <div class="g-body">
+        <div class="g-title">Specification</div>
+        <p>The user-facing mathematical API: UFL-conforming fields, operators, qualifiers, and the <code>EquationSystem</code> / <code>EquationSystems</code> container. Pure SymPy, importable on its own.</p>
+        <div class="io"><span><i>in</i> user code</span><span><i>out</i> EquationSystem</span></div>
+        <div class="forbid"><b>May not name</b> any other framework layer, any element type, any target, any layout, or any string of generated code. This single rule deletes all four of today's outgoing <code>symbolic/</code> edges.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">L1</div>
+      <div class="g-body">
+        <div class="g-title">Form lowering</div>
+        <p>Turns either user notation into the standardized 0/1/2-form collection: differentiation for energy input, direct assembly for residual input, dependency pruning, and the row/column block structure for coupled systems. This is where <code>weak_residual_coefficients</code> and <code>coupled_residual_weak_coefficients</code> belong — today they live in the residual emitter and are imported <em>back up</em> by <code>symbolic/equations.py:19</code>.</p>
+        <div class="io"><span><i>in</i> EquationSystem</span><span><i>out</i> FormCollection</span></div>
+        <div class="forbid"><b>May not name</b> elements, quadrature, geometry, targets — and may not leave a <code>.source</code> back-pointer. Anything a downstream layer needs from <code>CoupledResidualSystem</code> becomes a field on <code>FormCollection</code> or <code>FormBlock</code>. This is the boundary at which provenance dies.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">L2</div>
+      <div class="g-body">
+        <div class="g-title">Discretization</div>
+        <p>Element families, basis and quadrature data, affine vs. isoparametric geometry policy, tensor-product and sum-factorization policy, mixed-order compatibility (Taylor–Hood pairs). Produces a <code>DiscretePlan</code>: the element contexts, basis plans, geometry plans and reference data for one generation request. Largely the existing <code>fem/</code> package plus <code>plans/emission.py</code> and <code>plans/reference_data.py</code>.</p>
+        <div class="io"><span><i>in</i> FormCollection + element request</span><span><i>out</i> DiscretePlan</span></div>
+        <div class="forbid"><b>May not name</b> a target or emit text — which removes <code>fem/tensor_product_geometry.py:1</code>'s import of <code>OpenMPTarget</code> and moves its line-building into L6.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">L3</div>
+      <div class="g-body">
+        <div class="g-title">Kernel planning <span class="tag t-ok">new load-bearing layer</span></div>
+        <p>The layer the framework is missing. It decides everything about the kernel that is not syntax: the expression graph and common-subexpression structure, which values hoist to which scope (mesh, element, quadrature, test, trial), liveness and register-pressure estimates, arithmetic intensity, the data streams and their layouts, the mesh and local phase sequences, the block decomposition, and which matrix-format variants are requested.</p>
+        <p>Most of this code already exists — <code>ExpressionGraph</code>, <code>EvaluationPlan</code>, <code>ExpressionCost</code>, <code>LivenessState</code> in <code>symbolic/core.py:1123–1445</code>, and the whole <code>plans/</code> vocabulary. It needs to be assembled into one layer whose output is a <code>KernelPlan</code> complete enough that nothing downstream needs to look further up.</p>
+        <div class="io"><span><i>in</i> FormCollection + DiscretePlan</span><span><i>out</i> KernelPlan</span></div>
+        <div class="forbid"><b>May not</b> construct or differentiate forms, and may not emit text. It carries SymPy expressions as opaque payload and is the last layer permitted to hold them.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">L4</div>
+      <div class="g-body">
+        <div class="g-title">Kernel IR <span class="tag t-ok">new load-bearing layer</span></div>
+        <p>Concrete, typed, target-neutral: loop nests with explicit bounds, buffer declarations, gather and scatter nodes, geometry nodes, calls. <code>ir/kernel_ast.py</code> already defines this and is ready to use. Structural transformations run here as <code>KernelASTPass</code> objects — vectorization, unrolling, blocking, scratchpad packing, one-pass vs. two-pass packed traversal, per-thread and per-warp variants.</p>
+        <p>This is where the PRD's optimization goals become tractable: a pass is a testable function from AST to AST, and <code>KernelASTPassResult</code> already carries the metadata to say whether a pass was parity-preserving or performance-changing.</p>
+        <div class="io"><span><i>in</i> KernelPlan</span><span><i>out</i> KernelAST</span></div>
+        <div class="forbid"><b>May not</b> contain C or C++ syntax, or SymPy expressions other than as opaque leaf payload.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">L5</div>
+      <div class="g-body">
+        <div class="g-title">Target lowering</div>
+        <p>One target class per platform, each doing two things: AST-to-AST rewrites (parallel-for shape, work-item indexing, atomic strategy, vector width, memory space, matrix-unit microkernels) and supplying a <code>TargetDialect</code> of syntax facts (inline qualifier, pragma spelling, restrict keyword, header conventions). <code>OpenMPEnergySoASourceBuilder</code> / <code>CUDAEnergySoASourceBuilder</code> are the working prototype of the second half; generalize them and delete <code>_target()</code>.</p>
+        <div class="io"><span><i>in</i> KernelAST + Target</span><span><i>out</i> lowered KernelAST + TargetDialect</span></div>
+        <div class="forbid"><b>May not</b> know which physics produced the kernel, and may not build source lines beyond dialect tokens.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">L6</div>
+      <div class="g-body">
+        <div class="g-title">Emission</div>
+        <p>Mechanical. One printer walks a lowered <code>KernelAST</code> against a <code>TargetDialect</code> and produces text; a second small component assembles files and names. If the printer contains a branch on physics, provenance, element family or matrix format, a decision has leaked down from L2–L5.</p>
+        <p>Realistically this is a few hundred lines. The 19,786 lines in today's three emitters are almost entirely L3 and L5 material wearing a printer's name.</p>
+        <div class="io"><span><i>in</i> lowered KernelAST + TargetDialect</span><span><i>out</i> source files</span></div>
+        <div class="forbid"><b>May not</b> import L0–L3. The import test is the enforcement.</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="g-key">L7</div>
+      <div class="g-body">
+        <div class="g-title">Packaging</div>
+        <p>Everything about delivering the generated set rather than generating it: hoisting shared primitives into common headers so kernels include rather than re-generate them (KERNELS.md's “Cleaner Generated Code”), the C ABI, the <code>sfem::Op</code> subclass, factory registration, the HEX8-wraps-PROTEUS_HEX8 aliasing, and the FLOP/arithmetic-intensity reports built from L3 cost data. Today this is <code>sfem/_gen_op.py</code> plus the alias machinery at <code>sfem/gen.py:1311–1531</code>, both outside the framework.</p>
+        <div class="io"><span><i>in</i> source files + KernelPlan metadata</span><span><i>out</i> build-ready artifact set</span></div>
+        <div class="forbid"><b>May not</b> change kernel bodies. If packaging needs a different kernel, that is an L3 request, not a post-edit.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <h3>The three rules that make the boundaries real</h3>
+  <div class="col">
+  <p><b>One direction.</b> Imports point up only. Enforced by a <code>tests/test_layering.py</code> that walks the AST of every module, maps it to a layer, and fails on any downward edge. This is roughly thirty lines and would fail today on six package pairs — which is exactly why it is worth having before any relocation starts.</p>
+  <p><b>Closed handoffs.</b> Every boundary artifact must survive a round trip: dump to JSON, discard the layers above it, reconstruct, run the layers below, get byte-identical output. No back-pointers, no <code>getattr(x, "source", None)</code>, no plan carrying <code>unit</code> and <code>context</code> so the consumer can reach back through it — which <code>EnergySoAKernelEmissionPlan</code> does today. This property is testable, and passing it is the definition of “the layer above is finished.”</p>
+  <p><b>One dispatch axis per layer.</b> A layer may branch on the concept it owns and on nothing a layer above owns. No <code>if kind == "energy_soa"</code> in a backend; no <code>if "crs" in formats</code> in a printer; no <code>if material.name != "linear_elasticity"</code> anywhere.</p>
+  </div>
+</section>
+
+<!-- =========================== PART 3 =========================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">PART 3</span><h2>One path, before and after</h2></div>
+  <div class="col">
+  <p>Abstractly the target stack is uncontroversial. It is worth seeing what it changes for a single concrete path — the two-phase-flow residual on HEX8 — because that is where the cost lands.</p>
+  </div>
+
+  <figure>
+    <div class="fig-wrap">
+      <svg viewBox="0 0 940 560" role="img" aria-label="Side-by-side comparison of the residual HEX8 generation path. Today a symbolic CoupledResidualSystem travels directly into a 10,102-line emitter, plans arrive sideways as validators, and the target is a constant inside the emitter. In the target design the chain is FormCollection to KernelPlan to KernelAST to printer, with the target injected as a pass.">
+        <defs>
+          <marker id="f3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-head"/></marker>
+          <marker id="f3b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-headbad"/></marker>
+        </defs>
+
+        <text x="24" y="26" class="dg-title">TWO-PHASE FLOW RESIDUAL, HEX8</text>
+
+        <!-- divider -->
+        <line x1="470" y1="46" x2="470" y2="530" class="dg-rule"/>
+
+        <!-- LEFT: today -->
+        <text x="24" y="62" class="dg-bad">TODAY</text>
+
+        <rect x="24" y="76" width="300" height="46" class="dg-boxn" rx="2"/>
+        <text x="40" y="98" class="dg-name">EquationSystem</text>
+        <text x="40" y="114" class="dg-owns">materials/two_phase_flow.py</text>
+        <line x1="90" y1="122" x2="90" y2="146" class="dg-line" marker-end="url(#f3a)"/>
+
+        <rect x="24" y="150" width="300" height="58" class="dg-boxn" rx="2"/>
+        <text x="40" y="172" class="dg-name">FormCollection</text>
+        <text x="40" y="188" class="dg-owns">+ .source → CoupledResidualSystem</text>
+        <text x="40" y="203" class="dg-bad">the symbolic stage does not end</text>
+        <line x1="90" y1="208" x2="90" y2="248" class="dg-badline" marker-end="url(#f3b)"/>
+        <text x="102" y="232" class="dg-bad">CoupledResidualSystem travels on</text>
+
+        <rect x="24" y="252" width="300" height="46" class="dg-boxn" rx="2"/>
+        <text x="40" y="274" class="dg-name">OpenMPSoABackend</text>
+        <text x="40" y="290" class="dg-owns">branches on unit.kind; rebuilds a system</text>
+        <line x1="90" y1="298" x2="90" y2="326" class="dg-badline" marker-end="url(#f3b)"/>
+
+        <rect x="24" y="330" width="300" height="96" class="dg-band-bad" rx="2"/>
+        <text x="40" y="354" class="dg-name">residual_codegen.py</text>
+        <text x="40" y="372" class="dg-owns">10,102 LOC · 147 top-level defs</text>
+        <text x="40" y="390" class="dg-owns">plans loops · picks layouts · hoists</text>
+        <text x="40" y="406" class="dg-owns">scatters · prints C++</text>
+        <text x="40" y="420" class="dg-bad">_target() → OpenMPTarget()</text>
+
+        <line x1="90" y1="426" x2="90" y2="452" class="dg-line" marker-end="url(#f3a)"/>
+        <rect x="24" y="456" width="300" height="40" class="dg-boxn" rx="2"/>
+        <text x="40" y="481" class="dg-owns">generated_two_phase_flow_hex8_operator.cpp</text>
+
+        <!-- side arrow: plans arrive to validate -->
+        <rect x="344" y="252" width="106" height="66" class="dg-boxn" rx="2"/>
+        <text x="356" y="272" class="dg-owns">plans/</text>
+        <text x="356" y="288" class="dg-owns">reference_data</text>
+        <text x="356" y="303" class="dg-owns">diagnostics</text>
+        <path d="M344,300 L340,300 L340,368 L328,368" class="dg-badline" marker-end="url(#f3b)"/>
+        <text x="356" y="336" class="dg-bad">validate</text>
+        <text x="356" y="350" class="dg-bad">only</text>
+
+        <!-- RIGHT: target -->
+        <text x="500" y="62" class="dg-key">TARGET</text>
+
+        <rect x="500" y="76" width="300" height="46" class="dg-boxn" rx="2"/>
+        <text x="516" y="98" class="dg-name">EquationSystem</text>
+        <text x="516" y="114" class="dg-owns">unchanged</text>
+        <line x1="566" y1="122" x2="566" y2="146" class="dg-line" marker-end="url(#f3a)"/>
+
+        <rect x="500" y="150" width="300" height="46" class="dg-boxn" rx="2"/>
+        <text x="516" y="172" class="dg-name">FormCollection</text>
+        <text x="516" y="188" class="dg-owns">closed · blocks and coefficients inline</text>
+        <line x1="566" y1="196" x2="566" y2="224" class="dg-line" marker-end="url(#f3a)"/>
+
+        <rect x="500" y="228" width="300" height="46" class="dg-band-hi" rx="2"/>
+        <text x="516" y="250" class="dg-name">KernelPlan</text>
+        <text x="516" y="266" class="dg-owns">scopes · streams · phases · blocks · cost</text>
+        <line x1="566" y1="274" x2="566" y2="302" class="dg-line" marker-end="url(#f3a)"/>
+
+        <rect x="500" y="306" width="300" height="46" class="dg-band-hi" rx="2"/>
+        <text x="516" y="328" class="dg-name">KernelAST</text>
+        <text x="516" y="344" class="dg-owns">loops · buffers · gather · scatter</text>
+        <line x1="566" y1="352" x2="566" y2="380" class="dg-line" marker-end="url(#f3a)"/>
+
+        <rect x="500" y="384" width="300" height="46" class="dg-boxn" rx="2"/>
+        <text x="516" y="406" class="dg-name">OpenMPTarget pass</text>
+        <text x="516" y="422" class="dg-owns">CUDATarget is the same call, one argument</text>
+        <line x1="566" y1="430" x2="566" y2="452" class="dg-line" marker-end="url(#f3a)"/>
+
+        <rect x="500" y="456" width="300" height="40" class="dg-boxn" rx="2"/>
+        <text x="516" y="481" class="dg-owns">printer → …_hex8_operator.cpp (byte-identical)</text>
+
+        <!-- matrix formats now feed the plan -->
+        <rect x="820" y="228" width="96" height="46" class="dg-boxn" rx="2"/>
+        <text x="832" y="248" class="dg-owns">CRS / BSR</text>
+        <text x="832" y="264" class="dg-owns">assembly plans</text>
+        <path d="M820,251 L806,251" class="dg-line" marker-end="url(#f3a)"/>
+
+        <text x="500" y="522" class="dg-sub">Five arrows become one chain; the sideways validator arrow disappears; the target moves from a constant to an argument.</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 3.</b> The change that matters is not the number of boxes — it is that on the right no arrow skips a box and none points sideways. The assembly plans, which today no emitter reads, become an input to the layer that decides scatter structure rather than a document describing what the emitter happens to do.</figcaption>
+  </figure>
+</section>
+
+<!-- =========================== PART 4 =========================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">PART 4</span><h2>Migration</h2></div>
+
+  <div class="col">
+  <p>The order below is chosen so each step is independently shippable and reversible, and so the riskiest step (S5) comes only after the safety net exists and the interfaces have already been narrowed.</p>
+  <p>The gate for S0–S6 is <b>byte-identical generated output</b> across the full generator set. That is a stronger gate than a test suite and it settles the performance question by construction: if the emitted C++ is unchanged, kernel performance is unchanged. Only S7 intentionally changes output, and it carries a benchmark gate instead — throughput unchanged within measurement noise, measured before and after, not inferred.</p>
+  </div>
+
+  <div class="gutter">
+    <div class="row"><div class="g-key">S0</div><div class="g-body">
+      <div class="g-title">Snapshot the output <span class="tag t-ok">done</span></div>
+      <p><code>tools/codegen_snapshot.py</code> regenerates all 11 maintained materials through their real entry points and compares the result byte for byte. <code>capture</code> writes a 44 MB reference tree plus a committed hash manifest; <code>check</code> diffs against the tree and shows what moved; <code>verify</code> compares hashes only, so CI and a fresh clone need no reference tree. Baseline: <b>520 files</b>, and both modes confirm the tree reproduces exactly.</p>
+      <p>Two things worth knowing came out of building it. Generation <em>is</em> deterministic across processes — no hash-order or timestamp instability, and no absolute paths embedded in the output, so a reference tree is portable between checkouts. And the gate must generate into a directory named <code>generated</code> or it silently compares a different tree (F10).</p>
+      <div class="evidence"><b>gate</b> — none; this step creates the gate</div>
+    </div></div>
+
+    <div class="row"><div class="g-key">S1</div><div class="g-body">
+      <div class="g-title">Add the layering test, with the six known edges allowlisted <span class="tag t-ok">done</span></div>
+      <p><code>tests/test_layering.py</code> parses every module with <code>ast</code> — it never imports them, so import side effects can neither hide a violation nor break the test — and maps each to its layer. It finds <b>17 layer-to-layer edges: 11 upward, 6 downward</b>, matching the analysis exactly. The six are pinned in <code>KNOWN_VIOLATIONS</code>.</p>
+      <p>The ratchet cuts both ways, and both directions are negative-tested: a newly introduced downward import fails <code>test_no_new_downward_imports</code>, and a violation that gets fixed but is left in the allowlist fails <code>test_known_violations_are_still_present</code>. So the list can only shrink, and it cannot go stale.</p>
+      <div class="evidence"><b>gate</b> byte-identical output (trivially — no source changes) · added to <code>run_m9_regression.sh</code></div>
+    </div></div>
+
+    <div class="row"><div class="g-key">S2</div><div class="g-body">
+      <div class="g-title">Cut the four <code>symbolic/</code> edges <span class="tag t-ok">done</span></div>
+      <p>All four are gone; the allowlist is down from six entries to two. Four moves did it: the weak-coefficient builders (<code>WeakResidualCoefficients</code>, <code>weak_residual_coefficients</code>, <code>coupled_residual_weak_coefficients</code>) out of the 10k-line residual emitter into <code>symbolic/residual.py</code>, where they always belonged — they are <code>sp.diff</code> plus a linearity check, with no emission in them; <code>sfem_soa_adjugate_geometry_inputs</code> into <code>fem/reference.py</code>, which also deletes a lazy <code>import symbolic</code> inside <code>fem</code> that existed only to reach back for it; and the three <code>generate_*_kernel</code> entry points with their nine private helpers into a new <code>emitters/kernel_codegen.py</code>, which is what freed <code>core.py</code> of <code>OpenMPTarget</code> and <code>CUDATarget</code>.</p>
+      <p>The fourth was not a move at all. <code>symbolic/core.py</code> imported eighteen names it never used — from <code>fem.reference</code>, <code>fem.tensor_product_geometry</code>, <code>emitters.quadrature_codegen</code> and <code>plans.reference_data</code>. They were not dead: <code>emitters/energy_codegen.py</code> imported them <em>through</em> <code>symbolic.core</code>, which re-exports its own namespace. So the specification layer was acting as a pass-through for element, quadrature and plan symbols on behalf of an emitter, and that laundering was the entire reason three of the four edges existed. Pointing those imports at their real homes removed them.</p>
+      <p><code>symbolic/core.py</code> is now 2,149 lines, down from 2,556.</p>
+      <div class="evidence"><b>gate</b> byte-identical output (520 files) at each of the four moves · full suite unchanged · <b>ratchet</b> 6 edges → 2</div>
+    </div></div>
+
+    <div class="row"><div class="g-key">S3</div><div class="g-body">
+      <div class="g-title">Split <code>symbolic/core.py</code> along its seams <span class="tag t-ok">done</span></div>
+      <p><b>The printer seam.</b> The <code>C99CodePrinter</code> subclass, <code>_sfem_ccode</code>, the specialized-<code>pow</code> helpers, the math-header sources and the C naming helpers are now <code>emitters/cprinter.py</code>. Once S2 had moved the three <code>generate_*_kernel</code> entry points out, this cluster was fully isolated — nothing referenced it in either direction.</p>
+      <p><b>The artifact and weak-form seams.</b> <code>GeneratedKernelCode</code> and <code>GeneratedKernelFile</code> are emission outputs, so they moved to <code>emitters/artifacts.py</code>. The SoA weak-form builders moved to <code>symbolic/weak_forms.py</code> — L1 living inside the <code>symbolic/</code> package until L0 and L1 get separate packages.</p>
+      <p><b>The scheduling seam.</b> 33 symbols — <code>ExpressionGraph</code>, <code>EvaluationPlan</code>, <code>ExpressionCost</code>, <code>LivenessState</code>, <code>EvaluationMetrics</code>, CSE, scope hoisting, pattern detection, cost and liveness estimation — are now <code>plans/scheduling.py</code>. <b>L3 exists.</b></p>
+      <p>The single back-edge was resolved by deleting it rather than hiding it. <code>KernelExpressions.build_graph</code> is gone; the class exposes <code>.expressions</code> instead, and <code>build_expression_graph</code> accepts either that builder or a plain iterable. The three convenience wrappers that lived on the symbolic systems (<code>build_residual_graph</code>, <code>build_jacobian_action_graph</code>, and the two-phase equivalent) are now free functions in the planning layer that take a system and ask it for its expressions. 48 call sites were rewritten through the AST rather than by pattern matching, because the receivers include multi-line method chains.</p>
+      <p><b>Result: <code>symbolic/</code> has no outgoing edges at all.</b> It is now a true bottom layer — importable, testable and reusable without dragging in element policy, target policy or an emitter. <code>symbolic/core.py</code> is 1,245 lines, down from 2,556.</p>
+      <div class="evidence"><b>gate</b> byte-identical output (520 files) at every seam · 193 tests, failure set unchanged from S2</div>
+    </div></div>
+
+    <div class="row"><div class="g-key">S4</div><div class="g-body">
+      <div class="g-title">Close <code>FormCollection</code></div>
+      <p>Delete <code>.source</code>. Promote what downstream actually reads off <code>CoupledResidualSystem</code> — fields, parameters, per-block coefficients — onto <code>FormCollection</code> and <code>FormBlock</code>. This deletes the fabricated system at <code>backends/openmp.py:776</code> and is the first step that makes a boundary genuinely closed. Add the JSON round-trip test for <code>FormCollection</code> here.</p>
+      <div class="evidence"><b>gate</b> byte-identical output + round-trip identity</div>
+    </div></div>
+
+    <div class="row"><div class="g-key">S5</div><div class="g-body">
+      <div class="g-title">Invert the emitter interface</div>
+      <p>The step everything else was preparing for. Change <code>generate_coupled_residual_sfem_files(system, …, plan=None)</code> to take a <code>KernelPlan</code> and nothing else, and move the decisions the emitter currently makes internally — scopes, streams, phases, layouts — up into L3 where the corresponding plan types already exist and are waiting. Do this one form family at a time: residual first, since it is the largest and has no IR entanglement; then energy; then boundary.</p>
+      <p>Expect the emitters to lose the majority of their volume here, not by deletion but by relocation into L3.</p>
+      <div class="evidence"><b>gate</b> byte-identical output + plan round-trip identity, per form family</div>
+    </div></div>
+
+    <div class="row"><div class="g-key">S6</div><div class="g-body">
+      <div class="g-title">Route through the IR and make the target an argument</div>
+      <p>With L3 owning the decisions, the emitters build a <code>KernelAST</code> and a printer walks it. Delete <code>_target()</code>. CUDA stops being a separate backend restricted to <code>energy_soa</code> and becomes a target pass over the same AST — one argument rather than one fork.</p>
+      <p>S2 sharpened what this step has to do. The two remaining allowlist entries — <code>fem → backends</code> and <code>emitters → backends</code> — are not really violations to fix but a package to split: <code>backends/targets.py</code> is the L5 target layer, which sits <em>before</em> emission, so importing it from an emitter is an upward edge that ought to be legal; <code>backends/openmp.py</code> and <code>backends/cuda.py</code> are orchestrators that drive emitters and belong with the driver. Once <code>targets/</code> is its own package ranked below <code>emitters</code>, both entries disappear rather than being repaired.</p>
+      <div class="evidence"><b>gate</b> byte-identical output for OpenMP; new-path parity tests for CUDA · <b>ratchet</b> all 6 edges removed</div>
+    </div></div>
+
+    <div class="row"><div class="g-key">S7</div><div class="g-body">
+      <div class="g-title">Put the assembly plans to work</div>
+      <p>Drive CRS/BSR/DIA/COO/patch scatter from the plans that already describe them, and hoist shared primitives into common headers per KERNELS.md. This is the one step that intentionally changes generated text, so byte-identity no longer applies.</p>
+      <div class="evidence"><b>gate</b> numerical parity + benchmark: assembly and apply throughput unchanged within measurement noise, measured before and after</div>
+    </div></div>
+
+    <div class="row"><div class="g-key">S8</div><div class="g-body">
+      <div class="g-title">Bring the driver and packaging inside</div>
+      <p>Move the four stage classes and <code>generate(...)</code> from <code>sfem/gen.py</code> into <code>pipeline/</code>, and <code>_gen_op.py</code> into <code>package/</code>; <code>sfem.gen</code> becomes a thin re-export for existing callers. Then delete the 262-name flat facade in <code>__init__.py</code> in favour of per-layer public APIs, which is what makes the layering test meaningful to a reader rather than only to CI.</p>
+      <div class="evidence"><b>gate</b> byte-identical output</div>
+    </div></div>
+  </div>
+</section>
+
+<!-- =========================== PART 5 =========================== -->
+<section>
+  <div class="sec-head"><span class="sec-num">PART 5</span><h2>Decisions taken</h2></div>
+  <div class="col">
+  <p>Four questions I raised; all four are now settled. They are recorded here because each one constrains code that has not been written yet — the column on the right is the rule a reviewer should hold the implementation to.</p>
+  </div>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:26%">Question</th><th style="width:44%">The trade-off</th><th style="width:30%">Decision</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Does CSE belong to L3 or L4?</td>
+        <td>CSE on the SymPy graph (L3) sees algebraic structure and can exploit it; CSE on the AST (L4) sees the real loop nest and can hoist across scopes correctly. Today it is L3-shaped, inside <code>symbolic/core.py</code>.</td>
+        <td><b>L3.</b> CSE runs on the SymPy graph, in kernel planning. L4 receives an expression set that is already factored and is responsible for placing it, not for rediscovering it.</td>
+      </tr>
+      <tr>
+        <td>Packed and patch mesh layouts: L2 or L3?</td>
+        <td>They are traversal and data-layout choices, not discretization — but they interact with element connectivity, which is L2's.</td>
+        <td><b>L3.</b> Kernel planning owns the layout: L2 supplies connectivity and element facts, and every traversal variant — standard, packed one-pass and two-pass, patch — is planned in L3 as a different <code>KernelPlan</code> over the same discretization.</td>
+      </tr>
+      <tr>
+        <td>How much of L3 should be one plan versus a plan per form family?</td>
+        <td>One <code>KernelPlan</code> type keeps L4 simple; per-family plans keep each simpler but reintroduce the dispatch that F6 is about.</td>
+        <td><b>One type, varying by data.</b> A single <code>KernelPlan</code> whose contents differ per form family — no subclass, no family enum that L4 or L5 branches on. If a consumer has to ask which family produced a plan, the plan is missing a field.</td>
+      </tr>
+      <tr>
+        <td>Is S5 one branch or a long-lived parallel path?</td>
+        <td>A parallel implementation behind a flag is safer but doubles the surface for months. A per-family in-place inversion keeps one code path but has larger individual commits.</td>
+        <td><b>In place.</b> No parallel implementation and no feature flag; the inversion happens on the existing code path, one form family at a time, with byte-identical generated output as the gate on every commit.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<footer>
+  Analysis against the working tree at <code>python/codegen/framework</code>, branch <code>nonlinearspmg</code>. Line numbers cited as of 2026-09-02.
+</footer>
+
+</div>

@@ -1,5 +1,5 @@
 from codegen.framework.plans.matrix_formats import MatrixFormatPlan
-from codegen.framework.symbolic.core import GeneratedKernelFile
+from codegen.framework.emitters.artifacts import GeneratedKernelFile
 
 
 def emit_matrix_format_metadata_files(operator_prefix, matrix_format_plan):

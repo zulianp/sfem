@@ -6,41 +6,6 @@ import sympy as sp
 import sympy.codegen.ast as ast
 from sympy.printing.c import C99CodePrinter
 
-try:
-    from codegen.framework.fem.reference import (
-        SfemElementQuadratureRule,
-        SfemSoAArrayInput,
-        SfemSoAElementSpecialization,
-        sfem_element_quadrature_rule,
-        sfem_mesh_reference_data,
-        sfem_soa_array_input,
-        sfem_soa_element_specialization,
-        sfem_soa_element_specializations,
-        sfem_soa_reference_input,
-        sfem_supported_element_types,
-        sfem_tensor_product_hex_uses_cartesian_ordering,
-        sfem_tensor_product_quad_uses_cartesian_ordering,
-    )
-    from codegen.framework.plans.reference_data import validate_reference_data_plan
-except ImportError:
-    from fem import (
-        SfemElementQuadratureRule,
-        SfemSoAArrayInput,
-        SfemSoAElementSpecialization,
-        sfem_element_quadrature_rule,
-        sfem_mesh_reference_data,
-        sfem_soa_array_input,
-        sfem_soa_element_specialization,
-        sfem_soa_element_specializations,
-        sfem_soa_reference_input,
-        sfem_supported_element_types,
-        sfem_tensor_product_hex_uses_cartesian_ordering,
-        sfem_tensor_product_quad_uses_cartesian_ordering,
-    )
-    def validate_reference_data_plan(*args, **kwargs):
-        return None
-
-
 def _validate_diagnostics_plan_names(plan, expected_names):
     if plan is None:
         return None
@@ -53,206 +18,27 @@ def _validate_diagnostics_plan_names(plan, expected_names):
         )
     return plan
 
-try:
-    from codegen.framework.fem.tensor_product_geometry import (
-        isoparametric_adjugate_lines,
-        isoparametric_adjugate_call_lines,
-        isoparametric_adjugate_stream_array_lines,
-        streams_in_shape_order,
-        tensor_product_cartesian_shape_order,
-        tensor_product_coordinate_gradient_lines,
-        tensor_product_current_q_isoparametric_geometry_lines,
-        tensor_product_gradient_isoparametric_geometry_lines,
-        tensor_product_ordered_coordinate_streams,
-    )
-except ImportError:
-    from tensor_product_geometry import (
-        isoparametric_adjugate_lines,
-        isoparametric_adjugate_call_lines,
-        isoparametric_adjugate_stream_array_lines,
-        streams_in_shape_order,
-        tensor_product_cartesian_shape_order,
-        tensor_product_coordinate_gradient_lines,
-        tensor_product_current_q_isoparametric_geometry_lines,
-        tensor_product_gradient_isoparametric_geometry_lines,
-        tensor_product_ordered_coordinate_streams,
-    )
-
-try:
-    from codegen.framework.emitters.quadrature_codegen import (
-        quadrature_reference_accessor,
-        quadrature_reference_struct_lines,
-    )
-except ImportError:
-    from quadrature_codegen import (
-        quadrature_reference_accessor,
-        quadrature_reference_struct_lines,
-    )
-
-try:
-    from codegen.framework.backends.targets import CUDATarget, OpenMPTarget
-except ImportError:
-    from targets import CUDATarget, OpenMPTarget
-
-try:
-    from codegen.framework.fem.tensor_product_kernels import sfem_tensor_product_kernels_header_source
-except ImportError:
-    from tensor_product_kernels import sfem_tensor_product_kernels_header_source
-
-import networkx as nx
 
 
 SympyExpr = Union[sp.Expr, ast.Assignment, ast.AddAugmentedAssignment]
-_SFEM_SPECIALIZED_POW_MAX_EXPONENT = 16
 
 
-class _SfemCCodePrinter(C99CodePrinter):
-    def __init__(self, scalar_type="scalar_t", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._scalar_type = scalar_type
-
-    def _scalar_literal(self, value):
-        return "%s(%s)" % (self._scalar_type, value)
-
-    def _print_Integer(self, expr):
-        return self._scalar_literal("%d" % int(expr))
-
-    def _print_Float(self, expr):
-        return self._scalar_literal(super()._print_Float(expr))
-
-    def _print_Rational(self, expr):
-        return "(%s / %s)" % (
-            self._scalar_literal("%d" % int(expr.p)),
-            self._scalar_literal("%d" % int(expr.q)),
-        )
-
-    def _print_Pow(self, expr):
-        base, exponent = expr.as_base_exp()
-        if exponent.is_Integer:
-            exponent_value = int(exponent)
-            if abs(exponent_value) <= _SFEM_SPECIALIZED_POW_MAX_EXPONENT:
-                if exponent_value == 0:
-                    return self._scalar_literal("1")
-                if exponent_value == 1:
-                    return self._print(base)
-                suffix = "m%d" % abs(exponent_value) if exponent_value < 0 else "%d" % exponent_value
-                return "pow_%s(%s)" % (suffix, self._print(base))
-        return super()._print_Pow(expr)
 
 
-_SFEM_CCODE_PRINTERS = {}
 
 
-def _sfem_ccode(expression, scalar_type="scalar_t"):
-    printer = _SFEM_CCODE_PRINTERS.get(scalar_type)
-    if printer is None:
-        printer = _SfemCCodePrinter(scalar_type)
-        _SFEM_CCODE_PRINTERS[scalar_type] = printer
-    return printer.doprint(expression)
 
 
-def _prune_dead_cse_intermediates(intermediates, outputs):
-    required_symbols = set()
-    for output in outputs:
-        required_symbols.update(_rhs(output).free_symbols)
-
-    retained = []
-    for symbol, expression in reversed(tuple(intermediates)):
-        if symbol not in required_symbols:
-            continue
-        required_symbols.remove(symbol)
-        required_symbols.update(expression.free_symbols)
-        retained.append((symbol, expression))
-
-    return tuple(reversed(retained))
 
 
-def _sfem_pow_function_name(exponent):
-    exponent = int(exponent)
-    if exponent < 0:
-        return "pow_m%d" % abs(exponent)
-    return "pow_%d" % exponent
 
 
-def _sfem_pow_product_expression(exponent):
-    exponent = int(exponent)
-    if exponent == 0:
-        return "T(1)"
-    return " * ".join("x" for _ in range(exponent))
 
 
-def _sfem_math_function_lines(inline_qualifier="SFEM_INLINE"):
-    lines = []
-    for exponent in range(2, _SFEM_SPECIALIZED_POW_MAX_EXPONENT + 1):
-        lines.extend(
-            [
-                "template <typename T>",
-                "static %s T %s(const T x) {"
-                % (inline_qualifier, _sfem_pow_function_name(exponent)),
-                "    return %s;" % _sfem_pow_product_expression(exponent),
-                "}",
-                "",
-            ]
-        )
-    for exponent in range(1, _SFEM_SPECIALIZED_POW_MAX_EXPONENT + 1):
-        lines.extend(
-            [
-                "template <typename T>",
-                "static %s T %s(const T x) {"
-                % (inline_qualifier, _sfem_pow_function_name(-exponent)),
-                "    return T(1) / %s(x);" % _sfem_pow_function_name(exponent)
-                if exponent > 1
-                else "    return T(1) / x;",
-                "}",
-                "",
-            ]
-        )
-    return lines
 
 
-def _sfem_math_header_source(
-    header_guard_suffix="HPP",
-    inline_qualifier="SFEM_INLINE",
-    define_sfem_inline=True,
-):
-    guard = "SFEM_CODEGEN_KERNEL_MATH_%s" % header_guard_suffix
-    lines = [
-        "#ifndef %s" % guard,
-        "#define %s" % guard,
-        "",
-    ]
-    if define_sfem_inline:
-        lines.extend(
-            [
-                "#ifndef SFEM_INLINE",
-                "#define SFEM_INLINE inline",
-                "#endif",
-                "",
-            ]
-        )
-    lines.extend(["namespace sfem {", "namespace codegen {", ""])
-    lines.extend(_sfem_math_function_lines(inline_qualifier))
-    lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
-    return "\n".join(lines)
 
 
-def _sfem_math_inline_source_lines(
-    inline_qualifier="SFEM_INLINE",
-    define_sfem_inline=True,
-):
-    lines = [
-    ]
-    if define_sfem_inline:
-        lines.extend(
-            [
-                "#ifndef SFEM_INLINE",
-                "#define SFEM_INLINE inline",
-                "#endif",
-                "",
-            ]
-        )
-    lines.extend(_sfem_math_function_lines(inline_qualifier))
-    return lines
 
 
 class ExpressionRole(str, Enum):
@@ -989,237 +775,29 @@ def hessian_action_from_energy(energy, variables, directions):
     return jacobian_action_from_residual(residual, variables, directions)
 
 
-@dataclass(frozen=True)
-class GeneratedKernelCode:
-    language: str
-    function_name: str
-    source: str
-
-
-@dataclass(frozen=True)
-class GeneratedKernelFile:
-    path: str
-    source: str
-
-
-@dataclass(frozen=True)
-class SfemSoAKernelForm:
-    name: str
-    expression_graph: Optional["ExpressionGraph"] = None
-    has_direction: bool = False
-    output_mode: str = "accumulate"
-    weak_form: Optional["SfemSoAWeakForm"] = None
-    dependencies: object = None
-
-    def __post_init__(self):
-        if self.output_mode not in ("assign", "accumulate"):
-            raise ValueError("output_mode must be 'assign' or 'accumulate'")
-        if self.expression_graph is None and self.weak_form is None:
-            raise ValueError("SfemSoAKernelForm requires expression_graph or weak_form")
-
-
-def sfem_soa_kernel_form(
-    name,
-    expression_graph=None,
-    has_direction=False,
-    output_mode="accumulate",
-    weak_form=None,
-    dependencies=None,
-):
-    return SfemSoAKernelForm(name, expression_graph, has_direction, output_mode, weak_form, dependencies)
-
-
-@dataclass(frozen=True)
-class SfemSoAWeakForm:
-    energy_density: sp.Expr
-    deformation_gradient: Tuple[sp.Expr, ...]
-    dim: int
-
-    def __post_init__(self):
-        dim = int(self.dim)
-        deformation_gradient = tuple(self.deformation_gradient)
-        object.__setattr__(self, "dim", dim)
-        object.__setattr__(self, "energy_density", sp.sympify(self.energy_density))
-        object.__setattr__(self, "deformation_gradient", deformation_gradient)
-        if dim <= 0:
-            raise ValueError("weak form dim must be positive")
-        if len(deformation_gradient) != dim * dim:
-            raise ValueError("deformation_gradient must have dim * dim entries")
-
-    def deformation_gradient_matrix(self):
-        return sp.Matrix(self.dim, self.dim, self.deformation_gradient)
-
-    def first_piola(self):
-        variables = self.deformation_gradient
-        return sp.Matrix(
-            self.dim,
-            self.dim,
-            [sp.diff(self.energy_density, variable) for variable in variables],
-        )
-
-    def linearized_first_piola(self, trial_gradient):
-        trial_gradient = tuple(trial_gradient)
-        if len(trial_gradient) != self.dim * self.dim:
-            raise ValueError("trial_gradient must have dim * dim entries")
-        P = self.first_piola()
-        variables = self.deformation_gradient
-        return sp.Matrix(
-            self.dim,
-            self.dim,
-            [
-                directional_derivative(P[i, j], variables, trial_gradient)
-                for i in range(self.dim)
-                for j in range(self.dim)
-            ],
-        )
-
-    def diagnostic_expressions(self, has_direction=False):
-        expressions = [self.energy_density]
-        expressions.extend(tuple(self.first_piola()))
-        if has_direction:
-            trial_gradient = tuple(
-                sp.symbols("trial_grad[%d]" % i)
-                for i in range(self.dim * self.dim)
-            )
-            expressions.extend(tuple(self.linearized_first_piola(trial_gradient)))
-        return tuple(expressions)
-
-
-def sfem_soa_weak_form(energy_density, deformation_gradient):
-    deformation_gradient = _as_matrix(deformation_gradient, "deformation_gradient")
-    if deformation_gradient.shape[0] != deformation_gradient.shape[1]:
-        raise ValueError("deformation_gradient must be square")
-    return SfemSoAWeakForm(
-        energy_density,
-        tuple(deformation_gradient),
-        deformation_gradient.shape[0],
-    )
 
 
 
-def sfem_soa_adjugate_geometry_inputs(
-    specialization,
-    grad_ref_name="grad_ref",
-    adjugate_name="jacobian_adjugate",
-    determinant_name="jacobian_determinant",
-):
-    if isinstance(specialization, SfemSoAElementSpecialization):
-        dim = specialization.dim
-        n_qp = specialization.n_qp
-        n_shape = specialization.n_shape
-    elif isinstance(specialization, SfemElementQuadratureRule):
-        dim = specialization.dim
-        n_qp = specialization.n_qp
-        n_shape = specialization.n_shape
-    else:
-        raise TypeError("specialization must be SfemSoAElementSpecialization or SfemElementQuadratureRule")
-    return (
-        sfem_soa_reference_input(grad_ref_name, n_qp, n_shape, dim),
-        sfem_soa_array_input(adjugate_name, dim * dim),
-        sfem_soa_array_input(determinant_name, 1),
-    )
 
 
-@dataclass(frozen=True)
-class ExpressionCost:
-    adds: int = 0
-    muls: int = 0
-    divs: int = 0
-    sqrts: int = 0
-    pows: int = 0
-    exps: int = 0
-    logs: int = 0
-    trigs: int = 0
-    loads: int = 0
-    stores: int = 0
-    temporaries: int = 0
-    estimated_registers: int = 0
-
-    @property
-    def flops(self):
-        return (
-            self.adds
-            + self.muls
-            + 8 * self.divs
-            + 12 * self.sqrts
-            + self.pows
-            + 20 * self.exps
-            + 20 * self.logs
-            + 24 * self.trigs
-        )
 
 
-@dataclass(frozen=True)
-class EvaluationStatement:
-    target: object
-    expression: sp.Expr
-    kind: str
-    dependencies: Tuple[sp.Symbol, ...]
-    cost: ExpressionCost
-    role: Optional[ExpressionRole] = None
-    output_index: Optional[int] = None
-    augmented: bool = False
-    scopes: Tuple[ScopeKind, ...] = ()
-    hoist_scope: ScopeKind = ScopeKind.MESH
 
 
-@dataclass(frozen=True)
-class LivenessState:
-    statement_index: int
-    target: object
-    live_temporaries_after: Tuple[sp.Symbol, ...]
-    register_pressure: int
 
 
-@dataclass(frozen=True)
-class EvaluationMetrics:
-    total_flops: int
-    total_loads: int
-    total_stores: int
-    peak_registers: int
-    peak_live_temporaries: int
-    liveness: Tuple[LivenessState, ...]
 
 
-@dataclass(frozen=True)
-class EvaluationPlan:
-    statements: Tuple[EvaluationStatement, ...]
-    intermediates: Tuple[EvaluationStatement, ...]
-    outputs: Tuple[EvaluationStatement, ...]
-    metrics: EvaluationMetrics
-
-    @property
-    def temporary_symbols(self):
-        return tuple(statement.target for statement in self.intermediates)
 
 
-@dataclass(frozen=True)
-class ExpressionGraph:
-    graph: nx.DiGraph
-    outputs: Tuple[KernelExpression, ...]
-    intermediates: Tuple[Tuple[sp.Symbol, sp.Expr], ...]
-    reduced_outputs: Tuple[SympyExpr, ...]
-    patterns: Tuple[ExpressionPattern, ...]
-    evaluation_plan: EvaluationPlan
-    cost: ExpressionCost
-    scopes: Tuple[ExecutionScope, ...] = ()
-    template_parameters: Tuple[KernelTemplateParameter, ...] = ()
-    specialization: Optional[DimensionSpecialization] = None
 
-    def topological_nodes(self):
-        return tuple(nx.topological_sort(self.graph))
 
-    def patterns_by_kind(self, kind):
-        kind = PatternKind(kind)
-        return tuple(pattern for pattern in self.patterns if pattern.kind == kind)
 
-    def scope_symbols(self, kind):
-        kind = ScopeKind(kind)
-        symbols = []
-        for scope in self.scopes:
-            if scope.kind == kind:
-                symbols.extend(scope.symbols)
-        return tuple(symbols)
+
+
+
+
+
 
 
 class KernelExpressions:
@@ -1228,6 +806,18 @@ class KernelExpressions:
         if expressions is not None:
             for expr in expressions:
                 self.add(expr.role, expr.expression, expr.name)
+
+    @property
+    def expressions(self):
+        """The collected expressions, in insertion order.
+
+        Scheduling them is the planning layer's job -- see
+        ``codegen.framework.plans.scheduling.build_expression_graph``.  This
+        class deliberately has no ``build_graph`` method: reaching the scheduler
+        from here would point an import from the specification layer down into
+        the planning layer.
+        """
+        return tuple(self._expressions)
 
     def add(self, role, expression, name=None):
         role = ExpressionRole(role)
@@ -1286,31 +876,6 @@ class KernelExpressions:
             name,
         )
 
-    def build_graph(
-        self,
-        *,
-        data_symbols: Optional[Iterable[sp.Symbol]] = None,
-        loop_symbols: Optional[Mapping[str, Iterable[sp.Symbol]]] = None,
-        scopes: Optional[Iterable[ExecutionScope]] = None,
-        symbolic_objects: Optional[Iterable[SymbolicObject]] = None,
-        template_parameters: Optional[Iterable[KernelTemplateParameter]] = None,
-        specialization: Optional[DimensionSpecialization] = None,
-        temporary_prefix="t",
-        temporary_symbols=None,
-        optimizations="basic",
-    ):
-        return build_expression_graph(
-            self._expressions,
-            data_symbols=data_symbols,
-            loop_symbols=loop_symbols,
-            scopes=scopes,
-            symbolic_objects=symbolic_objects,
-            template_parameters=template_parameters,
-            specialization=specialization,
-            temporary_prefix=temporary_prefix,
-            temporary_symbols=temporary_symbols,
-            optimizations=optimizations,
-        )
 
     def __iter__(self):
         return iter(self._expressions)
@@ -1319,326 +884,15 @@ class KernelExpressions:
         return len(self._expressions)
 
 
-def build_expression_graph(
-    expressions: Iterable[KernelExpression],
-    *,
-    data_symbols: Optional[Iterable[sp.Symbol]] = None,
-    loop_symbols: Optional[Mapping[str, Iterable[sp.Symbol]]] = None,
-    scopes: Optional[Iterable[ExecutionScope]] = None,
-    symbolic_objects: Optional[Iterable[SymbolicObject]] = None,
-    template_parameters: Optional[Iterable[KernelTemplateParameter]] = None,
-    specialization: Optional[DimensionSpecialization] = None,
-    temporary_prefix="t",
-    temporary_symbols=None,
-    optimizations="basic",
-):
-    outputs = tuple(_normalize_kernel_expression(expr) for expr in expressions)
-    reduced_inputs = [_rhs(expr.expression) for expr in outputs]
-    cse_symbols = (
-        temporary_symbols
-        if temporary_symbols is not None
-        else sp.numbered_symbols(temporary_prefix)
-    )
-    intermediates, reduced_rhs = sp.cse(
-        reduced_inputs,
-        symbols=cse_symbols,
-        optimizations=optimizations,
-    )
-    reduced_outputs = _reattach_lhs(outputs, reduced_rhs)
-    intermediates = _prune_dead_cse_intermediates(intermediates, reduced_outputs)
-
-    graph = nx.DiGraph()
-    data_symbol_set = set(data_symbols or ())
-    symbolic_objects = tuple(symbolic_objects or ())
-    kernel_template_parameters = _template_parameters(
-        symbolic_objects,
-        template_parameters,
-    )
-    graph.graph["template_parameters"] = kernel_template_parameters
-    kernel_specialization = _dimension_specialization(
-        symbolic_objects,
-        specialization,
-    )
-    graph.graph["specialization"] = kernel_specialization
-    layout_symbol_map = _layout_symbol_map(symbolic_objects)
-    execution_scopes = _normalize_scopes(loop_symbols, scopes)
-    scope_symbol_map = _scope_symbol_map(execution_scopes)
-
-    for scope in execution_scopes:
-        for symbol in scope.symbols:
-            _add_node(
-                graph,
-                symbol,
-                "loop_index",
-                scope=scope.kind.value,
-                scope_name=scope.name,
-                scope_kind=scope.kind,
-            )
-
-    for symbol in data_symbol_set:
-        _add_node(graph, symbol, "data")
-        _annotate_data_layout(graph, symbol, layout_symbol_map)
-
-    for var, expr in intermediates:
-        _add_expression_node(
-            graph,
-            var,
-            expr,
-            data_symbol_set,
-            scope_symbol_map,
-            layout_symbol_map,
-            "intermediate",
-        )
-        graph.nodes[var]["scopes"] = _expression_scopes(expr, scope_symbol_map)
-
-    output_nodes = []
-    for idx, (kernel_expr, reduced_expr) in enumerate(zip(outputs, reduced_outputs)):
-        output_node = _output_node_name(kernel_expr, idx)
-        output_nodes.append(output_node)
-        graph.add_node(
-            output_node,
-            kind="output",
-            role=kernel_expr.role.value,
-            name=kernel_expr.name,
-            expression=reduced_expr,
-            scopes=_expression_scopes(_rhs(reduced_expr), scope_symbol_map),
-        )
-        for dep in _dependencies(_rhs(reduced_expr)):
-            _ensure_dependency_node(graph, dep, data_symbol_set, scope_symbol_map, layout_symbol_map)
-            graph.add_edge(dep, output_node)
-
-    patterns = _detect_patterns(
-        graph,
-        intermediates,
-        reduced_outputs,
-        output_nodes,
-        symbolic_objects,
-    )
-    evaluation_plan = _build_evaluation_plan(
-        intermediates,
-        reduced_outputs,
-        output_nodes,
-        outputs,
-        data_symbol_set,
-        scope_symbol_map,
-    )
-    _annotate_graph_scope_placements(graph, evaluation_plan, output_nodes)
-    cost = _expression_cost(
-        intermediates,
-        reduced_outputs,
-        data_symbol_set,
-        evaluation_plan.metrics.peak_registers,
-    )
-    return ExpressionGraph(
-        graph,
-        outputs,
-        tuple(intermediates),
-        reduced_outputs,
-        patterns,
-        evaluation_plan,
-        cost,
-        execution_scopes,
-        kernel_template_parameters,
-        kernel_specialization,
-    )
 
 
-def generate_cpp_kernel(
-    expression_graph,
-    function_name="generated_kernel",
-    scalar_type="double",
-    output_name="out",
-):
-    statements = expression_graph.evaluation_plan.statements
-    temporary_symbols = set(expression_graph.evaluation_plan.temporary_symbols)
-    input_symbols, output_targets = _kernel_io_symbols(statements, temporary_symbols)
-    arguments = _kernel_arguments(input_symbols, output_targets, scalar_type, output_name)
-
-    lines = [
-        "#include <math.h>",
-        "",
-    ]
-    lines.extend(_sfem_math_inline_source_lines())
-    lines.extend(["", 'extern "C" void %s(%s) {' % (function_name, ", ".join(arguments))])
-
-    _append_statement_lines(lines, statements, scalar_type, output_name, indent="    ")
-
-    lines.append("}")
-    lines.append("")
-    return GeneratedKernelCode("c++", function_name, "\n".join(lines))
 
 
-def generate_openmp_cpp_kernel(
-    expression_graph,
-    function_name="generated_openmp_kernel",
-    wrapper_name=None,
-    scalar_type="double",
-    index_type="ptrdiff_t",
-    output_name="out",
-    target=None,
-):
-    target = OpenMPTarget() if target is None else target
-    wrapper_name = wrapper_name or _cpp_wrapper_name(function_name)
-    element_function_name = "%s_element" % function_name
-    statements = expression_graph.evaluation_plan.statements
-    temporary_symbols = set(expression_graph.evaluation_plan.temporary_symbols)
-    input_symbols, output_targets = _kernel_io_symbols(statements, temporary_symbols)
-    element_arguments = _kernel_arguments(
-        input_symbols,
-        output_targets,
-        scalar_type,
-        output_name,
-    )
-    batch_arguments = _openmp_kernel_arguments(
-        input_symbols,
-        output_targets,
-        scalar_type,
-        index_type,
-        output_name,
-    )
-    element_call_arguments = _openmp_element_call_arguments(
-        input_symbols,
-        output_targets,
-        output_name,
-    )
-
-    lines = [
-        "#include <stddef.h>",
-        "#include <math.h>",
-        "",
-    ]
-    lines.extend(_sfem_math_inline_source_lines())
-    lines.extend(
-        [
-            "",
-            'extern "C" void %s(%s)' % (element_function_name, ", ".join(element_arguments)),
-            "{",
-        ]
-    )
-    _append_statement_lines(lines, statements, scalar_type, output_name, indent="    ")
-    lines.extend(
-        [
-            "}",
-            "",
-            'extern "C" void %s(%s) {' % (function_name, ", ".join(batch_arguments)),
-        ]
-    )
-    pragma = target.parallel_for_pragma()
-    if pragma:
-        lines.append(pragma)
-    lines.extend(
-        [
-            "    for (%s e = 0; e < nelements; ++e) {" % index_type,
-            "        %s(%s);" % (element_function_name, ", ".join(element_call_arguments)),
-            "    }",
-            "}",
-            "",
-            "struct %s {" % wrapper_name,
-            "    void apply(%s) const {" % ", ".join(batch_arguments),
-            "        %s(%s);" % (function_name, ", ".join(_openmp_wrapper_call_arguments(batch_arguments))),
-            "    }",
-            "};",
-            "",
-        ]
-    )
-    return GeneratedKernelCode(target.generated_language, function_name, "\n".join(lines))
 
 
-def generate_cuda_kernel(
-    expression_graph,
-    function_name="generated_cuda_kernel",
-    scalar_type="double",
-    index_type="ptrdiff_t",
-    output_name="out",
-    target=None,
-):
-    target = CUDATarget() if target is None else target
-    element_function_name = "%s_element" % function_name
-    global_function_name = "%s_global" % function_name
-    statements = expression_graph.evaluation_plan.statements
-    temporary_symbols = set(expression_graph.evaluation_plan.temporary_symbols)
-    input_symbols, output_targets = _kernel_io_symbols(statements, temporary_symbols)
-    element_arguments = _kernel_arguments(
-        input_symbols,
-        output_targets,
-        scalar_type,
-        output_name,
-    )
-    kernel_arguments = _openmp_kernel_arguments(
-        input_symbols,
-        output_targets,
-        scalar_type,
-        index_type,
-        output_name,
-    )
-    element_call_arguments = _openmp_element_call_arguments(
-        input_symbols,
-        output_targets,
-        output_name,
-    )
-    wrapper_call_arguments = _openmp_wrapper_call_arguments(kernel_arguments)
-    launch_arguments = tuple(arg for arg in wrapper_call_arguments if arg != "nelements")
-
-    lines = ["#include <stddef.h>"]
-    lines.extend(target.includes())
-    lines.append("")
-    lines.extend(
-        _sfem_math_inline_source_lines(
-            target.function_qualifier(),
-            define_sfem_inline=False,
-        )
-    )
-    lines.extend(
-        [
-            "",
-            target.function_qualifier(),
-            "void %s(%s)" % (element_function_name, ", ".join(element_arguments)),
-            "{",
-        ]
-    )
-    _append_statement_lines(lines, statements, scalar_type, output_name, indent="    ")
-    lines.extend(
-        [
-            "}",
-            "",
-            'extern "C" __global__ void %s(%s)' % (global_function_name, ", ".join(kernel_arguments)),
-            "{",
-            "    for (%s e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {" % index_type,
-            "        %s(%s);" % (element_function_name, ", ".join(element_call_arguments)),
-            "    }",
-            "}",
-            "",
-            'extern "C" void %s(%s)' % (function_name, ", ".join(kernel_arguments)),
-            "{",
-            "    const int block_size = 256;",
-            "    const int grid_size = (int)((nelements + block_size - 1) / block_size);",
-            "    %s<<<grid_size, block_size>>>(nelements%s%s);" % (
-                global_function_name,
-                ", " if launch_arguments else "",
-                ", ".join(launch_arguments),
-            ),
-            "}",
-            "",
-        ]
-    )
-    return GeneratedKernelCode(target.generated_language, function_name, "\n".join(lines))
-
-def _component_name(component):
-    return ("x", "y", "z")[component]
 
 
-def _append_statement_lines(lines, statements, scalar_type, output_name, indent):
-    for statement in statements:
-        expression = _sfem_ccode(statement.expression, scalar_type)
-        if statement.kind == "intermediate":
-            target = _cpp_symbol(statement.target, output_name)
-            lines.append("%sconst %s %s = %s;" % (indent, scalar_type, target, expression))
-        elif statement.augmented:
-            target = _cpp_lvalue(statement.target, output_name)
-            lines.append("%s%s += %s;" % (indent, target, expression))
-        else:
-            target = _cpp_lvalue(statement.target, output_name)
-            lines.append("%s%s = %s;" % (indent, target, expression))
+
 
 
 def _normalize_kernel_expression(expr):
@@ -1651,179 +905,30 @@ def _normalize_kernel_expression(expr):
     raise TypeError("Expected KernelExpression or (role, expression[, name]) tuple")
 
 
-def _kernel_io_symbols(statements, temporary_symbols):
-    inputs = set()
-    outputs = []
-    output_set = set()
-
-    for statement in statements:
-        if statement.target not in temporary_symbols and statement.target not in output_set:
-            outputs.append(statement.target)
-            output_set.add(statement.target)
-
-    for statement in statements:
-        for dependency in statement.dependencies:
-            if dependency not in temporary_symbols and dependency not in output_set:
-                inputs.add(dependency)
-
-    return tuple(sorted(inputs, key=str)), tuple(outputs)
 
 
-def _kernel_arguments(input_symbols, output_targets, scalar_type, output_name):
-    input_arrays, input_scalars = _group_kernel_symbols(input_symbols)
-    direct_output_targets = tuple(
-        target
-        for target in output_targets
-        if not (isinstance(target, str) and target.startswith("output:"))
-    )
-    needs_output_array = len(direct_output_targets) != len(output_targets)
-    output_arrays, output_scalars = _group_kernel_symbols(direct_output_targets)
-    arguments = []
-
-    for base in sorted(input_arrays):
-        arguments.append("const %s * const %s" % (scalar_type, base))
-    for symbol in sorted(input_scalars, key=str):
-        arguments.append("%s %s" % (scalar_type, _cpp_symbol(symbol, output_name)))
-    for base in sorted(output_arrays):
-        arguments.append("%s * const %s" % (scalar_type, base))
-    for symbol in sorted(output_scalars, key=str):
-        arguments.append("%s * const %s" % (scalar_type, _cpp_symbol(symbol, output_name)))
-
-    if needs_output_array or (not output_arrays and not output_scalars):
-        arguments.append("%s * const %s" % (scalar_type, output_name))
-
-    return arguments
 
 
-def _openmp_kernel_arguments(
-    input_symbols,
-    output_targets,
-    scalar_type,
-    index_type,
-    output_name,
-):
-    input_arrays, input_scalars = _group_kernel_symbols(input_symbols)
-    direct_output_targets, needs_output_array = _direct_output_targets(
-        output_targets,
-    )
-    output_arrays, output_scalars = _group_kernel_symbols(direct_output_targets)
-    arguments = ["%s nelements" % index_type]
-
-    for base in sorted(input_arrays):
-        arguments.append("const %s * const %s" % (scalar_type, base))
-        arguments.append("%s %s_stride" % (index_type, base))
-    for symbol in sorted(input_scalars, key=str):
-        arguments.append("%s %s" % (scalar_type, _cpp_symbol(symbol, output_name)))
-    for base in sorted(output_arrays):
-        arguments.append("%s * const %s" % (scalar_type, base))
-        arguments.append("%s %s_stride" % (index_type, base))
-    for symbol in sorted(output_scalars, key=str):
-        arguments.append("%s * const %s" % (scalar_type, _cpp_symbol(symbol, output_name)))
-
-    if needs_output_array or (not output_arrays and not output_scalars):
-        arguments.append("%s * const %s" % (scalar_type, output_name))
-        arguments.append("%s %s_stride" % (index_type, output_name))
-
-    return arguments
 
 
-def _openmp_element_call_arguments(input_symbols, output_targets, output_name):
-    input_arrays, input_scalars = _group_kernel_symbols(input_symbols)
-    direct_output_targets, needs_output_array = _direct_output_targets(
-        output_targets,
-    )
-    output_arrays, output_scalars = _group_kernel_symbols(direct_output_targets)
-    arguments = []
-
-    for base in sorted(input_arrays):
-        arguments.append("%s + e * %s_stride" % (base, base))
-    for symbol in sorted(input_scalars, key=str):
-        arguments.append(_cpp_symbol(symbol, output_name))
-    for base in sorted(output_arrays):
-        arguments.append("%s + e * %s_stride" % (base, base))
-    for symbol in sorted(output_scalars, key=str):
-        arguments.append(_cpp_symbol(symbol, output_name))
-
-    if needs_output_array or (not output_arrays and not output_scalars):
-        arguments.append("%s + e * %s_stride" % (output_name, output_name))
-
-    return arguments
 
 
-def _openmp_wrapper_call_arguments(arguments):
-    return tuple(_cpp_argument_name(argument) for argument in arguments)
 
 
-def _cpp_argument_name(argument):
-    return argument.replace("*", " ").split()[-1]
 
 
-def _direct_output_targets(output_targets):
-    direct_output_targets = tuple(
-        target
-        for target in output_targets
-        if not (isinstance(target, str) and target.startswith("output:"))
-    )
-    return direct_output_targets, len(direct_output_targets) != len(output_targets)
 
 
-def _group_kernel_symbols(symbols):
-    arrays = {}
-    scalars = []
-    for symbol in symbols:
-        base, index = _indexed_symbol(symbol)
-        if base is None:
-            scalars.append(symbol)
-        else:
-            arrays.setdefault(base, set()).add(index)
-    return arrays, tuple(scalars)
 
 
-def _indexed_symbol(symbol):
-    text = str(symbol)
-    if not text.endswith("]"):
-        return None, None
-    bracket = text.rfind("[")
-    if bracket <= 0:
-        return None, None
-    index = text[bracket + 1 : -1]
-    if not index.isdigit():
-        return None, None
-    return text[:bracket], int(index)
 
 
-def _cpp_symbol(symbol, output_name):
-    if isinstance(symbol, str) and symbol.startswith("output:"):
-        index = symbol.rsplit(":", 1)[-1]
-        return "%s[%s]" % (output_name, index)
-    return str(symbol)
 
 
-def _cpp_lvalue(symbol, output_name):
-    base, _ = _indexed_symbol(symbol)
-    if isinstance(symbol, str) and symbol.startswith("output:"):
-        return _cpp_symbol(symbol, output_name)
-    if base is not None:
-        return _cpp_symbol(symbol, output_name)
-    return "*%s" % _cpp_symbol(symbol, output_name)
 
 
-def _cpp_wrapper_name(function_name):
-    words = []
-    for word in str(function_name).replace("-", "_").split("_"):
-        if word:
-            words.append(word[0].upper() + word[1:])
-    return "%sOperator" % "".join(words)
 
 
-def _cpp_macro_name(name):
-    chars = []
-    for char in str(name):
-        if char.isalnum():
-            chars.append(char.upper())
-        else:
-            chars.append("_")
-    return "".join(chars)
 
 
 def _flatten_expression(expression):
@@ -1936,92 +1041,22 @@ def _template_parameters(symbolic_objects, explicit_parameters):
     return tuple(ordered)
 
 
-def _normalize_scopes(loop_symbols, scopes):
-    normalized = []
-
-    for raw_scope in scopes or ():
-        if isinstance(raw_scope, ExecutionScope):
-            normalized.append(raw_scope)
-        else:
-            raise TypeError("scopes must contain ExecutionScope instances")
-
-    for raw_kind, symbols in (loop_symbols or {}).items():
-        normalized.append(ExecutionScope(_scope_kind(raw_kind), symbols))
-
-    return tuple(normalized)
 
 
-def _scope_kind(value):
-    if isinstance(value, ScopeKind):
-        return value
-    normalized = str(value).replace("-", "_")
-    aliases = {
-        "mesh_wide": ScopeKind.MESH,
-        "meshwide": ScopeKind.MESH,
-        "mesh": ScopeKind.MESH,
-    }
-    if normalized in aliases:
-        return aliases[normalized]
-    return ScopeKind(normalized)
 
 
-def _scope_symbol_map(scopes):
-    ret = {}
-    for scope in scopes:
-        for symbol in scope.symbols:
-            ret[symbol] = scope
-    return ret
 
 
-def _layout_symbol_map(symbolic_objects):
-    ret = {}
-    for symbolic_object in symbolic_objects:
-        for symbol in symbolic_object.direct_symbols:
-            ret[symbol] = symbolic_object
-    return ret
 
 
-def _annotate_data_layout(graph, symbol, layout_symbol_map):
-    if symbol not in graph or symbol not in layout_symbol_map:
-        return
-
-    symbolic_object = layout_symbol_map[symbol]
-    component = symbolic_object.component_index(symbol)
-    item_index = sp.symbols("%s_idx" % symbolic_object.name, integer=True)
-    graph.nodes[symbol]["layout"] = symbolic_object.layout
-    graph.nodes[symbol]["layout_kind"] = symbolic_object.layout.kind
-    graph.nodes[symbol]["symbolic_object"] = symbolic_object.name
-    graph.nodes[symbol]["component"] = component
-    graph.nodes[symbol]["layout_index"] = item_index
-    graph.nodes[symbol]["layout_offset"] = symbolic_object.layout_offset(symbol, item_index)
-    graph.nodes[symbol]["object_metadata"] = symbolic_object.metadata
-    if "n_nodes" in symbolic_object.metadata and "dim" in symbolic_object.metadata:
-        dim = symbolic_object.metadata["dim"]
-        graph.nodes[symbol]["node"] = component // dim
-        graph.nodes[symbol]["dim_component"] = component % dim
 
 
-def _expression_scopes(expression, scope_symbol_map):
-    kinds = {
-        scope_symbol_map[symbol].kind
-        for symbol in expression.free_symbols
-        if symbol in scope_symbol_map
-    }
-    return _ordered_scopes(kinds)
 
 
-def _scope_sort_key(kind):
-    return tuple(ScopeKind).index(kind)
 
 
-def _ordered_scopes(scopes):
-    return tuple(sorted(scopes, key=_scope_sort_key))
 
 
-def _hoist_scope(scopes):
-    if not scopes:
-        return ScopeKind.MESH
-    return scopes[-1]
 
 
 def _as_vector(values):
@@ -2165,392 +1200,33 @@ def _reattach_lhs(outputs, reduced_rhs):
     return tuple(reduced_outputs)
 
 
-def _output_node_name(kernel_expr, idx):
-    if kernel_expr.name is not None:
-        return "output:%s:%s" % (kernel_expr.role.value, kernel_expr.name)
-    lhs = _lhs(kernel_expr.expression)
-    if lhs is not None:
-        return "output:%s:%s" % (kernel_expr.role.value, lhs)
-    return "output:%s:%d" % (kernel_expr.role.value, idx)
 
 
-def _add_expression_node(
-    graph,
-    symbol,
-    expression,
-    data_symbols,
-    scope_symbol_map,
-    layout_symbol_map,
-    kind,
-):
-    graph.add_node(symbol, kind=kind, expression=expression)
-    for dep in _dependencies(expression):
-        _ensure_dependency_node(graph, dep, data_symbols, scope_symbol_map, layout_symbol_map)
-        graph.add_edge(dep, symbol)
 
 
-def _add_node(graph, symbol, kind, **attrs):
-    if symbol not in graph:
-        graph.add_node(symbol, kind=kind, **attrs)
-    else:
-        graph.nodes[symbol].update(attrs)
-        graph.nodes[symbol]["kind"] = kind
 
 
-def _ensure_dependency_node(graph, symbol, data_symbols, scope_symbol_map, layout_symbol_map):
-    if symbol in graph:
-        _annotate_data_layout(graph, symbol, layout_symbol_map)
-        return
-
-    if symbol in scope_symbol_map:
-        scope = scope_symbol_map[symbol]
-        graph.add_node(
-            symbol,
-            kind="loop_index",
-            scope=scope.kind.value,
-            scope_name=scope.name,
-            scope_kind=scope.kind,
-        )
-        return
-
-    if symbol in data_symbols:
-        graph.add_node(symbol, kind="data")
-        _annotate_data_layout(graph, symbol, layout_symbol_map)
-    else:
-        graph.add_node(symbol, kind="symbol")
-        _annotate_data_layout(graph, symbol, layout_symbol_map)
 
 
-def _dependencies(expression):
-    return tuple(sorted(expression.free_symbols, key=str))
 
 
-def _build_evaluation_plan(
-    intermediates,
-    reduced_outputs,
-    output_nodes,
-    kernel_outputs,
-    data_symbols,
-    scope_symbol_map,
-):
-    intermediate_statements = []
-    output_statements = []
-
-    for target, expr in intermediates:
-        intermediate_statements.append(
-            EvaluationStatement(
-                target=target,
-                expression=expr,
-                kind="intermediate",
-                dependencies=_dependencies(expr),
-                cost=_statement_cost(expr, data_symbols, stores=1),
-                scopes=_expression_scopes(expr, scope_symbol_map),
-            )
-        )
-
-    for idx, (output, output_node, kernel_output) in enumerate(
-        zip(reduced_outputs, output_nodes, kernel_outputs)
-    ):
-        expr = _rhs(output)
-        lhs = _lhs(output)
-        output_statements.append(
-            EvaluationStatement(
-                target=lhs if lhs is not None else "output:%d" % idx,
-                expression=expr,
-                kind="output",
-                dependencies=_dependencies(expr),
-                cost=_statement_cost(expr, data_symbols, stores=1),
-                role=kernel_output.role,
-                output_index=idx,
-                augmented=isinstance(output, ast.AddAugmentedAssignment),
-                scopes=_expression_scopes(expr, scope_symbol_map),
-            )
-        )
-
-    statements = _resolve_statement_scopes(tuple(intermediate_statements + output_statements))
-    intermediate_count = len(intermediate_statements)
-    metrics = _evaluation_metrics(
-        statements,
-        tuple(stmt.target for stmt in statements[:intermediate_count]),
-    )
-    return EvaluationPlan(
-        statements,
-        tuple(statements[:intermediate_count]),
-        tuple(statements[intermediate_count:]),
-        metrics,
-    )
 
 
-def _annotate_graph_scope_placements(graph, evaluation_plan, output_nodes):
-    for statement in evaluation_plan.intermediates:
-        if statement.target in graph:
-            graph.nodes[statement.target]["scopes"] = statement.scopes
-            graph.nodes[statement.target]["hoist_scope"] = statement.hoist_scope
-
-    for statement, output_node in zip(evaluation_plan.outputs, output_nodes):
-        if output_node in graph:
-            graph.nodes[output_node]["scopes"] = statement.scopes
-            graph.nodes[output_node]["hoist_scope"] = statement.hoist_scope
 
 
-def _resolve_statement_scopes(statements):
-    scope_by_target = {}
-    resolved = []
-
-    for statement in statements:
-        scopes = set(statement.scopes)
-        for dependency in statement.dependencies:
-            scopes.update(scope_by_target.get(dependency, ()))
-
-        ordered_scopes = _ordered_scopes(scopes)
-        resolved_statement = replace(
-            statement,
-            scopes=ordered_scopes,
-            hoist_scope=_hoist_scope(ordered_scopes),
-        )
-        resolved.append(resolved_statement)
-        scope_by_target[statement.target] = ordered_scopes
-
-    return tuple(resolved)
 
 
-def _evaluation_metrics(statements, temporary_symbols):
-    temporary_symbol_set = set(temporary_symbols)
-    last_use = {}
-
-    for idx, statement in enumerate(statements):
-        for dependency in statement.dependencies:
-            last_use[dependency] = idx
-
-    produced_temporaries = set()
-    liveness = []
-    peak_registers = 0
-    peak_live_temporaries = 0
-    total_flops = 0
-    total_loads = 0
-    total_stores = 0
-
-    for idx, statement in enumerate(statements):
-        dependencies = set(statement.dependencies)
-        live_temporaries_before = {
-            symbol
-            for symbol in produced_temporaries
-            if last_use.get(symbol, -1) >= idx
-        }
-        live_during = dependencies | live_temporaries_before
-
-        if statement.target in temporary_symbol_set and last_use.get(statement.target, -1) > idx:
-            live_during.add(statement.target)
-
-        register_pressure = len(live_during)
-        if register_pressure > peak_registers:
-            peak_registers = register_pressure
-
-        if statement.target in temporary_symbol_set:
-            produced_temporaries.add(statement.target)
-
-        live_temporaries_after = tuple(
-            sorted(
-                (
-                    symbol
-                    for symbol in produced_temporaries
-                    if last_use.get(symbol, -1) > idx
-                ),
-                key=str,
-            )
-        )
-        if len(live_temporaries_after) > peak_live_temporaries:
-            peak_live_temporaries = len(live_temporaries_after)
-
-        liveness.append(
-            LivenessState(
-                idx,
-                statement.target,
-                live_temporaries_after,
-                register_pressure,
-            )
-        )
-
-        total_flops += statement.cost.flops
-        total_loads += statement.cost.loads
-        total_stores += statement.cost.stores
-
-    return EvaluationMetrics(
-        total_flops,
-        total_loads,
-        total_stores,
-        peak_registers,
-        peak_live_temporaries,
-        tuple(liveness),
-    )
 
 
-def _detect_patterns(graph, intermediates, reduced_outputs, output_nodes, symbolic_objects):
-    patterns = []
-    symbolic_objects = tuple(symbolic_objects)
-
-    for symbol, expr in intermediates:
-        _append_pattern(
-            graph,
-            patterns,
-            ExpressionPattern(
-                PatternKind.REPEATED_SUBEXPRESSION,
-                symbol,
-                expr,
-                _dependencies(expr),
-                "sympy_cse",
-            ),
-        )
-        _extend_patterns(graph, patterns, _match_objects(symbol, expr, symbolic_objects))
-
-    for output_node, output in zip(output_nodes, reduced_outputs):
-        expr = _rhs(output)
-        _extend_patterns(graph, patterns, _match_objects(output_node, expr, symbolic_objects))
-
-    return tuple(patterns)
 
 
-def _extend_patterns(graph, patterns, new_patterns):
-    for pattern in new_patterns:
-        _append_pattern(graph, patterns, pattern)
 
 
-def _append_pattern(graph, patterns, pattern):
-    patterns.append(pattern)
-    if pattern.node in graph:
-        node_attrs = graph.nodes[pattern.node]
-        node_patterns = list(node_attrs.get("patterns", ()))
-        node_patterns.append(pattern)
-        node_attrs["patterns"] = tuple(node_patterns)
 
 
-def _match_objects(node, expression, symbolic_objects):
-    matches = []
-
-    for symbolic_object in symbolic_objects:
-        matched_symbols, matched_expressions = symbolic_object.match(expression)
-        if matched_symbols or matched_expressions:
-            matches.append(
-                ExpressionPattern(
-                    symbolic_object.kind,
-                    node,
-                    expression,
-                    matched_symbols,
-                    symbolic_object.name,
-                    matched_expressions,
-                    symbolic_object,
-                )
-            )
-
-    return matches
 
 
-def _expression_cost(intermediates, reduced_outputs, data_symbols, estimated_registers):
-    adds = muls = divs = sqrts = pows = exps = logs = trigs = stores = 0
-    loaded = set()
-
-    for _, expr in intermediates:
-        a, m, d, s, p, exp_count, log_count, trig_count = _op_counts(expr)
-        adds += a
-        muls += m
-        divs += d
-        sqrts += s
-        pows += p
-        exps += exp_count
-        logs += log_count
-        trigs += trig_count
-        loaded.update(expr.free_symbols)
-        stores += 1
-
-    for output in reduced_outputs:
-        expr = _rhs(output)
-        a, m, d, s, p, exp_count, log_count, trig_count = _op_counts(expr)
-        adds += a
-        muls += m
-        divs += d
-        sqrts += s
-        pows += p
-        exps += exp_count
-        logs += log_count
-        trigs += trig_count
-        loaded.update(expr.free_symbols)
-        stores += 1
-
-    loads = len(loaded.intersection(data_symbols)) if data_symbols else len(loaded)
-    temporaries = len(intermediates)
-    return ExpressionCost(
-        adds=adds,
-        muls=muls,
-        divs=divs,
-        sqrts=sqrts,
-        pows=pows,
-        exps=exps,
-        logs=logs,
-        trigs=trigs,
-        loads=loads,
-        stores=stores,
-        temporaries=temporaries,
-        estimated_registers=estimated_registers,
-    )
 
 
-def _statement_cost(expression, data_symbols, stores):
-    adds, muls, divs, sqrts, pows, exps, logs, trigs = _op_counts(expression)
-    loaded = expression.free_symbols
-    loads = len(loaded.intersection(data_symbols)) if data_symbols else len(loaded)
-    return ExpressionCost(
-        adds=adds,
-        muls=muls,
-        divs=divs,
-        sqrts=sqrts,
-        pows=pows,
-        exps=exps,
-        logs=logs,
-        trigs=trigs,
-        loads=loads,
-        stores=stores,
-        temporaries=0,
-        estimated_registers=loads,
-    )
 
 
-def _op_counts(expression):
-    adds = muls = divs = sqrts = pows = exps = logs = trigs = 0
-    trig_functions = {
-        sp.sin,
-        sp.cos,
-        sp.tan,
-        sp.asin,
-        sp.acos,
-        sp.atan,
-        sp.sinh,
-        sp.cosh,
-        sp.tanh,
-        sp.asinh,
-        sp.acosh,
-        sp.atanh,
-    }
-
-    for node in sp.preorder_traversal(expression):
-        if isinstance(node, sp.Add):
-            adds += max(0, len(node.args) - 1)
-        elif isinstance(node, sp.Mul):
-            muls += max(0, len(node.args) - 1)
-        elif isinstance(node, sp.Pow):
-            if node.exp == -1:
-                divs += 1
-            elif isinstance(node.exp, sp.Number) and float(node.exp) == 0.5:
-                sqrts += 1
-            else:
-                pows += 1
-        elif getattr(node, "is_Function", False):
-            if node.func == sp.log:
-                logs += 1
-            elif node.func == sp.exp:
-                exps += 1
-            elif node.func in trig_functions:
-                trigs += 1
-            elif node.func == sp.sqrt:
-                sqrts += 1
-
-    return adds, muls, divs, sqrts, pows, exps, logs, trigs

@@ -253,21 +253,7 @@ class CoupledResidualSystem:
             )
         return expressions
 
-    def build_residual_graph(self, temporary_prefix="residual_tmp"):
-        return self.residual_expressions().build_graph(
-            data_symbols=self.residual_data_symbols(),
-            temporary_prefix=temporary_prefix,
-        )
 
-    def build_jacobian_action_graph(
-        self,
-        include_blocks=False,
-        temporary_prefix="jacobian_action_tmp",
-    ):
-        return self.jacobian_action_expressions(include_blocks).build_graph(
-            data_symbols=self.jacobian_action_data_symbols(),
-            temporary_prefix=temporary_prefix,
-        )
 
     def residual_data_symbols(self):
         candidates = []
@@ -370,3 +356,63 @@ def coupled_residual_system(dim):
 
 def _symbols(prefix, count):
     return tuple(sp.Symbol("%s_%d" % (prefix, index)) for index in range(count))
+
+
+# Weak-form coefficients of a residual: the factors multiplying each test
+# value and test gradient.  This is differentiation and a linearity check --
+# no emission -- so it belongs to form lowering, not to a text emitter.
+@dataclass(frozen=True)
+class WeakResidualCoefficients:
+    row_field: str
+    value: sp.Expr
+    gradient: tuple
+
+
+def weak_residual_coefficients(system, expression, row_field):
+    field = system.field(row_field)
+    expression = sp.sympify(expression)
+    value = sp.diff(expression, field.test_value)
+    gradient = tuple(
+        sp.diff(expression, symbol) for symbol in field.test_gradient
+    )
+    test_symbols = set(field.test_symbols)
+    if value.free_symbols.intersection(test_symbols) or any(
+        coefficient.free_symbols.intersection(test_symbols)
+        for coefficient in gradient
+    ):
+        raise ValueError(
+            "residual for field '%s' must be linear in its test value and gradient"
+            % field.name
+        )
+    if expression.xreplace({symbol: sp.S.Zero for symbol in test_symbols}) != 0:
+        raise ValueError(
+            "residual for field '%s' must not contain a test-independent term"
+            % field.name
+        )
+    return WeakResidualCoefficients(field.name, value, gradient)
+
+
+def coupled_residual_weak_coefficients(system, jacobian_action=False):
+    coefficients = []
+    if jacobian_action:
+        blocks = {
+            (block.row_field, block.column_field): block.expression
+            for block in system.jacobian_blocks()
+        }
+        for row in system.fields:
+            expression = sum(
+                blocks[(row.name, column.name)] for column in system.fields
+            )
+            coefficients.append(
+                weak_residual_coefficients(system, expression, row.name)
+            )
+    else:
+        for row in system.fields:
+            coefficients.append(
+                weak_residual_coefficients(
+                    system,
+                    system.residual_expression(row),
+                    row.name,
+                )
+            )
+    return tuple(coefficients)
