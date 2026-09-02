@@ -36,13 +36,20 @@ LAYER_ORDER = (
 # Packages that sit outside the lowering stack.  Frontend packages sit above the
 # whole stack and may import anything; tooling and tests likewise.  ``mlir`` is
 # an experimental subtree that is explicitly out of scope for the layering work.
+# Packages that sit outside the lowering stack.  `materials` and `generators`
+# are the frontend and sit above the whole stack.  `pipeline` is the driver: it
+# calls each layer in sequence and is imported by none of them, so ranking it
+# would be meaningless.  `package` is L7, which only ever runs after emission.
+# The rest is tooling, tests, and the out-of-scope mlir subtree.
 UNRANKED_PACKAGES = (
     "materials",
     "generators",
     "mlir",
+    "package",
+    "pipeline",
+    "scripts",
     "tests",
     "tools",
-    "scripts",
     "twophaseflow",
 )
 
@@ -189,6 +196,42 @@ class LayeringTest(unittest.TestCase):
             lines = ["these layering violations are fixed; remove them from KNOWN_VIOLATIONS:"]
             lines.extend("  %s -> %s" % edge for edge in stale)
             self.fail("\n".join(lines))
+
+
+    def test_framework_modules_do_not_import_the_flat_facade(self):
+        """Inside the framework, imports must name a layer.
+
+        ``codegen.framework`` re-exports 262 names across every layer.  An import
+        through it names no layer, so this test's whole premise -- that an import
+        can be attributed to a layer and checked -- fails silently wherever one is
+        used.  The facade stays for callers outside the framework.
+        """
+        root = _framework_root()
+        offenders = []
+        for directory, subdirectories, names in os.walk(root):
+            subdirectories[:] = [d for d in subdirectories if d != "__pycache__"]
+            for name in names:
+                if not name.endswith(".py"):
+                    continue
+                path = os.path.join(directory, name)
+                relative = os.path.relpath(path, root)
+                if relative.split(os.sep)[0] in ("tests", "mlir"):
+                    continue
+                with open(path, encoding="utf-8") as handle:
+                    tree = ast.parse(handle.read(), filename=path)
+                for node in ast.walk(tree):
+                    if (
+                        isinstance(node, ast.ImportFrom)
+                        and node.level == 0
+                        and node.module == FRAMEWORK_PACKAGE
+                    ):
+                        offenders.append("%s:%d" % (relative, node.lineno))
+        self.assertEqual(
+            offenders,
+            [],
+            "framework modules must import from the layer that defines a name, "
+            "not from the flat facade, at: %s" % ", ".join(offenders),
+        )
 
     def test_layer_order_covers_every_layer_package(self):
         """Every package under the framework is either a layer or unranked."""

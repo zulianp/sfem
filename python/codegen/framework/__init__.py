@@ -1,3 +1,16 @@
+"""Compatibility facade over the framework's layers.
+
+This module re-exports a flat namespace of 262 names drawn from every layer.
+That is convenient for callers outside the framework and actively harmful
+inside it: an import through this module names no layer, so the layering rule
+cannot be stated, let alone enforced, at such an import.
+
+Framework modules therefore import from the layer module that defines the name
+-- ``codegen.framework.plans.generation``, ``codegen.framework.symbolic.fields``
+and so on.  ``tests/test_layering.py`` enforces that; this facade exists for
+external callers only.
+"""
+
 from .symbolic import (
     DeformationGradient,
     DisplacementGradient,
