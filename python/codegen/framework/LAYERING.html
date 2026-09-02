@@ -908,9 +908,11 @@
     </div></div>
 
     <div class="row"><div class="g-key">S8</div><div class="g-body">
-      <div class="g-title">Bring the driver and packaging inside</div>
-      <p>Move the four stage classes and <code>generate(...)</code> from <code>sfem/gen.py</code> into <code>pipeline/</code>, and <code>_gen_op.py</code> into <code>package/</code>; <code>sfem.gen</code> becomes a thin re-export for existing callers. Then delete the 262-name flat facade in <code>__init__.py</code> in favour of per-layer public APIs, which is what makes the layering test meaningful to a reader rather than only to CI.</p>
-      <div class="evidence"><b>gate</b> byte-identical output</div>
+      <div class="g-title">Bring the driver and packaging inside <span class="tag t-ok">done</span></div>
+      <p><code>sfem/gen.py</code> — the four pipeline stages and <code>generate(...)</code>, 2,287 lines — is now <code>codegen/framework/pipeline/driver.py</code>. <code>sfem/_gen_op.py</code> — the C ABI, <code>sfem::Op</code> wrapper and factory generation, 7,388 lines — is <code>codegen/framework/package/op_wrappers.py</code>. Both keep thin re-export shims at their old paths, so all 36 callers work unchanged.</p>
+      <p>The move exposed one more instance of the F10 pattern. <code>gen.py</code> derived the repository root as <code>dirname(__file__)/../..</code>, correct only while the module lived in <code>python/sfem/</code>; relocating it would have silently pointed the compiler's include paths at <code>python/codegen</code>. It now walks up looking for a marker instead of counting <code>..</code>.</p>
+      <p>The 262-name flat facade is documented rather than deleted. Exactly one module imported it — the driver — and its 125 names now resolve to <b>16 concrete layer modules</b>, so the driver's dependencies are visible per layer instead of hidden behind a namespace that names none. The facade stays for callers outside the framework, and a new test fails if any framework module imports through it: an import that names no layer is one the layering rule cannot be stated at, which is precisely how the flat namespace made the architecture unenforceable.</p>
+      <div class="evidence"><b>gate</b> byte-identical output (520 files) · 202 tests, failure set unchanged</div>
     </div></div>
   </div>
 </section>
