@@ -260,7 +260,7 @@ namespace sfem {
 
                 auto blas = sfem::blas<real_t>(es_);
 
-                p1_ = smesh::astype<real_t>(surface_->points());
+                p1_ = smesh::astype<real_t>(surface_->points(), /*duplicate=*/true);
                 displace_points(surface_, displacement, p1_);
 
                 if (surface_element_type_ == smesh::TRISHELL3) {
@@ -1380,7 +1380,7 @@ namespace sfem {
                 auto blas = sfem::blas<real_t>(es_);
 
                 // 1) Current (displaced) surface configuration.
-                p1_ = smesh::astype<real_t>(surface_->points());
+                p1_ = smesh::astype<real_t>(surface_->points(), /*duplicate=*/true);
                 displace_points(surface_, displacement, p1_);
 
                 // 2) Broad-phase: candidate master faces per slave face.
@@ -1679,7 +1679,7 @@ namespace sfem {
 
             auto blas = sfem::blas<real_t>(es_);
 
-            p1_ = smesh::astype<real_t>(surface_->points());
+            p1_ = smesh::astype<real_t>(surface_->points(), /*duplicate=*/true);
             {
                 auto               p = p1_->data();
                 auto               u = displacement->data();

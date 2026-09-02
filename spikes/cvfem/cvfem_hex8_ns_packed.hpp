@@ -14,74 +14,14 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-using pack_idx_t = uint16_t;
+// PackedData and the pack helpers live in the shared header; this file used to
+// carry a divergent trimmed copy of them.
+#include "cvfem_hex8_pack_common.hpp"
 
-struct PackedData {
-    std::shared_ptr<smesh::PackedMesh<pack_idx_t>> packed;
-    ptrdiff_t                                      n_packs{0};
-    ptrdiff_t                                      n_elements_per_pack{0};
-    ptrdiff_t                                      max_nodes_per_pack{0};
-    pack_idx_t                                   **elems{nullptr};
-    const ptrdiff_t                               *owned_nodes_ptr{nullptr};
-    const ptrdiff_t                               *ghost_ptr{nullptr};
-    const smesh::idx_t                            *ghost_idx{nullptr};
-    ptrdiff_t                                      n_ghost_entries{0};
-    ptrdiff_t                                      n_ghost_reduce_rows{0};
-    const ptrdiff_t                               *ghost_reduce_ptr{nullptr};
-    const ptrdiff_t                               *ghost_reduce_idx{nullptr};
-    const smesh::idx_t                            *ghost_reduce_dest{nullptr};
-    std::vector<scalar_t>                          ghost_buf;
-    ptrdiff_t                                      max_actual_nodes_per_pack{0};
-};
 
-template <typename T>
-static T *cvfem_hex8_thread_scratch(const int slot, const size_t n) {
-    static thread_local T     *ptr[4] = {nullptr, nullptr, nullptr, nullptr};
-    static thread_local size_t cap[4] = {0, 0, 0, 0};
-    if (cap[slot] < n) {
-        std::free(ptr[slot]);
-        ptr[slot] = static_cast<T *>(std::calloc(n, sizeof(T)));
-        cap[slot] = ptr[slot] ? n : 0;
-    }
-    return ptr[slot];
-}
 
-static PackedData cvfem_hex8_make_packed(const std::shared_ptr<smesh::Mesh> &mesh, const int pack_size) {
-    PackedData p;
-    p.packed              = smesh::PackedMesh<pack_idx_t>::create(mesh, {}, true, pack_size);
-    p.n_packs             = p.packed->n_packs(0);
-    p.n_elements_per_pack = p.packed->n_elements_per_pack(0);
-    p.max_nodes_per_pack  = p.packed->max_nodes_per_pack();
-    p.elems               = p.packed->elements(0)->data();
-    p.owned_nodes_ptr     = p.packed->owned_nodes_ptr(0)->data();
-    p.ghost_ptr           = p.packed->ghost_ptr(0)->data();
-    p.ghost_idx           = p.packed->ghost_idx(0)->data();
-    p.n_ghost_entries     = p.packed->n_ghost_entries(0);
-    p.n_ghost_reduce_rows = p.packed->n_ghost_reduce_rows(0);
-    p.ghost_reduce_ptr    = p.packed->ghost_reduce_ptr(0)->data();
-    p.ghost_reduce_idx    = p.packed->ghost_reduce_idx(0)->data();
-    p.ghost_reduce_dest   = p.packed->ghost_reduce_dest(0)->data();
-    p.ghost_buf.assign((size_t)N_FIELDS * (size_t)p.n_ghost_entries, 0.0);
 
-    ptrdiff_t max_nodes = 0;
-    for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
-        const ptrdiff_t n_pack_nodes =
-                (p.owned_nodes_ptr[pack + 1] - p.owned_nodes_ptr[pack]) + (p.ghost_ptr[pack + 1] - p.ghost_ptr[pack]);
-        max_nodes = std::max(max_nodes, n_pack_nodes);
-    }
-    p.max_actual_nodes_per_pack = max_nodes;
-    return p;
-}
 
-static SFEM_INLINE size_t cvfem_hex8_packed_scratch_n(const PackedData &p) {
-    const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
-    return (size_t)N_FIELDS * (size_t)n;
-}
-
-static SFEM_INLINE size_t cvfem_hex8_packed_rc_n(const PackedData &p) {
-    const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
-    return 6 * (size_t)n;
-}
 
 static void cvfem_hex8_precompute_affine_geometry(MeshData &d) {
     for (int c = 0; c < 9; ++c) d.jacobian_adjugate[c].resize((size_t)d.nelements);
@@ -366,15 +306,15 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved(PackedData &p, scala
 
 static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_packed");
-    const size_t scratch_n = cvfem_hex8_packed_scratch_n(p);
-    const size_t rc_n      = cvfem_hex8_packed_rc_n(p);
+    const size_t scratch_n = packed_scratch_n(p);
+    const size_t rc_n      = packed_rc_n(p);
     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
     {
-        scalar_t *const SFEM_RESTRICT pack_u   = cvfem_hex8_thread_scratch<scalar_t>(0, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_out = cvfem_hex8_thread_scratch<scalar_t>(1, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_rc  = cvfem_hex8_thread_scratch<scalar_t>(3, rc_n);
+        scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_rc  = thread_scratch<scalar_t>(3, rc_n);
         const ptrdiff_t               nmax     = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x   = pack_rc;
         scalar_t *const SFEM_RESTRICT pack_y   = pack_rc + nmax;
@@ -481,16 +421,16 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                                                                   const scalar_t *const SFEM_RESTRICT dir,
                                                                   scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_packed");
-    const size_t scratch_n = cvfem_hex8_packed_scratch_n(p);
-    const size_t rc_n      = cvfem_hex8_packed_rc_n(p);
+    const size_t scratch_n = packed_scratch_n(p);
+    const size_t rc_n      = packed_rc_n(p);
     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
     {
-        scalar_t *const SFEM_RESTRICT pack_u   = cvfem_hex8_thread_scratch<scalar_t>(0, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_dir = cvfem_hex8_thread_scratch<scalar_t>(1, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_out = cvfem_hex8_thread_scratch<scalar_t>(2, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_rc  = cvfem_hex8_thread_scratch<scalar_t>(3, rc_n);
+        scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_rc  = thread_scratch<scalar_t>(3, rc_n);
         const ptrdiff_t               nmax     = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x   = pack_rc;
         scalar_t *const SFEM_RESTRICT pack_y   = pack_rc + nmax;

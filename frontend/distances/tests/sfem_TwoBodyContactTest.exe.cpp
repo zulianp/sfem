@@ -258,8 +258,8 @@ int test_two_body_contact() {
     std::shared_ptr<sccd::CCD<real_t>> ccd;
     ccd = sccd::CCD<real_t>::create(surface);
 
-    auto p0 = smesh::astype<real_t>(surface->points());
-    auto p1 = smesh::astype<real_t>(surface->points());
+    auto p0 = smesh::astype<real_t>(surface->points(), /*duplicate=*/true);
+    auto p1 = smesh::astype<real_t>(surface->points(), /*duplicate=*/true);
 
     displace_points(surface, displacement, p1);
 
@@ -341,10 +341,10 @@ int test_two_body_contact() {
         }
 
         if (env.enable_ccd && ccd) {
-            p0 = smesh::astype<real_t>(surface->points());
+            p0 = smesh::astype<real_t>(surface->points(), /*duplicate=*/true);
             displace_points(surface, previous_displacement, p0);
 
-            p1 = smesh::astype<real_t>(surface->points());
+            p1 = smesh::astype<real_t>(surface->points(), /*duplicate=*/true);
             displace_points(surface, displacement, p1);
 
             real_t ccd_toi = 1;

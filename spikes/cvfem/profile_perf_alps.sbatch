@@ -198,7 +198,7 @@ summarize_dof_rates() {
     local driver="$1"
     local stdout_log="$2"
     awk -v driver="${driver}" '
-        /MDOF\/s_unique_mesh_dofs:/ {
+        /MDOF\/s(_unique_mesh_dofs)?:/ {
             v = $2 + 0.0
             values[++n] = v
             sum += v
@@ -299,7 +299,7 @@ for mode in "${mode_list[@]}"; do
 
     echo "    counters: ${stat_csv}"
     echo "    stdout:   ${stdout_log}"
-    grep -E "operation:|seconds_per_|MELEM|MDOF|GFLOP|GB/s|elements:|nodes:|nnz:" "${stdout_log}" || true
+    grep -E "operation:|seconds_per_|MELEM|MDOF|GFLOP|GB/s|elements:|nodes:|dofs:|nnz:" "${stdout_log}" || true
     summarize_dof_rates "${mode}" "${stdout_log}" >>"${SUMMARY_TSV}"
 
     if [[ "${PERF_RECORD}" == "1" ]] && contains_word "${mode}" "${record_mode_list[@]}"; then
