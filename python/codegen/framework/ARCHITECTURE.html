@@ -193,7 +193,7 @@
   <p class="standfirst">The layer graph is now clean and enforced. The layers themselves are not yet doing the jobs they are named for — one of them holds 22,970 lines that should be a printer.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 7 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 10 commits from 060684ff</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
     <span><b>Date</b> 2026-09-02</span>
   </div>
@@ -500,15 +500,17 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Nine, ordered by what unblocks what. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Nine, ordered by what unblocks what. One is closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
-  <div class="op blocked">
+  <div class="op decide">
     <div class="rail"></div><div class="num">OP 1</div>
     <div class="body">
-      <div class="op-title">Move the emitters' decisions into L3 <span class="chip c-gap">blocked by nothing — blocks 2, 3, 4, 5</span></div>
+      <div class="op-title">Move the emitters' decisions into L3 <span class="chip c-part">under way — dependency analysis done</span></div>
       <p>The root open point. <code>residual_codegen.py</code> (10,074 lines) and <code>energy_codegen.py</code> (8,483) decide loop structure, scope placement, stream layout, gather and scatter shape and geometry policy while building strings. The plan types for all of it already exist and are unread.</p>
-      <p>This is not one change. A sane order is one decision family at a time — streams first, since <code>DataStreamPlan</code> is the most self-contained, then phases, then geometry, then loop structure — each gated on byte-identical output, so the emitter is progressively hollowed out rather than rewritten.</p>
-      <div class="op-facts"><span><i>size</i> 18,557 LOC across two modules</span><span><i>gate</i> byte-identity holds throughout</span><span><i>unblocks</i> OP2, OP3, OP4, OP5</span></div>
+      <p><b>Done: the dependency-analysis family.</b> Three decisions moved up, output unchanged at each. <code>plans/streams.py</code> owns which field stream groups a kernel needs — the emitter keeps only how each is spelled in C. <code>plans/dependencies.py</code> owns dependency pruning: which roles are touched, which parameters survive, which coefficient entries are structurally zero. <code>plans/boundary_usage.py</code> owns whether a boundary form's coefficients reach for coordinates or current values, a question the emitter had been asking four times in two different shapes.</p>
+      <p>Measured effect: <b>the largest emitter now contains zero free-symbol analysis</b>, down from six references; the boundary emitter is down from eight to two, both argument validation rather than planning. <code>tests/test_emitters_do_not_analyse.py</code> pins the remainder shrink-only, with the reason each is allowed.</p>
+      <p><b>Remaining: the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, geometry mode. These are harder because they are not analysis that can be lifted whole but structure interleaved with printing, and they are what OP 2 and OP 4 wait on.</p>
+      <div class="op-facts"><span><i>emitters</i> 18,557 LOC in two modules</span><span><i>gate</i> byte-identity holds throughout</span><span><i>still blocks</i> OP2, OP3, OP4</span></div>
     </div>
   </div>
 
@@ -581,13 +583,13 @@
     </div>
   </div>
 
-  <div class="op decide">
+  <div class="op ready">
     <div class="rail"></div><div class="num">OP 9</div>
     <div class="body">
-      <div class="op-title">Untracked files the branch depends on <span class="chip c-part">needs a decision</span></div>
-      <p>Practical, not architectural. <code>KERNELS.md</code>, <code>M11.md</code>, <code>docs/</code>, <code>scripts/</code> and two <code>mooney_rivlin_kelvin_voigt_newmark</code> modules are untracked in your checkout, so they exist on no branch. I copied them into the worktree to make the tests runnable but deliberately did not commit them — they are your work in progress, and committing them would put unfinished files into this branch's history.</p>
-      <p>Either commit them on your branch, or say the word and I will add them here.</p>
-      <div class="op-facts"><span><i>affects</i> a fresh clone of this branch</span><span><i>tests needing them fail identically on main</i></span></div>
+      <div class="op-title">Untracked files the branch depends on <span class="chip c-ok">closed</span></div>
+      <p>The <code>mooney_rivlin_kelvin_voigt_newmark</code> material and generator, <code>scripts/</code>, <code>KERNELS.md</code>, <code>M11.md</code>, <code>docs/</code> and <code>twophaseflow/run_m43.sh</code> are now tracked on this branch. A fresh clone can run its own tests: <code>scripts/</code> is imported by the matrix-format tests and the mooney material is part of the set the snapshot regenerates.</p>
+      <p>Only the repository-root <code>CLAUDE.md</code> is still untracked — tooling configuration rather than framework code, and yours to place.</p>
+      <div class="op-facts"><span><i>added</i> 292 LOC of code + 4 documents</span></div>
     </div>
   </div>
 </section>
