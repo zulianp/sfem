@@ -2046,7 +2046,20 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action_is
     }
 }
 
-template <bool Atomic, typename Slot, typename scalar_t>
+#define CVFEM_HEX8_PART_ALL       0
+#define CVFEM_HEX8_PART_LINEAR    1
+#define CVFEM_HEX8_PART_NONLINEAR 2
+
+// Part selects which half of the element matrix is written:
+//   CVFEM_HEX8_PART_ALL       everything, the original behaviour
+//   CVFEM_HEX8_PART_LINEAR    the viscous block only -- geometry and mu, no velocity, so
+//                             it is constant across Newton iterations
+//   CVFEM_HEX8_PART_NONLINEAR the convection and Rhie-Chow faces, which are what change
+//
+// The two halves are selected out of one body rather than derived separately, so
+// LINEAR + NONLINEAR reproduces ALL by construction. Deriving them independently is
+// how the affine split first went wrong.
+template <bool Atomic, int Part = CVFEM_HEX8_PART_ALL, typename Slot, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam(const scalar_t                        rho,
                                                                         const scalar_t                        mu,
                                                                         const scalar_t *const SFEM_RESTRICT   x,
@@ -2077,6 +2090,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots
 
         const int i = CVFEM_HEX8_SCS[s].i;
         const int j = CVFEM_HEX8_SCS[s].j;
+        if (Part != CVFEM_HEX8_PART_NONLINEAR)
         for (int k = 0; k < CVFEM_HEX8_N_NODES; ++k) {
             const scalar_t wx  = w[k][0];
             const scalar_t wy  = w[k][1];
@@ -2104,9 +2118,11 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots
                                            -d22);
         }
 
-        const scalar_t mdot_rc = p ? cvfem_hex8_rhie_chow_mdotc(rho, mu, rc, i, j, ax, ay, az, p[i], p[j]) : scalar_t(0);
-        cvfem_hex8_jac_conv_face<Atomic>(rho, ax, ay, az, i, j, ux, uy, uz, slots, values, mdot_rc);
-        cvfem_hex8_jac_rhie_chow_p<Atomic>(rho, mu, rc, ax, ay, az, i, j, ux, uy, uz, p, slots, values);
+        if (Part != CVFEM_HEX8_PART_LINEAR) {
+            const scalar_t mdot_rc = p ? cvfem_hex8_rhie_chow_mdotc(rho, mu, rc, i, j, ax, ay, az, p[i], p[j]) : scalar_t(0);
+            cvfem_hex8_jac_conv_face<Atomic>(rho, ax, ay, az, i, j, ux, uy, uz, slots, values, mdot_rc);
+            cvfem_hex8_jac_rhie_chow_p<Atomic>(rho, mu, rc, ax, ay, az, i, j, ux, uy, uz, p, slots, values);
+        }
     }
 }
 

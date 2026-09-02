@@ -451,7 +451,7 @@ __global__ void cvfem_hex8_ghost_reduce_kernel(
 // Element-parallel, grid-stride, writing straight into the global BSR with atomicAdd.
 // Both kernel families already accumulate through CVFEM_ATOMIC_ADD, which expands to
 // atomicAdd under __CUDA_ARCH__, so the same source serves host and device.
-template <int VARIANT, int GEOM = CVFEM_CUDA_GEOM_AFFINE>
+template <int VARIANT, int GEOM = CVFEM_CUDA_GEOM_AFFINE, int PART = CVFEM_HEX8_PART_ALL>
 __global__ void cvfem_hex8_assemble_bsr_kernel(
         const ptrdiff_t nelements, const double rho, const double mu,
         const int32_t *const __restrict__ elements,
@@ -477,7 +477,7 @@ __global__ void cvfem_hex8_assemble_bsr_kernel(
         }
         if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) {
             const int32_t *const es = &slots[(ptrdiff_t)e * 64];
-            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
+            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, PART>(
                     rho, mu, ex, ey, ez, ux, uy, uz, es, values);
             continue;
         }
@@ -514,7 +514,10 @@ __global__ void cvfem_hex8_assemble_ecolored_kernel(
         const double  *const __restrict__ adj,
         const double  *const __restrict__ det,
         const double  *const __restrict__ u,
-        double *const __restrict__ values) {
+        double *const __restrict__ values,
+        const double  *const __restrict__ px = nullptr,
+        const double  *const __restrict__ py = nullptr,
+        const double  *const __restrict__ pz = nullptr) {
     for (ptrdiff_t t = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; t < n_in_color;
          t += (ptrdiff_t)blockDim.x * gridDim.x) {
         const ptrdiff_t e = order[color_begin + t];
@@ -531,6 +534,20 @@ __global__ void cvfem_hex8_assemble_ecolored_kernel(
         for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
 
         const int32_t *const es = &slots[e * 64];
+        if constexpr (VARIANT == CVFEM_CUDA_JAC_ISOPARAM) {
+            // Colouring makes the writes race-free, so this accumulates without atomics
+            // exactly as the affine coloured variants do.
+            double ex[CVFEM_HEX8_N_NODES], ey[CVFEM_HEX8_N_NODES], ez[CVFEM_HEX8_N_NODES];
+#pragma unroll
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const ptrdiff_t g = elements[(ptrdiff_t)a * nelements + e];
+                ex[a] = px[g]; ey[a] = py[g]; ez[a] = pz[g];
+            }
+            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
+                    rho, mu, ex, ey, ez, ux, uy, uz, es, values);
+            (void)pe;
+            continue;
+        }
         if      constexpr (VARIANT == CVFEM_CUDA_JAC_HANDWRITTEN)
             cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
         else if constexpr (VARIANT == CVFEM_CUDA_JAC_SYMPY)
@@ -555,6 +572,44 @@ int launch_ecolored_v(cvfem_cuda_ctx *ctx, double rho, double mu, int block, cud
         cvfem_hex8_assemble_ecolored_kernel<VARIANT><<<grid, block, 0, s>>>(
                 n, b, ctx->nelements, rho, mu, ctx->element_order, ctx->elements_global,
                 ctx->element_slots, ctx->adj, ctx->det, ctx->u, ctx->values);
+        CVFEM_CUDA_CHECK(cudaGetLastError());
+    }
+    return 0;
+}
+
+// Isoparametric split. The viscous half depends only on geometry and mu, so it is built
+// once; the convective half is what each Newton step rebuilds. Same decomposition as the
+// affine split, but selected out of one kernel body rather than derived separately.
+template <int PART>
+int launch_assemble_isoparam_part(cvfem_cuda_ctx *ctx, double rho, double mu, double *dst,
+                                  bool zero_first, int block_size, cudaStream_t s) {
+    if (!ctx->px) return 1;
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    if (zero_first)
+        CVFEM_CUDA_CHECK(cudaMemsetAsync(dst, 0, (size_t)ctx->nnz * 16 * sizeof(double), s));
+    cvfem_hex8_assemble_bsr_kernel<CVFEM_CUDA_JAC_HANDWRITTEN, CVFEM_CUDA_GEOM_ISOPARAM, PART>
+            <<<grid, block, 0, s>>>(
+                    ctx->nelements, rho, mu, ctx->elements_global, ctx->element_slots,
+                    ctx->adj, ctx->det, ctx->u, dst, ctx->px, ctx->py, ctx->pz);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+int launch_ecolored_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu, int block_size,
+                             cudaStream_t s) {
+    if (!ctx->px) return 1;
+    const int block = block_size > 0 ? block_size : 128;
+    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
+                                     (size_t)ctx->nnz * 16 * sizeof(double), s));
+    for (int c = 0; c < ctx->n_ecolors; ++c) {
+        const ptrdiff_t b = ctx->h_ecolor_ptr[c], n = ctx->h_ecolor_ptr[c + 1] - b;
+        if (n <= 0) continue;
+        const int grid = (int)((n + block - 1) / block);
+        cvfem_hex8_assemble_ecolored_kernel<CVFEM_CUDA_JAC_ISOPARAM><<<grid, block, 0, s>>>(
+                n, b, ctx->nelements, rho, mu, ctx->element_order, ctx->elements_global,
+                ctx->element_slots, ctx->adj, ctx->det, ctx->u, ctx->values,
+                ctx->px, ctx->py, ctx->pz);
         CVFEM_CUDA_CHECK(cudaGetLastError());
     }
     return 0;
@@ -951,7 +1006,10 @@ __global__ void cvfem_hex8_assemble_diag_kernel(
         const double  *const __restrict__ adj,
         const double  *const __restrict__ det,
         const double  *const __restrict__ u,
-        double *const __restrict__ diag) {
+        double *const __restrict__ diag,
+        const double  *const __restrict__ px = nullptr,
+        const double  *const __restrict__ py = nullptr,
+        const double  *const __restrict__ pz = nullptr) {
     for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
          e += (ptrdiff_t)blockDim.x * gridDim.x) {
         // -1 everywhere off the diagonal: those writes are dropped, so only the 8
@@ -966,6 +1024,18 @@ __global__ void cvfem_hex8_assemble_diag_kernel(
             sl[a * 8 + a] = g;
             const double *const n = &u[(ptrdiff_t)g * CVFEM_CUDA_NF];
             ux[a] = n[0]; uy[a] = n[1]; uz[a] = n[2];
+        }
+        if constexpr (DIAG_MODE == 3) {
+            // Isoparametric: same negative-slot trick, geometry rebuilt per element.
+            double ex[CVFEM_HEX8_N_NODES], ey[CVFEM_HEX8_N_NODES], ez[CVFEM_HEX8_N_NODES];
+#pragma unroll
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const int32_t g = elements[(ptrdiff_t)a * nelements + e];
+                ex[a] = px[g]; ey[a] = py[g]; ez[a] = pz[g];
+            }
+            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
+                    rho, mu, ex, ey, ez, ux, uy, uz, sl, diag);
+            continue;
         }
         double adj_e[9];
 #pragma unroll
@@ -1450,6 +1520,67 @@ extern "C" int cvfem_cuda_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, dou
     return launch_assemble_isoparam(ctx, rho, mu, block_size, s);
 }
 
+extern "C" int cvfem_cuda_assemble_ecolored_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                     int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return launch_ecolored_isoparam(ctx, rho, mu, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_assemble_ecolored_isoparam(cvfem_cuda_ctx *ctx, double rho,
+                                                             double mu, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_ecolored_isoparam(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_ecolored_isoparam(ctx, rho, mu, block_size, 0) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+// Build the constant half once into values_linear.
+extern "C" int cvfem_cuda_assemble_linear_isoparam(cvfem_cuda_ctx *ctx, double mu,
+                                                   int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    if (!ctx->values) return 1;
+    const size_t nb = (size_t)ctx->nnz * 16 * sizeof(double);
+    if (!ctx->values_linear) CVFEM_CUDA_CHECK(cudaMalloc(&ctx->values_linear, nb));
+    return launch_assemble_isoparam_part<CVFEM_HEX8_PART_LINEAR>(ctx, 0.0, mu, ctx->values_linear,
+                                                                 true, block_size, s);
+}
+
+// Restore it and add only the velocity-dependent half.
+extern "C" int cvfem_cuda_assemble_nonlinear_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                      int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    if (!ctx->values_linear) return 1;
+    CVFEM_CUDA_CHECK(cudaMemcpyAsync(ctx->values, ctx->values_linear,
+                                     (size_t)ctx->nnz * 16 * sizeof(double),
+                                     cudaMemcpyDeviceToDevice, s));
+    return launch_assemble_isoparam_part<CVFEM_HEX8_PART_NONLINEAR>(ctx, rho, mu, ctx->values,
+                                                                    false, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_assemble_nonlinear_isoparam(cvfem_cuda_ctx *ctx, double rho,
+                                                              double mu, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (cvfem_cuda_assemble_nonlinear_isoparam(ctx, rho, mu, block_size, nullptr) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (cvfem_cuda_assemble_nonlinear_isoparam(ctx, rho, mu, block_size, nullptr) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
 extern "C" double cvfem_cuda_time_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                     int block_size, int repeat) {
     cudaEvent_t a, b;
@@ -1642,8 +1773,14 @@ static int launch_diag(cvfem_cuda_ctx *ctx, double rho, double mu, int mode,
         case 1: cvfem_hex8_assemble_diag_kernel<1><<<grid, block, 0, s>>>(
                     ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det, ctx->u, dst);
                 break;
-        default: cvfem_hex8_assemble_diag_kernel<2><<<grid, block, 0, s>>>(
+        case 2: cvfem_hex8_assemble_diag_kernel<2><<<grid, block, 0, s>>>(
                     ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det, ctx->u, dst);
+                break;
+        default:  // isoparametric
+                if (!ctx->px) return 1;
+                cvfem_hex8_assemble_diag_kernel<3><<<grid, block, 0, s>>>(
+                    ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det, ctx->u, dst,
+                    ctx->px, ctx->py, ctx->pz);
                 break;
     }
     CVFEM_CUDA_CHECK(cudaGetLastError());
@@ -1717,6 +1854,31 @@ extern "C" double cvfem_cuda_time_assemble_diag(cvfem_cuda_ctx *ctx, double rho,
     cudaEventDestroy(a); cudaEventDestroy(b);
     return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
 }
+
+extern "C" int cvfem_cuda_assemble_diag_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                 int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    if (cvfem_cuda_diag_alloc(ctx) != 0) return 1;
+    return launch_diag(ctx, rho, mu, 3, ctx->diag, block_size, s, true);
+}
+
+extern "C" double cvfem_cuda_time_assemble_diag_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                         int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cvfem_cuda_diag_alloc(ctx) != 0) return -1.0;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (launch_diag(ctx, rho, mu, 3, ctx->diag, block_size, 0, true) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (launch_diag(ctx, rho, mu, 3, ctx->diag, block_size, 0, true) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
 
 extern "C" double cvfem_cuda_time_assemble_diag_dynamic(cvfem_cuda_ctx *ctx, double rho, double mu,
                                                         int block_size, int repeat) {

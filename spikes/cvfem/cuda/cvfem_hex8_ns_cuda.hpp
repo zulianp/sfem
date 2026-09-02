@@ -104,6 +104,10 @@ enum {
     CVFEM_CUDA_JAC_SYMPY_ROW   = 3,  // generated, rowwise
     CVFEM_CUDA_JAC_SYMPY_FACE  = 4,  // generated, per sub-control-surface
     CVFEM_CUDA_JAC_N_VARIANTS  = 5,
+    // Isoparametric geometry. Kept outside the N_VARIANTS range because it is not an
+    // alternative CSE arrangement of the same element matrix -- it computes a different
+    // one -- so it must not be swept alongside the five above.
+    CVFEM_CUDA_JAC_ISOPARAM    = 16,
 };
 
 const char *cvfem_cuda_jac_variant_name(int variant);
@@ -158,6 +162,32 @@ int    cvfem_cuda_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                     int block_size, void *stream);
 double cvfem_cuda_time_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                          int block_size, int repeat);
+
+// The same BSR-assembly strategies the affine path has, on isoparametric geometry.
+//
+// Element-coloured: eight colours, no atomics.
+int    cvfem_cuda_assemble_ecolored_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                             int block_size, void *stream);
+double cvfem_cuda_time_assemble_ecolored_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                  int block_size, int repeat);
+
+// Split across Newton steps. The viscous half depends only on geometry and mu, so it stays
+// constant even though the geometry is rebuilt per element; assemble_linear_isoparam builds
+// it once and assemble_nonlinear_isoparam restores it and adds the convective half. The two
+// halves are selected out of one kernel body, so together they reproduce the full assembly
+// by construction.
+int    cvfem_cuda_assemble_linear_isoparam(cvfem_cuda_ctx *ctx, double mu,
+                                           int block_size, void *stream);
+int    cvfem_cuda_assemble_nonlinear_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                              int block_size, void *stream);
+double cvfem_cuda_time_assemble_nonlinear_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                   int block_size, int repeat);
+
+// Block diagonal only, for the block-Jacobi preconditioner.
+int    cvfem_cuda_assemble_diag_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                         int block_size, void *stream);
+double cvfem_cuda_time_assemble_diag_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                              int block_size, int repeat);
 
 // ---- block diagonal, for the block-Jacobi preconditioner --------------------
 //

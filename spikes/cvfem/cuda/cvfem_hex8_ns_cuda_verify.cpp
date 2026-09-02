@@ -799,6 +799,65 @@ int main(int argc, char **argv) {
         fail |= !aok;
         std::printf("assemble isoparam vs host: rel = %.3e  %s\n", arel, aok ? "OK" : "FAIL");
 
+        // --- the other BSR-assembly strategies, all against the same host matrix ---
+        //
+        // Every one of these must reproduce iso_vals exactly: element colouring only
+        // changes the write order, and the split only changes when each half is
+        // computed, not what it computes.
+        struct { const char *name; int (*fn)(cvfem_cuda_ctx *, double, double, int, void *); } strat[] = {
+            {"element-coloured", cvfem_cuda_assemble_ecolored_isoparam},
+        };
+        for (auto &st : strat) {
+            if (st.fn(ctx, rho, mu, block_size, nullptr) != 0 || cvfem_cuda_synchronize() != 0) {
+                std::fprintf(stderr, "%s isoparam failed\n", st.name);
+                return 1;
+            }
+            if (cvfem_cuda_download_values(ctx, idvals.data()) != 0) return 1;
+            const double r = max_abs_diff(iso_vals, idvals) / (vmax > 0 ? vmax : 1.0);
+            fail |= !(r <= 1e-12);
+            std::printf("assemble isoparam %-18s vs host: rel = %.3e  %s\n",
+                        st.name, r, r <= 1e-12 ? "OK" : "FAIL");
+        }
+
+        // Split: build the constant half once, then the velocity-dependent half.
+        if (cvfem_cuda_assemble_linear_isoparam(ctx, mu, block_size, nullptr) != 0 ||
+            cvfem_cuda_assemble_nonlinear_isoparam(ctx, rho, mu, block_size, nullptr) != 0 ||
+            cvfem_cuda_synchronize() != 0) {
+            std::fprintf(stderr, "split isoparam failed\n");
+            return 1;
+        }
+        if (cvfem_cuda_download_values(ctx, idvals.data()) != 0) return 1;
+        {
+            const double r = max_abs_diff(iso_vals, idvals) / (vmax > 0 ? vmax : 1.0);
+            fail |= !(r <= 1e-12);
+            std::printf("assemble isoparam %-18s vs host: rel = %.3e  %s\n",
+                        "split", r, r <= 1e-12 ? "OK" : "FAIL");
+        }
+
+        // Block diagonal: the 4x4 diagonal blocks only, against the same host matrix
+        // read at its diagonal.
+        if (cvfem_cuda_assemble_diag_isoparam(ctx, rho, mu, block_size, nullptr) != 0 ||
+            cvfem_cuda_synchronize() != 0) {
+            std::fprintf(stderr, "diag isoparam failed\n");
+            return 1;
+        }
+        {
+            std::vector<double> ddiag((size_t)d.nnodes * 16);
+            if (cvfem_cuda_download_diag(ctx, ddiag.data()) != 0) return 1;
+            // Pull the diagonal blocks out of the host matrix for comparison.
+            std::vector<double> hdiag((size_t)d.nnodes * 16, 0.0);
+            for (ptrdiff_t r = 0; r < d.nnodes; ++r)
+                for (smesh::count_t k = bsr.rowptr[r]; k < bsr.rowptr[r + 1]; ++k)
+                    if (bsr.colidx[k] == (smesh::idx_t)r)
+                        std::memcpy(&hdiag[(size_t)r * 16], &iso_vals[(size_t)k * 16],
+                                    16 * sizeof(double));
+            const double dmaxv = max_abs(hdiag);
+            const double r = max_abs_diff(hdiag, ddiag) / (dmaxv > 0 ? dmaxv : 1.0);
+            fail |= !(r <= 1e-12);
+            std::printf("assemble isoparam %-18s vs host: rel = %.3e  %s\n",
+                        "block diagonal", r, r <= 1e-12 ? "OK" : "FAIL");
+        }
+
         // --- throughput ------------------------------------------------------
         std::printf("%-34s %12s %12s\n", "variant", "s/call", "MDOF/s");
         struct { const char *name; double t; } iso_rows[] = {
@@ -812,6 +871,12 @@ int main(int argc, char **argv) {
              cvfem_cuda_time_jacobian_action_isoparam(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC, block_size, repeat)},
             {"assemble isoparam",
              cvfem_cuda_time_assemble_isoparam(ctx, rho, mu, block_size, repeat)},
+            {"assemble isoparam ecoloured",
+             cvfem_cuda_time_assemble_ecolored_isoparam(ctx, rho, mu, block_size, repeat)},
+            {"assemble isoparam split",
+             cvfem_cuda_time_assemble_nonlinear_isoparam(ctx, rho, mu, block_size, repeat)},
+            {"assemble isoparam diagonal",
+             cvfem_cuda_time_assemble_diag_isoparam(ctx, rho, mu, block_size, repeat)},
         };
         for (auto &r : iso_rows) {
             std::printf("%-34s %12.3e %12.1f\n", r.name, r.t,
