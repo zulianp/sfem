@@ -3,6 +3,11 @@ from dataclasses import dataclass
 import sympy as sp
 
 from codegen.framework.plans.residual_model import ResidualEmissionModel
+from codegen.framework.plans.dependencies import (
+    ResidualCodegenDependencies,
+    residual_codegen_dependencies,
+)
+from codegen.framework.plans.streams import field_stream_groups
 from codegen.framework.symbolic.residual import (
     CoupledResidualSystem,
     WeakResidualCoefficients,
@@ -999,40 +1004,6 @@ def _field_atomic_scatter_lines(system, indent, element_array="elements"):
 
 
 
-@dataclass(frozen=True)
-class ResidualCodegenDependencies:
-    current: bool
-    previous: bool
-    direction: bool
-    parameters: tuple
-    current_value: bool
-    current_gradient: bool
-    previous_value: bool
-    previous_gradient: bool
-    direction_value: bool
-    direction_gradient: bool
-    value_coefficients: tuple
-    gradient_coefficients: tuple
-
-    @property
-    def uses_trial_gradients(self):
-        return self.current_gradient or self.previous_gradient or self.direction_gradient
-
-    @property
-    def uses_test_gradients(self):
-        return any(any(row) for row in self.gradient_coefficients)
-
-    @property
-    def uses_test_coefficients(self):
-        return any(self.value_coefficients) or self.uses_test_gradients
-
-    @property
-    def uses_reference_gradients(self):
-        return self.uses_trial_gradients or self.uses_test_gradients
-
-    @property
-    def uses_adjugate(self):
-        return self.uses_reference_gradients
 
 
 @dataclass(frozen=True)
@@ -1152,42 +1123,33 @@ class DependencyStreamGroup:
     uses_gradient: bool
 
 
+# How each planned stream group is spelled in the generated C.  This is the only
+# part of stream handling that belongs to emission: which groups exist, and what
+# each carries, is decided in plans.streams from the form's dependencies.
+_STREAM_GROUP_SYNTAX = {
+    "current": ("", "_data", "current_stride"),
+    "previous": ("_old", "_old_data", "previous_stride"),
+    "direction": ("_direction", "_direction_data", "direction_stride"),
+}
+
+
 def _dependency_stream_groups(dependencies, *, mesh=False):
-    groups = []
-    if dependencies.current:
-        groups.append(
-            DependencyStreamGroup(
-                "current",
-                "",
-                "_data" if mesh else "",
-                "current_stride",
-                dependencies.current_value,
-                dependencies.current_gradient,
-            )
-        )
-    if dependencies.previous:
-        groups.append(
-            DependencyStreamGroup(
-                "previous",
-                "_old",
-                "_old_data" if mesh else "",
-                "previous_stride",
-                dependencies.previous_value,
-                dependencies.previous_gradient,
-            )
-        )
-    if dependencies.direction:
-        groups.append(
-            DependencyStreamGroup(
-                "direction",
-                "_direction",
-                "_direction_data" if mesh else "",
-                "direction_stride",
-                dependencies.direction_value,
-                dependencies.direction_gradient,
-            )
-        )
-    return tuple(groups)
+    return tuple(
+        _spell_stream_group(group, mesh=mesh)
+        for group in field_stream_groups(dependencies)
+    )
+
+
+def _spell_stream_group(group, *, mesh):
+    symbol_suffix, pointer_suffix, stride = _STREAM_GROUP_SYNTAX[group.name]
+    return DependencyStreamGroup(
+        group.name,
+        symbol_suffix,
+        pointer_suffix if mesh else "",
+        stride,
+        group.uses_value,
+        group.uses_gradient,
+    )
 
 
 def _dependency_stream_group_by_name(dependencies, name):
@@ -1642,53 +1604,6 @@ def _mixed_field_atomic_scatter_lines(system, layout, indent, field_element_arra
 
 
 
-def _codegen_dependencies(system, coefficients, dependencies):
-    free_symbols = set()
-    for coefficient in coefficients:
-        free_symbols.update(sp.sympify(coefficient.value).free_symbols)
-        for expression in coefficient.gradient:
-            free_symbols.update(sp.sympify(expression).free_symbols)
-    candidate_parameters = tuple(
-        dict.fromkeys(tuple(dependencies.parameters) + tuple(system.parameters))
-    )
-    current_value = any(field.value in free_symbols for field in system.fields)
-    current_gradient = any(
-        free_symbols.intersection(field.gradient) for field in system.fields
-    )
-    previous_value = any(
-        field.previous_value is not None and field.previous_value in free_symbols
-        for field in system.fields
-    )
-    previous_gradient = any(
-        free_symbols.intersection(field.previous_gradient) for field in system.fields
-    )
-    direction_value = any(
-        field.direction_value in free_symbols for field in system.fields
-    )
-    direction_gradient = any(
-        free_symbols.intersection(field.direction_gradient) for field in system.fields
-    )
-    return ResidualCodegenDependencies(
-        current=current_value or current_gradient,
-        previous=previous_value or previous_gradient,
-        direction=direction_value or direction_gradient,
-        parameters=tuple(
-            parameter for parameter in candidate_parameters if parameter in free_symbols
-        ),
-        current_value=current_value,
-        current_gradient=current_gradient,
-        previous_value=previous_value,
-        previous_gradient=previous_gradient,
-        direction_value=direction_value,
-        direction_gradient=direction_gradient,
-        value_coefficients=tuple(
-            not _is_zero(coefficient.value) for coefficient in coefficients
-        ),
-        gradient_coefficients=tuple(
-            tuple(not _is_zero(expression) for expression in coefficient.gradient)
-            for coefficient in coefficients
-        ),
-    )
 
 
 def _is_zero(expression):
@@ -1932,12 +1847,12 @@ def generate_mixed_residual_sfem_files(
 
 def _local_header(system, local_prefix, specialization, residual_coeffs, action_coeffs, basis_family=None):
     rule = specialization.quadrature_rule
-    residual_dependencies = _codegen_dependencies(
+    residual_dependencies = residual_codegen_dependencies(
         system,
         residual_coeffs,
         system.residual_dependencies(),
     )
-    action_dependencies = _codegen_dependencies(
+    action_dependencies = residual_codegen_dependencies(
         system,
         action_coeffs,
         system.jacobian_action_dependencies(),
@@ -2151,12 +2066,12 @@ def _mixed_local_header(
     action_coeffs,
     basis_family=None,
 ):
-    residual_dependencies = _codegen_dependencies(
+    residual_dependencies = residual_codegen_dependencies(
         system,
         residual_coeffs,
         system.residual_dependencies(),
     )
-    action_dependencies = _codegen_dependencies(
+    action_dependencies = residual_codegen_dependencies(
         system,
         action_coeffs,
         system.jacobian_action_dependencies(),
@@ -3728,12 +3643,12 @@ def _operator_source(
         lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
         lines.append("")
     form_dependencies = {
-        "residual": _codegen_dependencies(
+        "residual": residual_codegen_dependencies(
             system,
             residual_coeffs,
             system.residual_dependencies(),
         ),
-        "jacobian_action": _codegen_dependencies(
+        "jacobian_action": residual_codegen_dependencies(
             system,
             action_coeffs,
             system.jacobian_action_dependencies(),
@@ -4019,7 +3934,7 @@ def _mixed_operator_source(
         (
             "residual",
             residual_coeffs,
-            _codegen_dependencies(
+            residual_codegen_dependencies(
                 system,
                 residual_coeffs,
                 system.residual_dependencies(),
@@ -4028,7 +3943,7 @@ def _mixed_operator_source(
         (
             "jacobian_action",
             action_coeffs,
-            _codegen_dependencies(
+            residual_codegen_dependencies(
                 system,
                 action_coeffs,
                 system.jacobian_action_dependencies(),
@@ -4076,7 +3991,7 @@ def _mixed_operator_source(
             element,
             rule,
             field_element_types,
-            _codegen_dependencies(
+            residual_codegen_dependencies(
                 system,
                 action_coeffs,
                 system.jacobian_action_dependencies(),
@@ -5165,7 +5080,7 @@ def _mixed_residual_diagnostics_lines(
         (
             "%s_%s_residual_element_soa" % (prefix, element),
             build_residual_graph(system, "residual_diagnostics_tmp").cost,
-            _codegen_dependencies(
+            residual_codegen_dependencies(
                 system,
                 residual_coeffs,
                 system.residual_dependencies(),
@@ -5176,7 +5091,7 @@ def _mixed_residual_diagnostics_lines(
             build_jacobian_action_graph(system, 
                 temporary_prefix="jacobian_action_diagnostics_tmp"
             ).cost,
-            _codegen_dependencies(
+            residual_codegen_dependencies(
                 system,
                 action_coeffs,
                 system.jacobian_action_dependencies(),
