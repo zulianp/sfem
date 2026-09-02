@@ -10,8 +10,8 @@ from codegen.framework.ir.kernel_ast import (
     iterator,
 )
 from codegen.framework.emitters.ast_printer import render_kernel_ast_lines
-from codegen.framework.fem.tensor_product_geometry import sfem_geometry_kernels_header_source
-from codegen.framework.backends.targets import CUDATarget, OpenMPTarget
+from codegen.framework.emitters.tensor_product_geometry import sfem_geometry_kernels_header_source
+from codegen.framework.targets import CUDATarget, OpenMPTarget
 
 
 def _join_lines(lines):
@@ -200,7 +200,7 @@ class OpenMPEnergySoASourceBuilder:
         return True
 
     def tensor_product_header_source(self):
-        from codegen.framework.fem.tensor_product_kernels import sfem_tensor_product_kernels_header_source
+        from codegen.framework.emitters.tensor_product_kernels import sfem_tensor_product_kernels_header_source
 
         return sfem_tensor_product_kernels_header_source()
 
@@ -320,7 +320,7 @@ class CUDAEnergySoASourceBuilder:
         return str(basis_family) == "tensor_product"
 
     def tensor_product_header_source(self):
-        from codegen.framework.fem.tensor_product_kernels import sfem_tensor_product_kernels_header_source
+        from codegen.framework.emitters.tensor_product_kernels import sfem_tensor_product_kernels_header_source
 
         return sfem_tensor_product_kernels_header_source(
             inline_qualifier=self.inline_qualifier(),

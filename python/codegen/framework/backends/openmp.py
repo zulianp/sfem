@@ -25,7 +25,7 @@ from codegen.framework.emitters.residual_codegen import (
     generate_mixed_residual_sfem_files,
 )
 from codegen.framework.emitters.matrix_formats import emit_matrix_format_metadata_files
-from codegen.framework.backends.targets import OpenMPTarget, TargetLanguage
+from codegen.framework.targets import OpenMPTarget, TargetLanguage
 
 
 @dataclass(frozen=True)

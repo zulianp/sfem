@@ -180,7 +180,7 @@ from codegen.framework.fem import (
 )
 from codegen.framework.backends.cuda import CUDASoABackend as _CUDASoABackend
 from codegen.framework.backends.openmp import OpenMPSoABackend as _OpenMPSoABackend
-from codegen.framework.backends.targets import (
+from codegen.framework.targets import (
     AVX512Target,
     ARMSMETarget,
     ARMSVETarget,

@@ -1,4 +1,4 @@
-from codegen.framework.backends.targets import OpenMPTarget
+from codegen.framework.targets import OpenMPTarget
 
 
 def _matching_brace_index(text, open_brace):

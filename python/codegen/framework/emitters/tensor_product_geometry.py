@@ -1,4 +1,4 @@
-from codegen.framework.backends.targets import OpenMPTarget
+from codegen.framework.targets import OpenMPTarget
 from codegen.framework.fem.tensor_product import (
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,

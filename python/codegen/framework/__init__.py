@@ -281,7 +281,7 @@ from .symbolic.qualifiers import (
     qualify,
     variable,
 )
-from .backends.targets import (
+from .targets import (
     AVX512Target,
     ARMSMETarget,
     ARMSVETarget,

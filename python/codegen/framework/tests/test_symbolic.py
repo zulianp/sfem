@@ -58,7 +58,7 @@ from codegen.framework.symbolic.forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
-from codegen.framework.backends.targets import (
+from codegen.framework.targets import (
     AVX512Target,
     ARMSMETarget,
     ARMSVETarget,
