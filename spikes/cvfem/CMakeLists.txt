@@ -31,6 +31,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 find_package(OpenMP COMPONENTS CXX)
+enable_testing()
 
 set(_cvfem_perf_opts)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
@@ -38,6 +39,36 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
         -O3
         -DNDEBUG
         -ffast-math
+        # Load-bearing, do not remove. -ffast-math implies -ffinite-math-only,
+        # under which the compiler may assume no NaN and no infinity ever occurs.
+        # It then folds every std::isfinite()/std::isnan() guard to a constant
+        # `true` -- including the ones in cvfem_hex8_ns_steady.cpp that exist to
+        # catch a singular preconditioner block or a diverged Newton residual.
+        # The guards failed *open*: the solver proceeded on a NaN state instead
+        # of reporting failure. Verified on the generated code, where the guard
+        # compiled to `mov w0, #1; ret`.
+        #
+        # This cannot be worked around in the source. A bit test on the IEEE
+        # exponent field folds away too, because the optimizer propagates the
+        # assumption through the double-typed value before the bits are ever
+        # read -- so does the same test behind a pointer, once the producing
+        # arithmetic is visible in the same function.
+        #
+        # -fno-finite-math-only restores NaN/Inf handling while keeping the rest
+        # of -ffast-math (reassociation, FMA contraction, no-signed-zeros,
+        # reciprocal math).
+        #
+        # It is not codegen-neutral, and the change is in our favour. Measured on
+        # 72 Grace cores, interleaved A/B, medians of 5: assembly is flat (sympy
+        # 56.8 -> 56.2, sumfact 39.5 -> 39.5, store 74.0 -> 74.1, packed 54.9 ->
+        # 54.6) while the packed matrix-free operators gain (residual 2320 ->
+        # 2457, +5.9%; J*v 1873 -> 2028, +8.2%). The cause is visible in the
+        # object code: cvfem_hex8_conv_all_simd and _conv_all_jv_simd stop being
+        # emitted out of line (4328 and 6200 bytes -> 12-byte stubs) and are
+        # inlined into the packed loops instead, and the large SymPy Jacobian
+        # kernels shrink 10-17%. Worst cell measured was atomic residual at
+        # -1.5%, inside this machine's ~4% run-to-run band.
+        -fno-finite-math-only
         -funroll-loops
         -fomit-frame-pointer
         -fno-math-errno
@@ -82,6 +113,15 @@ target_link_libraries(nlcover PRIVATE SFEM::sfem
     $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
 target_compile_options(nlcover PRIVATE ${_cvfem_perf_opts})
 target_include_directories(nlcover PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Guards the guards. Built with exactly the solver's flags, so it fails if the
+# build's floating-point options have folded cvfem_hex8_ns_steady.cpp's
+# std::isfinite() checks into a constant `true`. See the -fno-finite-math-only
+# comment above. Run it in CI; it takes microseconds.
+add_executable(cvfem_guard_selftest cvfem_guard_selftest.cpp)
+target_compile_options(cvfem_guard_selftest PRIVATE ${_cvfem_perf_opts})
+target_include_directories(cvfem_guard_selftest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME cvfem_guard_selftest COMMAND cvfem_guard_selftest)
 
 add_executable(cvfem_hex8_ns_steady cvfem_hex8_ns_steady.cpp)
 target_link_libraries(cvfem_hex8_ns_steady

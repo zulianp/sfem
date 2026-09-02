@@ -295,7 +295,7 @@ int main(int argc, char **argv) {
 
     if (!kernel_is_valid(kernel)) {
         std::fprintf(stderr,
-                     "invalid --kernel '%s' (expected sumfact, current, fd, sympy, sympy_block, sympy_row, or sympy_face)\n",
+                     "invalid --kernel '%s' (expected sumfact, current, fd, sympy, sympy_block, sympy_row, sympy_face, or split)\n",
                      kernel.c_str());
         if (own_mpi) MPI_Finalize();
         return 1;
@@ -319,6 +319,17 @@ int main(int argc, char **argv) {
     }
     if (layout != "packed" && layout != "atomic" && layout != "colored" && layout != "store") {
         std::fprintf(stderr, "invalid --layout '%s' (expected packed, atomic, colored or store)\n", layout.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // The split assembly restores a saved constant half into the global BSR values
+    // and adds the velocity-dependent half through precomputed element slots, so it
+    // is defined only for the atomic layout. Reject the other combinations rather
+    // than letting them fall through to the layout's default kernel: a silent
+    // fallback here reports a throughput and a verification result for a kernel
+    // that never ran.
+    if (kernel_kind == KernelKind::Split && layout != "atomic") {
+        std::fprintf(stderr, "--kernel split requires --layout atomic (got '%s')\n", layout.c_str());
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -559,7 +570,18 @@ int main(int argc, char **argv) {
             assemble_jacobian_atomic_sympy_row(d, bsr, rho, mu);
         else if (kernel_kind == KernelKind::SympyFace)
             assemble_jacobian_atomic_sympy_face(d, bsr, rho, mu);
+        else if (kernel_kind == KernelKind::Split)
+            // Restore the geometry-only half built once at setup, then add only
+            // the velocity-dependent half. The linear half is not rebuilt here:
+            // that is the whole point of the split.
+            assemble_jacobian_atomic_nonlinear(d, bsr, rho, mu, jac_linear);
         else
+            // Current and Fd both land here. There is no dedicated `current`
+            // assembly kernel -- the loop residual kernel has no assembled
+            // counterpart -- so `--kernel current --assemble` measures the
+            // finite-difference kernel. Kept as the fallback rather than
+            // rejected, because fd is also the correctness reference, but the
+            // two rows are the same kernel and should not be read as distinct.
             assemble_jacobian_atomic_fd(d, bsr, rho, mu);
     };
 
