@@ -1,0 +1,80 @@
+schema_version: 1
+id: cylindrical_pressure_vessel
+name: Hyperelastic cylindrical pressure vessel
+kind: validation
+source:
+  description: Published analytical radial and hoop Cauchy stress profiles
+  tutorial: https://www.solids4foam.com/tutorials/more-tutorials/solid-mechanics/hyperelasticity/cylindricalPressureVessel.html
+  data: https://github.com/solids4foam/solids4foam-tutorials-benchmark-data/tree/6917f439243d7d782d42aacf1227b12b2300d5b2/tutorials/solids/hyperelasticity/cylindricalPressureVessel/fe41
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - "{mesh}"
+    - --nr
+    - "20"
+    - --ntheta
+    - "20"
+    - --ri
+    - "7"
+    - --ro
+    - "18.625"
+
+inputs:
+  - template: symmetry.yaml
+    output: "{output}/symmetry.yaml"
+  - template: inner_pressure.yaml
+    output: "{output}/inner_pressure.yaml"
+
+driver:
+  executable: "{build_dir}/hyperelasticity_bdf2"
+  arguments:
+    - "{mesh}"
+    - "{output}/symmetry.yaml"
+    - "{output}/inner_pressure.yaml"
+    - "{output}/solution"
+  environment:
+    OMP_NUM_THREADS: "1"
+    SFEM_OPERATOR: GeneratedModifiedMooneyRivlin
+    SFEM_C1: "80"
+    SFEM_C2: "20"
+    SFEM_KAPPA: "9933.333333333334"
+    SFEM_RHO: "0"
+    SFEM_DT: "0.05"
+    SFEM_T_END: "1"
+    SFEM_STEPS: "20"
+    SFEM_EXPORT_FREQ: "20"
+    SFEM_LOAD_RAMP_TIME: "1"
+    SFEM_NL_MAX_IT: "100"
+    SFEM_NL_TOL: "1e-4"
+    SFEM_LSOLVE_RTOL: "1e-4"
+    SFEM_LSOLVE_MAX_IT: "20000"
+    SFEM_ENABLE_LINE_SEARCH: "1"
+
+verification:
+  command:
+    - "{python}"
+    - "{case_dir}/verify.py"
+    - --case
+    - "{case_dir}/case.yaml"
+    - --output
+    - "{output}"
+    - --report
+    - "{output}/verification.json"
+  report: "{output}/verification.json"
+  forbidden_output:
+    - No progress made
+    - "(max iterations)"
+  required_output:
+    - pattern: "(converged)"
+      count: 20
+  tolerances:
+    radial_stress_relative_l2: 0.04
+    radial_stress_max_abs_mpa: 5.0
+    hoop_stress_relative_l2: 0.04
+    hoop_stress_max_abs_mpa: 5.0
+
+oracle:
+  radial_stress: oracle/radial_stress.csv
+  hoop_stress: oracle/hoop_stress.csv
