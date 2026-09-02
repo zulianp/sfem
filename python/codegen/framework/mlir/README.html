@@ -1,0 +1,134 @@
+<h1>SFEM MLIR Lowering</h1>
+<p>This package contains the experimental MLIR-based matrix-free lowering path.</p>
+<ul>
+<li><code>model.py</code>: SFEM kernel model extraction from the existing generated framework.</li>
+<li><code>common.py</code>: shared inspection and optimization strategy data.</li>
+<li><code>tools.py</code>: wrappers around <code>mlir-opt</code>, <code>mlir-translate</code>, and <code>mlir-runner</code>.</li>
+<li><code>openmp.py</code>: SCF/OpenMP/LLVM/EmitC lowering and OpenMP runner support.</li>
+<li><code>opencl.py</code>: OpenCL lowering, SPIR-V inspection artifacts, and Apple OpenCL C source emission.</li>
+<li><code>runtime.py</code>: Python reference/threaded EBE executor helpers used by tests.</li>
+<li><code>sum_factorization.py</code>: tensor-product SFEM IR extraction plus linalg, generic GPU dialect MLIR, Metal smoke-test source emission, and fused Laplace tensor-product apply emission in GPU dialect and Metal.</li>
+<li><code>cpp/</code>: benchmark C++ harnesses used by the MLIR benchmark script.</li>
+<li><code>scripts/</code>: MLIR benchmark drivers.</li>
+</ul>
+<p>Use this package directly through <code>codegen.framework.mlir</code>.</p>
+<p>Tensor-product Laplace inspection artifacts can be emitted from the existing SFEM form:</p>
+<pre class="codehilite"><code class="language-python">from codegen.framework.materials.laplace import material
+from codegen.framework.mlir import (
+    TensorProductLaplaceFormBatchedGPULowering,
+    TensorProductLaplaceFormEBEGPULowering,
+    TensorProductLaplaceFormEBEMetalLowering,
+    TensorProductLaplaceFormGPULowering,
+    TensorProductLaplaceFormLinalgLowering,
+    TensorProductSumFactorMLIRLowering,
+    tensor_product_laplace_form_ir_from_user_input_stage,
+    tensor_product_sum_factor_ir_from_user_input_stage,
+)
+from sfem import gen
+
+stage = gen.UserInputStage.create(material, (&quot;HEX27&quot;,), 8, None)
+sum_factor = tensor_product_sum_factor_ir_from_user_input_stage(stage)
+TensorProductSumFactorMLIRLowering(sum_factor).write_inspection_artifacts(&quot;artifacts/sum_factor&quot;)
+
+form = tensor_product_laplace_form_ir_from_user_input_stage(stage)
+TensorProductLaplaceFormLinalgLowering(form).write_inspection_artifacts(&quot;artifacts/laplace_form_linalg&quot;)
+TensorProductLaplaceFormGPULowering(form).write_inspection_artifacts(&quot;artifacts/laplace_form&quot;)
+TensorProductLaplaceFormBatchedGPULowering(form, max_elements=1024, max_nodes=4096).write_inspection_artifacts(&quot;artifacts/laplace_ebe&quot;)
+TensorProductLaplaceFormEBEGPULowering(
+    form,
+    max_elements=1024,
+    max_nodes=4096,
+    max_node_degree=32,
+).write_inspection_artifacts(&quot;artifacts/laplace_ebe_full&quot;)
+TensorProductLaplaceFormEBEMetalLowering(
+    form,
+    max_elements=1024,
+    max_nodes=4096,
+    max_node_degree=32,
+).write_inspection_artifacts(&quot;artifacts/laplace_ebe_metal&quot;)</code></pre>
+
+
+<p>The artifact driver emits <code>.sum_factor.ir.json</code> and <code>.laplace_form.ir.json</code> files for the SFEM IR handoff. The sum-factor writer emits <code>.linalg.mlir</code>, whole-chain <code>.linalg_pipeline.mlir</code>, raw <code>.vector.mlir</code>, padded <code>.matrix_unit.mlir</code>, raw-buffer <code>.matrix_unit_memref.mlir</code>, whole-chain <code>.matrix_unit_pipeline.mlir</code>, <code>.gpu.mlir</code>, direct <code>.spirv.opencl.mlir</code>, <code>.spirv.opencl.op.mlir</code>, <code>.spirv.opencl.spv</code>, <code>.spirv.opencl.dispatch.json</code>, <code>.metal</code>, and <code>.metal_smoke.mm</code> files for tensor-product elements including QUAD4, HEX8/HEX27, and higher-order PROTEUS_HEX cases. The sum-factor linalg pipeline invokes the structured tensor stage functions in SFEM IR schedule order and uses static <code>linalg.generic</code> bridge copies when adjacent stages use different 2D tensor views. The Laplace form linalg pipeline composes those derivative pipelines with quadrature weights and <code>kappa</code> into a full local residual apply. These structured tensor pipelines are the IREE Metal VMFB inputs. The padded matrix-unit artifact rounds each <code>vector.matrix_multiply</code> dimension up to the requested <code>vector_size</code> tile so high-order contractions such as HEX27 and PROTEUS_HEX64 expose hardware-aligned matrix boundaries while preserving raw dimensions as attributes. The raw-buffer matrix-unit artifact adds <code>vector.transfer_read</code>, <code>vector.shape_cast</code>, and <code>vector.transfer_write</code> around the same padded multiply so raw sum-factor contraction buffers can be packed into matrix-unit tiles without changing the SFEM IR shape. The whole-chain matrix-unit pipeline invokes the raw-buffer stage functions in the SFEM IR schedule order with explicit scratch buffers and remains the matrix-unit inspection boundary. The generic GPU dialect artifacts include static <code>spirv.entry_point_abi</code> workgroup metadata and <code>spirv.interface_var_abi</code> buffer binding metadata for downstream GPU-to-SPIR-V lowering. The direct SPIR-V/OpenCL artifacts emit branch-free kernels for both the sum-factor stage pipeline and the fused Laplace form apply, use CrossWorkgroup buffers, unroll tensor-product contractions in SPIR-V dialect, record dispatch sizes, and serialize extracted <code>spirv.module</code> operations to SPIR-V binaries for generic GPU inspection. With <code>--validate-mlir</code>, the driver deserializes each generated <code>.spv</code> back to SPIR-V dialect and records the result in <code>spirv_binary_validation</code>. The sum-factor Metal smoke harness dispatches every generated tensor-product stage kernel on Apple GPU. The fused form writer also emits the Metal source and ObjC++ smoke-test harness used by the Apple GPU runtime tests.
+The driver also writes <code>pipeline_evidence.json</code>, a compact summary of the Python form source module, SFEM IR, generated GPU artifacts, IREE Metal VMFB/executable/backend-file probes, SPIR-V validation, Metal toolchain compilation, and runtime smoke status. This is intended as the first place to check the end-to-end tensor-product Laplace pipeline state for a generated artifact directory.
+The batched EBE map writer emits <code>.ebe.gpu.mlir</code>, launching one GPU block per element and one thread per local test function while writing element-local residual scratch to avoid atomics.
+The full EBE writer emits <code>.ebe.full.gpu.mlir</code>, adding an inverse-topology reduce kernel that accumulates element-local scratch into nodal output without atomics.
+The Metal EBE writer emits <code>.ebe.metal</code> and <code>.ebe_metal_smoke.mm</code>, using the same map/reduce split for Apple GPU runtime smoke tests.</p>
+<p>Current PROTEUS_HEX64 Apple GPU measurements from the strict artifact gate on 2026-07-03:</p>
+<table>
+<thead>
+<tr>
+<th>Kernel path</th>
+<th>Element/work</th>
+<th>Output check</th>
+<th>Timing</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generated SFEM <code>laplace_proteus_hex64_residual_element_soa_float</code> vs fused Metal local apply</td>
+<td>1 element, 64 shape functions, 64 quadrature points, identity geometry</td>
+<td>max abs diff <code>2.85065539e-07</code> with tolerance <code>5e-4</code></td>
+<td>generated SFEM CPU <code>1.802928 us</code> avg over 4096 calls; Metal GPU <code>216.904298 us</code> avg over 64 dispatches in the comparison harness</td>
+<td><code>/private/tmp/sfem_laplace_proteus_hex64_host_wrapper_spirv/manifest.json</code>, <code>generated_sfem_comparison</code></td>
+</tr>
+<tr>
+<td>SFEM-IR fused Metal local apply smoke</td>
+<td>1 element, 64 shape functions, 64 quadrature points</td>
+<td>pass against SFEM IR reference</td>
+<td><code>227.050782 us</code> avg GPU time over 64 dispatches</td>
+<td>same manifest, <code>metal_smoke.local_apply</code></td>
+</tr>
+<tr>
+<td>SFEM-IR Metal EBE map plus reduce smoke</td>
+<td>1 element, 65-node bound, node degree 1</td>
+<td>pass against SFEM IR EBE reference</td>
+<td><code>349.203777 us</code> avg GPU time over 64 map+reduce command buffers</td>
+<td>same manifest, <code>metal_smoke.ebe_map_reduce</code></td>
+</tr>
+<tr>
+<td>SFEM-IR Metal sum-factor stage smoke</td>
+<td>18 generated stage kernels</td>
+<td>each stage pass against dense stage reference</td>
+<td><code>30.336625 us</code> mean avg GPU time per stage, range <code>16.548827-44.608073 us</code>; serial stage-sum <code>546.059242 us</code></td>
+<td>same manifest, <code>metal_smoke.sum_factor_stages</code></td>
+</tr>
+<tr>
+<td>IREE Metal linalg pipelines</td>
+<td>sum-factor and full-form <code>.linalg_pipeline.mlir</code> VMFBs</td>
+<td>runtime pass against SFEM reference values</td>
+<td>timing not recorded yet; backend dump has 8 MSL files and 8 SPIR-V binaries totaling 18272 bytes</td>
+<td>same manifest, <code>iree_metal_runtime</code>, <code>iree_metal_executable_files</code></td>
+</tr>
+<tr>
+<td>Raw generic GPU to SPIR-V probe</td>
+<td>sum-factor, form, EBE map, EBE full GPU dialect artifacts</td>
+<td>host <code>func.func</code> wrappers preserved; extracted <code>spirv.module</code> kernels verify and serialize</td>
+<td>4 raw kernel SPIR-V binaries totaling 27712 bytes; not runnable yet because <code>gpu.launch_func</code> lowering remains open</td>
+<td>same manifest, <code>mlir_gpu_to_spirv</code></td>
+</tr>
+</tbody>
+</table>
+<p>The full tensor-product Laplace artifact bundle can also be emitted from the repo venv:</p>
+<pre class="codehilite"><code class="language-bash">PYTHONPATH=python venv/bin/python python/codegen/framework/mlir/scripts/tensor_product_laplace_artifacts.py \
+  --output-dir /tmp/sfem_laplace_hex27_mlir \
+  --element HEX27 \
+  --max-elements 1024 \
+  --max-nodes 4096 \
+  --max-node-degree 32 \
+  --verify-reference \
+  --verify-performance-shape \
+  --validate-mlir \
+  --probe-iree-metal \
+  --run-iree-metal-runtime \
+  --probe-metal-toolchain</code></pre>
+
+
+<p>Add <code>--run-metal-smoke</code> on an Apple GPU host to compile and dispatch the generated Metal smoke tests. For 3D tensor-product Laplace elements it also generates the corresponding SFEM OpenMP kernel into the artifact directory, compiles an ObjC++ comparison harness, compares the fused Metal local-apply output against the generated SFEM <code>*_residual_element_soa_float</code> output, and records both timings in <code>generated_sfem_comparison</code>. <code>--verify-reference</code> runs deterministic CPU checks from the SFEM IR, including a constant-field residual check and EBE map/reduce checksum. <code>--verify-performance-shape</code> checks that generated GPU/Metal kernel artifacts keep the expected linalg/vector structure, that the full-form linalg pipeline covers every derivative direction, that the sum-factor generic GPU artifact has one launch/kernel pair per stage with SPIR-V ABI metadata, that the local form and EBE generic GPU artifacts have the expected dispatch and descriptor ABI shape, and that hot-loop branches and atomics are avoided. Use <code>--require-metal-device</code> when the command should fail instead of recording a no-device skip.
+Use <code>--require-iree-metal</code> when missing <code>iree-compile</code> or a failed IREE Metal VMFB build from a sum-factor or full-form <code>.linalg_pipeline.mlir</code> artifact should fail the command instead of being recorded in the manifest. The same probe also records <code>iree_metal_executable_sources</code> by compiling those linalg pipelines with <code>--compile-to=executable-sources</code>; these artifacts expose the successful IREE HAL boundary with <code>hal.executable</code>, <code>stream.cmd.dispatch</code>, and <code>flow.dispatch.tensor</code> operations before VMFB emission. It also records <code>iree_metal_executable_files</code> from <code>--iree-hal-dump-executable-files-to</code>, including configured executable MLIR, Metal target MLIR, nonempty SPIR-V binaries that deserialize back to SPIR-V dialect, and generated MSL source files with kernel/device/thread-position entry points.
+Use <code>--probe-iree-metal-matrix-unit</code> to also record whether the sum-factor <code>.matrix_unit.mlir</code>, <code>.matrix_unit_memref.mlir</code>, and <code>.matrix_unit_pipeline.mlir</code> inspection boundaries currently compile to IREE Metal VMFBs. This probe is separate because the matrix-unit artifacts intentionally expose raw <code>vector.transfer_read</code>/<code>vector.matrix_multiply</code> structure that may require additional IREE lowering support before they can be required runtime gates; add <code>--require-iree-metal-matrix-unit</code> when those boundaries must pass. Failed IREE probe stdout/stderr streams are written next to the attempted VMFB input and the manifest keeps compact previews plus byte counts. Known IREE VM conversion failures around matrix-unit vector/memref ABI materialization are classified as <code>iree_vm_matrix_unit_abi_conversion</code>.
+Use <code>--probe-iree-metal-gpu</code> to record whether the generated generic GPU dialect artifacts currently compile directly to IREE Metal VMFBs. This probe covers the sum-factor stage kernels, local form apply, EBE map, and EBE map/reduce GPU artifacts. Each record keeps the baseline command plus VM/SPIR-V index-width and input-demotion compile attempts so IREE compatibility failures are reproducible from the manifest. Known IREE VM conversion failures around <code>gpu.launch_func</code> and SCF/index materialization are classified as <code>iree_vm_generic_gpu_index_conversion</code>; add <code>--require-iree-metal-gpu</code> when those boundaries must pass.
+Use <code>--probe-mlir-gpu-to-spirv</code> to also run the standard MLIR GPU-module-to-SPIR-V pass pipeline on those raw generic GPU artifacts. This probe records kernel lowering, host wrapper preservation, extracted kernel-module verification, binary serialization, and host launch lowering separately: <code>raw_gpu_spirv_kernel_ok</code> is true once raw GPU kernels lower to SPIR-V with OpenCL storage classes and no remaining memref loads/stores, <code>raw_gpu_spirv_host_wrapper_ok</code> is true when the host side remains a normal <code>func.func</code> wrapper around <code>gpu.launch_func</code>, <code>raw_gpu_spirv_kernel_module_ok</code> is true once the nested <code>spirv.module</code> verifies as standalone SPIR-V dialect, and <code>raw_gpu_spirv_kernel_binary_ok</code> is true once the extracted kernel modules serialize to nonempty SPIR-V binaries with <code>mlir-translate --serialize-spirv</code>. Unresolved host <code>gpu.launch_func</code>/<code>gpu.module</code> wiring keeps <code>raw_gpu_spirv_host_launch_ok</code> false and is classified as <code>mlir_gpu_to_spirv_host_launch_boundary</code>.
+Use <code>--require-iree-metal-runtime</code> when the sum-factor and full-form <code>.linalg_pipeline.mlir</code> VMFBs must dispatch through the IREE Metal runtime and match the SFEM reference values instead of being recorded as a skip or failure.
+Use <code>--require-metal-toolchain</code> when missing <code>xcrun metal</code> offline compilation support should fail the command instead of being recorded in the manifest. The toolchain probe tags each <code>.metal</code> input as either SFEM-generated Metal or IREE-emitted MSL from <code>iree_metal_executable_files</code>, and writes <code>.air</code> outputs under matching relative paths so the manifest preserves which backend source path was compiled.
+Use <code>--require-pipeline-evidence</code> when the summarized SFEM IR to IREE/Metal path must be complete according to <code>pipeline_evidence["metal_pipeline_ok"]</code>.</p>
