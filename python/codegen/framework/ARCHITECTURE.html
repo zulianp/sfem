@@ -193,7 +193,7 @@
   <p class="standfirst">The layer graph is now clean and enforced. The layers themselves are not yet doing the jobs they are named for — one of them holds 22,970 lines that should be a printer.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 11 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 13 commits from 060684ff</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
     <span><b>Date</b> 2026-09-02</span>
   </div>
@@ -344,7 +344,7 @@
       <tr>
         <td><b>One dispatch axis</b></td>
         <td>A layer may branch on the concept it owns and on nothing a layer above owns. No <code>if kind == "energy_soa"</code> in a backend, no <code>if "crs" in formats</code> in a printer.</td>
-        <td class="m">partly: tests/test_plans_are_consumed.py pins the 13 structural plans no emitter reads, shrink-only in both directions — see open point 5</td>
+        <td class="m">partly: tests/test_plans_are_consumed.py pins the structural plans no emitter reads — 11 of 13, shrink-only in both directions — see open point 5</td>
       </tr>
     </tbody>
   </table>
@@ -460,10 +460,10 @@
         <text x="264" y="216" class="d-dim">DataStreamPlan</text>
         <text x="264" y="232" class="d-dim">BlockPlan</text>
         <text x="264" y="248" class="d-dim">GeometryPlan</text>
-        <text x="264" y="264" class="d-dim">LocalKernelPlan · MeshKernelPlan</text>
+        <text x="264" y="264" class="d-okt">LocalKernelPlan · MeshKernelPlan  ✓ read</text>
         <text x="264" y="288" class="d-dim">CRS / BSR / DIA / COO /</text>
         <text x="264" y="304" class="d-dim">Patch / BlockDiagSym AssemblyPlan</text>
-        <text x="264" y="326" class="d-gapt">defined, tested, read by no emitter</text>
+        <text x="264" y="326" class="d-gapt">11 of 13 read by no emitter</text>
         <path d="M350,140 L350,110" class="d-gline" stroke-dasharray="4 4"/>
 
         <!-- what the emitter re-derives -->
@@ -510,8 +510,9 @@
       <p><b>Done: the analysis family.</b> <code>plans/streams.py</code> owns which field stream groups a kernel needs — the emitter keeps only how each is spelled in C. <code>plans/dependencies.py</code> owns dependency pruning: which roles are touched, which parameters survive, which coefficient entries are structurally zero. <code>plans/boundary_usage.py</code> owns whether a boundary form's coefficients reach for coordinates or current values, a question the emitter had been asking four times in two different shapes.</p>
       <p><b>Done: the layout family.</b> <code>plans/layout.py</code> takes 17 more functions — which shape function maps to which stream, where a field's components sit in a packed lane buffer, how tensor-product elements reorder into Cartesian order, and the mixed-order variants for Taylor–Hood. These decide the memory access pattern of every generated loop, and so whether the loads are unit stride.</p>
       <p>Measured effect: <b>the largest emitter contains zero free-symbol analysis</b>, down from six references, and its text-free helper count has fallen from 32 to 18. <code>residual_codegen.py</code> is 9,875 lines, from 10,074. The boundary emitter is down from eight symbol scans to two, both argument validation rather than planning.</p>
-      <p><b>Remaining: the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, geometry mode. These are harder because they are not analysis that can be lifted whole but structure interleaved with printing, and they are what OP 2 and OP 4 wait on.</p>
-      <div class="op-facts"><span><i>emitters</i> 18,358 LOC in two modules</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP2, OP3, OP4</span></div>
+      <p><b>Done: kernel file naming.</b> Which files a kernel produces and what they are called — <code>LocalKernelPlan.name</code>/<code>.header</code> and <code>MeshKernelPlan.name</code>/<code>.source</code> were already the definition, and the emitters rebuilt both from format strings. The idempotence rule the emitter carried privately (a prefix already naming its element does not get a second one) moved into the plan factory with it. <b>This is the first move that changes the plan-consumption count: 13 unread, now 11.</b></p>
+      <p><b>Remaining: the rest of the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, geometry mode, and the six assembly plans. These are harder because they are not analysis or arithmetic that lifts out whole but structure interleaved with printing, and they are what OP 2 and OP 4 wait on.</p>
+      <div class="op-facts"><span><i>emitters</i> 18,344 LOC in two modules</span><span><i>plans unread</i> 13 → 11</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP2, OP3, OP4</span></div>
     </div>
   </div>
 
