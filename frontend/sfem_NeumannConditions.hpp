@@ -28,6 +28,7 @@ namespace sfem {
             SharedBuffer<real_t>                  values;
             real_t                                value{0};
             int                                   component{0};
+            bool                                  follower_pressure{false};
         };
 
         static std::shared_ptr<NeumannConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
