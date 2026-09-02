@@ -193,7 +193,7 @@
   <p class="standfirst">The layer graph is now clean and enforced. The layers themselves are not yet doing the jobs they are named for — one of them holds 22,970 lines that should be a printer.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 17 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 20 commits from 060684ff</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
     <span><b>Date</b> 2026-09-02</span>
   </div>
@@ -501,6 +501,18 @@
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
   <p>Nine, ordered by what unblocks what. One is closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 0</div>
+    <div class="body">
+      <div class="op-title">The matrix-free apply matrix <span class="chip c-part">stated and verified; 1 of 4 axes drives</span></div>
+      <p>The matrix-free action is the framework's primary product — <b>219 of the 520 generated files</b> — and every kernel is emitted several times over across four axes: mesh traversal, geometry mode, element data layout, and precision. Which combinations exist was written down nowhere; it was readable only by generating the output and looking at what came out.</p>
+      <p><code>plans/apply_variants.py</code> now states the rule, verified against the real tree: <b>181 of 181 apply kernels predicted exactly</b> across all eleven materials. The rule has genuine content — AoS only ever appears with isoparametric geometry, and never for Taylor–Hood formulations, which is why poro-hyperelasticity and Stokes have no AoS variants at all; packed traversal applies to the Jacobian action only, never the residual; and packed isoparametric variants are skipped for TRI3 and TET4, whose isoparametric geometry <em>is</em> affine.</p>
+      <p><b>The precision axis drives.</b> It was a literal tuple repeated seventeen times in one emitter; all seventeen now read the plan, and a test proves the difference between consulted and ignored by changing the plan and requiring the kernels to follow — drop a precision and its kernels vanish, add a third and a third full set appears. That is the precondition for the per-thread, per-warp and CUDA/HIP apply variants goal 8 asks for: adding a row is now a plan change.</p>
+      <p><b>The other three axes are still decided by the emitters.</b> Precision was the one already expressed as a clean iteration; traversal, geometry and layout are branches woven through emission, and moving them is the harder half.</p>
+      <div class="op-facts"><span><i>apply kernels</i> 219 files · 181 kernels</span><span><i>axes driving</i> 1 of 4</span><span><i>gate</i> byte-identity + drive tests</span></div>
+    </div>
+  </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 1</div>
