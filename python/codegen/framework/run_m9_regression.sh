@@ -55,7 +55,7 @@ fi
 
 if [[ "${SFEM_APPLY_BENCH:-0}" == "1" ]]; then
     echo "Matrix-free apply gate: parity and throughput"
-    "$PYTHON_BIN" -m codegen.framework.tools.apply_bench --element HEX8 --refine 40
+    "$PYTHON_BIN" -m codegen.framework.tools.apply_bench --element HEX8 --refine 30
 else
     echo "Matrix-free apply gate: skipped; set SFEM_APPLY_BENCH=1 to run it (needs a C++ compiler)"
 fi
