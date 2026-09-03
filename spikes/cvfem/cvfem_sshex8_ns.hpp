@@ -454,3 +454,232 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// One Jacobian per macro-element, and the linear terms lifted out of the loop.
+//
+// Under the affine-macro assumption the geometry is invariant over all L^3
+// micro-elements, and three things the action kernel recomputes per element become
+// loop invariants:
+//
+//   * the direction areas A[3][3], from cvfem_hex8_dir_areas(adj, A)
+//   * the twelve node-separation vectors d_ij across the sub-control-surfaces
+//   * the twelve Rhie-Chow coefficients rho * Df * A^2 / (A.d), Df = scale h^2/(2 mu)
+//
+// The last is the valuable one. It is pure geometry, so it is constant here, and each
+// evaluation costs a square root and a division -- twelve of them per micro-element,
+// L^3 times per macro, all producing the same twelve numbers.
+//
+// What cannot be hoisted is the viscous term. It is linear in the direction v and its
+// geometry is invariant, but it still contracts against v, which changes per element:
+// cvfem_hex8_grad_sumfact has to run either way. Only its geometric factors are lifted.
+// The convective term stays inside entirely -- its upwind switch depends on the state.
+//
+// This is the one place in this file that restates kernel arithmetic rather than calling
+// the shared kernel, which is why the benchmark checks it against the naive variant like
+// the others. If it stops agreeing, this is the copy that drifted.
+
+struct SSMacroGeom {
+    scalar_t adj[9];
+    scalar_t det;
+    scalar_t A[3][3];
+    scalar_t coeff[CVFEM_HEX8_N_SCS];
+    scalar_t dvec[CVFEM_HEX8_N_SCS][3];
+};
+
+inline void sscvfem_macro_geom(const scalar_t x[8], const scalar_t y[8], const scalar_t z[8],
+                               const scalar_t rho, const scalar_t mu, const scalar_t rc_scale,
+                               SSMacroGeom &g) {
+    sscvfem_micro_geom(x, y, z, g.adj, &g.det);
+    cvfem_hex8_dir_areas(g.adj, g.A);
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const int i = CVFEM_HEX8_SCS[s].i;
+        const int j = CVFEM_HEX8_SCS[s].j;
+        const int d = s >> 2;
+        g.dvec[s][0] = x[j] - x[i];
+        g.dvec[s][1] = y[j] - y[i];
+        g.dvec[s][2] = z[j] - z[i];
+        g.coeff[s]   = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc_scale,
+                                                       g.dvec[s][0], g.dvec[s][1], g.dvec[s][2],
+                                                       g.A[d][0], g.A[d][1], g.A[d][2]);
+    }
+}
+
+// Mirrors cvfem_hex8_ns_upwind_jacobian_action with the invariants passed in.
+static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_t mu, const SSMacroGeom &g,
+                                               const scalar_t *const SFEM_RESTRICT ux,
+                                               const scalar_t *const SFEM_RESTRICT uy,
+                                               const scalar_t *const SFEM_RESTRICT uz,
+                                               const scalar_t *const SFEM_RESTRICT vx,
+                                               const scalar_t *const SFEM_RESTRICT vy,
+                                               const scalar_t *const SFEM_RESTRICT vz,
+                                               const scalar_t *const SFEM_RESTRICT q,
+                                               const scalar_t *const SFEM_RESTRICT p,
+                                               const scalar_t *const SFEM_RESTRICT pgx,
+                                               const scalar_t *const SFEM_RESTRICT pgy,
+                                               const scalar_t *const SFEM_RESTRICT pgz,
+                                               scalar_t *const SFEM_RESTRICT       r) {
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+
+    scalar_t dgrad[9];
+    cvfem_hex8_grad_sumfact(g.adj, g.det, vx, vy, vz, dgrad);
+
+    for (int d = 0; d < 3; ++d) {
+        scalar_t tx, ty, tz;
+        cvfem_hex8_traction(mu, dgrad[0], dgrad[1], dgrad[2], dgrad[3], dgrad[4], dgrad[5], dgrad[6], dgrad[7],
+                            dgrad[8], g.A[d][0], g.A[d][1], g.A[d][2], tx, ty, tz);
+        for (int e = 0; e < 4; ++e) {
+            const int i = CVFEM_HEX8_DIR_EDGES[d][e][0];
+            const int j = CVFEM_HEX8_DIR_EDGES[d][e][1];
+            r[i * 4 + 0] -= tx;
+            r[i * 4 + 1] -= ty;
+            r[i * 4 + 2] -= tz;
+            r[j * 4 + 0] += tx;
+            r[j * 4 + 1] += ty;
+            r[j * 4 + 2] += tz;
+        }
+    }
+
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t one  = scalar_t(1);
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const int      i  = CVFEM_HEX8_SCS[s].i;
+        const int      j  = CVFEM_HEX8_SCS[s].j;
+        const int      d  = s >> 2;
+        const scalar_t ax = g.A[d][0], ay = g.A[d][1], az = g.A[d][2];
+        const scalar_t c  = g.coeff[s];
+
+        const scalar_t adv_x = half * (ux[i] + ux[j]);
+        const scalar_t adv_y = half * (uy[i] + uy[j]);
+        const scalar_t adv_z = half * (uz[i] + uz[j]);
+
+        // -coeff * ((p_j - p_i) - avg(grad p) . d), with coeff and d both loop invariants.
+        const scalar_t corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
+                                               half * (pgy[i] + pgy[j]) * g.dvec[s][1] +
+                                               half * (pgz[i] + pgz[j]) * g.dvec[s][2]);
+        const scalar_t mdot_rc = -c * corr;
+
+        const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
+        const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
+        const scalar_t mpos  = half * (mdot + sgn * mdot);
+        const scalar_t mneg  = half * (mdot - sgn * mdot);
+        const scalar_t d_pos = half * (one + sgn);
+        const scalar_t d_neg = half * (one - sgn);
+
+        const scalar_t dmdot = rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay + (vz[i] + vz[j]) * az) +
+                               c * (q[i] - q[j]);
+        const scalar_t dpos = d_pos * dmdot;
+        const scalar_t dneg = d_neg * dmdot;
+        const scalar_t qmid = half * (q[i] + q[j]);
+        const scalar_t fx   = dpos * ux[i] + mpos * vx[i] + dneg * ux[j] + mneg * vx[j] + qmid * ax;
+        const scalar_t fy   = dpos * uy[i] + mpos * vy[i] + dneg * uy[j] + mneg * vy[j] + qmid * ay;
+        const scalar_t fz   = dpos * uz[i] + mpos * vz[i] + dneg * uz[j] + mneg * vz[j] + qmid * az;
+        r[i * 4 + 0] += fx;
+        r[i * 4 + 1] += fy;
+        r[i * 4 + 2] += fz;
+        r[i * 4 + 3] += dmdot;
+        r[j * 4 + 0] -= fx;
+        r[j * 4 + 1] -= fy;
+        r[j * 4 + 2] -= fz;
+        r[j * 4 + 3] -= dmdot;
+    }
+}
+
+inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT dir,
+                                                            scalar_t *const SFEM_RESTRICT       jv) {
+    SFEM_TRACE_SCOPE("sscvfem::apply_macro_local_hoisted");
+    const int L   = d.level;
+    const int nxe = d.nxe;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+#pragma omp parallel
+    {
+        std::vector<smesh::idx_t> lg((size_t)nxe);
+        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
+        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
+        std::vector<scalar_t>     lvx((size_t)nxe), lvy((size_t)nxe), lvz((size_t)nxe), lq((size_t)nxe);
+        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
+        std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                lg[(size_t)a]        = g;
+                lx[(size_t)a]        = (scalar_t)d.points[0][g];
+                ly[(size_t)a]        = (scalar_t)d.points[1][g];
+                lz[(size_t)a]        = (scalar_t)d.points[2][g];
+                lux[(size_t)a]       = d.ux[(size_t)g];
+                luy[(size_t)a]       = d.uy[(size_t)g];
+                luz[(size_t)a]       = d.uz[(size_t)g];
+                lp[(size_t)a]        = d.p[(size_t)g];
+                lvx[(size_t)a]       = dir[(size_t)g * 4 + 0];
+                lvy[(size_t)a]       = dir[(size_t)g * 4 + 1];
+                lvz[(size_t)a]       = dir[(size_t)g * 4 + 2];
+                lq[(size_t)a]        = dir[(size_t)g * 4 + 3];
+                lpgx[(size_t)a]      = d.pgx[(size_t)g];
+                lpgy[(size_t)a]      = d.pgy[(size_t)g];
+                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+            }
+            std::fill(lout.begin(), lout.end(), scalar_t(0));
+
+            SSMacroGeom mg;
+            {
+                scalar_t ex[8], ey[8], ez[8];
+                for (int a = 0; a < 8; ++a) {
+                    const int l = off[a];
+                    ex[a]       = lx[(size_t)l];
+                    ey[a]       = ly[(size_t)l];
+                    ez[a]       = lz[(size_t)l];
+                }
+                sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+            }
+
+            for (int zi = 0; zi < L; ++zi) {
+                for (int yi = 0; yi < L; ++yi) {
+                    for (int xi = 0; xi < L; ++xi) {
+                        const int base = sscvfem_lidx(L, xi, yi, zi);
+
+                        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+                        scalar_t vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
+                        scalar_t r[CVFEM_HEX8_N_DOF];
+                        for (int a = 0; a < 8; ++a) {
+                            const int l = base + off[a];
+                            x[a]        = lx[(size_t)l];
+                            y[a]        = ly[(size_t)l];
+                            z[a]        = lz[(size_t)l];
+                            ux[a]       = lux[(size_t)l];
+                            uy[a]       = luy[(size_t)l];
+                            uz[a]       = luz[(size_t)l];
+                            p[a]        = lp[(size_t)l];
+                            vx[a]       = lvx[(size_t)l];
+                            vy[a]       = lvy[(size_t)l];
+                            vz[a]       = lvz[(size_t)l];
+                            q[a]        = lq[(size_t)l];
+                            pgx[a]      = lpgx[(size_t)l];
+                            pgy[a]      = lpgy[(size_t)l];
+                            pgz[a]      = lpgz[(size_t)l];
+                        }
+
+                        sscvfem_action_hoisted(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz, r);
+                        boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                         ux, uy, uz, vx, vy, vz, q, r);
+
+                        for (int a = 0; a < 8; ++a) {
+                            const int l = base + off[a];
+                            for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
+                        }
+                    }
+                }
+            }
+
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = lg[(size_t)a];
+                for (int c = 0; c < N_FIELDS; ++c)
+                    atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+            }
+        }
+    }
+}
