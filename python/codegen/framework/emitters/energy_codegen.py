@@ -24,7 +24,13 @@ from codegen.framework.emitters.ast_printer import (
     render_kernel_ast_lines,
 )
 from codegen.framework.targets import current_target
-from codegen.framework.plans.matrix_formats import BSRAssemblyPlan
+from codegen.framework.plans.matrix_formats import (
+    BSRAssemblyPlan,
+    BlockDiagSymAssemblyPlan,
+    COOAssemblyPlan,
+    DIAAssemblyPlan,
+    PatchAssemblyPlan,
+)
 from codegen.framework.symbolic.core import (
     ExpressionRole,
     KernelExpressions,
@@ -6264,12 +6270,18 @@ def _counting_loop(name, begin, end, body):
     )
 
 
-def _bsr_reduction_is_atomic(reduction_policy):
-    """How the plan's reduction policy is spelled for this target."""
+def _assembly_reduction_is_atomic(reduction_policy, format_name):
+    """How an assembly plan's reduction policy is spelled for this target.
+
+    Every format's plan currently says ``atomic_add`` and every scatter emits
+    an atomic update, so this reads as a formality -- but it is the point of
+    connecting the plan: a policy the emitter cannot spell stops generation
+    instead of silently becoming a plain add.
+    """
     if str(reduction_policy) != "atomic_add":
         raise ValueError(
-            "unsupported BSR reduction policy '%s'; the emitter can spell "
-            "atomic_add only" % reduction_policy
+            "unsupported %s reduction policy '%s'; the emitter can spell "
+            "atomic_add only" % (format_name, reduction_policy)
         )
     return True
 
@@ -6280,10 +6292,11 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     The stream names and the reduction come from ``BSRAssemblyPlan``, which is
     where they are defined; this function spells them.  Its defaults are the
     names the generated kernels have always used, so the emitted text is
-    unchanged -- but the plan is now the definition point, and changing it
-    changes the kernel rather than requiring an edit here.  That is the same
-    arrangement ``_scalar_crs_matrix_scatter_lines`` has, and it is what takes
-    BSRAssemblyPlan off the unread list.
+    unchanged.  That is the same arrangement
+    ``_scalar_crs_matrix_scatter_lines`` has, and it is what takes
+    BSRAssemblyPlan off the unread list -- with the same limit: the rename
+    reaches this scatter's parameters and not the callers that pass the
+    buffers in, which still name them as literals.
 
     The format vector problems use, so the one worth having in the IR.  It
     still carries the per-element graph validation OP 10 is about removing:
@@ -6297,7 +6310,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     row_pointer = assembly.row_pointer
     column_index = assembly.column_index
     value_stream = assembly.value_stream
-    atomic = _bsr_reduction_is_atomic(assembly.reduction_policy)
+    atomic = _assembly_reduction_is_atomic(assembly.reduction_policy, "BSR")
 
     missing = expr_ref("ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]")
     report = CallNode(
@@ -6564,16 +6577,30 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes):
     ]
 
 
-def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes):
+def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes, assembly=None):
+    """Scatter one element block onto the stored diagonals.
+
+    The offset and value stream names and the reduction come from
+    ``DIAAssemblyPlan``.  Note which field the parameter is spelled from:
+    ``diagonal_offsets`` is the diagnostics indexing policy and says
+    "diagonal_offsets", while the kernel's parameter is ``diag_offsets``.  The
+    two drifted apart because nothing read the plan; the parameter comes from
+    ``diagonal_offset_stream`` and the divergence is recorded, not reconciled,
+    because reconciling it changes published diagnostics text.
+    """
+    assembly = DIAAssemblyPlan() if assembly is None else assembly
+    offsets = assembly.diagonal_offset_stream
+    value_stream = assembly.value_stream
+    _assembly_reduction_is_atomic(assembly.reduction_policy, "DIA")
     return [
         "template <typename scalar_t>",
         "static SFEM_INLINE int %s_scatter_dia(" % function_base,
         "        const idx_t *const SFEM_RESTRICT ev,",
         "        const scalar_t *const SFEM_RESTRICT element_matrix,",
         "        const ptrdiff_t nnodes,",
-        "        const int *const SFEM_RESTRICT diag_offsets,",
+        "        const int *const SFEM_RESTRICT %s," % offsets,
         "        const ptrdiff_t ndiag,",
-        "        scalar_t *const SFEM_RESTRICT values) {",
+        "        scalar_t *const SFEM_RESTRICT %s) {" % value_stream,
         "    static constexpr int DIM = %d;" % dim,
         "    static constexpr int N_SHAPE = %d;" % n_nodes,
         "    ptrdiff_t diagonals[N_SHAPE * N_SHAPE];",
@@ -6582,7 +6609,7 @@ def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes):
         "        for (int j = 0; j < N_SHAPE; ++j) {",
         "            const int offset = (int)(ev[j] - ev[i]);",
         "            ptrdiff_t diagonal = 0;",
-        "            while (diagonal < ndiag && diag_offsets[diagonal] != offset) ++diagonal;",
+        "            while (diagonal < ndiag && %s[diagonal] != offset) ++diagonal;" % offsets,
         "            if (diagonal == ndiag) {",
         "                if (valid_diagonal_offsets) {",
         "                    std::fprintf(stderr, \"%s_scatter_dia missing diagonal offset %%d\\n\", offset);"
@@ -6599,7 +6626,7 @@ def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes):
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        for (int j = 0; j < N_SHAPE; ++j) {",
         "            const ptrdiff_t diagonal = diagonals[i * N_SHAPE + j];",
-        "            scalar_t *const block = &values[(diagonal * nnodes + ev[i]) * DIM * DIM];",
+        "            scalar_t *const block = &%s[(diagonal * nnodes + ev[i]) * DIM * DIM];" % value_stream,
         "            for (int bi = 0; bi < DIM; ++bi) {",
         "                const int row = bi * N_SHAPE + i;",
         "                for (int bj = 0; bj < DIM; ++bj) {",
@@ -6616,16 +6643,35 @@ def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes):
     ]
 
 
-def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes):
+def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, assembly=None):
+    """Locate each element entry in a sorted COO graph and accumulate into it.
+
+    Stream names and reduction from ``COOAssemblyPlan``, and the same split as
+    DIA applies: ``row_index_stream``/``column_index_stream`` are the
+    diagnostics policy and say "rowidx"/"colidx", while the kernel writes
+    ``rows`` and ``cols``, which is what ``row_stream``/``column_stream`` hold.
+    """
+    assembly = COOAssemblyPlan() if assembly is None else assembly
+    rows = assembly.row_stream
+    cols = assembly.column_stream
+    value_stream = assembly.value_stream
+    # COOAssemblyPlan carries no reduction_policy.  It has reduction_phase =
+    # "non_hot_setup_phase" and accumulation_policy = "emit_triplets", which
+    # describe the *triplet* scatter -- the one that writes (row, col, value)
+    # and leaves the reduction to a later pass.  This scatter is the other COO
+    # form: it locates the entry in a sorted graph and accumulates atomically
+    # in the hot loop.  One plan, two kernels, and the plan describes only one
+    # of them.  Recorded in ARCHITECTURE.html OP 13 rather than papered over by
+    # asserting a policy that would be the wrong one for this kernel.
     return [
         "template <typename scalar_t>",
         "static SFEM_INLINE int %s_scatter_coo(" % function_base,
         "        const idx_t *const SFEM_RESTRICT ev,",
         "        const scalar_t *const SFEM_RESTRICT element_matrix,",
         "        const ptrdiff_t nnz,",
-        "        const idx_t *const SFEM_RESTRICT rows,",
-        "        const idx_t *const SFEM_RESTRICT cols,",
-        "        scalar_t *const SFEM_RESTRICT values) {",
+        "        const idx_t *const SFEM_RESTRICT %s," % rows,
+        "        const idx_t *const SFEM_RESTRICT %s," % cols,
+        "        scalar_t *const SFEM_RESTRICT %s) {" % value_stream,
         "    static constexpr int DIM = %d;" % dim,
         "    static constexpr int N_SHAPE = %d;" % n_nodes,
         "    ptrdiff_t entries[N_SHAPE * N_SHAPE];",
@@ -6636,10 +6682,11 @@ def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes):
         "            ptrdiff_t hi = nnz;",
         "            while (lo < hi) {",
         "                const ptrdiff_t mid = lo + (hi - lo) / 2;",
-        "                if (rows[mid] < ev[i] || (rows[mid] == ev[i] && cols[mid] < ev[j])) lo = mid + 1;",
+        "                if (%s[mid] < ev[i] || (%s[mid] == ev[i] && %s[mid] < ev[j])) lo = mid + 1;"
+        % (rows, rows, cols),
         "                else hi = mid;",
         "            }",
-        "            if (lo == nnz || rows[lo] != ev[i] || cols[lo] != ev[j]) {",
+        "            if (lo == nnz || %s[lo] != ev[i] || %s[lo] != ev[j]) {" % (rows, cols),
         "                if (valid_coo_entries) {",
         "                    std::fprintf(stderr, \"%s_scatter_coo missing graph entry (%%ld, %%ld)\\n\", (long)ev[i], (long)ev[j]);"
         % function_base,
@@ -6654,7 +6701,7 @@ def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes):
         "    if (!valid_coo_entries) return SFEM_FAILURE;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            scalar_t *const block = &values[entries[i * N_SHAPE + j] * DIM * DIM];",
+        "            scalar_t *const block = &%s[entries[i * N_SHAPE + j] * DIM * DIM];" % value_stream,
         "            for (int bi = 0; bi < DIM; ++bi) {",
         "                const int row = bi * N_SHAPE + i;",
         "                for (int bj = 0; bj < DIM; ++bj) {",
@@ -6739,14 +6786,25 @@ def _sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes):
     )
 
 
-def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
+def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=None):
     """Scatter into a patch-local CRS block.
+
+    Graph and value stream names and the reduction come from
+    ``PatchAssemblyPlan``.  Unlike DIA and COO its diagnostics policy and its
+    parameters agree -- ``patch_graph`` is "rowptr_colidx" and the kernel does
+    read ``rowptr`` and ``colidx`` -- so the two new fields simply name the
+    halves the scatter spells.
 
     Migrated because it carries no graph validation: it locates its entries
     and uses them.  The BSR, CRS, DIA and COO helpers do validate, and that
     machinery is what OP 10 is about removing -- see the note in
     ``RawLinesRatchetTest``.
     """
+    assembly = PatchAssemblyPlan() if assembly is None else assembly
+    row_pointer = assembly.row_pointer
+    column_index = assembly.column_index
+    value_stream = assembly.value_stream
+    _assembly_reduction_is_atomic(assembly.reduction_policy, "patch")
     accumulate = [
         BufferDeclNode("const int", "col", (), expr_ref("bj * N_SHAPE + j")),
         ScatterNode(
@@ -6767,19 +6825,22 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
             expr_ref("N_SHAPE"),
             [
                 BufferDeclNode(
-                    "const count_t", "row_begin", (), expr_ref("rowptr[ev[i]]")
+                    "const count_t",
+                    "row_begin",
+                    (),
+                    expr_ref("%s[ev[i]]" % row_pointer),
                 ),
                 BufferDeclNode(
                     "const int",
                     "lenrow",
                     (),
-                    expr_ref("(int)(rowptr[ev[i] + 1] - row_begin)"),
+                    expr_ref("(int)(%s[ev[i] + 1] - row_begin)" % row_pointer),
                 ),
                 BufferDeclNode(
                     "const idx_t *const SFEM_RESTRICT",
                     "cols",
                     (),
-                    expr_ref("&colidx[row_begin]"),
+                    expr_ref("&%s[row_begin]" % column_index),
                 ),
                 CallNode(
                     "%s_find_cols" % function_base,
@@ -6812,7 +6873,9 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
                             "scalar_t *const",
                             "block",
                             (),
-                            expr_ref("&values[entries[i * N_SHAPE + j] * DIM * DIM]"),
+                            expr_ref(
+                "&%s[entries[i * N_SHAPE + j] * DIM * DIM]" % value_stream
+            ),
                         ),
                         _counting_loop(
                             "bi",
@@ -6839,9 +6902,9 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
             params=(
                 "const idx_t *const SFEM_RESTRICT ev",
                 "const scalar_t *const SFEM_RESTRICT element_matrix",
-                "const count_t *const SFEM_RESTRICT rowptr",
-                "const idx_t *const SFEM_RESTRICT colidx",
-                "scalar_t *const SFEM_RESTRICT values",
+                "const count_t *const SFEM_RESTRICT %s" % row_pointer,
+                "const idx_t *const SFEM_RESTRICT %s" % column_index,
+                "scalar_t *const SFEM_RESTRICT %s" % value_stream,
             ),
             body=tuple(body),
             return_type="int",
@@ -6851,8 +6914,18 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
     )
 
 
-def _sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes):
-    """Accumulate only the symmetric block diagonal."""
+def _sfem_soa_hessian_scatter_block_diag_sym_lines(
+    function_base, dim, n_nodes, assembly=None
+):
+    """Accumulate only the symmetric block diagonal.
+
+    The simplest of the six: one value stream and a reduction, both from
+    ``BlockDiagSymAssemblyPlan``, and no index structure of its own because the
+    node index is the block index.
+    """
+    assembly = BlockDiagSymAssemblyPlan() if assembly is None else assembly
+    value_stream = assembly.value_stream
+    _assembly_reduction_is_atomic(assembly.reduction_policy, "block-diagonal-symmetric")
     body = [
         BufferDeclNode("static constexpr int", "DIM", (), expr_ref(str(dim))),
         BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
@@ -6869,7 +6942,7 @@ def _sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes):
                     "scalar_t *const",
                     "block",
                     (),
-                    expr_ref("&values[(ptrdiff_t)ev[i] * SYM_DIM]"),
+                    expr_ref("&%s[(ptrdiff_t)ev[i] * SYM_DIM]" % value_stream),
                 ),
                 BufferDeclNode("int", "sym", (), expr_ref("0")),
                 _counting_loop(
@@ -6907,7 +6980,7 @@ def _sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes):
             params=(
                 "const idx_t *const SFEM_RESTRICT ev",
                 "const scalar_t *const SFEM_RESTRICT element_matrix",
-                "scalar_t *const SFEM_RESTRICT values",
+                "scalar_t *const SFEM_RESTRICT %s" % value_stream,
             ),
             body=tuple(body),
             qualifier="static SFEM_INLINE",

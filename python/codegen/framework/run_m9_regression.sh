@@ -22,6 +22,7 @@ unittest_status=0
     python.codegen.framework.tests.test_form_collection_boundary \
     python.codegen.framework.tests.test_emitters_do_not_analyse \
     python.codegen.framework.tests.test_plans_are_consumed \
+    python.codegen.framework.tests.test_assembly_plans_name_the_kernels \
     python.codegen.framework.tests.test_geometry_plan_agrees \
     python.codegen.framework.tests.test_apply_variants \
     python.codegen.framework.tests.test_apply_variants_drive_emission \
