@@ -477,7 +477,7 @@ static SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &
                     scalar_t           adj[9], det;
                     cvfem_hex8_load_adj(d, e, adj, &det);
                     const smesh::count_t *const SFEM_RESTRICT es = slots + (size_t)e * 64;
-                    cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(
+                    cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(
                             rho, mu, adj, det, ux, uy, uz, reinterpret_cast<const int *>(es), values);
                     cvfem_hex8_ns_upwind_jacobian_add_rhie_chow<false>(rho, mu, adj, rc, ux, uy, uz, pp, es, values);
                     boundary_scs_add_jacobian<false>(
@@ -504,7 +504,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
-        cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(
+        cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
         cvfem_hex8_ns_upwind_jacobian_add_rhie_chow<true>(
                 rho, mu, adj, rc, ux, uy, uz, p, slots + (size_t)e * 64, values);
