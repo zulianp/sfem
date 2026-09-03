@@ -68,6 +68,7 @@ from codegen.framework.plans.residual_structure import (
     residual_mesh_phase_plans,
 )
 from codegen.framework.plans.streams import (
+    STATE_FIELD_ROLES,
     live_field_roles,
     local_kernel_stream_plans,
     mesh_kernel_stream_plans,
@@ -8595,13 +8596,17 @@ def _scalar_packed_jacobian_action_source(
             "        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);",
         ]
     )
-    if dependencies.current:
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
+        # Both state roles are handed scratch slot 1, which aliases them if a
+        # form ever reads current and previous together here.  No shipped
+        # material does -- these emitters are guarded to single-field kernels
+        # and no single-field material has a previous state, so pack_previous
+        # appears in none of the generated sources.  Preserved verbatim rather
+        # than corrected: the gate on this branch is byte-identity, and a fix
+        # belongs with a case that can exercise it.  ARCHITECTURE.html OP 12.
         lines.append(
-            "        scalar_t *const SFEM_RESTRICT pack_current = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
-        )
-    if dependencies.previous:
-        lines.append(
-            "        scalar_t *const SFEM_RESTRICT pack_previous = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
+            "        scalar_t *const SFEM_RESTRICT pack_%s = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
+            % role.name
         )
     lines.extend(
         [
@@ -8632,27 +8637,17 @@ def _scalar_packed_jacobian_action_source(
         ]
     )
     field = system.fields[0]
-    if dependencies.current:
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.extend(
             [
                 "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                pack_current[k] = %s[node * current_stride];" % field.name,
+                "                pack_%s[k] = %s[node * %s];"
+                % (role.name, role.field_pointer(field.name), role.stride),
                 "            }",
                 "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                pack_current[n_contiguous + k] = %s[ghosts[k] * current_stride];" % field.name,
-                "            }",
-            ]
-        )
-    if dependencies.previous:
-        lines.extend(
-            [
-                "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                "                const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                pack_previous[k] = %s_old[node * previous_stride];" % field.name,
-                "            }",
-                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                pack_previous[n_contiguous + k] = %s_old[ghosts[k] * previous_stride];" % field.name,
+                "                pack_%s[n_contiguous + k] = %s[ghosts[k] * %s];"
+                % (role.name, role.field_pointer(field.name), role.stride),
                 "            }",
             ]
         )
@@ -8673,10 +8668,10 @@ def _scalar_packed_jacobian_action_source(
             "                scalar_t block_determinant[N_QP * VECTOR_SIZE];",
         ]
     )
-    if dependencies.current:
-        lines.append("                scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
-    if dependencies.previous:
-        lines.append("                scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
+        lines.append(
+            "                scalar_t block_%s[N_STREAMS][VECTOR_SIZE];" % role.name
+        )
     lines.extend(
         [
             "                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
@@ -8693,21 +8688,13 @@ def _scalar_packed_jacobian_action_source(
             "                    }",
         ]
     )
-    if dependencies.current:
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.extend(
             [
                 _vectorize_pragma(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        block_current[shape][lane] = pack_current[field_shape[evbegin + lane]];",
-                "                    }",
-            ]
-        )
-    if dependencies.previous:
-        lines.extend(
-            [
-                _vectorize_pragma(),
-                "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        block_previous[shape][lane] = pack_previous[field_shape[evbegin + lane]];",
+                "                        block_%s[shape][lane] = pack_%s[field_shape[evbegin + lane]];"
+                % (role.name, role.name),
                 "                    }",
             ]
         )
@@ -9741,13 +9728,17 @@ def _scalar_packed_affine_jacobian_action_source(
             "    {",
         ]
     )
-    if dependencies.current:
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
+        # Both state roles are handed scratch slot 1, which aliases them if a
+        # form ever reads current and previous together here.  No shipped
+        # material does -- these emitters are guarded to single-field kernels
+        # and no single-field material has a previous state, so pack_previous
+        # appears in none of the generated sources.  Preserved verbatim rather
+        # than corrected: the gate on this branch is byte-identity, and a fix
+        # belongs with a case that can exercise it.  ARCHITECTURE.html OP 12.
         lines.append(
-            "        scalar_t *const SFEM_RESTRICT pack_current = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
-        )
-    if dependencies.previous:
-        lines.append(
-            "        scalar_t *const SFEM_RESTRICT pack_previous = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
+            "        scalar_t *const SFEM_RESTRICT pack_%s = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)max_nodes_per_pack);"
+            % role.name
         )
     lines.extend(
         [
@@ -9765,27 +9756,17 @@ def _scalar_packed_affine_jacobian_action_source(
             "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
         ]
     )
-    if dependencies.current:
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.extend(
             [
                 "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                pack_current[k] = %s[node * current_stride];" % field.name,
+                "                pack_%s[k] = %s[node * %s];"
+                % (role.name, role.field_pointer(field.name), role.stride),
                 "            }",
                 "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                pack_current[n_contiguous + k] = %s[ghosts[k] * current_stride];" % field.name,
-                "            }",
-            ]
-        )
-    if dependencies.previous:
-        lines.extend(
-            [
-                "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                "                const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                pack_previous[k] = %s_old[node * previous_stride];" % field.name,
-                "            }",
-                "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "                pack_previous[n_contiguous + k] = %s_old[ghosts[k] * previous_stride];" % field.name,
+                "                pack_%s[n_contiguous + k] = %s[ghosts[k] * %s];"
+                % (role.name, role.field_pointer(field.name), role.stride),
                 "            }",
             ]
         )
@@ -9803,10 +9784,10 @@ def _scalar_packed_affine_jacobian_action_source(
             "                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
         ]
     )
-    if dependencies.current:
-        lines.append("                scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
-    if dependencies.previous:
-        lines.append("                scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
+        lines.append(
+            "                scalar_t block_%s[N_STREAMS][VECTOR_SIZE];" % role.name
+        )
     lines.extend(
         [
             "                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
@@ -9816,21 +9797,13 @@ def _scalar_packed_affine_jacobian_action_source(
             "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
         ]
     )
-    if dependencies.current:
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.extend(
             [
                 _vectorize_pragma(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        block_current[shape][lane] = pack_current[field_shape[evbegin + lane]];",
-                "                    }",
-            ]
-        )
-    if dependencies.previous:
-        lines.extend(
-            [
-                _vectorize_pragma(),
-                "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        block_previous[shape][lane] = pack_previous[field_shape[evbegin + lane]];",
+                "                        block_%s[shape][lane] = pack_%s[field_shape[evbegin + lane]];"
+                % (role.name, role.name),
                 "                    }",
             ]
         )
