@@ -63,7 +63,7 @@ from codegen.framework.emitters.tensor_product_geometry import (
     tensor_product_gradient_isoparametric_geometry_lines,
 )
 from codegen.framework.emitters.tensor_product_kernels import sfem_tensor_product_kernels_header_source
-from codegen.framework.targets import OpenMPTarget
+from codegen.framework.targets import current_target
 from codegen.framework.fem.reference import (
     sfem_mesh_reference_data,
     sfem_reference_data,
@@ -113,7 +113,13 @@ from codegen.framework.plans.scheduling import (
 
 
 def _target():
-    return OpenMPTarget()
+    """The target this emission prints for -- bound by the backend, not chosen here.
+
+    Kept as a one-line indirection rather than replaced at all 57 call sites in
+    this module: the name is what those call sites read, and pointing it at the
+    L5 binding is the whole of the change.
+    """
+    return current_target()
 
 
 
@@ -6065,7 +6071,7 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
         "            const int col_shape = COL_SHAPE[col_stream];",
         "            const int bj = COL_COMPONENT[col_stream];",
         "            scalar_t *const block = &values[entries[row_shape * N_SHAPE + col_shape] * N_FIELDS * N_FIELDS];",
-        "#pragma omp atomic update",
+        _atomic_update_pragma(),
         "            block[bi * N_FIELDS + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];",
         "        }",
         "    }",
@@ -6129,7 +6135,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
                 "    static constexpr int N_SHAPE = %d;" % n_shape,
                 "    for (int i = 0; i < N_SHAPE; ++i) {",
                 "        for (int j = 0; j < N_SHAPE; ++j) {",
-                "#pragma omp atomic update",
+                _atomic_update_pragma(),
                 "            values[entries[i * N_SHAPE + j]] += element_matrix[i * N_SHAPE + j];",
                 "        }",
                 "    }",
@@ -6179,7 +6185,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
             "            const int col_shape = COL_SHAPE[col_stream];",
             "            const int bj = COL_COMPONENT[col_stream];",
             "            scalar_t *const block = &values[entries[row_shape * N_SHAPE + col_shape] * N_FIELDS * N_FIELDS];",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "            block[bi * N_FIELDS + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];",
             "        }",
             "    }",
@@ -7712,7 +7718,7 @@ def _scalar_dia_matrix_scatter_lines(function_base, n_shape):
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        for (int j = 0; j < N_SHAPE; ++j) {",
         "            const ptrdiff_t diagonal = diagonals[i * N_SHAPE + j];",
-        "#pragma omp atomic update",
+        _atomic_update_pragma(),
         "            values[diagonal * nnodes + ev[i]] += element_matrix[i * N_SHAPE + j];",
         "        }",
         "    }",
@@ -8589,7 +8595,7 @@ def _scalar_packed_jacobian_action_source(
             "                    const uint16_t *const SFEM_RESTRICT coordinate_shape = %s[shape];" % coordinate_element_array,
             "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
             "                    for (int d = 0; d < DIM; ++d) {",
-            "#pragma omp simd",
+            _vectorize_pragma(),
             "                        for (int lane = 0; lane < nelems; ++lane) {",
             "                            block_coordinates[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + coordinate_shape[evbegin + lane]];",
             "                        }",
@@ -8599,7 +8605,7 @@ def _scalar_packed_jacobian_action_source(
     if dependencies.current:
         lines.extend(
             [
-                "#pragma omp simd",
+                _vectorize_pragma(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
                 "                        block_current[shape][lane] = pack_current[field_shape[evbegin + lane]];",
                 "                    }",
@@ -8608,7 +8614,7 @@ def _scalar_packed_jacobian_action_source(
     if dependencies.previous:
         lines.extend(
             [
-                "#pragma omp simd",
+                _vectorize_pragma(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
                 "                        block_previous[shape][lane] = pack_previous[field_shape[evbegin + lane]];",
                 "                    }",
@@ -8616,7 +8622,7 @@ def _scalar_packed_jacobian_action_source(
         )
     lines.extend(
         [
-            "#pragma omp simd",
+            _vectorize_pragma(),
             "                    for (int lane = 0; lane < nelems; ++lane) {",
             "                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];",
             "                        block_output[shape][lane] = scalar_t(0);",
@@ -8773,12 +8779,12 @@ def _scalar_packed_jacobian_action_source(
                 "                pack_out[k] = scalar_t(0);",
                 "            }",
                 "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-                "#pragma omp atomic update",
+                _atomic_update_pragma(),
                 "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
                 "                pack_out[k] = scalar_t(0);",
                 "            }",
                 "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                "#pragma omp atomic update",
+                _atomic_update_pragma(),
                 "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field.name,
                 "                pack_out[n_contiguous + k] = scalar_t(0);",
                 "            }",
@@ -8924,7 +8930,7 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "                    u3[lane] = pack_direction[elements[3][element]];",
             "                }",
             "",
-            "#pragma omp simd",
+            _vectorize_pragma(),
             "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             "                    tet4_laplacian_apply_fff_soa_tpl<scalar_t, scalar_t>(",
             "                            fff0[lane], fff1[lane], fff2[lane], fff3[lane], fff4[lane], fff5[lane],",
@@ -8946,12 +8952,12 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "                pack_out[k] = scalar_t(0);",
             "            }",
             "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
             "                pack_out[k] = scalar_t(0);",
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field_name,
             "                pack_out[n_contiguous + k] = scalar_t(0);",
             "            }",
@@ -9113,7 +9119,7 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "                    u%d[lane] = pack_direction[elements[%d][element]];"
             % (shape, primitive_shape_order[shape])
         )
-    lines.extend(["                }", "", "#pragma omp simd", "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
+    lines.extend(["                }", "", _vectorize_pragma(), "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {"])
     primitive_args = (
         ["fff%d[lane]" % component for component in range(6)]
         + ["u%d[lane]" % shape for shape in range(n_shape)]
@@ -9139,12 +9145,12 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "                pack_out[k] = scalar_t(0);",
             "            }",
             "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field_name,
             "                pack_out[k] = scalar_t(0);",
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field_name,
             "                pack_out[n_contiguous + k] = scalar_t(0);",
             "            }",
@@ -9347,7 +9353,7 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
         [
             "                }",
             "",
-            "#pragma omp simd",
+            _vectorize_pragma(),
             "                for (ptrdiff_t lane = 0; lane < nelems; ++lane) {",
             "                    %s%s(%s);" % (primitive, primitive_template, ", ".join(primitive_args)),
             "                }",
@@ -9372,12 +9378,12 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "                pack_out[k] = scalar_t(0);",
             "            }",
             "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "                acc[k] += pack_out[k];",
             "                pack_out[k] = scalar_t(0);",
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "                %s_out[ghosts[k]] += ghost_out[k];" % field_name,
             "                ghost_out[k] = scalar_t(0);",
             "            }",
@@ -9759,7 +9765,7 @@ def _scalar_packed_affine_jacobian_action_source(
     if dependencies.current:
         lines.extend(
             [
-                "#pragma omp simd",
+                _vectorize_pragma(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
                 "                        block_current[shape][lane] = pack_current[field_shape[evbegin + lane]];",
                 "                    }",
@@ -9768,7 +9774,7 @@ def _scalar_packed_affine_jacobian_action_source(
     if dependencies.previous:
         lines.extend(
             [
-                "#pragma omp simd",
+                _vectorize_pragma(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
                 "                        block_previous[shape][lane] = pack_previous[field_shape[evbegin + lane]];",
                 "                    }",
@@ -9776,7 +9782,7 @@ def _scalar_packed_affine_jacobian_action_source(
         )
     lines.extend(
         [
-            "#pragma omp simd",
+            _vectorize_pragma(),
             "                    for (int lane = 0; lane < nelems; ++lane) {",
             "                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];",
             "                        block_output[shape][lane] = scalar_t(0);",
@@ -9900,12 +9906,12 @@ def _scalar_packed_affine_jacobian_action_source(
             "                pack_out[k] = scalar_t(0);",
             "            }",
             "            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "                %s_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];" % field.name,
             "                pack_out[k] = scalar_t(0);",
             "            }",
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "                %s_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];" % field.name,
             "                pack_out[n_contiguous + k] = scalar_t(0);",
             "            }",

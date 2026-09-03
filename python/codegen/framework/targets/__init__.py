@@ -13,6 +13,10 @@ orchestrator would not be. Splitting the package makes the distinction
 enforceable instead of a matter of interpretation.
 """
 
+from codegen.framework.targets.context import (  # noqa: F401
+    current_target,
+    use_target,
+)
 from codegen.framework.targets.targets import *  # noqa: F401,F403
 from codegen.framework.targets.targets import (  # noqa: F401
     CUDATarget,

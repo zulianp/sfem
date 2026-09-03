@@ -1,4 +1,4 @@
-from codegen.framework.targets import OpenMPTarget
+from codegen.framework.targets import current_target
 
 
 def _matching_brace_index(text, open_brace):
@@ -127,7 +127,7 @@ def sfem_tensor_product_kernels_header_source(
     single_work_item=False,
     header_guard_suffix="HPP",
 ):
-    target = OpenMPTarget()
+    target = current_target()
     inline_qualifier = target.inline_qualifier() if inline_qualifier is None else inline_qualifier
     work_item_index = target.work_item_index() if work_item_index is None else work_item_index
     if simd_lines is None:

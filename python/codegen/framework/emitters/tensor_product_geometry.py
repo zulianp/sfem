@@ -1,4 +1,4 @@
-from codegen.framework.targets import OpenMPTarget
+from codegen.framework.targets import current_target
 from codegen.framework.fem.tensor_product import (
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
@@ -7,7 +7,8 @@ from codegen.framework.fem.tensor_product import (
 
 
 def _default_target():
-    return OpenMPTarget()
+    """The target this emission prints for -- bound by the backend, not chosen here."""
+    return current_target()
 
 
 def _target_simd_lines(simd_lines=None):
