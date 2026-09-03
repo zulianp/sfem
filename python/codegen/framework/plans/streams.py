@@ -20,7 +20,11 @@ from which the emitter derives the individual streams.
 
 from dataclasses import dataclass
 
-from codegen.framework.plans.generation import DataStreamRole
+from codegen.framework.plans.generation import (
+    DataStreamLayout,
+    DataStreamPlan,
+    DataStreamRole,
+)
 
 
 #: Roles in the order the generated kernels have always emitted them.  The order
@@ -95,3 +99,152 @@ def field_stream_group(dependencies, name):
         if group.name == name:
             return group
     return None
+
+
+#: The three field streams a local kernel may be handed, in the order the
+#: kernel signature has always listed them.
+_FIELD_STREAM_ORDER = ("current", "previous", "direction")
+
+
+def local_kernel_stream_plans(
+    dependencies,
+    *,
+    dim,
+    n_fields,
+    tensor_product,
+    uses_gradient_metric,
+    metric_components,
+    stream_layout="pointer",
+    grad_ref_name=None,
+):
+    """Which streams cross a local kernel's boundary, and in what order.
+
+    This is a planning decision, not a spelling one.  Whether the kernel is
+    handed a metric or a determinant and adjugate, whether it needs
+    one-dimensional or simplex reference basis data, which field streams are
+    live and whether they arrive as pointers or contiguous tiles -- all of it
+    follows from the dependencies and the geometry, and none of it depends on
+    how C declares a parameter.
+
+    It used to be seventy lines of conditionals inside ``_local_function``,
+    which meant the signature of every generated kernel was decided in the
+    emission layer.  The emitter now spells what this returns.
+
+    The order is part of the contract: it is the kernel's ABI, and every
+    caller the framework emits depends on it.
+    """
+    streams = []
+
+    if uses_gradient_metric:
+        streams.append(
+            DataStreamPlan(
+                name="geom_metric",
+                role=DataStreamRole.GEOMETRY,
+                layout=DataStreamLayout.SOA,
+                n_items=int(metric_components),
+            )
+        )
+    else:
+        streams.append(
+            DataStreamPlan(
+                name="determinant",
+                role=DataStreamRole.GEOMETRY,
+                layout=DataStreamLayout.SCALAR,
+            )
+        )
+        if dependencies.uses_adjugate:
+            streams.append(
+                DataStreamPlan(
+                    name="adjugate",
+                    role=DataStreamRole.GEOMETRY,
+                    layout=DataStreamLayout.SOA,
+                    n_items=dim * dim,
+                )
+            )
+
+    if tensor_product:
+        streams.append(
+            DataStreamPlan(
+                name="shape_1d",
+                role=DataStreamRole.REFERENCE,
+                layout=DataStreamLayout.TENSOR_PRODUCT_1D,
+            )
+        )
+        if dependencies.uses_reference_gradients:
+            streams.append(
+                DataStreamPlan(
+                    name="grad_1d",
+                    role=DataStreamRole.REFERENCE,
+                    layout=DataStreamLayout.TENSOR_PRODUCT_1D,
+                )
+            )
+        streams.append(
+            DataStreamPlan(
+                name="q_weight_1d",
+                role=DataStreamRole.REFERENCE,
+                layout=DataStreamLayout.TENSOR_PRODUCT_1D,
+            )
+        )
+    else:
+        # A gradient-metric kernel contracts the basis into the metric before
+        # it is called, so it is handed no reference basis at all.
+        if not uses_gradient_metric:
+            streams.append(
+                DataStreamPlan(
+                    name="shape",
+                    role=DataStreamRole.REFERENCE,
+                    layout=DataStreamLayout.SCALAR,
+                )
+            )
+            if dependencies.uses_reference_gradients:
+                streams.extend(
+                    DataStreamPlan(
+                        name=grad_ref_name(d),
+                        role=DataStreamRole.REFERENCE,
+                        layout=DataStreamLayout.SCALAR,
+                    )
+                    for d in range(dim)
+                )
+        streams.append(
+            DataStreamPlan(
+                name="q_weight",
+                role=DataStreamRole.REFERENCE,
+                layout=DataStreamLayout.SCALAR,
+            )
+        )
+
+    contiguous = stream_layout == "contiguous"
+    for name in _FIELD_STREAM_ORDER:
+        if not getattr(dependencies, name):
+            continue
+        streams.append(
+            DataStreamPlan(
+                name=name,
+                role=(
+                    DataStreamRole.DIRECTION
+                    if name == "direction"
+                    else DataStreamRole.FIELD
+                ),
+                layout=DataStreamLayout.AOS if contiguous else DataStreamLayout.SOA,
+                components=n_fields,
+            )
+        )
+
+    streams.extend(
+        DataStreamPlan(
+            name=parameter,
+            role=DataStreamRole.MATERIAL_PARAMETER,
+            layout=DataStreamLayout.SCALAR,
+        )
+        for parameter in dependencies.parameters
+    )
+
+    streams.append(
+        DataStreamPlan(
+            name="output",
+            role=DataStreamRole.OUTPUT,
+            layout=DataStreamLayout.AOS if contiguous else DataStreamLayout.SOA,
+            components=n_fields,
+        )
+    )
+    return tuple(streams)

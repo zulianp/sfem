@@ -56,6 +56,11 @@ from codegen.framework.plans.layout import (
     _stream_to_tensor_order,
     _tensor_product_coordinate_shape_order,
 )
+from codegen.framework.plans.generation import (
+    DataStreamLayout,
+    DataStreamRole,
+)
+from codegen.framework.plans.streams import local_kernel_stream_plans
 from codegen.framework.plans.streams import field_stream_groups
 from codegen.framework.symbolic.residual import (
     coupled_residual_weak_coefficients,
@@ -2603,6 +2608,39 @@ def _mixed_local_field_evaluation_lines(
     return lines
 
 
+def _declare_stream(stream):
+    """Spell one ``DataStreamPlan`` as a C parameter declaration.
+
+    The plan says what the stream is -- its role, layout, how many components
+    and items it carries.  This says how C writes that down, which is the only
+    part of it that belongs in the emission layer.
+    """
+    mutable = stream.role is DataStreamRole.OUTPUT
+    qualifier = "scalar_t" if mutable else "const scalar_t"
+
+    if stream.layout is DataStreamLayout.AOS:
+        # A contiguous tile: the kernel indexes [item][lane] directly.
+        return "%s %s[%d * N_SHAPE][VECTOR_SIZE]" % (
+            qualifier,
+            stream.name,
+            stream.components,
+        )
+    if stream.role in (DataStreamRole.FIELD, DataStreamRole.DIRECTION, DataStreamRole.OUTPUT):
+        return "%s *const SFEM_RESTRICT %s[%d * N_SHAPE]" % (
+            qualifier,
+            stream.name,
+            stream.components,
+        )
+    if stream.role is DataStreamRole.MATERIAL_PARAMETER:
+        return "const scalar_t %s" % stream.name
+    if stream.n_items > 1:
+        return "const scalar_t *const SFEM_RESTRICT %s[%d]" % (
+            stream.name,
+            stream.n_items,
+        )
+    return "const scalar_t *const SFEM_RESTRICT %s" % stream.name
+
+
 def _local_function(
     system,
     function_name,
@@ -2624,79 +2662,22 @@ def _local_function(
         if tensor_product or not allow_simplex_gradient_metric
         else simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
     )
-    omit_simplex_reference_basis_inputs = gradient_metric is not None
-    params = [
-        "const int nelems",
-        "const ptrdiff_t geometry_stride",
-    ]
-    if gradient_metric is not None:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT geom_metric[%d]"
-            % symmetric_metric_component_count(dim)
-        )
-    else:
-        params.append("const scalar_t *const SFEM_RESTRICT determinant")
-    if dependencies.uses_adjugate and gradient_metric is None:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim)
-        )
-    if tensor_product:
-        params.append("const scalar_t *const SFEM_RESTRICT shape_1d")
-        if dependencies.uses_reference_gradients:
-            params.append("const scalar_t *const SFEM_RESTRICT grad_1d")
-        params.append("const scalar_t *const SFEM_RESTRICT q_weight_1d")
-    else:
-        if not omit_simplex_reference_basis_inputs:
-            params.append("const scalar_t *const SFEM_RESTRICT shape")
-            if dependencies.uses_reference_gradients:
-                params.extend(
-                    "const scalar_t *const SFEM_RESTRICT %s"
-                    % sfem_simplex_grad_ref_name("grad_ref", d)
-                    for d in range(dim)
-                )
-        params.append("const scalar_t *const SFEM_RESTRICT q_weight")
-    if dependencies.current:
-        if stream_layout == "contiguous":
-            params.append(
-                "const scalar_t current[%d * N_SHAPE][VECTOR_SIZE]"
-                % n_fields
-            )
-        else:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT current[%d * N_SHAPE]"
-                % n_fields
-            )
-    if dependencies.previous:
-        if stream_layout == "contiguous":
-            params.append(
-                "const scalar_t previous[%d * N_SHAPE][VECTOR_SIZE]"
-                % n_fields
-            )
-        else:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT previous[%d * N_SHAPE]"
-                % n_fields
-            )
-    if dependencies.direction:
-        if stream_layout == "contiguous":
-            params.append(
-                "const scalar_t direction[%d * N_SHAPE][VECTOR_SIZE]"
-                % n_fields
-            )
-        else:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT direction[%d * N_SHAPE]"
-                % n_fields
-            )
+    # Which streams cross this kernel's boundary is a planning decision; this
+    # function only spells the declarations.  The order is the kernel's ABI.
+    params = ["const int nelems", "const ptrdiff_t geometry_stride"]
     params.extend(
-        "const scalar_t %s" % parameter for parameter in dependencies.parameters
-    )
-    if stream_layout == "contiguous":
-        params.append("scalar_t output[%d * N_SHAPE][VECTOR_SIZE]" % n_fields)
-    else:
-        params.append(
-            "scalar_t *const SFEM_RESTRICT output[%d * N_SHAPE]" % n_fields
+        _declare_stream(stream)
+        for stream in local_kernel_stream_plans(
+            dependencies,
+            dim=dim,
+            n_fields=n_fields,
+            tensor_product=tensor_product,
+            uses_gradient_metric=gradient_metric is not None,
+            metric_components=symmetric_metric_component_count(dim),
+            stream_layout=stream_layout,
+            grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
         )
+    )
     template_params = [
         "typename scalar_t",
         "int N_QP",

@@ -81,6 +81,13 @@ UNCONSUMED_PLAN_TYPES = frozenset(
         # geometry plans it is handed against the modes it spells, so a plan
         # that changed its mind stops generation instead of being ignored.
         "GeometryPlan",
+        # Which streams cross a local kernel's boundary, and in what order,
+        # is now decided by plans.streams.local_kernel_stream_plans.  About
+        # seventy lines of conditionals left the emitter, which keeps only
+        # _declare_stream -- how C writes a declaration down.  This is the
+        # first of these connections that moved logic rather than re-routing
+        # a name.
+        "DataStreamPlan",
     }
 )
 
@@ -163,7 +170,7 @@ class PlansAreConsumedTest(unittest.TestCase):
         )
         self.assertEqual(
             unconsumed,
-            8,
+            7,
             "the number of unread structural plans changed to %d; update this "
             "expectation deliberately, and say why in the commit" % unconsumed,
         )
