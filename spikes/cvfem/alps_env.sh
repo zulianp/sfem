@@ -38,12 +38,51 @@ cvfem_uenv() { uenv run --view="$CVFEM_VIEW" "$CVFEM_UENV" -- "$@"; }
 # runs a stale binary. Touch the sources after every sync.
 cvfem_touch() { touch "$CVFEM_SRC"/*.hpp "$CVFEM_SRC"/*.cpp "$CVFEM_SRC"/cuda/* 2>/dev/null; }
 
+# The dependency configs are under lib64/cmake/<dep>/ while SFEM's own is under
+# lib/cmake/, and the spike's CMakeLists resolves the dependencies relative to SFEM_DIR.
+# Pointing SFEM_DIR at lib/cmake therefore finds SFEM and none of ryml, matrixio, smesh,
+# SCCD or ssdf, and CMAKE_PREFIX_PATH alone did not rescue it -- configure failed on
+# "Could not find a package configuration file provided by ryml". Each is passed
+# explicitly, guarded so this still works on an install that puts them elsewhere.
+cvfem_dep_dirs() {
+    local d args=()
+    for d in ryml matrixio smesh SCCD ssdf; do
+        if [ -f "$CVFEM_SFEM_INSTALL/lib64/cmake/$d/${d}Config.cmake" ]; then
+            args+=("-D${d}_DIR=$CVFEM_SFEM_INSTALL/lib64/cmake/$d")
+        fi
+    done
+    printf '%s\n' "${args[@]}"
+}
+
 cvfem_configure() {
+    local deps=()
+    while IFS= read -r line; do [ -n "$line" ] && deps+=("$line"); done < <(cvfem_dep_dirs)
     cvfem_uenv cmake -S "$CVFEM_SRC" -B "$CVFEM_BUILD" \
         -DCMAKE_CXX_COMPILER=mpicxx \
         -DSFEM_DIR="$CVFEM_SFEM_INSTALL/lib/cmake" \
         -DCMAKE_PREFIX_PATH="$CVFEM_SFEM_INSTALL" \
+        "${deps[@]}" \
         -DCMAKE_BUILD_TYPE=Release "$@"
+}
+
+# Hopper. Separate build tree so the CPU one is not reconfigured with CUDA on.
+cvfem_configure_cuda() {
+    CVFEM_BUILD="${CVFEM_BUILD_CUDA:-$CVFEM_SRC/build_cuda}" \
+        cvfem_configure -DCVFEM_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=90 "$@"
+}
+
+cvfem_build_cuda() {
+    CVFEM_BUILD="${CVFEM_BUILD_CUDA:-$CVFEM_SRC/build_cuda}" cvfem_build "$@"
+}
+
+# The CUDA binaries link libcudart from the uenv image, so they must be launched
+# through it -- run directly they fail with "libcudart.so.12: cannot open shared
+# object file".
+cvfem_run_cuda() {
+    srun --account="$CVFEM_ACCOUNT" --partition="${CVFEM_PARTITION:-debug}" \
+         --nodes=1 --ntasks=1 --cpus-per-task="${CVFEM_CPUS:-72}" --gpus-per-task=1 \
+         --time="${CVFEM_TIME:-00:10:00}" \
+         --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" "$@"
 }
 
 cvfem_build() {

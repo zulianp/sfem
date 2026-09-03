@@ -129,3 +129,61 @@ Two things should carry to Grace and are worth checking first:
   threads. At 72 threads that is a much stronger constraint than at 8 — start the
   pack-size sweep low and watch the `packs_per_color_min_max` line and the
   warning the benchmark prints.
+
+## Operator throughput: Grace, Hopper, and a laptop
+
+Baseline for the semi-structured work, all measuring the same thing -- the
+matrix-free Jacobian action `y = J(u) v`, which T1 established is where the time
+goes (roughly 800 linear iterations per Newton step, against one assembly).
+
+| machine | cores/GPU | MDOF/s | ns/dof | vs Grace |
+|---|---|---|---|---|
+| Apple M-series | 10 cores | 74 | 13.5 | 0.17x |
+| Grace | 72 cores | 424 | 2.36 | 1.0x |
+| Hopper GH200 | 1 GPU | 10417 | 0.096 | 24.6x |
+
+Saturation was swept, not assumed: Grace reaches it near 1.85M dofs, Hopper by
+1.1M. Below that both mislead badly -- Grace reads 20 MDOF/s at 10k dofs, a
+twentieth of its saturated figure.
+
+Three things worth carrying forward.
+
+**Grace scales, the laptop does not.** 46.5x on 72 cores (65% efficiency),
+degrading smoothly from 98.6% at four threads. The laptop stalls at five of ten
+cores and gains 5% for the second five. The conclusion first drawn there -- that
+the memory system gives out at half the machine -- is a property of that machine
+and does not reproduce here.
+
+**Neither is bandwidth bound.** Compulsory traffic is 21.7 GB/s on Grace against
+roughly 500 GB/s of LPDDR5X, and about 537 GB/s on Hopper against roughly 4 TB/s
+of HBM3: 4% and 13% of peak. The traffic model is a floor, excluding
+connectivity, coordinates and the nodal pressure gradient, so the real figure is
+higher -- but not by the twenty-fold that would make either memory bound.
+
+**Packing inverts on the GPU.** On CPU the packed layout is worth about 10% over
+the atomic one. On Hopper it loses: 7351 MDOF/s packed against 10417 standard,
+so the standard layout is 42% faster. Whatever packing buys on a CPU cache
+hierarchy, it costs on the GPU.
+
+And the case for matrix-free is much stronger on Hopper than on CPU. Assembly
+runs at 248 MDOF/s there against 10417 for the action, so one assembly costs
+about 42 applies -- but the decisive figure is memory: the assembled BSR is
+7.4 GB at n=128 and grows with the mesh, against a few hundred megabytes for the
+matrix-free path. At p=1 on CPU assembled BSR still wins on speed; on GPU it is
+the resolution ceiling.
+
+### Reproducing
+
+```bash
+rsync -az --delete --exclude 'build*/' spikes/cvfem/ alps:$SCRATCH/sfem/spikes/cvfem/
+ssh alps
+cd $SCRATCH/sfem/spikes/cvfem && source alps_env.sh
+
+cvfem_configure && cvfem_build --target cvfem_ns_apply_bench
+CVFEM_CPUS=72 cvfem_run env OMP_NUM_THREADS=72 OMP_PROC_BIND=close OMP_PLACES=cores \
+    SFEM_BENCH_SIZES=8,16,32,48,64 ./build/cvfem_ns_apply_bench
+
+cvfem_configure_cuda && cvfem_build_cuda --target cvfem_hex8_ns_cuda_verify
+cvfem_run_cuda ./build_cuda/cvfem_hex8_ns_cuda_verify --n 128 --time-only --repeat 20
+```
+
