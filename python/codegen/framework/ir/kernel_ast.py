@@ -323,9 +323,21 @@ class BufferDeclNode:
 
 @dataclass(frozen=True)
 class CallNode:
+    """A call, optionally with its arguments on a continuation line.
+
+    ``wrap_arguments`` is a formatting concession and worth naming as one.
+    Layout belongs to the printer, not to the IR; this flag is here because
+    the tensor-product body emits every one of its helper calls wrapped -- the
+    callee at the statement indent, the arguments eight columns further in --
+    and reproducing that exactly is what lets the migration be proven by
+    byte-identity rather than by reading the diff.  When the printer grows a
+    real line-breaking policy this flag should go with it.
+    """
+
     callee: SymbolRef
     arguments: tuple = ()
     template_arguments: tuple = ()
+    wrap_arguments: bool = False
     kind: KernelASTNodeKind = field(default=KernelASTNodeKind.CALL, init=False)
 
     def __post_init__(self):

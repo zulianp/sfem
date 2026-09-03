@@ -165,27 +165,23 @@ class EveryLocalKernelIsATreeTest(unittest.TestCase):
 
 
 class RawLinesRatchetTest(unittest.TestCase):
-    """How much of a kernel is still text.  Shrink-only.
+    """How much of a kernel is still text.  Now: none of it.
 
-    One body generator still hands back pre-rendered lines: the
-    tensor-product body, whose interesting structure is calls into helper
-    templates rather than a loop nest, so migrating it is a ``CallNode`` job
-    rather than a loop one.  It is the last place a ``KernelASTPass`` cannot
-    reach.
+    ``RawLinesNode`` was introduced so a kernel could be a ``FunctionDefNode``
+    before its body was nodes -- an escape hatch that bought the IR the whole
+    spine at once and made "what is left" countable.  It counted down 3, 2, 1,
+    0 as the bare work-item block, the generic simplex body and the
+    tensor-product body migrated.
 
-    The generic simplex body is gone from this list.  It was the largest of
-    the migrations and the one that needed shapes the earlier two did not:
-    five separate work-item scopes at quadrature level, two-level nesting for
-    the trial and test loops, and staging buffers with extents.
-
-    A third is gone.  Targets whose lowering policy opens a bare work-item
-    block instead of a lane loop had no node for that shape, so the entire
-    nest fell back to text on exactly the targets the IR exists to serve;
-    ``BlockNode`` closed it.
+    The budget is zero and this is now a floor rather than a ratchet: a new
+    ``RawLinesNode`` in the residual emitter means a kernel body went back to
+    string building.  The node itself is kept, because it is the honest way to
+    stage the next emitter's migration, and because deleting it would only
+    mean the next un-migrated body hides as an unmarked list of strings.
     """
 
     #: Construction sites of RawLinesNode in the residual emitter.
-    BUDGET = 1
+    BUDGET = 0
 
     def _raw_lines_sites(self):
         import ast

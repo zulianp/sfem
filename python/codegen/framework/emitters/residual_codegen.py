@@ -17,6 +17,7 @@ from codegen.framework.ir.kernel_ast import (
     AssignmentNode,
     BlockNode,
     BufferDeclNode,
+    CallNode,
     FunctionDefNode,
     LoopKind,
     LoopNode,
@@ -2676,18 +2677,13 @@ def _local_function(
         ),
     ]
     if tensor_product:
-        body.append(
-            RawLinesNode(
-                tuple(
-                    _tensor_local_body(
-                        system,
-                        local_prefix,
-                        coefficients,
-                        dependencies,
-                        stream_layout=stream_layout,
-                    )
-                ),
-                reason="tensor-product body: hand-written loop nest, not yet IR",
+        body.extend(
+            _tensor_local_body(
+                system,
+                local_prefix,
+                coefficients,
+                dependencies,
+                stream_layout=stream_layout,
             )
         )
     else:
@@ -3345,29 +3341,24 @@ def _sum_cpp_terms(terms):
 
 
 def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout="pointer"):
+    """The tensor-product body, built as IR.
+
+    The last body to migrate, and the one whose structure is calls rather than
+    loops: fields are evaluated at every quadrature point up front by a helper
+    template, contracted per point, then integrated back by another helper.
+    """
     dim = system.dim
     n_fields = len(system.fields)
     uses_determinant = any(dependencies.value_coefficients) or dependencies.uses_adjugate
     uses_geometry_offset = uses_determinant or dependencies.uses_adjugate
-    lines = []
     if not dependencies.uses_test_coefficients:
-        return lines
-    tensor_evaluate_name = (
-        "tensor_evaluate_contiguous" if stream_layout == "contiguous" else "tensor_evaluate"
-    )
-    tensor_evaluate_value_name = (
-        "tensor_evaluate_value_contiguous"
-        if stream_layout == "contiguous"
-        else "tensor_evaluate_value"
-    )
-    tensor_integrate_name = (
-        "tensor_integrate_contiguous" if stream_layout == "contiguous" else "tensor_integrate"
-    )
-    tensor_integrate_value_name = (
-        "tensor_integrate_value_contiguous"
-        if stream_layout == "contiguous"
-        else "tensor_integrate_value"
-    )
+        return ()
+
+    contiguous = stream_layout == "contiguous"
+    suffix = "_contiguous" if contiguous else ""
+    templates = ("scalar_t", "N_QP", "N_SHAPE", "VECTOR_SIZE", "DIM", "N_FIELDS")
+
+    nodes = []
     for group, enabled in (
         ("current", dependencies.current),
         ("previous", dependencies.previous),
@@ -3376,115 +3367,167 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         if not enabled:
             continue
         uses_gradient = getattr(dependencies, "%s_gradient" % group)
-        lines.extend(
-            [
-                "    scalar_t %s_value[N_FIELDS * N_QP * VECTOR_SIZE];" % group,
-            ]
+        nodes.append(
+            BufferDeclNode(
+                "scalar_t", "%s_value" % group, ("N_FIELDS * N_QP * VECTOR_SIZE",)
+            )
         )
         if uses_gradient:
-            lines.append(
-                "    scalar_t %s_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];"
-                % group
-            )
-        if uses_gradient:
-            lines.extend(
-                [
-                    "    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>("
-                    % tensor_evaluate_name,
-                    "            nelems, shape_1d, grad_1d, %s, %s_value, %s_grad_ref);"
-                    % (group, group, group),
-                ]
-            )
-        else:
-            lines.extend(
-                [
-                    "    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>("
-                    % tensor_evaluate_value_name,
-                    "            nelems, shape_1d, %s, %s_value);" % (group, group),
-                ]
-            )
-    lines.append("    scalar_t value_coeff[N_FIELDS * N_QP * VECTOR_SIZE];")
-    if dependencies.uses_test_gradients:
-        lines.append("    scalar_t grad_coeff_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];")
-    lines.extend(
-        [
-            "    static constexpr int Q = integer_root(N_QP, DIM);",
-            "    for (int q = 0; q < N_QP; ++q) {",
-        ]
-    )
-    if dim == 2:
-        lines.extend(
-            [
-                "        const int qx = q % Q;",
-                "        const int qy = q / Q;",
-                "        const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy];",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "        const int qx = q % Q;",
-                "        const int qy = (q / Q) % Q;",
-                "        const int qz = q / (Q * Q);",
-                "        const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];",
-            ]
-        )
-    lines.extend(
-        [
-            *_work_item_loop_lines("        "),
-        ]
-    )
-    if uses_geometry_offset:
-        lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + lane;")
-    if uses_determinant:
-        lines.append("            const scalar_t det = determinant[geometry_offset];")
-    if dependencies.uses_adjugate:
-        for i in range(dim * dim):
-            lines.append(
-                "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
-                % (i, i)
-            )
-    lines.extend(_tensor_field_alias_lines(system, dependencies))
-    lines.extend(_coefficient_evaluation_lines(system, coefficients, "            ", "qw", dependencies))
-    for row in range(n_fields):
-        if dependencies.value_coefficients[row]:
-            value = "qw * det * value_coeff%d" % row
-        else:
-            value = "scalar_t(0)"
-        lines.append(
-            "            value_coeff[(%d * N_QP + q) * VECTOR_SIZE + lane] = %s;"
-            % (row, value)
-        )
-        if dependencies.uses_test_gradients:
-            for k in range(dim):
-                terms = [
-                    "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
-                    for d in range(dim)
-                    if dependencies.gradient_coefficients[row][d]
-                ]
-                value = "qw * (%s)" % " + ".join(terms) if terms else "scalar_t(0)"
-                lines.append(
-                    "            grad_coeff_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane] = %s;"
-                    % (row, k, value)
+            nodes.append(
+                BufferDeclNode(
+                    "scalar_t",
+                    "%s_grad_ref" % group,
+                    ("N_FIELDS * N_QP * DIM * VECTOR_SIZE",),
                 )
-    lines.extend(["        }", "    }"])
+            )
+            nodes.append(
+                CallNode(
+                    "tensor_evaluate%s" % suffix,
+                    ("nelems", "shape_1d", "grad_1d", group,
+                     "%s_value" % group, "%s_grad_ref" % group),
+                    templates,
+                    wrap_arguments=True,
+                )
+            )
+        else:
+            nodes.append(
+                CallNode(
+                    "tensor_evaluate_value%s" % suffix,
+                    ("nelems", "shape_1d", group, "%s_value" % group),
+                    templates,
+                    wrap_arguments=True,
+                )
+            )
+
+    nodes.append(
+        BufferDeclNode("scalar_t", "value_coeff", ("N_FIELDS * N_QP * VECTOR_SIZE",))
+    )
     if dependencies.uses_test_gradients:
-        lines.extend(
+        nodes.append(
+            BufferDeclNode(
+                "scalar_t", "grad_coeff_ref", ("N_FIELDS * N_QP * DIM * VECTOR_SIZE",)
+            )
+        )
+    nodes.append(
+        BufferDeclNode(
+            "static constexpr int", "Q", (), expr_ref("integer_root(N_QP, DIM)")
+        )
+    )
+
+    quadrature_body = []
+    if dim == 2:
+        quadrature_body.extend(
             [
-                "    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>("
-                % tensor_integrate_name,
-                "            nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);",
+                BufferDeclNode("const int", "qx", (), expr_ref("q % Q")),
+                BufferDeclNode("const int", "qy", (), expr_ref("q / Q")),
+                BufferDeclNode(
+                    "const scalar_t", "qw", (),
+                    expr_ref("q_weight_1d[qx] * q_weight_1d[qy]"),
+                ),
             ]
         )
     else:
-        lines.extend(
+        quadrature_body.extend(
             [
-                "    %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>("
-                % tensor_integrate_value_name,
-                "            nelems, shape_1d, value_coeff, output);",
+                BufferDeclNode("const int", "qx", (), expr_ref("q % Q")),
+                BufferDeclNode("const int", "qy", (), expr_ref("(q / Q) % Q")),
+                BufferDeclNode("const int", "qz", (), expr_ref("q / (Q * Q)")),
+                BufferDeclNode(
+                    "const scalar_t", "qw", (),
+                    expr_ref("q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz]"),
+                ),
             ]
         )
-    return lines
+
+    lane_body = []
+    if uses_geometry_offset:
+        lane_body.append(
+            BufferDeclNode(
+                "const ptrdiff_t", "geometry_offset", (),
+                expr_ref("q * geometry_stride + lane"),
+            )
+        )
+    if uses_determinant:
+        lane_body.append(
+            BufferDeclNode(
+                "const scalar_t", "det", (), expr_ref("determinant[geometry_offset]")
+            )
+        )
+    if dependencies.uses_adjugate:
+        lane_body.extend(
+            BufferDeclNode(
+                "const scalar_t", "adj%d" % i, (),
+                expr_ref("adjugate[%d][geometry_offset]" % i),
+            )
+            for i in range(dim * dim)
+        )
+    lane_body.extend(_tensor_field_alias_nodes(system, dependencies))
+    lane_body.extend(
+        _coefficient_evaluation_nodes(system, coefficients, dependencies)
+    )
+    for row in range(n_fields):
+        value = (
+            "qw * det * value_coeff%d" % row
+            if dependencies.value_coefficients[row]
+            else "scalar_t(0)"
+        )
+        lane_body.append(
+            AssignmentNode(
+                expr_ref("value_coeff[(%d * N_QP + q) * VECTOR_SIZE + lane]" % row),
+                expr_ref(value),
+            )
+        )
+        if not dependencies.uses_test_gradients:
+            continue
+        for k in range(dim):
+            terms = [
+                "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
+                for d in range(dim)
+                if dependencies.gradient_coefficients[row][d]
+            ]
+            value = "qw * (%s)" % " + ".join(terms) if terms else "scalar_t(0)"
+            lane_body.append(
+                AssignmentNode(
+                    expr_ref(
+                        "grad_coeff_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane]"
+                        % (row, k)
+                    ),
+                    expr_ref(value),
+                )
+            )
+
+    quadrature_body.append(_work_item_loop_node(lane_body))
+    quadrature = iterator("q", "int")
+    nodes.append(
+        LoopNode(
+            LoopKind.QUADRATURE,
+            quadrature,
+            iteration_range(0, expr_ref("N_QP", "quadrature_count")),
+            pre_increment(quadrature),
+            body=tuple(quadrature_body),
+        )
+    )
+
+    if dependencies.uses_test_gradients:
+        nodes.append(
+            CallNode(
+                "tensor_integrate%s" % suffix,
+                ("nelems", "shape_1d", "grad_1d", "value_coeff",
+                 "grad_coeff_ref", "output"),
+                templates,
+                wrap_arguments=True,
+            )
+        )
+    else:
+        nodes.append(
+            CallNode(
+                "tensor_integrate_value%s" % suffix,
+                ("nelems", "shape_1d", "value_coeff", "output"),
+                templates,
+                wrap_arguments=True,
+            )
+        )
+    return tuple(nodes)
 
 
 def _field_evaluation_lines(system, dependencies, indent, tensor):
@@ -3579,36 +3622,53 @@ def _physical_gradient_lines(stem, dim, indent):
     return _print_statement_nodes(_physical_gradient_nodes(stem, dim), indent)
 
 
-def _tensor_field_alias_lines(system, dependencies):
+def _tensor_field_alias_nodes(system, dependencies):
+    """Read one quadrature point's staged field values back out, as IR.
+
+    The tensor-product path evaluates every field at every quadrature point up
+    front into flat buffers; this names the slice belonging to the current
+    point and lane, then applies the chain rule to it.
+    """
     dim = system.dim
-    lines = []
+    nodes = []
     groups = _dependency_stream_groups(dependencies)
     for field_index, field in enumerate(system.fields):
         for group in groups:
+            stem = field.name + group.symbol_suffix
             if group.uses_value:
-                lines.append(
-                    "            const scalar_t %s%s = %s_value[(%d * N_QP + q) * VECTOR_SIZE + lane];"
-                    % (field.name, group.symbol_suffix, group.name, field_index)
+                nodes.append(
+                    BufferDeclNode(
+                        "const scalar_t",
+                        stem,
+                        (),
+                        expr_ref(
+                            "%s_value[(%d * N_QP + q) * VECTOR_SIZE + lane]"
+                            % (group.name, field_index)
+                        ),
+                    )
                 )
             if group.uses_gradient:
-                for k in range(dim):
-                    lines.append(
-                        "            const scalar_t %s%s_grad_%d_ref = %s_grad_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane];"
-                        % (
-                            field.name,
-                            group.symbol_suffix,
-                            k,
-                            group.name,
-                            field_index,
-                            k,
-                        )
+                nodes.extend(
+                    BufferDeclNode(
+                        "const scalar_t",
+                        "%s_grad_%d_ref" % (stem, k),
+                        (),
+                        expr_ref(
+                            "%s_grad_ref[((%d * N_QP + q) * DIM + %d) * VECTOR_SIZE + lane]"
+                            % (group.name, field_index, k)
+                        ),
                     )
-                lines.extend(
-                    _physical_gradient_lines(
-                        field.name + group.symbol_suffix, dim, "            "
-                    )
+                    for k in range(dim)
                 )
-    return lines
+                nodes.extend(_physical_gradient_nodes(stem, dim))
+    return nodes
+
+
+def _tensor_field_alias_lines(system, dependencies):
+    """The printed view of :func:`_tensor_field_alias_nodes`."""
+    return _print_statement_nodes(
+        _tensor_field_alias_nodes(system, dependencies), "            "
+    )
 
 
 def _coefficient_evaluation_lines(system, coefficients, indent, weight, dependencies=None):
