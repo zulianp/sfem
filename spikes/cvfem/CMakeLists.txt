@@ -155,6 +155,14 @@ target_include_directories(cvfem_ns_op PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
 cvfem_subpar_target(cvfem_ns_op)
 
+# Proves the Op reproduces the standalone driver on the same mesh and state. Cheap
+# enough to be a ctest, and it is the gate everything downstream of the Op rests on.
+add_executable(cvfem_ns_op_gate cvfem_ns_op_gate.cpp)
+target_link_libraries(cvfem_ns_op_gate PRIVATE cvfem_ns_op)
+target_compile_options(cvfem_ns_op_gate PRIVATE ${_cvfem_perf_opts})
+cvfem_subpar_target(cvfem_ns_op_gate)
+add_test(NAME cvfem_ns_op_gate COMMAND cvfem_ns_op_gate)
+
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
