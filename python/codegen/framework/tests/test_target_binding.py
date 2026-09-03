@@ -222,10 +222,13 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     serial loop -- code that compiles and is quietly wrong -- which hides the
     portability gap instead of closing it.  Restructuring is the real fix.
 
-    Seven ``#pragma omp atomic update`` sit in the ``_sfem_soa_hessian_scatter_*``
-    matrix-format helpers, which take no ``source_builder``.  Those are leaves
-    and should be converted; it needs the builder threaded into seven
-    functions, which is mechanical and separable.
+    Six ``#pragma omp atomic update`` sit in the ``_sfem_soa_hessian_scatter_*``
+    matrix-format helpers.  These were recorded as blocked on threading a
+    ``source_builder`` through seven functions; the target binding removed
+    that blocker, since a helper can read ``current_target()`` directly.  The
+    seventh is gone: ``_scatter_block_diag_sym`` is built from IR nodes and
+    its atomic comes from the target through ``ScatterNode(atomic=True)``.
+    The rest follow as each helper migrates.
 
     One ``#pragma omp parallel`` is in ``_sfem_packed_thread_scratch_header_source``,
     which preallocates thread-local scratch.  That is OpenMP-specific
@@ -236,7 +239,7 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     #: file -> literal pragmas remaining.  Lower these; never raise them.
     BUDGET = {
         "residual_codegen.py": 17,
-        "energy_codegen.py": 14,
+        "energy_codegen.py": 13,
     }
 
     def _literal_pragmas(self, name):

@@ -1,9 +1,14 @@
 import sympy as sp
 
 from codegen.framework.ir.kernel_ast import (
+    AssignmentNode,
+    BufferDeclNode,
+    CallNode,
+    FunctionDefNode,
     LoopHeaderNode,
     LoopKind,
     LoopNode,
+    ReturnNode,
     ScatterNode,
     add_assign_increment,
     expr_ref,
@@ -11,7 +16,12 @@ from codegen.framework.ir.kernel_ast import (
     iterator,
     pre_increment,
 )
-from codegen.framework.emitters.ast_printer import CLikeKernelASTPrinter, render_kernel_ast_lines
+from codegen.framework.emitters.ast_printer import (
+    CLikeKernelASTPrinter,
+    PrinterLayout,
+    render_kernel_ast_lines,
+)
+from codegen.framework.targets import current_target
 from codegen.framework.symbolic.core import (
     ExpressionRole,
     KernelExpressions,
@@ -6163,6 +6173,38 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats):
     return lines
 
 
+SCATTER_LAYOUT = PrinterLayout(
+    close_signature_on_last_param=True, atomic_pragma_at_column_zero=True
+)
+
+
+def _print_scatter_function(node):
+    """Render one scatter helper, in the layout the energy path already uses.
+
+    The signature closes on its last parameter and the atomic pragma sits at
+    column zero -- both different from the residual path, both facts about
+    existing generated code rather than choices being made here.
+    """
+    target = current_target()
+    printer = CLikeKernelASTPrinter(
+        atomic_update_pragma=target.atomic_update_pragma() or "",
+        layout=SCATTER_LAYOUT,
+    )
+    return list(printer.print_node(node)) + [""]
+
+
+def _counting_loop(name, begin, end, body):
+    """``for (int <name> = <begin>; <name> < <end>; ++<name>)``."""
+    index = iterator(name, "int")
+    return LoopNode(
+        LoopKind.SHAPE,
+        index,
+        iteration_range(begin, end),
+        pre_increment(index),
+        body=tuple(body),
+    )
+
+
 def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes):
     return [
         "template <typename scalar_t>",
@@ -6458,37 +6500,71 @@ def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes):
 
 
 def _sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes):
-    return [
-        "template <typename scalar_t>",
-        "static SFEM_INLINE void %s_scatter_coo_triplets(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
-        "        const ptrdiff_t element,",
-        "        idx_t *const SFEM_RESTRICT rows,",
-        "        idx_t *const SFEM_RESTRICT cols,",
-        "        scalar_t *const SFEM_RESTRICT values) {",
-        "    static constexpr int DIM = %d;" % dim,
-        "    static constexpr int N_SHAPE = %d;" % n_nodes,
-        "    static constexpr int NDOFS = DIM * N_SHAPE;",
-        "    const ptrdiff_t element_offset = element * NDOFS * NDOFS;",
-        "    for (int bi = 0; bi < DIM; ++bi) {",
-        "        for (int i = 0; i < N_SHAPE; ++i) {",
-        "            const int row = bi * N_SHAPE + i;",
-        "            const idx_t global_row = ev[i] * DIM + bi;",
-        "            for (int bj = 0; bj < DIM; ++bj) {",
-        "                for (int j = 0; j < N_SHAPE; ++j) {",
-        "                    const int col = bj * N_SHAPE + j;",
-        "                    const ptrdiff_t entry = element_offset + row * NDOFS + col;",
-        "                    rows[entry] = global_row;",
-        "                    cols[entry] = ev[j] * DIM + bj;",
-        "                    values[entry] = element_matrix[row * NDOFS + col];",
-        "                }",
-        "            }",
-        "        }",
-        "    }",
-        "}",
-        "",
+    """Write one element's matrix out as (row, col, value) triplets."""
+    inner = [
+        BufferDeclNode("const int", "col", (), expr_ref("bj * N_SHAPE + j")),
+        BufferDeclNode(
+            "const ptrdiff_t",
+            "entry",
+            (),
+            expr_ref("element_offset + row * NDOFS + col"),
+        ),
+        AssignmentNode(expr_ref("rows[entry]"), expr_ref("global_row")),
+        AssignmentNode(expr_ref("cols[entry]"), expr_ref("ev[j] * DIM + bj")),
+        AssignmentNode(
+            expr_ref("values[entry]"), expr_ref("element_matrix[row * NDOFS + col]")
+        ),
     ]
+    body = [
+        BufferDeclNode("static constexpr int", "DIM", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
+        BufferDeclNode("static constexpr int", "NDOFS", (), expr_ref("DIM * N_SHAPE")),
+        BufferDeclNode(
+            "const ptrdiff_t", "element_offset", (), expr_ref("element * NDOFS * NDOFS")
+        ),
+        _counting_loop(
+            "bi",
+            0,
+            expr_ref("DIM"),
+            [
+                _counting_loop(
+                    "i",
+                    0,
+                    expr_ref("N_SHAPE"),
+                    [
+                        BufferDeclNode(
+                            "const int", "row", (), expr_ref("bi * N_SHAPE + i")
+                        ),
+                        BufferDeclNode(
+                            "const idx_t", "global_row", (), expr_ref("ev[i] * DIM + bi")
+                        ),
+                        _counting_loop(
+                            "bj",
+                            0,
+                            expr_ref("DIM"),
+                            [_counting_loop("j", 0, expr_ref("N_SHAPE"), inner)],
+                        ),
+                    ],
+                )
+            ],
+        ),
+    ]
+    return _print_scatter_function(
+        FunctionDefNode(
+            "%s_scatter_coo_triplets" % function_base,
+            params=(
+                "const idx_t *const SFEM_RESTRICT ev",
+                "const scalar_t *const SFEM_RESTRICT element_matrix",
+                "const ptrdiff_t element",
+                "idx_t *const SFEM_RESTRICT rows",
+                "idx_t *const SFEM_RESTRICT cols",
+                "scalar_t *const SFEM_RESTRICT values",
+            ),
+            body=tuple(body),
+            qualifier="static SFEM_INLINE",
+            template_params=("typename scalar_t",),
+        )
+    )
 
 
 def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
@@ -6533,31 +6609,68 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
 
 
 def _sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes):
-    return [
-        "template <typename scalar_t>",
-        "static SFEM_INLINE void %s_scatter_block_diag_sym(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
-        "        scalar_t *const SFEM_RESTRICT values) {",
-        "    static constexpr int DIM = %d;" % dim,
-        "    static constexpr int N_SHAPE = %d;" % n_nodes,
-        "    static constexpr int NDOFS = DIM * N_SHAPE;",
-        "    static constexpr int SYM_DIM = (DIM * (DIM + 1)) / 2;",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        scalar_t *const block = &values[(ptrdiff_t)ev[i] * SYM_DIM];",
-        "        int sym = 0;",
-        "        for (int bi = 0; bi < DIM; ++bi) {",
-        "            const int row = bi * N_SHAPE + i;",
-        "            for (int bj = bi; bj < DIM; ++bj) {",
-        "                const int col = bj * N_SHAPE + i;",
-        "#pragma omp atomic update",
-        "                block[sym++] += element_matrix[row * NDOFS + col];",
-        "            }",
-        "        }",
-        "    }",
-        "}",
-        "",
+    """Accumulate only the symmetric block diagonal."""
+    body = [
+        BufferDeclNode("static constexpr int", "DIM", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
+        BufferDeclNode("static constexpr int", "NDOFS", (), expr_ref("DIM * N_SHAPE")),
+        BufferDeclNode(
+            "static constexpr int", "SYM_DIM", (), expr_ref("(DIM * (DIM + 1)) / 2")
+        ),
+        _counting_loop(
+            "i",
+            0,
+            expr_ref("N_SHAPE"),
+            [
+                BufferDeclNode(
+                    "scalar_t *const",
+                    "block",
+                    (),
+                    expr_ref("&values[(ptrdiff_t)ev[i] * SYM_DIM]"),
+                ),
+                BufferDeclNode("int", "sym", (), expr_ref("0")),
+                _counting_loop(
+                    "bi",
+                    0,
+                    expr_ref("DIM"),
+                    [
+                        BufferDeclNode(
+                            "const int", "row", (), expr_ref("bi * N_SHAPE + i")
+                        ),
+                        _counting_loop(
+                            "bj",
+                            expr_ref("bi"),
+                            expr_ref("DIM"),
+                            [
+                                BufferDeclNode(
+                                    "const int", "col", (), expr_ref("bj * N_SHAPE + i")
+                                ),
+                                ScatterNode(
+                                    expr_ref("block[sym++]"),
+                                    expr_ref("element_matrix[row * NDOFS + col]"),
+                                    "+=",
+                                    atomic=True,
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
     ]
+    return _print_scatter_function(
+        FunctionDefNode(
+            "%s_scatter_block_diag_sym" % function_base,
+            params=(
+                "const idx_t *const SFEM_RESTRICT ev",
+                "const scalar_t *const SFEM_RESTRICT element_matrix",
+                "scalar_t *const SFEM_RESTRICT values",
+            ),
+            body=tuple(body),
+            qualifier="static SFEM_INLINE",
+            template_params=("typename scalar_t",),
+        )
+    )
 
 
 def _sfem_soa_hessian_matrix_public_wrappers(

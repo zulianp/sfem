@@ -15,6 +15,7 @@ class KernelASTNodeKind(str, Enum):
     RAW_LINES = "raw_lines"
     BLOCK = "block"
     LOOP_HEADER = "loop_header"
+    RETURN = "return"
 
 
 class GeometryNodeKind(str, Enum):
@@ -439,6 +440,29 @@ class LocalComputationNode:
             "output_name": self.output_name,
             "statement_count": len(tuple(getattr(self.evaluation_plan, "statements", ()))),
             "cost": None if self.cost is None else _cost_to_dict(self.cost),
+        }
+
+
+@dataclass(frozen=True)
+class ReturnNode:
+    """A return, with or without a value.
+
+    The scatter helpers report whether they found every entry they needed, so
+    they return a status rather than being void.  Nothing in the IR could say
+    that, which is why those kernels stayed text.
+    """
+
+    value: object = None
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.RETURN, init=False)
+
+    def __post_init__(self):
+        if self.value is not None:
+            object.__setattr__(self, "value", _as_expr(self.value))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "value": None if self.value is None else _entity_to_dict(self.value),
         }
 
 
