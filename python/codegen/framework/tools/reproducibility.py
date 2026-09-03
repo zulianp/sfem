@@ -93,25 +93,37 @@ MATERIALS = (
 ELEMENT = "HEX8"
 ALIAS_TARGETS = ("PROTEUS_HEX8",)
 
+#: Materials whose kernels are not enabled for HEX8 and the element they take
+#: instead.  Taylor-Hood pairs a quadratic velocity mesh with a linear pressure
+#: mesh on the same cells, so the grid is the HEX27 one and the pressure nodes
+#: are its corners.
+ELEMENT_BY_MATERIAL = {
+    "poro_elasticity": ("HEX27_HEX8", ()),
+    "stokes": ("HEX27_HEX8", ()),
+}
+
+
+def _elements_for(material):
+    element, aliases = ELEMENT_BY_MATERIAL.get(material, (ELEMENT, ALIAS_TARGETS))
+    return element, aliases
+
+
+#: The local node index of each lexicographic position in a HEX27 element,
+#: taken from fem.reference.sfem_tensor_hex_shape_index rather than guessed --
+#: a wrong ordering would make the isoparametric geometry disagree with the
+#: affine adjugate the harness supplies, which the parity check would catch.
+HEX27_FROM_LEXICOGRAPHIC = (
+    0, 8, 1, 11, 24, 9, 3, 10, 2,
+    16, 20, 17, 23, 26, 21, 19, 22, 18,
+    4, 12, 5, 15, 25, 13, 7, 14, 6,
+)
+
 #: Materials this harness cannot drive, and why.  These are facts about the
 #: material rather than defects in the tool, so they are stated rather than
 #: left to surface as a failure -- and they are the honest edge of the
 #: coverage, which is the number that matters when this gate is used to justify
 #: an intended output change.
-NOT_COVERED = {
-    "poro_elasticity": (
-        "Taylor-Hood: enabled for TRI6_TRI3 / TET10_TET4 / HEX27_HEX8, whose "
-        "topology this Cartesian HEX8 grid does not build"
-    ),
-    "stokes": (
-        "Taylor-Hood: enabled for TRI6_TRI3 / TET10_TET4 / HEX27_HEX8, whose "
-        "topology this Cartesian HEX8 grid does not build"
-    ),
-    "two_phase_flow": (
-        "its per-form operators each define the same element-generic entry "
-        "points, so the translation units cannot be linked into one driver"
-    ),
-}
+NOT_COVERED = {}
 
 
 def _repo_root():
@@ -173,11 +185,22 @@ def _include_flags(root, generated_dir):
 # Reading the manifest
 # --------------------------------------------------------------------------
 
-_PARAM = re.compile(r"^\s*(?P<type>.+?)\s*(?P<name>[A-Za-z_]\w*)\s*$")
+#: A parameter is a type, a name, and optionally an array extent.  The extent
+#: matters: a Taylor-Hood kernel takes its velocity components as
+#: ``const double *const SFEM_RESTRICT u_data[3]`` -- an array of pointers, not
+#: a pointer -- and calling it needs three buffers and a stack array holding
+#: their addresses.
+_PARAM = re.compile(
+    r"^\s*(?P<type>.+?)\s*(?P<name>[A-Za-z_]\w*)\s*(?:\[(?P<extent>\d+)\])?\s*$"
+)
 
 
 def _parameters(declaration):
-    """The (type, name) pairs of one C ABI declaration, in order."""
+    """The (type, name, extent) triples of one declaration, in order.
+
+    ``extent`` is 0 for a plain parameter and the array length for one declared
+    as ``name[N]``.
+    """
     inner = declaration[declaration.index("(") + 1 : declaration.rindex(")")]
     params = []
     for part in inner.split(","):
@@ -187,7 +210,10 @@ def _parameters(declaration):
         match = _PARAM.match(part)
         if match is None:
             return None
-        params.append((match.group("type").strip(), match.group("name")))
+        extent = match.group("extent")
+        params.append(
+            (match.group("type").strip(), match.group("name"), int(extent or 0))
+        )
     return params
 
 
@@ -248,7 +274,7 @@ def _bind(params, element, components):
     args = []
     inputs = []
     outputs = []
-    for ctype, name in params:
+    for ctype, name, extent in params:
         if name == "element_type":
             args.append("smesh::ElemType::%s" % element)
         elif name == "nelements":
@@ -271,13 +297,13 @@ def _bind(params, element, components):
         elif ctype in OUT_FIELDS:
             scalar = _scalar_type(ctype)
             buffer = "out_%s_%s" % (scalar, name)
-            outputs.append((buffer, scalar, name, components))
-            args.append("%s.data()" % buffer)
+            outputs.append((buffer, scalar, name, components, extent))
+            args.append(buffer if extent else "%s.data()" % buffer)
         elif ctype in IN_FIELDS:
             scalar = _scalar_type(ctype)
             buffer = "in_%s_%s" % (scalar, name)
-            inputs.append((buffer, scalar, name, components))
-            args.append("%s.data()" % buffer)
+            inputs.append((buffer, scalar, name, components, extent))
+            args.append(buffer if extent else "%s.data()" % buffer)
         else:
             raise Unbindable("%s %s" % (ctype, name))
     if not outputs:
@@ -356,6 +382,55 @@ static Mesh build_grid(int n) {
     return m;
 }
 
+// The quadratic grid: the same cells, with nodes on a lattice of twice the
+// resolution.  The cell map is still affine, so the adjugate and determinant
+// are the same constants, and the isoparametric kernels must still agree with
+// the affine ones -- which is what checks the local node ordering below.
+static Mesh build_grid_hex27(int n) {
+    Mesh m;
+    static const int local_of[27] = {
+        0, 8, 1, 11, 24, 9, 3, 10, 2,
+        16, 20, 17, 23, 26, 21, 19, 22, 18,
+        4, 12, 5, 15, 25, 13, 7, 14, 6
+    };
+    const int nn = 2 * n + 1;
+    m.h = 1.0 / (double)n;
+    const double hh = m.h / 2.0;
+    m.nnodes = (ptrdiff_t)nn * nn * nn;
+    m.nelements = (ptrdiff_t)n * n * n;
+    m.elements.assign(27, std::vector<idx_t>(m.nelements));
+    m.points.assign(3, std::vector<geom_t>(m.nnodes));
+    auto nid = [&](int i, int j, int k) { return (idx_t)((k * nn + j) * nn + i); };
+    for (int k = 0; k < nn; ++k)
+        for (int j = 0; j < nn; ++j)
+            for (int i = 0; i < nn; ++i) {
+                const idx_t id = nid(i, j, k);
+                m.points[0][id] = (geom_t)(i * hh);
+                m.points[1][id] = (geom_t)(j * hh);
+                m.points[2][id] = (geom_t)(k * hh);
+            }
+    ptrdiff_t e = 0;
+    for (int k = 0; k < n; ++k)
+        for (int j = 0; j < n; ++j)
+            for (int i = 0; i < n; ++i, ++e)
+                for (int sz = 0; sz < 3; ++sz)
+                    for (int sy = 0; sy < 3; ++sy)
+                        for (int sx = 0; sx < 3; ++sx) {
+                            const int local = local_of[sx + 3 * (sy + 3 * sz)];
+                            m.elements[local][e] = nid(2 * i + sx, 2 * j + sy, 2 * k + sz);
+                        }
+    for (auto &row : m.elements) m.element_ptrs.push_back(row.data());
+    for (auto &row : m.points) m.point_ptrs.push_back(row.data());
+    m.adjugate.assign(9, std::vector<geom_t>(m.nelements, (geom_t)0));
+    m.determinant.assign(m.nelements, (geom_t)(m.h * m.h * m.h));
+    for (ptrdiff_t i = 0; i < m.nelements; ++i) {
+        m.adjugate[0][i] = (geom_t)(m.h * m.h);
+        m.adjugate[4][i] = (geom_t)(m.h * m.h);
+        m.adjugate[8][i] = (geom_t)(m.h * m.h);
+    }
+    return m;
+}
+
 // A stable hash of the parameter name, so every field is filled differently and
 // the same way on every machine.  Two kernels reading the same named field read
 // the same numbers, which is what lets their digests be compared.
@@ -403,28 +478,64 @@ static void report(const char *name, const Digest &d) {
 
 def _call_block(name, args, inputs, outputs):
     lines = ["    {"]
-    for buffer, scalar, param, components in inputs:
-        lines.append(
-            "        std::vector<%s> %s(nodes * %d); fill_field(%s, \"%s\");"
-            % (scalar, buffer, components, buffer, param)
-        )
-    for buffer, scalar, _param, components in outputs:
-        lines.append(
-            "        std::vector<%s> %s(nodes * %d, (%s)0);"
-            % (scalar, buffer, components, scalar)
-        )
+    for buffer, scalar, param, components, extent in inputs:
+        if extent:
+            for slot in range(extent):
+                lines.append(
+                    "        std::vector<%s> %s_%d(nodes * %d); fill_field(%s_%d, \"%s_%d\");"
+                    % (scalar, buffer, slot, components, buffer, slot, param, slot)
+                )
+            lines.append(
+                "        const %s *const %s[%d] = {%s};"
+                % (
+                    scalar,
+                    buffer,
+                    extent,
+                    ", ".join("%s_%d.data()" % (buffer, s) for s in range(extent)),
+                )
+            )
+        else:
+            lines.append(
+                "        std::vector<%s> %s(nodes * %d); fill_field(%s, \"%s\");"
+                % (scalar, buffer, components, buffer, param)
+            )
+    for buffer, scalar, _param, components, extent in outputs:
+        if extent:
+            for slot in range(extent):
+                lines.append(
+                    "        std::vector<%s> %s_%d(nodes * %d, (%s)0);"
+                    % (scalar, buffer, slot, components, scalar)
+                )
+            lines.append(
+                "        %s *const %s[%d] = {%s};"
+                % (
+                    scalar,
+                    buffer,
+                    extent,
+                    ", ".join("%s_%d.data()" % (buffer, s) for s in range(extent)),
+                )
+            )
+        else:
+            lines.append(
+                "        std::vector<%s> %s(nodes * %d, (%s)0);"
+                % (scalar, buffer, components, scalar)
+            )
     lines.append("        %s(" % name)
     lines.append("            " + ",\n            ".join(args))
     lines.append("        );")
     lines.append("        Digest d;")
-    for buffer, _scalar, _param, _components in outputs:
-        lines.append("        accumulate(d, %s);" % buffer)
+    for buffer, _scalar, _param, _components, extent in outputs:
+        if extent:
+            for slot in range(extent):
+                lines.append("        accumulate(d, %s_%d);" % (buffer, slot))
+        else:
+            lines.append("        accumulate(d, %s);" % buffer)
     lines.append('        report("%s", d);' % name)
     lines.append("    }")
     return "\n".join(lines)
 
 
-def _driver_source(declarations, blocks, refine):
+def _driver_source(declarations, blocks, refine, builder):
     return "\n".join(
         [
             DRIVER_HEAD,
@@ -433,7 +544,8 @@ def _driver_source(declarations, blocks, refine):
             "}",
             "",
             "int main() {",
-            "    Mesh mesh = build_grid(%d);  // not const: the kernels take idx_t **const" % refine,
+            "    Mesh mesh = %s(%d);  // not const: the kernels take idx_t **const"
+            % (builder, refine),
             "    const size_t nodes = (size_t)mesh.nnodes;",
             "",
             "\n\n".join(blocks),
@@ -454,7 +566,8 @@ def _generate(root, generated, material):
     env["PYTHONPATH"] = (
         os.path.join(root, "python") + os.pathsep + env.get("PYTHONPATH", "")
     )
-    elements = (ELEMENT,) + ALIAS_TARGETS
+    element, aliases = _elements_for(material)
+    elements = (element,) + aliases
     completed = subprocess.run(
         [
             sys.executable,
@@ -483,6 +596,11 @@ def run_material(root, generated, material, refine, compiler, verbose=False):
     if not entries:
         raise RuntimeError("no manifest for %s" % material)
 
+    element, _aliases = _elements_for(material)
+    # A Taylor-Hood pair names its velocity element; the grid is that element's.
+    grid_element = element.split("_")[0] if "_" in element else element
+    builder = "build_grid_hex27" if grid_element == "HEX27" else "build_grid"
+
     # How many fields the system carries, read off the structure-of-arrays
     # kernels: those take one output pointer per field.  The interleaved
     # array-of-structures kernels take a single pointer holding all of them, so
@@ -490,9 +608,9 @@ def run_material(root, generated, material, refine, compiler, verbose=False):
     n_fields = 1
     for entry in entries:
         params = _parameters(entry["declaration"])
-        if params is None or not any(n.endswith("_stride") for _t, n in params):
+        if params is None or not any(n.endswith("_stride") for _t, n, _e in params):
             continue
-        outs = sum(1 for t, _n in params if t in OUT_FIELDS)
+        outs = sum(1 for t, _n, _e in params if t in OUT_FIELDS)
         n_fields = max(n_fields, outs)
 
     declarations, blocks, skipped = [], [], []
@@ -501,10 +619,13 @@ def run_material(root, generated, material, refine, compiler, verbose=False):
         if params is None:
             skipped.append((entry["name"], "unparsed declaration"))
             continue
-        interleaved = not any(name.endswith("_stride") for _t, name in params)
+        interleaved = not any(name.endswith("_stride") for _t, name, _e in params)
         try:
+            # element_type is a smesh::ElemType, so a Taylor-Hood pair passes
+            # its velocity element rather than the pair label the generator
+            # names the kernels after.
             args, inputs, outputs = _bind(
-                params, ELEMENT, n_fields if interleaved else 1
+                params, grid_element, n_fields if interleaved else 1
             )
         except Unbindable as reason:
             skipped.append((entry["name"], str(reason)))
@@ -519,7 +640,7 @@ def run_material(root, generated, material, refine, compiler, verbose=False):
     os.makedirs(workdir, exist_ok=True)
     driver_path = os.path.join(workdir, "driver.cpp")
     with open(driver_path, "w", encoding="utf-8") as handle:
-        handle.write(_driver_source(declarations, blocks, refine))
+        handle.write(_driver_source(declarations, blocks, refine, builder))
 
     operators = sorted(
         os.path.join(directory, name)
@@ -571,7 +692,18 @@ def run_material(root, generated, material, refine, compiler, verbose=False):
 #: both are driven anyway -- and it is the check that catches a bug in the
 #: adjugate routing, which a digest alone would happily record as the new
 #: correct answer.
-PARITY_TOLERANCE = {"double": 1e-12, "float": 1e-6}
+#:
+#: They agree to geometry precision rather than exactly, because the two derive
+#: the metric differently and ``geom_t`` is single precision: the affine kernels
+#: read an adjugate the harness rounds to float, the isoparametric ones compute
+#: one in double from float coordinates.  ``apply_bench`` classifies the same
+#: comparison the same way and for the same reason.
+#:
+#: The first version of this used 1e-12 and passed, which was luck rather than
+#: agreement: on a HEX8 grid at refine=4 the spacing is 0.25 and every geometry
+#: value is exactly representable, so no rounding happened.  The quadratic grid,
+#: whose spacing is 1/3, showed the difference at 1e-8 immediately.
+PARITY_TOLERANCE = {"double": 1e-5, "float": 1e-5}
 
 
 def _geometry_parity(measured):
