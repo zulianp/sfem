@@ -824,7 +824,7 @@ int sshex8_neohookean_ogden_partial_assembly_apply(int                          
 
 #ifdef SFEM_ENABLE_BLAS
             sshex8_SoA_pack_elements(level, eh, X);
-            packed_elements_matmul(24, txe, 24, element_matrix, X, Y);
+            packed_elements_matmul_sym(24, txe, 24, element_matrix, X, Y);
             sshex8_SoA_unpack_add_elements(level, Y, v);
 #else
             // Iterate over sub-elements

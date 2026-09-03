@@ -196,7 +196,7 @@ int sshex8_stencil_element_matrix_apply3(const int                           lev
             }
 
             sshex8_SoA_pack_elements(level, eu, X);
-            packed_elements_matmul(24, txe, 24, &g_element_matrix[e * 24 * 24], X, Y);
+            packed_elements_matmul_sym(24, txe, 24, &g_element_matrix[e * 24 * 24], X, Y);
 
             for (int d = 0; d < 3; d++) {
                 memset(v[d], 0, nxe * sizeof(scalar_t));

@@ -1334,7 +1334,7 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_warp(
                 }
             }
 
-            // Y = A * X (row-major), matching host packed_elements_matmul
+            // Y = A * X (row-major), matching host packed_elements_matmul_nonsym
             for (int i = 0; i < 24; i++) {
                 const T *const row = &emat[i * 24];
                 T              acc = 0;
