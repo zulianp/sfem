@@ -119,7 +119,11 @@ static void usage(const char *argv0) {
                  "  SFEM_CHECK_JV        1: print |J_mf v - J_asm v| after first assembly\n"
                  "  SFEM_RHIE_CHOW       colocated mass-flux interpolation (default 1)\n"
                  "  SFEM_RHIE_CHOW_SCALE D_f = scale * h^2 / (2 mu) (default 1)\n"
-                 "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n",
+                 "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
+                 "  SFEM_PC_PSCALE       Schur scaling of the pressure block:\n"
+                 "                       inv_pp = PSCALE / V_p (default 0 = use 1/A_pp;\n"
+                 "                       measured optimum 0.1, independent of mu and h)\n"
+                 "  SFEM_PC_PDAMP        damping on the 1 / A_pp pressure block (default 1)\n",
                  argv0);
 }
 
@@ -750,10 +754,40 @@ static bool invert3_vel(const scalar_t *const SFEM_RESTRICT a, scalar_t *const S
     return std::isfinite(inv[0]) && std::isfinite(inv[5]) && std::isfinite(inv[10]);
 }
 
-static void build_block_jacobi(const BSR4                 &b,
-                               const std::vector<uint8_t> &constrained,
-                               const ptrdiff_t             nnodes,
-                               std::vector<scalar_t>      &inv_diag) {
+// Lumped pressure mass matrix: the control volume attached to each node.
+//
+// A HEX8 element's eight sub-control volumes partition it evenly, so each node collects
+// |det| / 8 from every element it touches. This is M_p for a piecewise-constant pressure
+// test space, which is what the Schur approximation below needs.
+static void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol) {
+    node_vol.assign((size_t)d.nnodes, scalar_t(0));
+    // jacobian_determinant is only precomputed for affine geometry, so evaluate it here
+    // when it is absent rather than reading an empty array.
+    const bool have_det = (ptrdiff_t)d.jacobian_determinant.size() >= d.nelements;
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t det;
+        if (have_det) {
+            det = d.jacobian_determinant[e];
+        } else {
+            scalar_t x[8], y[8], z[8], adj[9];
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                x[a] = d.points[0][g]; y[a] = d.points[1][g]; z[a] = d.points[2][g];
+            }
+            cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
+        }
+        const scalar_t v = std::fabs(det) / scalar_t(8);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) node_vol[d.elems[a][e]] += v;
+    }
+}
+
+static void build_block_jacobi(const BSR4                  &b,
+                               const std::vector<uint8_t>  &constrained,
+                               const ptrdiff_t              nnodes,
+                               const std::vector<scalar_t> &node_vol,
+                               const scalar_t               pscale,
+                               const scalar_t               pdamp,
+                               std::vector<scalar_t>       &inv_diag) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_block_jacobi");
     inv_diag.assign((size_t)nnodes * 16, scalar_t(0));
     const scalar_t *const SFEM_RESTRICT values = b.values->data();
@@ -784,7 +818,33 @@ static void build_block_jacobi(const BSR4                 &b,
             inv[15] = scalar_t(1);
         } else {
             const scalar_t d = blk[15];
-            inv[15]          = (std::fabs(d) > scalar_t(1e-30)) ? scalar_t(1) / d : scalar_t(1);
+            const scalar_t v = node_vol[(size_t)row];
+            if (pscale != scalar_t(0) && v > scalar_t(1e-30)) {
+                // Schur-complement scaling of the pressure block. Left to itself
+                // block-Jacobi inverts A_pp, which on a colocated discretisation is not
+                // the operator that governs convergence -- it is whatever the Rhie-Chow
+                // stabilisation happens to leave on the diagonal. What governs
+                // convergence is the pressure Schur complement S = -B A^-1 B^T, and the
+                // textbook viscous approximation is S^-1 ~ -mu M_p^-1, i.e. -mu / V_p
+                // with the lumped mass matrix.
+                //
+                // Measured, the mu does not belong. Sweeping SFEM_PC_PSCALE at mu = 0.01
+                // and mu = 0.1 puts the optimum at the same inv_pp = 0.1 / V_p in both
+                // cases, not at a value ten times apart, so this uses PSCALE / V_p. That
+                // is consistent with the Schur complement here being dominated by the
+                // Rhie-Chow stabilisation, whose D_f = scale * h^2 / (2 mu) cancels the
+                // viscosity, rather than by the viscous operator.
+                //
+                // Positive is the correct sign for the continuity row as assembled here:
+                // negative values diverge. The rho, U and domain-size dependence of the
+                // 0.1 is not established, which is why this stays a knob defaulting to
+                // 0 (plain 1 / A_pp) rather than becoming the default preconditioner.
+                inv[15] = pscale / v;
+            } else {
+                // A_pp is only structurally zero without Rhie-Chow, a configuration whose
+                // linear solves do not converge anyway; the guard costs one compare.
+                inv[15] = (std::fabs(d) > scalar_t(1e-30)) ? pdamp / d : scalar_t(1);
+            }
         }
     }
 }
@@ -1046,6 +1106,11 @@ int main(int argc, char **argv) {
     int         rhie_chow   = smesh::Env::read<int>("SFEM_RHIE_CHOW", 1);
     scalar_t    rc_scale    = smesh::Env::read<scalar_t>("SFEM_RHIE_CHOW_SCALE", 1);
     int         pack_size   = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
+    // Schur scaling of the pressure block in the block-Jacobi preconditioner.
+    // 0 = the original identity-on-pressure behaviour, which is the control.
+    scalar_t    pscale      = smesh::Env::read<scalar_t>("SFEM_PC_PSCALE", 0);
+    // Damping applied to the plain 1 / A_pp pressure block. 1 = unchanged block-Jacobi.
+    scalar_t    pdamp       = smesh::Env::read<scalar_t>("SFEM_PC_PDAMP", 1);
 
     if (case_name.empty()) {
         std::fprintf(stderr, "SFEM_CASE is required (poiseuille, couette, or coutte)\n");
@@ -1113,6 +1178,8 @@ int main(int argc, char **argv) {
             "- SFEM_RHIE_CHOW=%d\n"
             "- SFEM_RHIE_CHOW_SCALE=%g\n"
             "- SFEM_PACK_SIZE=%d\n"
+            "- SFEM_PC_PSCALE=%g\n"
+            "- SFEM_PC_PDAMP=%g\n"
             "----------------------------------------\n",
             flow_name,
             n,
@@ -1139,7 +1206,9 @@ int main(int argc, char **argv) {
             matrix_free,
             rhie_chow,
             (rhie_chow == 0) ? scalar_t(0) : rc_scale,
-            pack_size);
+            pack_size,
+            pscale,
+            pdamp);
 
     MeshData d;
     d.Lx               = Lx;
@@ -1185,6 +1254,12 @@ int main(int argc, char **argv) {
 
     const ptrdiff_t       ndof = d.nnodes * N_FIELDS;
     std::vector<scalar_t> x((size_t)ndof), r((size_t)ndof), dx((size_t)ndof), rhs((size_t)ndof);
+    // The lumped pressure mass matrix for the Schur scaling in build_block_jacobi. The
+    // geometry it needs is fixed, so this is computed once. Isoparametrically the
+    // determinant varies within an element and jacobian_determinant holds the value at
+    // the centre; that is accurate enough for a preconditioner scaling.
+    std::vector<scalar_t> node_vol;
+    build_node_volume(d, node_vol);
     std::vector<scalar_t> inv_diag;
     pack_fields(d, x.data());
 
@@ -1298,7 +1373,8 @@ int main(int argc, char **argv) {
             if (assemble_jac) {
                 assemble_jacobian(d, bsr, rho_use, mu, geom);
                 apply_dirichlet_bsr(bsr, constrained, d.nnodes);
-                if (use_prec) build_block_jacobi(bsr, constrained, d.nnodes, inv_diag);
+                if (use_prec)
+                    build_block_jacobi(bsr, constrained, d.nnodes, node_vol, pscale, pdamp, inv_diag);
                 if (check_jv && matrix_free && newton_it == 0 && stage == 0) {
                     compare_hessian_apply(d, *A_bsr, rho_use, mu, geom, constrained, r.data(), ndof);
                 }
