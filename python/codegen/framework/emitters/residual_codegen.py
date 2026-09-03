@@ -6261,8 +6261,14 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
     The stream names and the reduction come from ``CRSAssemblyPlan``, which is
     where they are defined; this function spells them.  Its defaults are the
     names the generated kernels have always used, so the emitted text is
-    unchanged, but changing the plan now changes the kernel rather than
-    requiring an edit here.
+    unchanged.
+
+    What changing the plan changes is *this scatter's* parameters.  The mesh
+    operators that call it still name ``rowptr``, ``colidx`` and ``values`` as
+    literals -- fourteen sites for the row pointer alone across the two
+    emitters -- so a rename here would not reach them and the result would not
+    compile.  Centralizing those is what would make the plan drive the ABI;
+    until then ``test_assembly_plans_name_the_kernels`` pins the agreement.
     """
     assembly = CRSAssemblyPlan() if assembly is None else assembly
     row_pointer = assembly.row_pointer

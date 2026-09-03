@@ -136,7 +136,15 @@ class BSRAssemblyPlan:
 
 @dataclass(frozen=True)
 class DIAAssemblyPlan:
+    #: The indexing policy reported in the assembly diagnostics.  For CRS, BSR
+    #: and patch this is the kernel's parameter names joined, but here it is
+    #: not: the scatter reads ``diag_offsets``.  The two were free to disagree
+    #: for as long as nothing read this plan, and reconciling them changes the
+    #: published ``index_policy`` string, so it is a deliberate output change
+    #: rather than part of connecting the plan.  See ARCHITECTURE.html OP 13.
     diagonal_offsets: str = "diagonal_offsets"
+    #: The C parameter the scatter reads its offsets from.
+    diagonal_offset_stream: str = "diag_offsets"
     value_stream: str = "values"
     element_connectivity: str = "elements"
     mesh_access: str = "standard_block_elements"
@@ -157,6 +165,7 @@ class DIAAssemblyPlan:
         return {
             "kind": "dia",
             "diagonal_offsets": self.diagonal_offsets,
+            "diagonal_offset_stream": self.diagonal_offset_stream,
             "value_stream": self.value_stream,
             "element_connectivity": self.element_connectivity,
             "mesh_access": self.mesh_access,
@@ -177,8 +186,14 @@ class DIAAssemblyPlan:
 
 @dataclass(frozen=True)
 class COOAssemblyPlan:
+    #: The two halves of the diagnostics indexing policy.  As with DIA these
+    #: are not the kernel's parameter names -- the scatter writes ``rows`` and
+    #: ``cols`` -- and the mismatch survived because the plan had no reader.
     row_index_stream: str = "rowidx"
     column_index_stream: str = "colidx"
+    #: The C parameters the triplet scatter writes.
+    row_stream: str = "rows"
+    column_stream: str = "cols"
     value_stream: str = "values"
     element_connectivity: str = "elements"
     mesh_access: str = "standard_block_elements"
@@ -198,6 +213,8 @@ class COOAssemblyPlan:
             "kind": "coo",
             "row_index_stream": self.row_index_stream,
             "column_index_stream": self.column_index_stream,
+            "row_stream": self.row_stream,
+            "column_stream": self.column_stream,
             "value_stream": self.value_stream,
             "element_connectivity": self.element_connectivity,
             "mesh_access": self.mesh_access,
@@ -216,7 +233,12 @@ class COOAssemblyPlan:
 
 @dataclass(frozen=True)
 class PatchAssemblyPlan:
+    #: The diagnostics indexing policy.  Here it does agree with the kernel:
+    #: the scatter reads ``rowptr`` and ``colidx``, which the two fields below
+    #: name individually so the scatter can be spelled from the plan.
     patch_graph: str = "rowptr_colidx"
+    row_pointer: str = "rowptr"
+    column_index: str = "colidx"
     value_stream: str = "values"
     element_connectivity: str = "elements"
     mesh_access: str = "standard_block_elements"
@@ -237,6 +259,8 @@ class PatchAssemblyPlan:
         return {
             "kind": "patch",
             "patch_graph": self.patch_graph,
+            "row_pointer": self.row_pointer,
+            "column_index": self.column_index,
             "value_stream": self.value_stream,
             "element_connectivity": self.element_connectivity,
             "mesh_access": self.mesh_access,
