@@ -962,35 +962,26 @@ def _mesh_block_scatter_loop_lines(indent, loop, accumulation_line):
 
 def _field_gather_lines(system, dependencies, indent, element_array="elements"):
     lines = []
-    if dependencies.current:
+    for role in live_field_roles(dependencies):
         lines.append(
-            "%sconst scalar_t *const current_components[N_FIELDS] = {%s};"
-            % (indent, ", ".join(field.name for field in system.fields))
-        )
-    if dependencies.previous:
-        lines.append(
-            "%sconst scalar_t *const previous_components[N_FIELDS] = {%s};"
-            % (indent, ", ".join("%s_old" % field.name for field in system.fields))
-        )
-    if dependencies.direction:
-        lines.append(
-            "%sconst scalar_t *const direction_components[N_FIELDS] = {%s};"
-            % (indent, ", ".join("%s_direction" % field.name for field in system.fields))
+            "%sconst scalar_t *const %s_components[N_FIELDS] = {%s};"
+            % (
+                indent,
+                role.name,
+                ", ".join(
+                    role.field_pointer(field.name) for field in system.fields
+                ),
+            )
         )
 
     if not lines:
         return lines
 
     assignment_lines = []
-    if dependencies.current:
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         assignment_lines.append(
-            "%s            block_current[stream][lane] = current_components[field][node * current_stride];"
-            % indent
-        )
-    if dependencies.previous:
-        assignment_lines.append(
-            "%s            block_previous[stream][lane] = previous_components[field][node * previous_stride];"
-            % indent
+            "%s            block_%s[stream][lane] = %s_components[field][node * %s];"
+            % (indent, role.name, role.name, role.stride)
         )
     if dependencies.direction:
         assignment_lines.append(
@@ -4660,12 +4651,10 @@ def _mixed_affine_function(
             "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
         ]
     )
-    if dependencies.current:
-        lines.append("        scalar_t block_current[N_FIELD_STREAMS][VECTOR_SIZE];")
-    if dependencies.previous:
-        lines.append("        scalar_t block_previous[N_FIELD_STREAMS][VECTOR_SIZE];")
-    if dependencies.direction:
-        lines.append("        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];")
+    for role in live_field_roles(dependencies):
+        lines.append(
+            "        scalar_t block_%s[N_FIELD_STREAMS][VECTOR_SIZE];" % role.name
+        )
     lines.extend(
         [
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
@@ -4878,12 +4867,10 @@ def _mixed_isoparametric_function(
             "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
         ]
     )
-    if dependencies.current:
-        lines.append("        scalar_t block_current[N_FIELD_STREAMS][VECTOR_SIZE];")
-    if dependencies.previous:
-        lines.append("        scalar_t block_previous[N_FIELD_STREAMS][VECTOR_SIZE];")
-    if dependencies.direction:
-        lines.append("        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];")
+    for role in live_field_roles(dependencies):
+        lines.append(
+            "        scalar_t block_%s[N_FIELD_STREAMS][VECTOR_SIZE];" % role.name
+        )
     lines.extend(
         [
             "        scalar_t block_output[N_FIELD_STREAMS][VECTOR_SIZE];",
@@ -5238,10 +5225,10 @@ def _mixed_coo_triplet_matrix_assembly_source(
             "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
         ]
     )
-    if dependencies.current:
-        lines.append("        scalar_t block_current[N_FIELD_STREAMS][VECTOR_SIZE];")
-    if dependencies.previous:
-        lines.append("        scalar_t block_previous[N_FIELD_STREAMS][VECTOR_SIZE];")
+    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
+        lines.append(
+            "        scalar_t block_%s[N_FIELD_STREAMS][VECTOR_SIZE];" % role.name
+        )
     lines.extend(
         [
             "        scalar_t block_direction[N_FIELD_STREAMS][VECTOR_SIZE];",
@@ -5865,17 +5852,9 @@ def _mesh_operator_source(
             "        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);",
         ]
     )
-    if dependencies.current:
+    for role in live_field_roles(dependencies):
         lines.append(
-            "        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
-        )
-    if dependencies.previous:
-        lines.append(
-            "        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
-        )
-    if dependencies.direction:
-        lines.append(
-            "        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
+            "        scalar_t block_%s[N_FIELDS * N_SHAPE][VECTOR_SIZE];" % role.name
         )
     if gradient_metric is not None and not uses_cached_affine_metric:
         lines.append(
@@ -6135,14 +6114,10 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
             "const geom_t *const *const SFEM_RESTRICT points",
             "const %s *const SFEM_RESTRICT parameters" % scalar_type,
         ]
-        if dependencies.current:
-            params.append("const %s *const SFEM_RESTRICT current" % scalar_type)
-        if dependencies.previous:
-            params.append("const %s *const SFEM_RESTRICT previous" % scalar_type)
-        if dependencies.direction:
-            params.append(
-                "const %s *const SFEM_RESTRICT direction" % scalar_type
-            )
+        params.extend(
+            "const %s *const SFEM_RESTRICT %s" % (scalar_type, role.name)
+            for role in live_field_roles(dependencies)
+        )
         params.append("%s *const SFEM_RESTRICT output" % scalar_type)
         lines.append('extern "C" int %s%s(' % (function, suffix))
         for index, param in enumerate(params):
@@ -6155,23 +6130,10 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
             for index, parameter in enumerate(system.parameters)
             if parameter in dependencies.parameters
         )
-        if dependencies.current:
+        for role in live_field_roles(dependencies):
             call_args.append(str(n_fields))
             call_args.extend(
-                "current + %d" % index
-                for index in range(n_fields)
-            )
-        if dependencies.previous:
-            call_args.append(str(n_fields))
-            call_args.extend(
-                "previous + %d" % index
-                for index in range(n_fields)
-            )
-        if dependencies.direction:
-            call_args.append(str(n_fields))
-            call_args.extend(
-                "direction + %d" % index
-                for index in range(n_fields)
+                "%s + %d" % (role.name, index) for index in range(n_fields)
             )
         call_args.append(str(n_fields))
         call_args.extend(
@@ -8332,17 +8294,9 @@ def _isoparametric_mesh_operator_source(
             "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
         ]
     )
-    if dependencies.current:
+    for role in live_field_roles(dependencies):
         lines.append(
-            "        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
-        )
-    if dependencies.previous:
-        lines.append(
-            "        scalar_t block_previous[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
-        )
-    if dependencies.direction:
-        lines.append(
-            "        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];"
+            "        scalar_t block_%s[N_FIELDS * N_SHAPE][VECTOR_SIZE];" % role.name
         )
     if gradient_metric is not None:
         lines.append(
