@@ -435,6 +435,8 @@ int main(int argc, char **argv) {
         csv_rows.push_back(row);
     }
 
+#ifdef CVFEM_ENABLE_SUBPAR
+    // Pack colouring on the device: see subpar/cuda/cvfem_hex8_ns_cuda_colored.cuh.
     // ---- coloured assembly: does removing atomics help? ----------------------
     PackColoring colors = cvfem_build_pack_coloring(packed.n_packs, packed.owned_nodes_ptr,
                                                     packed.ghost_ptr, packed.ghost_idx);
@@ -471,6 +473,8 @@ int main(int argc, char **argv) {
                     us ? "col/sympy" : "col/hand", dmax, rel, t,
                     t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0, ok ? "OK" : "FAIL");
     }
+
+#endif  // CVFEM_ENABLE_SUBPAR
 
     // ---- split assembly: do not rebuild the terms that did not change ---------
     std::printf("\n=== split assembly (linear part reused) ===\n");

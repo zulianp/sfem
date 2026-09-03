@@ -70,6 +70,34 @@ static constexpr int N_FIELDS = 4;
 #include "cvfem_hex8_ns_upwind_kernels.hpp"
 #include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 
+// The rowwise and facewise CSE arrangements lost the saturated evaluation (see
+// subpar/README.md) and were moved to subpar/. Building with -DCVFEM_ENABLE_SUBPAR puts
+// them back so `--kernel sympy_row|sympy_face` can be measured again.
+//
+// Without the option they are rejected by name during CLI validation, which is what
+// makes the stubs below unreachable. They exist so that the layout dispatch chains --
+// which are long else-if ladders in four headers -- keep compiling untouched, rather
+// than being carved up with preprocessor branches. Reaching one is a bug, and says so.
+#ifdef CVFEM_ENABLE_SUBPAR
+#include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
+#else
+#define CVFEM_SUBPAR_STUB(name)                                                        \
+    template <typename... Args>                                                        \
+    static SFEM_INLINE void name(Args &&...) {                                         \
+        std::fprintf(stderr,                                                           \
+                     "%s was moved to subpar/: it is not the fastest kernel in any "    \
+                     "measured configuration. Rebuild with -DCVFEM_ENABLE_SUBPAR to "  \
+                     "use it.\n",                                                      \
+                     #name);                                                           \
+        std::abort();                                                                  \
+    }
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise)
+#undef CVFEM_SUBPAR_STUB
+#endif
+
 enum class KernelKind {
     Current,
     Fd,

@@ -595,8 +595,56 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
 """
 
 
+# CSE arrangements that lost the saturated evaluation and moved to subpar/. They are
+# still generated -- the removal was made on measured grounds and has to stay
+# reproducible -- but into a separate header that only builds under
+# -DCVFEM_ENABLE_SUBPAR. See subpar/README.md for the numbers.
+SUBPAR_MARKERS = ("_rowwise", "_facewise")
+
+SUBPAR_OUT = OUT.parent / "subpar" / "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
+
+
+def split_generated(text: str) -> tuple[str, str]:
+    """Partition the generated header into survivors and quarantined arrangements.
+
+    The functions are *moved*, not re-emitted: both outputs carry the exact text this
+    run produced, so a survivor cannot drift as a side effect of the split. That is the
+    property worth having -- the alternative, generating each set separately, would let
+    a change in which expressions are built perturb the CSE of the ones that stayed.
+    """
+    marker = "template <typename scalar_t"
+    first = text.index(marker)
+    prologue, tail = text[:first], "\n#endif\n"
+    body = text[first : text.rindex("#endif")]
+
+    chunks, keep, drop = [], [], []
+    idx = [i for i in range(len(body)) if body.startswith(marker, i)]
+    for a, b in zip(idx, idx[1:] + [len(body)]):
+        chunks.append(body[a:b])
+    for c in chunks:
+        (drop if any(m in c.split("(")[0] for m in SUBPAR_MARKERS) else keep).append(c)
+
+    subpar_prologue = prologue.replace(
+        "CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP", "CVFEM_HEX8_NS_UPWIND_SYMPY_SUBPAR_HPP"
+    ).replace(
+        "// Not self-contained:",
+        "// QUARANTINED. These CSE arrangements are not the fastest choice in any measured\n"
+        "// configuration on either platform; see subpar/README.md. Built only under\n"
+        "// -DCVFEM_ENABLE_SUBPAR.\n"
+        "//\n"
+        "// Not self-contained:",
+    )
+    return prologue + "".join(keep) + tail, subpar_prologue + "".join(drop) + tail
+
+
 def main() -> None:
-    OUT.write_text(generate())
+    full = generate()
+    main_hpp, subpar_hpp = split_generated(full)
+    OUT.write_text(main_hpp)
+    SUBPAR_OUT.parent.mkdir(parents=True, exist_ok=True)
+    SUBPAR_OUT.write_text(subpar_hpp)
+    print(f"{OUT.name}: {main_hpp.count(chr(10))} lines")
+    print(f"{SUBPAR_OUT.name}: {subpar_hpp.count(chr(10))} lines")
 
 
 if __name__ == "__main__":

@@ -101,9 +101,19 @@ enum {
     CVFEM_CUDA_JAC_HANDWRITTEN = 0,  // cvfem_hex8_ns_upwind_jacobian_add_slots
     CVFEM_CUDA_JAC_SYMPY       = 1,  // generated, flat CSE
     CVFEM_CUDA_JAC_SYMPY_BLOCK = 2,  // generated, blockwise write scheduling
-    CVFEM_CUDA_JAC_SYMPY_ROW   = 3,  // generated, rowwise
-    CVFEM_CUDA_JAC_SYMPY_FACE  = 4,  // generated, per sub-control-surface
+    // Moved to subpar/: neither is the fastest arrangement in any measured
+    // configuration. sympy_row is within noise of sympy on the atomic layout and 6.5%
+    // behind sympy_block when element-coloured; sympy_face is roughly half the speed of
+    // everything else on both platforms. The enumerators stay so the numbering is stable
+    // across a -DCVFEM_ENABLE_SUBPAR build, but N_VARIANTS -- which is what the driver
+    // sweeps -- stops before them.
+    CVFEM_CUDA_JAC_SYMPY_ROW   = 3,  // generated, rowwise    (subpar)
+    CVFEM_CUDA_JAC_SYMPY_FACE  = 4,  // generated, facewise   (subpar)
+#ifdef CVFEM_ENABLE_SUBPAR
     CVFEM_CUDA_JAC_N_VARIANTS  = 5,
+#else
+    CVFEM_CUDA_JAC_N_VARIANTS  = 3,
+#endif
     // Isoparametric geometry. Kept outside the N_VARIANTS range because it is not an
     // alternative CSE arrangement of the same element matrix -- it computes a different
     // one -- so it must not be swept alongside the five above.
@@ -370,12 +380,15 @@ int cvfem_cuda_assemble_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu,
 double cvfem_cuda_time_assemble_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu,
                                          int variant, int block_size, int repeat);
 
-// Coloured assembly: one kernel launch per colour, no atomics anywhere.
+// Pack-coloured assembly -- MOVED TO subpar/, build with -DCVFEM_ENABLE_SUBPAR.
 //
-// Two packs of the same colour share no nodes (that is what the colouring guarantees),
-// so they can never write the same BSR block (i,j) -- a block is written only by an
-// element containing both i and j. This exists to answer one question: is assembly
-// limited by atomic throughput? Compare it against the atomic variants.
+// The reasoning that produced it does not survive the move to a device. Two packs of the
+// same colour share no nodes, so on the CPU -- where a pack is one thread -- colouring
+// removes the atomics. On the device a pack is a whole block, so the race within the pack
+// remains, and the kernel is correct only with blockDim.x == 1: 1.2 MDOF/s, about 200x
+// slower than the atomic path. Element colouring (cvfem_cuda_assemble_ecolored, above) is
+// the form that works here and is the fastest GPU assembly there is.
+#ifdef CVFEM_ENABLE_SUBPAR
 int cvfem_cuda_coloring_attach(cvfem_cuda_ctx *ctx, int n_colors,
                                const ptrdiff_t *pack_order, const ptrdiff_t *color_ptr);
 
@@ -384,6 +397,7 @@ int cvfem_cuda_assemble_colored(cvfem_cuda_ctx *ctx, double rho, double mu,
 
 double cvfem_cuda_time_assemble_colored(cvfem_cuda_ctx *ctx, double rho, double mu,
                                         int use_sympy, int block_size, int repeat);
+#endif
 
 double cvfem_cuda_time_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
                                 int variant, int block_size, int repeat);
