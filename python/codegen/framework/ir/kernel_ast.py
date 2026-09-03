@@ -13,6 +13,8 @@ class KernelASTNodeKind(str, Enum):
     LOCAL_COMPUTATION = "local_computation"
     FUNCTION_DEF = "function_def"
     RAW_LINES = "raw_lines"
+    BLOCK = "block"
+    LOOP_HEADER = "loop_header"
 
 
 class GeometryNodeKind(str, Enum):
@@ -426,6 +428,54 @@ class LocalComputationNode:
             "statement_count": len(tuple(getattr(self.evaluation_plan, "statements", ()))),
             "cost": None if self.cost is None else _cost_to_dict(self.cost),
         }
+
+
+@dataclass(frozen=True)
+class BlockNode:
+    """A braced scope with no loop of its own.
+
+    A target whose lowering policy sets ``emits_lane_loop = False`` -- CUDA,
+    where the lane is a thread rather than an iteration -- opens a bare
+    ``{`` where a CPU target opens a lane loop.  Without this node that shape
+    had no representation, so the whole loop nest fell back to pre-rendered
+    text on exactly the targets the IR exists to serve.
+    """
+
+    body: tuple = ()
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.BLOCK, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "body", tuple(self.body))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "body": [_entity_to_dict(node) for node in self.body],
+        }
+
+
+@dataclass(frozen=True)
+class LoopHeaderNode:
+    """Just the opening lines of a loop, with the closing brace left to the caller.
+
+    This exists to make an old implicit behaviour explicit.  ``LoopNode``
+    used to omit its closing brace whenever its body was empty, and five call
+    sites relied on that to use it as a header generator while they built the
+    body as lines and wrote the matching ``}`` by hand.  The cost was that a
+    genuinely empty loop silently emitted unbalanced braces, and nothing in
+    the IR distinguished "I want only the header" from "this loop has no
+    statements".
+
+    Wrapping the loop says which one is meant, so ``LoopNode`` can always
+    close what it opens.  Every use of this node is a body that has not
+    migrated; when one does, the wrapper goes away with it.
+    """
+
+    loop: object
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.LOOP_HEADER, init=False)
+
+    def to_dict(self):
+        return {"kind": self.kind.value, "loop": _entity_to_dict(self.loop)}
 
 
 @dataclass(frozen=True)

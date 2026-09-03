@@ -18,8 +18,10 @@ import unittest
 from codegen.framework.emitters import residual_codegen
 from codegen.framework.emitters.ast_printer import CLikeKernelASTPrinter
 from codegen.framework.ir.kernel_ast import (
+    BlockNode,
     BufferDeclNode,
     FunctionDefNode,
+    LoopHeaderNode,
     LoopKind,
     LoopNode,
     RawLinesNode,
@@ -165,14 +167,18 @@ class EveryLocalKernelIsATreeTest(unittest.TestCase):
 class RawLinesRatchetTest(unittest.TestCase):
     """How much of a kernel is still text.  Shrink-only.
 
-    Three body generators still hand back pre-rendered lines: the generic
-    simplex body, the tensor-product body, and the loop nest for targets whose
-    lowering policy opens a bare work-item block instead of a lane loop, which
-    the IR has no node for.  Each is a place a ``KernelASTPass`` cannot reach.
+    Two body generators still hand back pre-rendered lines: the generic
+    simplex body and the tensor-product body, both hand-written loop nests.
+    Each is a place a ``KernelASTPass`` cannot reach.
+
+    A third is gone.  Targets whose lowering policy opens a bare work-item
+    block instead of a lane loop had no node for that shape, so the entire
+    nest fell back to text on exactly the targets the IR exists to serve;
+    ``BlockNode`` closed it.
     """
 
     #: Construction sites of RawLinesNode in the residual emitter.
-    BUDGET = 3
+    BUDGET = 2
 
     def _raw_lines_sites(self):
         import ast
@@ -220,3 +226,101 @@ class RawLinesRatchetTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BlockAndLoopHeaderTest(unittest.TestCase):
+    """The two nodes that removed the last structural gap and the brace trap."""
+
+    def test_a_loop_with_no_body_now_closes_its_brace(self):
+        """The trap, removed.
+
+        ``LoopNode`` used to omit its closing brace whenever its body was
+        empty, so a genuinely empty loop emitted unbalanced braces and nothing
+        distinguished that from "header only".
+        """
+        lane = iterator("lane", "int")
+        loop = LoopNode(
+            LoopKind.SIMD, lane, iteration_range(0, expr_ref("nelems")), pre_increment(lane)
+        )
+        lines = CLikeKernelASTPrinter().print_node(loop)
+        self.assertEqual("".join(lines).count("{"), "".join(lines).count("}"))
+
+    def test_loop_header_node_leaves_the_brace_to_the_caller(self):
+        lane = iterator("lane", "int")
+        loop = LoopNode(
+            LoopKind.SIMD, lane, iteration_range(0, expr_ref("nelems")), pre_increment(lane)
+        )
+        lines = CLikeKernelASTPrinter().print_node(LoopHeaderNode(loop))
+        self.assertEqual(lines, ("for (int lane = 0; lane < nelems; ++lane) {",))
+
+    def test_header_only_loops_are_now_declared_rather_than_implied(self):
+        """No emitter may rely on an empty body to suppress a brace."""
+        import ast
+        import os
+
+        emitters = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "emitters"
+        )
+        offenders = []
+        for name in sorted(os.listdir(emitters)):
+            if not name.endswith(".py"):
+                continue
+            path = os.path.join(emitters, name)
+            with open(path, encoding="utf-8") as handle:
+                tree = ast.parse(handle.read(), filename=path)
+            for node in ast.walk(tree):
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "LoopNode"
+                    and not any(kw.arg == "body" for kw in node.keywords)
+                ):
+                    parent_is_header = False
+                    for outer in ast.walk(tree):
+                        if (
+                            isinstance(outer, ast.Call)
+                            and isinstance(outer.func, ast.Name)
+                            and outer.func.id == "LoopHeaderNode"
+                            and any(arg is node for arg in outer.args)
+                        ):
+                            parent_is_header = True
+                            break
+                    if not parent_is_header:
+                        offenders.append("%s:%d" % (name, node.lineno))
+        self.assertEqual(
+            offenders,
+            [],
+            "a body-less LoopNode outside LoopHeaderNode: it now prints a "
+            "closing brace, which is probably not what the caller wants",
+        )
+
+    def test_a_thread_lane_target_builds_a_block_not_text(self):
+        """The gap BlockNode closed, on the target that has it.
+
+        Byte-identity cannot see this: the snapshot generates for OpenMP, so
+        the lane-loop branch is the only one it exercises.
+        """
+        from codegen.framework.targets import CUDATarget, use_target
+
+        body = [BufferDeclNode("const scalar_t", "x", (), expr_ref("1"))]
+        node = residual_codegen._quadrature_lane_kernel_node(body)
+        self.assertIsInstance(node.body[0], LoopNode, "OpenMP should open a lane loop")
+
+        with use_target(CUDATarget()):
+            node = residual_codegen._quadrature_lane_kernel_node(body)
+        self.assertIsInstance(
+            node.body[0],
+            BlockNode,
+            "a target whose lane is a thread should open a bare scope, as a node",
+        )
+        self.assertNotIsInstance(node, RawLinesNode)
+
+    def test_the_thread_lane_nest_prints_balanced(self):
+        from codegen.framework.targets import CUDATarget, use_target
+
+        body = [BufferDeclNode("const scalar_t", "x", (), expr_ref("1"))]
+        with use_target(CUDATarget()):
+            lines = residual_codegen._quadrature_lane_kernel_lines(body)
+        text = "".join(lines)
+        self.assertEqual(text.count("{"), text.count("}"))
+        self.assertNotIn("#pragma omp simd", text)

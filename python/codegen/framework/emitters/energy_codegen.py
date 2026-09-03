@@ -1,6 +1,7 @@
 import sympy as sp
 
 from codegen.framework.ir.kernel_ast import (
+    LoopHeaderNode,
     LoopKind,
     LoopNode,
     ScatterNode,
@@ -143,12 +144,14 @@ def _work_item_loop_lines(source_builder, indent):
                     for line in render_kernel_ast_lines(
                         "work_item_loop_header",
                         (
-                            LoopNode(
-                                LoopKind.SIMD,
-                                lane_iterator,
-                                iteration_range(0, expr_ref("nelems", "tile_extent")),
-                                pre_increment(lane_iterator),
-                                vectorized=bool(pragma),
+                            LoopHeaderNode(
+                                LoopNode(
+                                    LoopKind.SIMD,
+                                    lane_iterator,
+                                    iteration_range(0, expr_ref("nelems", "tile_extent")),
+                                    pre_increment(lane_iterator),
+                                    vectorized=bool(pragma),
+                                )
                             ),
                         ),
                         printer=printer,
@@ -168,12 +171,14 @@ def _work_item_loop_lines(source_builder, indent):
         for line in render_kernel_ast_lines(
             "work_item_loop_header",
             (
-                LoopNode(
-                    LoopKind.SIMD,
-                    lane_iterator,
-                    iteration_range(0, expr_ref("nelems", "tile_extent")),
-                    pre_increment(lane_iterator),
-                    vectorized=bool(simd_lines),
+                LoopHeaderNode(
+                    LoopNode(
+                        LoopKind.SIMD,
+                        lane_iterator,
+                        iteration_range(0, expr_ref("nelems", "tile_extent")),
+                        pre_increment(lane_iterator),
+                        vectorized=bool(simd_lines),
+                    )
                 ),
             ),
             printer=CLikeKernelASTPrinter(
@@ -285,11 +290,13 @@ def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
             for line in render_kernel_ast_lines(
                 "scatter_loop_header",
                 (
-                    LoopNode(
-                        LoopKind.SCATTER,
-                        iterator("scatter", "int"),
-                        iteration_range(0, expr_ref("nelems", "tile_extent")),
-                        pre_increment(iterator("scatter", "int")),
+                    LoopHeaderNode(
+                        LoopNode(
+                            LoopKind.SCATTER,
+                            iterator("scatter", "int"),
+                            iteration_range(0, expr_ref("nelems", "tile_extent")),
+                            pre_increment(iterator("scatter", "int")),
+                        )
                     ),
                 ),
             )
