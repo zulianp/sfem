@@ -15,9 +15,30 @@ from codegen.framework.ir.kernel_ast import (
     LoopHeaderNode,
     LoopNode,
     RawLinesNode,
+    ReturnNode,
     ScatterNode,
     SymbolRef,
 )
+
+
+@dataclass(frozen=True)
+class PrinterLayout:
+    """Where the printer puts things, as opposed to what it prints.
+
+    The emitters do not agree on layout.  The residual path closes a signature
+    on its own line; the energy path's scatter helpers close it on the last
+    parameter.  Some pragmas sit at the statement indent, others at column
+    zero.  These are real differences in existing generated code, so a
+    migration that must stay byte-identical has to reproduce whichever one its
+    kernel uses.
+
+    They live here rather than on the nodes because layout is the printer's
+    job.  ``CallNode.wrap_arguments`` is the exception and should move here
+    once it has company; it was added before this object existed.
+    """
+
+    close_signature_on_last_param: bool = False
+    atomic_pragma_at_column_zero: bool = False
 
 
 @dataclass(frozen=True)
@@ -25,6 +46,7 @@ class CLikeKernelASTPrinter:
     indent_unit: str = "    "
     vectorize_pragma: str = ""
     atomic_update_pragma: str = ""
+    layout: PrinterLayout = PrinterLayout()
 
     def print_ast(self, ast):
         if not isinstance(ast, KernelAST):
@@ -72,15 +94,23 @@ class CLikeKernelASTPrinter:
             opener = " ".join(part for part in (node.qualifier, node.return_type) if part)
             lines.append("%s%s %s(" % (indent, opener, node.name))
             last = len(node.params) - 1
+            close_on_last = self.layout.close_signature_on_last_param and node.params
             for position, param in enumerate(node.params):
-                lines.append(
-                    "%s        %s%s" % (indent, param, "" if position == last else ",")
-                )
-            lines.append("%s) {" % indent)
+                if position == last:
+                    tail = ") {" if close_on_last else ""
+                else:
+                    tail = ","
+                lines.append("%s        %s%s" % (indent, param, tail))
+            if not close_on_last:
+                lines.append("%s) {" % indent)
             for body_node in node.body:
                 lines.extend(self.print_node(body_node, indent + self.indent_unit))
             lines.append("%s}" % indent)
             return tuple(lines)
+        if isinstance(node, ReturnNode):
+            if node.value is None:
+                return ("%sreturn;" % indent,)
+            return ("%sreturn %s;" % (indent, self.render_entity(node.value)),)
         if isinstance(node, BlockNode):
             lines = ["%s{" % indent]
             for body_node in node.body:
@@ -151,7 +181,10 @@ class CLikeKernelASTPrinter:
         if isinstance(node, ScatterNode):
             lines = []
             if node.atomic and self.atomic_update_pragma:
-                lines.append("%s%s" % (indent, self.atomic_update_pragma))
+                pragma_indent = (
+                    "" if self.layout.atomic_pragma_at_column_zero else indent
+                )
+                lines.append("%s%s" % (pragma_indent, self.atomic_update_pragma))
             lines.append(
                 "%s%s %s %s;"
                 % (
