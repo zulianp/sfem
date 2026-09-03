@@ -402,17 +402,27 @@ def generate_sfem_soa_cpp_files(
     forms = tuple(forms)
     if quadrature_rule is None and element_type is not None:
         quadrature_rule = sfem_element_quadrature_rule(element_type, quadrature_order)
-    if quadrature_rule is not None:
-        dim = quadrature_rule.dim
-        n_nodes = quadrature_rule.n_shape
-        n_qp = quadrature_rule.n_qp
+    if quadrature_rule is None:
+        # Established once, here, so that nothing below has to ask.  Every
+        # production path already supplies one -- the element entry point
+        # passes the specialization's rule -- and roughly twenty helpers
+        # nonetheless carried an `is None` arm, three of which raised this same
+        # complaint from deep inside emission.  A precondition belongs at the
+        # boundary the caller crosses, not at each place that would trip over
+        # its absence.
+        raise ValueError(
+            "energy code generation requires an element quadrature rule: pass "
+            "quadrature_rule, or element_type for one to be derived from"
+        )
+    dim = quadrature_rule.dim
+    n_nodes = quadrature_rule.n_shape
+    n_qp = quadrature_rule.n_qp
     if affine_quadrature_rule is None:
         affine_quadrature_rule = quadrature_rule
-    if affine_quadrature_rule is not None:
-        if affine_quadrature_rule.dim != dim:
-            raise ValueError("affine and isoparametric quadrature rules must have the same dimension")
-        if affine_quadrature_rule.n_shape != n_nodes:
-            raise ValueError("affine and isoparametric quadrature rules must have the same shape count")
+    if affine_quadrature_rule.dim != dim:
+        raise ValueError("affine and isoparametric quadrature rules must have the same dimension")
+    if affine_quadrature_rule.n_shape != n_nodes:
+        raise ValueError("affine and isoparametric quadrature rules must have the same shape count")
     n_qp = int(n_qp)
     array_inputs = tuple(
         array_inputs
@@ -438,8 +448,7 @@ def generate_sfem_soa_cpp_files(
                 "reference input '%s' has n_shape=%d, expected %d"
                 % (array_input.name, array_input.n_shape, n_nodes)
             )
-    if quadrature_rule is not None:
-        _validate_sfem_soa_quadrature_rule(quadrature_rule, dim, n_nodes, n_qp, array_inputs)
+    _validate_sfem_soa_quadrature_rule(quadrature_rule, dim, n_nodes, n_qp, array_inputs)
     if reference_data_plan is not None:
         validate_reference_data_plan(
             reference_data_plan,
@@ -744,8 +753,6 @@ def _sfem_soa_emits_hessian_header(
     array_inputs,
     basis_family,
 ):
-    if quadrature_rule is None:
-        return False
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     return any(
         _sfem_soa_direct_hessian_matrix_assembly_available(
@@ -1459,7 +1466,7 @@ def _constant_p1_specialized_local(local_prefix, quadrature_rule):
     if specialized_prefix is not None:
         return specialized_prefix, quadrature_rule
 
-    if quadrature_rule is None or not str(local_prefix).endswith("_simplex"):
+    if not str(local_prefix).endswith("_simplex"):
         return None
 
     element_type = {2: "TRI3", 3: "TET4"}.get(int(getattr(quadrature_rule, "dim", 0)))
@@ -1477,8 +1484,6 @@ def _constant_p1_specialized_local(local_prefix, quadrature_rule):
 
 
 def _constant_p1_specialized_local_prefix(local_prefix, quadrature_rule):
-    if quadrature_rule is None:
-        return None
     if constant_p1_simplex_reference_gradients(quadrature_rule) is None:
         return None
     element_type = str(getattr(quadrature_rule, "element_type", "")).lower()
@@ -2266,8 +2271,7 @@ def _tensor_product_q_index_lines(dim, indent):
 
 def _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes):
     if (
-        quadrature_rule is not None
-        and (
+        (
             sfem_tensor_product_hex_uses_cartesian_ordering(quadrature_rule.element_type)
             or sfem_tensor_product_quad_uses_cartesian_ordering(quadrature_rule.element_type)
         )
@@ -2277,8 +2281,6 @@ def _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes):
 
 
 def _use_tensor_product_reference(quadrature_rule, reference_inputs, basis_family=None):
-    if quadrature_rule is None:
-        return False
     if basis_family is None:
         raise ValueError("basis family must be provided by the emission plan")
     tensor_product = str(basis_family) == "tensor_product"
@@ -2719,25 +2721,23 @@ def _sfem_soa_operator_source(
         )
     )
     lines.append("")
-    if quadrature_rule is not None:
-        lines.extend(["namespace sfem {", "namespace codegen {", ""])
-        if affine_quadrature_rule is not None:
-            lines.extend(
-                quadrature_reference_struct_lines(
-                    prefix,
-                    "affine",
-                    sfem_mesh_reference_data(affine_quadrature_rule),
-                )
-            )
-        lines.extend(
-            quadrature_reference_struct_lines(
-                prefix,
-                "isoparametric",
-                sfem_mesh_reference_data(quadrature_rule),
-            )
+    lines.extend(["namespace sfem {", "namespace codegen {", ""])
+    lines.extend(
+        quadrature_reference_struct_lines(
+            prefix,
+            "affine",
+            sfem_mesh_reference_data(affine_quadrature_rule),
         )
-        lines.extend(["", "} // namespace codegen", "} // namespace sfem"])
-        lines.append("")
+    )
+    lines.extend(
+        quadrature_reference_struct_lines(
+            prefix,
+            "isoparametric",
+            sfem_mesh_reference_data(quadrature_rule),
+        )
+    )
+    lines.extend(["", "} // namespace codegen", "} // namespace sfem"])
+    lines.append("")
 
     for form in forms:
         lines.extend(
@@ -2754,12 +2754,8 @@ def _sfem_soa_operator_source(
             )
         )
         lines.append("")
-        if quadrature_rule is not None and _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
-            affine_rule = (
-                affine_quadrature_rule
-                if affine_quadrature_rule is not None
-                else quadrature_rule
-            )
+        if _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
+            affine_rule = affine_quadrature_rule
             lines.append("")
             lines.extend(
                 _sfem_soa_mesh_operator_function(
@@ -2883,8 +2879,6 @@ def _is_tet4_linear_elasticity_aos_unit_candidate(form, prefix, dim, n_nodes, qu
     if dim != 3 or n_nodes != 4:
         return False
     if not str(prefix).startswith("linear_elasticity_"):
-        return False
-    if quadrature_rule is None:
         return False
     element_type = str(getattr(quadrature_rule, "element_type", "")).lower()
     return element_type == "tet4"
@@ -3476,8 +3470,6 @@ def _sfem_soa_mesh_operator_function(
     effective_vector_size = source_builder.effective_vector_size(vector_size)
     if geometry_mode not in ("affine", "isoparametric"):
         raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
-    if quadrature_rule is None:
-        raise ValueError("mesh SoA wrappers require an element quadrature rule")
     material_parameter_names = _form_material_parameter_names(form)
 
     function_name = _sfem_soa_mesh_public_function_name(
@@ -4687,8 +4679,6 @@ def _sfem_soa_mesh_objective_steps_function(
         return []
     if geometry_mode not in ("affine", "isoparametric"):
         raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
-    if quadrature_rule is None:
-        raise ValueError("mesh objective_steps wrappers require an element quadrature rule")
     work_item = _work_item_index(source_builder)
     material_parameter_names = _form_material_parameter_names(form)
 
@@ -5426,8 +5416,6 @@ def _sfem_soa_hessian_matrix_assembly_function(
         return []
     if form.name != "apply" or form.weak_form is None:
         return []
-    if quadrature_rule is None:
-        raise ValueError("hessian matrix assembly requires an element quadrature rule")
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     packed_crs_passes = _packed_crs_passes(matrix_format_plan)
@@ -7883,7 +7871,7 @@ def _objective_weight_flops_per_qp():
 
 
 def _tensor_product_mesh_extra_flops_per_element(form, dim, n_qp, quadrature_rule, basis_family):
-    if quadrature_rule is None or str(basis_family) != "tensor_product":
+    if str(basis_family) != "tensor_product":
         return 0, 0
     n_qp_1d = int(quadrature_rule.tensor_product_n_qp_1d)
     n_shape_1d = int(quadrature_rule.tensor_product_n_shape_1d)
@@ -7967,7 +7955,7 @@ def _sfem_soa_diagnostics_lines(
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     geometry_streams = sum(array_input.size for array_input in element_inputs)
-    if quadrature_rule is not None and str(basis_family) == "tensor_product":
+    if str(basis_family) == "tensor_product":
         reference_scalars = (
             len(quadrature_rule.tensor_product_shape_values_1d)
             + len(quadrature_rule.tensor_product_shape_gradients_1d)
@@ -7975,14 +7963,14 @@ def _sfem_soa_diagnostics_lines(
         quadrature_weight_scalars = len(quadrature_rule.tensor_product_weights_1d)
     else:
         reference_scalars = sum(array_input.size for array_input in reference_inputs)
-        quadrature_weight_scalars = n_qp if quadrature_rule is not None else 1
+        quadrature_weight_scalars = n_qp
     output_streams = len(_output_stream_names(form, dim, n_nodes))
     output_reads = output_streams if form.output_mode == "accumulate" else 0
     output_writes = output_streams
     u_streams = dim * n_nodes if uses_current else 0
     h_streams = dim * n_nodes if uses_direction else 0
-    element_type = quadrature_rule.element_type if quadrature_rule is not None else "GENERIC"
-    quadrature_order = quadrature_rule.order if quadrature_rule is not None else 0
+    element_type = quadrature_rule.element_type
+    quadrature_order = quadrature_rule.order
     affine_extra_flops, isoparametric_extra_flops = _tensor_product_mesh_extra_flops_per_element(
         form,
         dim,
@@ -8054,29 +8042,28 @@ def _sfem_soa_diagnostics_lines(
         "}",
     ]
     function_names = [public_name]
-    if quadrature_rule is not None:
-        function_names.extend(
+    function_names.extend(
+        (
             (
-                (
-                    _sfem_soa_mesh_public_function_name(
-                        prefix,
-                        form.name,
-                        quadrature_rule,
-                        "affine",
-                    ),
-                    "KernelDiagnostics_print_rate_affine_mesh",
+                _sfem_soa_mesh_public_function_name(
+                    prefix,
+                    form.name,
+                    quadrature_rule,
+                    "affine",
                 ),
-                (
-                    _sfem_soa_mesh_public_function_name(
-                        prefix,
-                        form.name,
-                        quadrature_rule,
-                        "isoparametric",
-                    ),
-                    "KernelDiagnostics_print_rate_isoparametric_mesh",
+                "KernelDiagnostics_print_rate_affine_mesh",
+            ),
+            (
+                _sfem_soa_mesh_public_function_name(
+                    prefix,
+                    form.name,
+                    quadrature_rule,
+                    "isoparametric",
                 ),
-            )
+                "KernelDiagnostics_print_rate_isoparametric_mesh",
+            ),
         )
+    )
     for function_name_entry in function_names:
         if isinstance(function_name_entry, tuple):
             function_name, print_rate_helper = function_name_entry
@@ -8225,7 +8212,7 @@ def _sfem_soa_element_api_header(
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
-    if quadrature_rule is None or not _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
+    if not _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
         guard = "%s_ELEMENT_API_%s" % (
             _cpp_macro_name(prefix),
             source_builder.header_guard_suffix(),
@@ -8991,8 +8978,6 @@ def _sfem_soa_mesh_reference_alias_lines(
 
 
 def _sfem_soa_public_function_name(prefix, form_name, quadrature_rule):
-    if quadrature_rule is None:
-        return "%s_%s_soa" % (prefix, form_name)
     element = quadrature_rule.element_type.lower()
     if _sfem_soa_prefix_has_element_suffix(prefix, element):
         return "%s_%s_soa" % (prefix, form_name)
@@ -9004,8 +8989,6 @@ def _sfem_soa_public_function_name(prefix, form_name, quadrature_rule):
 
 
 def _sfem_soa_isoparametric_public_function_name(prefix, form_name, quadrature_rule):
-    if quadrature_rule is None:
-        return "%s_%s_isoparametric_soa" % (prefix, form_name)
     element = quadrature_rule.element_type.lower()
     if _sfem_soa_prefix_has_element_suffix(prefix, element):
         return "%s_%s_isoparametric_soa" % (prefix, form_name)
@@ -9017,8 +9000,6 @@ def _sfem_soa_isoparametric_public_function_name(prefix, form_name, quadrature_r
 
 
 def _sfem_soa_mesh_public_function_name(prefix, form_name, quadrature_rule, geometry_mode):
-    if quadrature_rule is None:
-        return "%s_%s_%s_mesh_soa" % (prefix, form_name, geometry_mode)
     element = quadrature_rule.element_type.lower()
     if _sfem_soa_prefix_has_element_suffix(prefix, element):
         return "%s_%s_%s_mesh_soa" % (prefix, form_name, geometry_mode)
