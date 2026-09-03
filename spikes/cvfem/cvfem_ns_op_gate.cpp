@@ -152,18 +152,45 @@ int main(int argc, char **argv) {
             std::vector<real_t> op_jv((size_t)ndof, 0);
             op->apply(x.data(), dir.data(), op_jv.data());
 
+            // Block diagonal against the diagonal blocks of the assembled Jacobian. This
+            // is the check the bench's own diag verification cannot make: it compares
+            // against a boundary-free assembly from its own header, so it would pass with
+            // the Rhie-Chow and boundary terms missing.
+            std::vector<scalar_t> ref_bd((size_t)d.nnodes * 16, scalar_t(0));
+            for (ptrdiff_t r = 0; r < d.nnodes; ++r) {
+                for (smesh::count_t j = b.rowptr[r]; j < b.rowptr[r + 1]; ++j) {
+                    if (b.colidx[j] != (smesh::idx_t)r) continue;
+                    for (int k = 0; k < 16; ++k) ref_bd[(size_t)r * 16 + k] = ref_h[(size_t)j * 16 + k];
+                }
+            }
+            std::vector<real_t> op_bd((size_t)d.nnodes * 16, 0);
+            op->hessian_block_diag(x.data(), op_bd.data());
+
+            // And the scalar diagonal, which is what the base-class virtual exposes.
+            std::vector<scalar_t> ref_sd((size_t)ndof, scalar_t(0));
+            for (ptrdiff_t r = 0; r < d.nnodes; ++r)
+                for (int c = 0; c < N_FIELDS; ++c)
+                    ref_sd[(size_t)r * N_FIELDS + c] = ref_bd[(size_t)r * 16 + c * 4 + c];
+            std::vector<real_t> op_sd((size_t)ndof, 0);
+            op->hessian_diag(x.data(), op_sd.data());
+
             const Diff dr = compare(ref_r, op_r);
             const Diff dh = compare(ref_h, op_h);
             const Diff dj = compare(ref_jv, op_jv);
+            const Diff db = compare(ref_bd, op_bd);
+            const Diff ds = compare(ref_sd, op_sd);
 
-            std::printf("%-9s pack=%-5d  gradient rel=%.3e  hessian_bsr rel=%.3e  apply rel=%.3e\n",
+            std::printf("%-9s pack=%-5d  grad=%.3e  bsr=%.3e  apply=%.3e  blockdiag=%.3e  diag=%.3e\n",
                         gname,
                         pack_size,
                         dr.max_rel,
                         dh.max_rel,
-                        dj.max_rel);
+                        dj.max_rel,
+                        db.max_rel,
+                        ds.max_rel);
 
-            const bool ok = dr.max_rel < tol && dh.max_rel < tol && dj.max_rel < tol;
+            const bool ok = dr.max_rel < tol && dh.max_rel < tol && dj.max_rel < tol && db.max_rel < tol &&
+                            ds.max_rel < tol;
             if (!ok) {
                 std::printf("  FAIL (tol %.1e)  |ref|_inf: grad %.6e  hess %.6e  apply %.6e\n",
                             tol,

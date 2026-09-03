@@ -552,6 +552,74 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
     }
 }
 
+// Node-indexed 4x4 diagonal blocks, 16 doubles per node, without forming the matrix.
+// This is what a block-Jacobi smoother wants, and it is the reason the multigrid work
+// does not have to keep assembling a BSR on the fine level.
+//
+// The bench has a diagonal assembly (assemble_diag_atomic in cvfem_hex8_layout_atomic.hpp)
+// that masks the off-diagonal slots with -1 and lets the element kernel drop them, since
+// cvfem_hex8_bsr_acc returns on a negative slot. That trick cannot be reused here, for
+// two independent reasons:
+//
+//   - The solver's affine path runs the SymPy kernel, which writes
+//     values[slots[k] * 16 + f] directly instead of going through the guarded accessor.
+//     A negative slot there is an out-of-bounds write, not a dropped one.
+//   - The bench's version omits both the Rhie-Chow and the boundary sub-control-surface
+//     terms, because the bench has no boundary handling at all and verifies against its
+//     own boundary-free assembly. Rhie-Chow is the entire pressure-pressure diagonal, so
+//     a diagonal missing it is exactly the degenerate saddle point block-Jacobi cannot
+//     invert, and the boundary term reaches 43% of the nodes on this channel at N=8 --
+//     a larger share on the coarse grids where a smoother matters most.
+//
+// So each element assembles its full 8x8 block set into a local buffer addressed by
+// identity slots, which is correct for every kernel however it writes, and only the eight
+// diagonal blocks are scattered. The call sequence mirrors assemble_jacobian_atomic_*
+// exactly; if those gain a term, this must too, and the gate will say so.
+inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
+                                              const scalar_t        rho,
+                                              const scalar_t        mu,
+                                              const GeomKind        geom,
+                                              std::vector<scalar_t> &diag) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_block_diag");
+    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
+    assemble_nodal_p_grad(d, geom);
+    scalar_t *const SFEM_RESTRICT out = diag.data();
+
+    smesh::count_t sl[64];
+    for (int k = 0; k < 64; ++k) sl[k] = (smesh::count_t)k;
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t loc[64 * 16];
+        for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
+
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t pgx[8], pgy[8], pgz[8];
+        gather_element_pgrad(d, e, pgx, pgy, pgz);
+        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+
+        if (geom == GeomKind::Isoparam) {
+            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(rho, mu, x, y, z, ux, uy, uz, sl, loc, rc, p);
+            boundary_scs_add_jacobian<false>(
+                    rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc);
+        } else {
+            scalar_t adj[9], det;
+            cvfem_hex8_load_adj(d, e, adj, &det);
+            cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, adj, det, ux, uy, uz, sl, loc);
+            cvfem_hex8_ns_upwind_jacobian_add_rhie_chow<false>(rho, mu, adj, rc, ux, uy, uz, p, sl, loc);
+            boundary_scs_add_jacobian<false>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc);
+        }
+
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t          g   = d.elems[a][e];
+            const scalar_t *const       blk = loc + (size_t)(a * 8 + a) * 16;
+            for (int k = 0; k < 16; ++k) CVFEM_ATOMIC_ADD(out[(size_t)g * 16 + k], blk[k]);
+        }
+    }
+}
+
 inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual");
     assemble_nodal_p_grad(d, geom);

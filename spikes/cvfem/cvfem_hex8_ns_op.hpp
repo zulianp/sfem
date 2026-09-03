@@ -65,9 +65,13 @@ namespace sfem {
                         const idx_t *const   colidx,
                         real_t *const        values) override;
 
-        // hessian_diag is deliberately absent. The smoothers that need it come with the
-        // multigrid work, and there is no diagonal assembly in the CVFEM core yet; the
-        // base class errors loudly rather than this returning something plausible.
+        // Scalar diagonal, one value per dof, taken from the diagonal of each 4x4 block.
+        int hessian_diag(const real_t *const x, real_t *const values) override;
+
+        // Full 4x4 diagonal block per node, 16 values each, matrix-free. Not a base-class
+        // virtual: Op offers hessian_block_diag_sym, whose symmetric packing does not fit
+        // a Navier-Stokes block. This is what the block-Jacobi smoother will call.
+        int hessian_block_diag(const real_t *const x, real_t *const values);
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
         std::shared_ptr<Op> clone() const override;
