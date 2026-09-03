@@ -187,57 +187,71 @@ cvfem_configure_cuda && cvfem_build_cuda --target cvfem_hex8_ns_cuda_verify
 cvfem_run_cuda ./build_cuda/cvfem_hex8_ns_cuda_verify --n 128 --time-only --repeat 20
 ```
 
-## T3: the macro-local gather, and the linear terms lifted out of it
+## T3: the macro-local gather, the invariants lifted out of it, and the block diagonal
 
 The semi-structured kernel gathers a macro-element's `(L+1)^3` nodes once and runs its
-`L^3` micro-elements against constant offsets, instead of re-reading eight nodes per
-element through the global id. A fourth variant then uses the affine-macro assumption --
-one Jacobian per macro -- to lift the loop-invariant geometry out: the direction areas,
-the twelve node-separation vectors, and the twelve Rhie-Chow coefficients, each of which
-costs a square root and a division and was recomputed `12 * L^3` times per macro to
-produce the same twelve numbers. All four variants agree to 5e-16.
+`L^3` micro-elements against constant offsets, then lifts the affine-macro invariants out
+of the loop: the direction areas, the node-separation vectors, and the twelve Rhie-Chow
+coefficients, each of which costs a square root and a division and was recomputed
+`12 * L^3` times per macro to produce the same twelve numbers. All variants agree with
+the naive control to better than 5e-16.
 
-Matched problem size, 4343300 dofs, one Grace socket:
+One Grace socket, 4343300 dofs:
 
-| L | naive | macro-local | + geom hoist | + invariants | vs naive | MDOF/s |
-|---|---|---|---|---|---|---|
-| 2 | 2.163 | 1.643 | 1.596 | 1.347 | 1.61x | 743 |
-| 4 | 1.920 | 1.463 | 1.425 | 1.176 | 1.63x | 850 |
-| 8 | 2.016 | 1.400 | 1.393 | **1.092** | **1.85x** | **916** |
-| 16 | 2.163 | 1.543 | 1.537 | 1.195 | 1.81x | 837 |
+| L | naive | macro-local | + invariants | pgrad | apply+pgrad | blockdiag naive | blockdiag macro |
+|---|---|---|---|---|---|---|---|
+| 2 | 1.971 | 1.650 | 1.352 | 1.052 | 2.404 | 11.811 | 3.150 |
+| 4 | 1.905 | 1.432 | 1.107 | 0.973 | 2.079 | 11.283 | 2.613 |
+| 8 | 2.002 | 1.420 | **1.095** | 0.970 | **2.065** | 11.344 | **2.456** |
+| 16 | 2.145 | 1.556 | 1.186 | 1.079 | 2.265 | 12.387 | 2.628 |
 
-The flat kernel at that size is 2.50 ns/dof, so the best variant is **2.29x faster**.
-The gather is worth 1.44x of that and lifting the invariants a further 1.28x -- the
-second being the larger surprise, since it was not on the task list at all.
+### Read the `apply+pgrad` column, not `+ invariants`
+
+The flat operator recomputes the nodal pressure gradient inside every apply
+(`cvfem_hex8_ns_op.cpp`, and `assemble_block_diag` does the same). This benchmark hoists
+it out of the timed region. So the comparable figure against the flat kernel's 2.50
+ns/dof is `apply+pgrad`, and the honest speedup is **1.21x**, not the 2.29x reported
+before that discrepancy was noticed. The gains *within* the semi-structured kernel are
+unaffected, since every variant there excludes the pass equally: the gather is worth about
+1.41x and the invariants a further 1.30x, 1.83x together.
+
+| | claimed | like-for-like |
+|---|---|---|
+| apply vs flat | 2.29x | **1.21x** |
+| block diagonal vs flat | -- | **2.83x** |
+
+### The block diagonal gains far more than the apply
+
+The layout is worth **4.62x** there (11.344 to 2.456) against 1.83x for the apply, and
+2.83x against the flat kernel's 9.70 ns/dof once the gradient pass is added to both.
+
+The reason is that the semi-structured path can use the slot mask and the flat one cannot.
+`cvfem_hex8_ns_upwind_jacobian_add_slots` writes exclusively through `cvfem_hex8_bsr_acc`,
+which drops a negative slot, so the full element kernel produces the block diagonal with
+none of the off-diagonal write traffic. The flat `assemble_block_diag` runs the SymPy
+kernel, whose writes go straight to `values[...]` with no guard, so it has to assemble
+each element into a 64-block scratch and discard seven eighths of it.
+
+### The gradient pass is worth more than the layout
+
+It is 0.970 ns/dof against an apply of 1.095, or 39% of the flat operator's per-apply
+cost. In a Krylov solve the state is fixed for hundreds of applies, so computing it once
+per Newton step instead of once per apply is a larger win than the entire layout change --
+and `Op::update(x)` already exists as the place to do it.
 
 L=8 is the optimum on both machines. The working set is `(L+1)^3` nodes times fifteen
 arrays: 82 KB at L=8, 590 KB at L=16.
 
-### The laptop cannot be trusted for this
-
-| | laptop | Grace |
-|---|---|---|
-| gather (macro-local vs naive) | 1.10x | 1.44x |
-| geometry hoist | 1.02x | 1.01x |
-| invariants hoisted | 1.33x | 1.28x |
-| best vs flat kernel | 1.38x | 2.29x |
-
-On the laptop the gather alone was worth 10% and read as a negative result against the
-1.48x bar; on Grace it is 44%. Measure layout questions on Grace. The one thing that
-transfers is the invariant hoist, which is arithmetic rather than memory.
-
 ### The default
 
-`sscvfem_apply` is the hoisted variant: 1.097 ns/dof on one Grace socket at L=8, 2.29x the
-flat kernel. The gather is worth 1.44x of that and lifting the invariants a further 1.28x.
-
-The element-matrix and gemm variants were measured and lost -- 1.205 ns/dof for the 24x24
-gemm against 1.097 direct -- and moved to `subpar/cvfem_sshex8_em.hpp`, which builds under
-`-DCVFEM_ENABLE_SUBPAR=ON`. `subpar/README.md` records the numbers. The naive and
-intermediate variants stay on the default path: the first is the correctness control the
-benchmark checks everything against, the others are how the 1.44x and 1.28x are attributed.
+`sscvfem_apply` is the hoisted variant and `sscvfem_block_diag` its block diagonal. The
+naive variants are the correctness controls the benchmark checks everything against, and
+the intermediate ones are how the gather and invariant contributions are attributed. The
+element-matrix and gemm variants lost and live in `subpar/cvfem_sshex8_em.hpp` under
+`-DCVFEM_ENABLE_SUBPAR=ON`.
 
 ```bash
 cvfem_build --target cvfem_sshex8_bench
 CVFEM_CPUS=72 cvfem_run ./run_sshex8_sweep.sh
+SFEM_BENCH_PROBE_DIAG=1 ./build/cvfem_sshex8_bench   # block diag against the operator
 ```

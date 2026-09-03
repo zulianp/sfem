@@ -711,6 +711,173 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
 // matrix stays in L1 across the whole macro-element. The benchmark decides.
 
 // ---------------------------------------------------------------------------
+// Block diagonal: the 4x4 block per node, which is what a block-Jacobi smoother inverts.
+//
+// The multigrid path needs one of these at every level, so it is not the once-per-Newton
+// cost it looked like when only a single-level solve existed.
+//
+// Unlike the flat path, this can use the slot mask. cvfem_hex8_ns_upwind_jacobian_add_slots
+// writes exclusively through cvfem_hex8_bsr_acc, which drops a negative slot, so passing
+// -1 everywhere off the diagonal makes the full element kernel produce the block diagonal
+// with none of the off-diagonal write traffic. The flat assemble_block_diag cannot do that:
+// its affine path runs the SymPy kernel, whose 768 writes go straight to values[...] with
+// no guard, so a negative slot there is an out-of-bounds write and it has to assemble the
+// whole element into a 64-block scratch and throw away seven eighths of it.
+//
+// Both variants below use the same kernel as the apply, so the diagonal and the operator
+// cannot drift apart.
+
+// Control: the flat gather, one masked element assembly per micro-element, atomics to a
+// node-indexed destination.
+inline SFEM_NOINLINE void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                                   std::vector<scalar_t> &diag) {
+    SFEM_TRACE_SCOPE("sscvfem::block_diag_naive");
+    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
+    scalar_t *const SFEM_RESTRICT out = diag.data();
+
+    const int L = d.level;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        for (int zi = 0; zi < L; ++zi) {
+            for (int yi = 0; yi < L; ++yi) {
+                for (int xi = 0; xi < L; ++xi) {
+                    const int base = sscvfem_lidx(L, xi, yi, zi);
+
+                    smesh::idx_t g[8];
+                    scalar_t     x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
+                    for (int a = 0; a < 8; ++a) {
+                        g[a]   = d.elems[base + off[a]][e];
+                        x[a]   = (scalar_t)d.points[0][g[a]];
+                        y[a]   = (scalar_t)d.points[1][g[a]];
+                        z[a]   = (scalar_t)d.points[2][g[a]];
+                        ux[a]  = d.ux[(size_t)g[a]];
+                        uy[a]  = d.uy[(size_t)g[a]];
+                        uz[a]  = d.uz[(size_t)g[a]];
+                        p[a]   = d.p[(size_t)g[a]];
+                        pgx[a] = d.pgx[(size_t)g[a]];
+                        pgy[a] = d.pgy[(size_t)g[a]];
+                        pgz[a] = d.pgz[(size_t)g[a]];
+                    }
+
+                    // Diagonal slots address the destination by node; everything else is
+                    // dropped by the guard in cvfem_hex8_bsr_acc.
+                    // count_t, not ptrdiff_t: boundary_scs_add_jacobian takes count_t
+                    // slots. It is signed, so -1 still means "drop this block".
+                    smesh::count_t sl[64];
+                    for (int a = 0; a < 8; ++a) {
+                        for (int b = 0; b < 8; ++b) sl[a * 8 + b] = -1;
+                        sl[a * 8 + a] = (smesh::count_t)g[a];
+                    }
+
+                    const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                    scalar_t           adj[9], det;
+                    sscvfem_micro_geom(x, y, z, adj, &det);
+                    cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, out, rc, p);
+                    boundary_scs_add_jacobian<true>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, out);
+                }
+            }
+        }
+    }
+}
+
+// The default: gather the macro-element once, accumulate into a macro-local destination
+// addressed by local node so the element assembly needs no atomics at all, and scatter
+// once per macro node at the end. Geometry is lifted out of the loop as in the apply.
+inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                             std::vector<scalar_t> &diag) {
+    SFEM_TRACE_SCOPE("sscvfem::block_diag");
+    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
+    scalar_t *const SFEM_RESTRICT out = diag.data();
+
+    const int L   = d.level;
+    const int nxe = d.nxe;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+#pragma omp parallel
+    {
+        std::vector<smesh::idx_t> lg((size_t)nxe);
+        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
+        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
+        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
+        std::vector<scalar_t>     lout((size_t)nxe * 16);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                lg[(size_t)a]        = g;
+                lx[(size_t)a]        = (scalar_t)d.points[0][g];
+                ly[(size_t)a]        = (scalar_t)d.points[1][g];
+                lz[(size_t)a]        = (scalar_t)d.points[2][g];
+                lux[(size_t)a]       = d.ux[(size_t)g];
+                luy[(size_t)a]       = d.uy[(size_t)g];
+                luz[(size_t)a]       = d.uz[(size_t)g];
+                lp[(size_t)a]        = d.p[(size_t)g];
+                lpgx[(size_t)a]      = d.pgx[(size_t)g];
+                lpgy[(size_t)a]      = d.pgy[(size_t)g];
+                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+            }
+            std::fill(lout.begin(), lout.end(), scalar_t(0));
+
+            scalar_t madj[9], mdet;
+            {
+                scalar_t ex[8], ey[8], ez[8];
+                for (int a = 0; a < 8; ++a) {
+                    const int l = off[a];
+                    ex[a]       = lx[(size_t)l];
+                    ey[a]       = ly[(size_t)l];
+                    ez[a]       = lz[(size_t)l];
+                }
+                sscvfem_micro_geom(ex, ey, ez, madj, &mdet);
+            }
+
+            for (int zi = 0; zi < L; ++zi) {
+                for (int yi = 0; yi < L; ++yi) {
+                    for (int xi = 0; xi < L; ++xi) {
+                        const int base = sscvfem_lidx(L, xi, yi, zi);
+
+                        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
+                        smesh::count_t sl[64];
+                        for (int a = 0; a < 8; ++a) {
+                            const int l = base + off[a];
+                            x[a]        = lx[(size_t)l];
+                            y[a]        = ly[(size_t)l];
+                            z[a]        = lz[(size_t)l];
+                            ux[a]       = lux[(size_t)l];
+                            uy[a]       = luy[(size_t)l];
+                            uz[a]       = luz[(size_t)l];
+                            p[a]        = lp[(size_t)l];
+                            pgx[a]      = lpgx[(size_t)l];
+                            pgy[a]      = lpgy[(size_t)l];
+                            pgz[a]      = lpgz[(size_t)l];
+                            for (int b = 0; b < 8; ++b) sl[a * 8 + b] = -1;
+                        }
+                        // Local node index: the destination is this macro-element's own
+                        // buffer, so no thread can be writing the same entry.
+                        for (int a = 0; a < 8; ++a) sl[a * 8 + a] = (smesh::count_t)(base + off[a]);
+
+                        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                        cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, madj, mdet, ux, uy, uz, sl,
+                                                                       lout.data(), rc, p);
+                        boundary_scs_add_jacobian<false>(rho, mu, 0, madj, mdet, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                         ux, uy, uz, sl, lout.data());
+                    }
+                }
+            }
+
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = lg[(size_t)a];
+                for (int k = 0; k < 16; ++k) atomic_add(out + (ptrdiff_t)g * 16 + k, 0, lout[(size_t)a * 16 + k]);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // The default.
 //
 // Measured best on both machines tried, at 4343300 dofs and L=8: 1.097 ns/dof on one

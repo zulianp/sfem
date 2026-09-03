@@ -60,11 +60,14 @@ int main(int argc, char **argv) {
     const double tol = 1e-11;
 
     // Macro-element counts in y, and the internal level of each.
+    // ndof applies is only affordable on a small mesh, so the probe check is opt-in and
+    // self-limiting.
+    const int  probe_diag = smesh::Env::read<int>("SFEM_BENCH_PROBE_DIAG", 0);
     const auto macros = parse_list(smesh::Env::read_string("SFEM_BENCH_MACROS", "2,4,6,8"));
     const auto levels = parse_list(smesh::Env::read_string("SFEM_BENCH_LEVELS", "2,4,8"));
 
-    std::printf("%-4s %-10s %-12s %-12s %-12s %-12s %-12s %-12s %-9s %-12s %s\n",
-                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "sp_best", "best_MDOF/s", "agree_rel");
+    std::printf("%-4s %-10s %-11s %-11s %-11s %-11s %-11s %-11s %-9s %-9s %-9s %-10s %-10s %s\n",
+                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "bd_nv", "bd_mac", "pgrad", "hoist+pg", "agree", "bd_agree");
 
     int failures = 0;
 
@@ -131,6 +134,44 @@ int main(int argc, char **argv) {
             }
             const double rel = (amax > 0) ? dmax / amax : dmax;
 
+            // Block diagonal, both layouts. Checked twice: against each other, and -- on
+            // the smallest configuration, where ndof applies is affordable -- against the
+            // operator itself, by probing sscvfem_apply with unit vectors and picking out
+            // the diagonal blocks. The second is what makes this a statement about the
+            // Jacobian rather than about two functions agreeing with each other.
+            std::vector<scalar_t> bd_naive, bd_macro;
+            sscvfem_block_diag_naive(d, rho, mu, bd_naive);
+            sscvfem_block_diag(d, rho, mu, bd_macro);
+
+            double bdmax = 0, bdref = 0;
+            for (size_t i = 0; i < bd_naive.size(); ++i) {
+                bdmax = std::max(bdmax, std::fabs(bd_naive[i] - bd_macro[i]));
+                bdref = std::max(bdref, std::fabs(bd_naive[i]));
+            }
+            const double bd_rel = (bdref > 0) ? bdmax / bdref : bdmax;
+
+            double bd_probe_rel = 0;
+            if (probe_diag && ndof <= 20000) {
+                std::vector<scalar_t> ecol((size_t)ndof), ycol((size_t)ndof);
+                double                pmax = 0, pref = 0;
+                for (ptrdiff_t c = 0; c < ndof; ++c) {
+                    std::fill(ecol.begin(), ecol.end(), scalar_t(0));
+                    ecol[(size_t)c] = scalar_t(1);
+                    std::fill(ycol.begin(), ycol.end(), scalar_t(0));
+                    sscvfem_apply(d, rho, mu, ecol.data(), ycol.data());
+                    // Column c of J touches the diagonal block of node c/4 in rows of the
+                    // same node.
+                    const ptrdiff_t node = c / 4, fld = c % 4;
+                    for (int r = 0; r < 4; ++r) {
+                        const double a = (double)ycol[(size_t)node * 4 + r];
+                        const double b = (double)bd_macro[(size_t)node * 16 + r * 4 + fld];
+                        pmax = std::max(pmax, std::fabs(a - b));
+                        pref = std::max(pref, std::fabs(a));
+                    }
+                }
+                bd_probe_rel = (pref > 0) ? pmax / pref : pmax;
+            }
+
             auto time_it = [&](auto &&fn) {
                 for (int r = 0; r < warmup; ++r) fn();
                 std::vector<double> t;
@@ -175,12 +216,23 @@ int main(int argc, char **argv) {
                 sscvfem_apply_macro_local_emfull(d, rho, mu, dir.data(), y_emf.data());
             });
             const double t_best = std::min(std::min(t_macro, t_aff), std::min(std::min(t_hoi, t_em), t_emf));
+            const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d, rho, mu, bd_naive); });
+            const double t_bdm = time_it([&] { sscvfem_block_diag(d, rho, mu, bd_macro); });
+
 #else
             const double t_emf  = 0;
             const double t_best = std::min(std::min(t_macro, t_aff), t_hoi);
 #endif
+            const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d, rho, mu, bd_naive); });
+            const double t_bdm = time_it([&] { sscvfem_block_diag(d, rho, mu, bd_macro); });
 
-            std::printf("%-4d %-10td %-12.3f %-12.3f %-12.3f %-12.3f %-12.3f %-12.3f %-9.2f %-12.1f %.3e%s\n",
+            // The nodal pressure gradient, timed separately because the flat operator
+            // recomputes it inside every apply while this benchmark hoists it out of the
+            // timed region. Any comparison against the flat kernel has to add it back, or
+            // it is not measuring the same work.
+            const double t_pg = time_it([&] { sscvfem_nodal_p_grad(d); });
+
+            std::printf("%-4d %-10td %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-9.3f %-9.3f %-9.3f %-10.3f %-10.2e %.2e%s\n",
                         L,
                         ndof,
                         1e9 * t_naive / (double)ndof,
@@ -189,11 +241,14 @@ int main(int argc, char **argv) {
                         1e9 * t_hoi / (double)ndof,
                         1e9 * t_em / (double)ndof,
                         1e9 * t_emf / (double)ndof,
-                        t_naive / t_best,
-                        1e-6 * (double)ndof / t_best,
+                        1e9 * t_bdn / (double)ndof,
+                        1e9 * t_bdm / (double)ndof,
+                        1e9 * t_pg / (double)ndof,
+                        1e9 * (t_hoi + t_pg) / (double)ndof,
                         rel,
+                        std::max(bd_rel, bd_probe_rel),
                         (rel < tol) ? "" : "  <-- MISMATCH");
-            if (rel >= tol) ++failures;
+            if (rel >= tol || bd_rel >= tol || bd_probe_rel >= tol) ++failures;
         }
     }
 
