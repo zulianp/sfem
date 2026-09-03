@@ -1,4 +1,4 @@
-"""One kernel's structure lives in the IR, and must stay there.
+"""Two kernels' structure lives in the IR, and must stay there.
 
 ``ir/kernel_ast.py`` has been a complete, well-formed kernel IR with no
 production consumer: the residual path built zero nodes, and the energy path
@@ -10,6 +10,14 @@ tree the printer walks.  It is the constant-P1 simplex gradient-metric kernel:
 a quadrature loop over a vector-lane loop over a statement sequence, which is
 the smallest complete kernel the framework emits and the shape
 ``EvaluationStatement.hoist_scope`` already describes.
+
+``_constant_p1_gradient_expanded_body`` is the second, and the one that shows
+the first was not a special case.  It is the same nest fed by five statement
+sources rather than two, so the statement helpers themselves --
+``_physical_gradient_nodes`` and ``_coefficient_evaluation_nodes`` -- now
+produce nodes, and their ``_lines`` counterparts are those nodes printed.  The
+tests below pin that equivalence, because a helper that drifted from its
+printed view would reintroduce string building underneath an IR-shaped API.
 
 These tests pin two separate things.  That the loop nest really is built from
 IR nodes -- not strings that happen to look the same -- and that the text it
@@ -30,6 +38,17 @@ from codegen.framework.ir.kernel_ast import (
     ScatterNode,
     expr_ref,
 )
+
+
+#: The formulation that reaches ``_constant_p1_gradient_expanded_body``.
+#: The gradient-metric branch is tried first and wins wherever it applies, so
+#: this kernel is only reached by a form that is gradient-only on a linear
+#: simplex yet has no gradient-metric transformation -- among the shipped
+#: materials, only this one.  A sweep of all fifteen found it on TET4 and TRI3
+#: and nowhere else, which is why the test below names it explicitly rather
+#: than searching.
+EXPANDED_MATERIAL = "mooney_rivlin_kelvin_voigt_newmark"
+EXPANDED_ELEMENT = "TET4"
 
 
 class QuadratureLaneKernelTest(unittest.TestCase):
@@ -77,52 +96,6 @@ class QuadratureLaneKernelTest(unittest.TestCase):
         self.assertEqual(sum(l.count("{") for l in lines), sum(l.count("}") for l in lines))
 
 
-class KernelBodyIsBuiltFromNodesTest(unittest.TestCase):
-    def test_the_body_generator_constructs_ir_nodes(self):
-        """The proof that this is an AST and not a string builder.
-
-        Every statement reaching the printer must be an IR node.  If the body
-        generator regressed to assembling strings, the nodes captured here would
-        not appear and the emitted text could still be identical -- which is why
-        this is checked at the node level rather than in the output.
-        """
-        captured = []
-        original = residual_codegen._quadrature_lane_kernel_lines
-
-        def capture(lane_body, indent="    "):
-            captured.extend(lane_body)
-            return original(lane_body, indent=indent)
-
-        residual_codegen._quadrature_lane_kernel_lines = capture
-        try:
-            from sfem import gen
-
-            from codegen.framework.materials.laplace import material
-
-            user_input = gen.UserInputStage.create(material, ("TET4",), 8, None)
-            form_evaluation = gen._evaluate_forms(user_input)
-            plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
-            gen.CodeGenerationStage(user_input, plan).run()
-        finally:
-            residual_codegen._quadrature_lane_kernel_lines = original
-
-        self.assertTrue(captured, "the gradient-metric kernel body was never generated")
-        for node in captured:
-            self.assertIsInstance(
-                node,
-                (BufferDeclNode, ScatterNode),
-                "the kernel body must reach the printer as IR nodes",
-            )
-        self.assertTrue(
-            any(isinstance(node, ScatterNode) for node in captured),
-            "the kernel must accumulate into its output through a ScatterNode",
-        )
-        self.assertTrue(
-            any(isinstance(node, BufferDeclNode) for node in captured),
-            "the kernel's temporaries must be declared through BufferDeclNode",
-        )
-
-
 class PrinterHandlesRealBodiesTest(unittest.TestCase):
     def test_nested_loops_with_bodies_close_their_braces(self):
         """Guards the trap: the printer omits `}` only for an empty body.
@@ -159,3 +132,101 @@ class PrinterHandlesRealBodiesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StatementHelpersProduceNodesTest(unittest.TestCase):
+    """The statement sources hand back IR, and their printed views agree.
+
+    Each helper exists in two forms: a ``_nodes`` builder and a ``_lines``
+    printer.  If the printed view were ever reimplemented as string formatting
+    the outputs could stay identical while the IR quietly lost a consumer, so
+    the equivalence is asserted directly rather than inferred from the
+    generated code.
+    """
+
+    def test_physical_gradient_nodes_are_declarations(self):
+        nodes = residual_codegen._physical_gradient_nodes("u", 3)
+        self.assertEqual(len(nodes), 3, "one declaration per physical direction")
+        for node in nodes:
+            self.assertIsInstance(node, BufferDeclNode)
+            self.assertEqual(node.extents, ())
+
+    def test_physical_gradient_lines_are_those_nodes_printed(self):
+        nodes = residual_codegen._physical_gradient_nodes("u", 3)
+        self.assertEqual(
+            residual_codegen._physical_gradient_lines("u", 3, "        "),
+            residual_codegen._print_statement_nodes(nodes, "        "),
+        )
+
+    def test_the_printed_view_still_matches_the_original_spelling(self):
+        """Byte-identity of the whole tree depends on this exact text."""
+        self.assertEqual(
+            residual_codegen._physical_gradient_lines("u", 2, "    "),
+            [
+                "    const scalar_t u_grad_0 = (u_grad_0_ref * adj0 + u_grad_1_ref * adj2) / det;",
+                "    const scalar_t u_grad_1 = (u_grad_0_ref * adj1 + u_grad_1_ref * adj3) / det;",
+            ],
+        )
+
+    def test_print_statement_nodes_honours_indent(self):
+        node = BufferDeclNode("const scalar_t", "x", (), expr_ref("y"))
+        self.assertEqual(
+            residual_codegen._print_statement_nodes([node], "      "),
+            ["      const scalar_t x = y;"],
+        )
+
+
+class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
+    """Two kernels now, distinguished by the AST name each one registers."""
+
+    def _capture(self, material_name, element):
+        captured = {}
+        original = residual_codegen._quadrature_lane_kernel_lines
+
+        def capture(lane_body, indent="    ", name="quadrature_lane_body"):
+            captured.setdefault(name, []).extend(lane_body)
+            return original(lane_body, indent=indent, name=name)
+
+        residual_codegen._quadrature_lane_kernel_lines = capture
+        try:
+            import importlib
+
+            from sfem import gen
+
+            material = importlib.import_module(
+                "codegen.framework.materials.%s" % material_name
+            ).material
+            user_input = gen.UserInputStage.create(material, (element,), 8, None)
+            form_evaluation = gen._evaluate_forms(user_input)
+            plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
+            gen.CodeGenerationStage(user_input, plan).run()
+        finally:
+            residual_codegen._quadrature_lane_kernel_lines = original
+        return captured
+
+    def _assert_all_nodes(self, statements):
+        self.assertTrue(statements)
+        for node in statements:
+            self.assertIsInstance(
+                node,
+                (BufferDeclNode, ScatterNode),
+                "the kernel body must reach the printer as IR nodes",
+            )
+        self.assertTrue(any(isinstance(n, ScatterNode) for n in statements))
+        self.assertTrue(any(isinstance(n, BufferDeclNode) for n in statements))
+
+    def test_gradient_metric_body_is_nodes(self):
+        captured = self._capture("laplace", "TET4")
+        self.assertIn("simplex_gradient_metric_body", captured)
+        self._assert_all_nodes(captured["simplex_gradient_metric_body"])
+
+    def test_constant_p1_expanded_body_is_nodes(self):
+        captured = self._capture(EXPANDED_MATERIAL, EXPANDED_ELEMENT)
+        self.assertIn(
+            "constant_p1_gradient_expanded_body",
+            captured,
+            "%s/%s no longer exercises the expanded constant-P1 kernel; pick a "
+            "material that does, or this test silently stops proving anything"
+            % (EXPANDED_MATERIAL, EXPANDED_ELEMENT),
+        )
+        self._assert_all_nodes(captured["constant_p1_gradient_expanded_body"])

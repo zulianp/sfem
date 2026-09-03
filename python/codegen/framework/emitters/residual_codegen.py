@@ -2908,27 +2908,46 @@ def _constant_reference_gradient_sum(reference_gradients, n_shape, dim, expr_for
 
 
 def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, reference_gradients):
+    """The expanded constant-P1 gradient kernel, built as IR.
+
+    The second kernel whose body is a tree rather than a list of strings, and
+    the one that shows the first generalises.  It is the same quadrature-over-
+    lane nest, but fed by five statement sources instead of two -- the geometry
+    loads, the reference-gradient contraction, the chain rule, the CSE'd
+    coefficients and the test-function gradients -- each of which now hands
+    back nodes.
+    """
     dim = system.dim
     n_fields = len(system.fields)
     groups = _dependency_stream_groups(dependencies)
-    lines = ["    for (int q = 0; q < N_QP; ++q) {"]
-    lines.extend(_work_item_loop_lines("        "))
-    lines.extend(
-        [
-            "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
-            "            const scalar_t det = determinant[geometry_offset];",
-        ]
-    )
+
+    body = [
+        BufferDeclNode(
+            "const ptrdiff_t",
+            "geometry_offset",
+            (),
+            expr_ref("q * geometry_stride + lane"),
+        ),
+        BufferDeclNode(
+            "const scalar_t", "det", (), expr_ref("determinant[geometry_offset]")
+        ),
+    ]
     if dependencies.uses_adjugate:
-        for i in range(dim * dim):
-            lines.append(
-                "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
-                % (i, i)
+        body.extend(
+            BufferDeclNode(
+                "const scalar_t",
+                "adj%d" % i,
+                (),
+                expr_ref("adjugate[%d][geometry_offset]" % i),
             )
+            for i in range(dim * dim)
+        )
+
     for field_index, field in enumerate(system.fields):
         for group in groups:
             if not group.uses_gradient:
                 continue
+            stem = field.name + group.symbol_suffix
             for d in range(dim):
                 value = _constant_reference_gradient_sum(
                     reference_gradients,
@@ -2937,67 +2956,74 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
                     lambda shape, group=group, field_index=field_index: "%s[%d][lane]"
                     % (group.name, shape * n_fields + field_index),
                 )
-                lines.append(
-                    "            const scalar_t %s%s_grad_%d_ref = %s;"
-                    % (field.name, group.symbol_suffix, d, value)
+                body.append(
+                    BufferDeclNode(
+                        "const scalar_t",
+                        "%s_grad_%d_ref" % (stem, d),
+                        (),
+                        expr_ref(value),
+                    )
                 )
-            lines.extend(
-                _physical_gradient_lines(
-                    field.name + group.symbol_suffix, dim, "            "
-                )
-            )
-    lines.extend(
-        _coefficient_evaluation_lines(
-            system,
-            coefficients,
-            "            ",
-            "q_weight[q]",
-            dependencies,
-        )
-    )
+            body.extend(_physical_gradient_nodes(stem, dim))
+
+    body.extend(_coefficient_evaluation_nodes(system, coefficients, dependencies))
+
     for row in range(n_fields):
         for d in range(dim):
             if dependencies.gradient_coefficients[row][d]:
-                lines.append(
-                    "            const scalar_t grad_coeff%d_%d_value = grad_coeff%d_%d;"
-                    % (row, d, row, d)
+                body.append(
+                    BufferDeclNode(
+                        "const scalar_t",
+                        "grad_coeff%d_%d_value" % (row, d),
+                        (),
+                        expr_ref("grad_coeff%d_%d" % (row, d)),
+                    )
                 )
+
     test_grad_names = {}
     for test in range(dim + 1):
         for d in range(dim):
             if not any(row[d] for row in dependencies.gradient_coefficients):
                 continue
-            name = "test%d_grad%d" % (test, d)
-            test_grad_names[(test, d)] = name
+            test_name = "test%d_grad%d" % (test, d)
+            test_grad_names[(test, d)] = test_name
             terms = []
             for k in range(dim):
                 factor = _reference_gradient_expr(reference_gradients, test, k)
                 if factor == 0:
                     continue
                 terms.append(_scaled_cpp_term(factor, "adj%d" % (k * dim + d)))
-            lines.append(
-                "            const scalar_t %s = (%s) / det;"
-                % (name, _sum_cpp_terms(terms))
+            body.append(
+                BufferDeclNode(
+                    "const scalar_t",
+                    test_name,
+                    (),
+                    expr_ref("(%s) / det" % _sum_cpp_terms(terms)),
+                )
             )
+
     for test in range(dim + 1):
         for row in range(n_fields):
-            terms = []
-            for d in range(dim):
-                if dependencies.gradient_coefficients[row][d]:
-                    terms.append(
-                        "grad_coeff%d_%d_value * %s"
-                        % (row, d, test_grad_names[(test, d)])
-                    )
+            terms = [
+                "grad_coeff%d_%d_value * %s" % (row, d, test_grad_names[(test, d)])
+                for d in range(dim)
+                if dependencies.gradient_coefficients[row][d]
+            ]
             if terms:
-                lines.append(
-                    "            output[%d][lane] += q_weight[q] * det * (%s);"
-                    % (test * n_fields + row, _sum_cpp_terms(terms))
+                body.append(
+                    ScatterNode(
+                        expr_ref("output[%d][lane]" % (test * n_fields + row)),
+                        expr_ref("q_weight[q] * det * (%s)" % _sum_cpp_terms(terms)),
+                        "+=",
+                    )
                 )
-    lines.extend(["        }", "    }"])
-    return lines
+
+    return _quadrature_lane_kernel_lines(
+        body, indent="    ", name="constant_p1_gradient_expanded_body"
+    )
 
 
-def _quadrature_lane_kernel_lines(lane_body, indent="    "):
+def _quadrature_lane_kernel_lines(lane_body, indent="    ", name="quadrature_lane_body"):
     """Print a quadrature loop over a vector-lane loop over ``lane_body``.
 
     The loop nest is built as a ``KernelAST`` and rendered by the shared
@@ -3025,7 +3051,7 @@ def _quadrature_lane_kernel_lines(lane_body, indent="    "):
     quadrature = iterator("q", "int")
     pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
     ast_lines = render_kernel_ast_lines(
-        "simplex_gradient_metric_body",
+        name,
         (
             LoopNode(
                 LoopKind.QUADRATURE,
@@ -3056,7 +3082,7 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
     assembled as strings.  The loop nest comes from the plan: every statement
     here is scoped either to the quadrature loop or to the vector lane, which is
     exactly what ``EvaluationStatement.hoist_scope`` records, and the printer
-    turns the two ``LoopNode``\ s and their statements into text.
+    turns the two ``LoopNode`` objects and their statements into text.
 
     Expressions remain opaque C strings from ``_sfem_ccode``.  An expression IR
     is a separate subsystem; carrying pre-rendered strings is what keeps this
@@ -3161,7 +3187,9 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
                 )
             )
 
-    return _quadrature_lane_kernel_lines(body, indent="    ")
+    return _quadrature_lane_kernel_lines(
+        body, indent="    ", name="simplex_gradient_metric_body"
+    )
 
 
 def _scaled_cpp_term(factor, expression):
@@ -3380,18 +3408,45 @@ def _field_evaluation_lines(system, dependencies, indent, tensor):
     return lines
 
 
-def _physical_gradient_lines(stem, dim, indent):
-    lines = []
-    for d in range(dim):
-        terms = [
-            "%s_grad_%d_ref * adj%d" % (stem, k, k * dim + d)
-            for k in range(dim)
-        ]
-        lines.append(
-            "%sconst scalar_t %s_grad_%d = (%s) / det;"
-            % (indent, stem, d, " + ".join(terms))
+def _print_statement_nodes(nodes, indent):
+    """Render a flat sequence of IR statements at ``indent``.
+
+    The bridge that lets a node builder serve the call sites that still want
+    lines: each statement helper produces nodes, and its ``_lines`` variant is
+    this function applied to them.
+    """
+    printer = CLikeKernelASTPrinter()
+    return [line for node in nodes for line in printer.print_node(node, indent)]
+
+
+def _physical_gradient_nodes(stem, dim):
+    """The chain rule taking a reference gradient to a physical one, as IR.
+
+    ``grad_d = (sum_k grad_k_ref * adj[k][d]) / det`` -- one declaration per
+    physical direction.  This is the node-producing form;
+    ``_physical_gradient_lines`` prints exactly these nodes, so the two cannot
+    drift apart.
+    """
+    return [
+        BufferDeclNode(
+            "const scalar_t",
+            "%s_grad_%d" % (stem, d),
+            (),
+            expr_ref(
+                "(%s) / det"
+                % " + ".join(
+                    "%s_grad_%d_ref * adj%d" % (stem, k, k * dim + d)
+                    for k in range(dim)
+                )
+            ),
         )
-    return lines
+        for d in range(dim)
+    ]
+
+
+def _physical_gradient_lines(stem, dim, indent):
+    """The printed view of :func:`_physical_gradient_nodes`."""
+    return _print_statement_nodes(_physical_gradient_nodes(stem, dim), indent)
 
 
 def _tensor_field_alias_lines(system, dependencies):
@@ -3427,6 +3482,23 @@ def _tensor_field_alias_lines(system, dependencies):
 
 
 def _coefficient_evaluation_lines(system, coefficients, indent, weight, dependencies=None):
+    """The printed view of :func:`_coefficient_evaluation_nodes`.
+
+    ``weight`` is accepted and ignored -- the quadrature weight is applied by
+    the caller at the accumulation, not here.  It stays in the signature
+    because five call sites pass it positionally.
+    """
+    return _print_statement_nodes(
+        _coefficient_evaluation_nodes(system, coefficients, dependencies), indent
+    )
+
+
+def _coefficient_evaluation_nodes(system, coefficients, dependencies=None):
+    """Coefficient values and gradients, common-subexpression-eliminated, as IR.
+
+    The sympy-to-C bridge: the CSE temporaries first, then the coefficient
+    targets that reference them, each one a scalar declaration.
+    """
     expressions = []
     targets = []
     for row, coefficient in enumerate(coefficients):
@@ -3444,16 +3516,19 @@ def _coefficient_evaluation_lines(system, coefficients, indent, weight, dependen
         symbols=sp.numbered_symbols("residual_tmp"),
     )
     temporaries = _prune_dead_cse_intermediates(temporaries, reduced)
-    lines = [
-        "%sconst scalar_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
+    nodes = [
+        BufferDeclNode(
+            "const scalar_t", str(symbol), (), expr_ref(_sfem_ccode(expression))
+        )
         for symbol, expression in temporaries
     ]
-    lines.extend(
-        "%sconst scalar_t %s = %s;"
-        % (indent, target, _sfem_ccode(expression))
+    nodes.extend(
+        BufferDeclNode(
+            "const scalar_t", target, (), expr_ref(_sfem_ccode(expression))
+        )
         for target, expression in zip(targets, reduced)
     )
-    return lines
+    return nodes
 
 
 def _geometry_metric_stream_initializer(name, dim):
