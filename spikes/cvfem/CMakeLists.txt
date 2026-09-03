@@ -186,6 +186,16 @@ target_link_libraries(cvfem_ns_apply_bench PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_ns_apply_bench PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_apply_bench)
 
+# T3: the macro-local gather on a semi-structured mesh, against the flat gather on the
+# same mesh. Doubles as a correctness test -- the two must agree to round-off.
+add_executable(cvfem_sshex8_bench cvfem_sshex8_bench.cpp)
+target_link_libraries(cvfem_sshex8_bench PRIVATE cvfem_ns_op)
+target_compile_options(cvfem_sshex8_bench PRIVATE ${_cvfem_perf_opts})
+target_include_directories(cvfem_sshex8_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+cvfem_subpar_target(cvfem_sshex8_bench)
+add_test(NAME cvfem_sshex8_agree COMMAND cvfem_sshex8_bench)
+set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0")
+
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
