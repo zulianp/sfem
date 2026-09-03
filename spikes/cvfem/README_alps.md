@@ -187,38 +187,46 @@ cvfem_configure_cuda && cvfem_build_cuda --target cvfem_hex8_ns_cuda_verify
 cvfem_run_cuda ./build_cuda/cvfem_hex8_ns_cuda_verify --n 128 --time-only --repeat 20
 ```
 
-## T3: the macro-local gather, and why the laptop said no
+## T3: the macro-local gather, and the linear terms lifted out of it
 
 The semi-structured kernel gathers a macro-element's `(L+1)^3` nodes once and runs its
 `L^3` micro-elements against constant offsets, instead of re-reading eight nodes per
-element through the global id. Three variants, identical physics -- the element kernels
-are reused verbatim -- differing only in the gather. They agree to 3e-16.
+element through the global id. A fourth variant then uses the affine-macro assumption --
+one Jacobian per macro -- to lift the loop-invariant geometry out: the direction areas,
+the twelve node-separation vectors, and the twelve Rhie-Chow coefficients, each of which
+costs a square root and a division and was recomputed `12 * L^3` times per macro to
+produce the same twelve numbers. All four variants agree to 5e-16.
 
 Matched problem size, 4343300 dofs, one Grace socket:
 
-| L | naive ns/dof | macro-local | + geometry hoisted | speedup | MDOF/s |
-|---|---|---|---|---|---|
-| 2 | 1.975 | 1.633 | 1.609 | 1.23x | 622 |
-| 4 | 1.916 | 1.434 | 1.422 | 1.35x | 703 |
-| 8 | 1.969 | 1.405 | **1.393** | **1.41x** | **718** |
-| 16 | 2.149 | 1.554 | 1.541 | 1.39x | 649 |
+| L | naive | macro-local | + geom hoist | + invariants | vs naive | MDOF/s |
+|---|---|---|---|---|---|---|
+| 2 | 2.163 | 1.643 | 1.596 | 1.347 | 1.61x | 743 |
+| 4 | 1.920 | 1.463 | 1.425 | 1.176 | 1.63x | 850 |
+| 8 | 2.016 | 1.400 | 1.393 | **1.092** | **1.85x** | **916** |
+| 16 | 2.163 | 1.543 | 1.537 | 1.195 | 1.81x | 837 |
 
-The flat kernel at the same 4343300 dofs is 2.50 ns/dof, so the semi-structured one is
-**1.79x faster**, past the 1.48x that T1 set as the bar for matching assembled BSR.
+The flat kernel at that size is 2.50 ns/dof, so the best variant is **2.29x faster**.
+The gather is worth 1.44x of that and lifting the invariants a further 1.28x -- the
+second being the larger surprise, since it was not on the task list at all.
 
-The laptop said this was worth 10%, and that the geometry hoist was worth 2%, and that
-L=16 was a regression. On Grace it is 41%, the hoist is 1%, and L=16 barely dips. The
-laptop understated the win fourfold. That is now twice it has pointed the wrong way --
-first on thread scaling, then here -- and both times the error was in the direction of
-discouraging work that turns out to pay. Measure the layout questions on Grace.
+L=8 is the optimum on both machines. The working set is `(L+1)^3` nodes times fifteen
+arrays: 82 KB at L=8, 590 KB at L=16.
 
-L=8 is the optimum on both machines, which is the one thing they agree on. The working
-set is `(L+1)^3` nodes times fifteen arrays: 82 KB at L=8, 590 KB at L=16. The laptop
-falls off a cliff at L=16 and Grace does not, which is what its larger caches would
-predict.
+### The laptop cannot be trusted for this
+
+| | laptop | Grace |
+|---|---|---|
+| gather (macro-local vs naive) | 1.10x | 1.44x |
+| geometry hoist | 1.02x | 1.01x |
+| invariants hoisted | 1.33x | 1.28x |
+| best vs flat kernel | 1.38x | 2.29x |
+
+On the laptop the gather alone was worth 10% and read as a negative result against the
+1.48x bar; on Grace it is 44%. Measure layout questions on Grace. The one thing that
+transfers is the invariant hoist, which is arithmetic rather than memory.
 
 ```bash
 cvfem_build --target cvfem_sshex8_bench
 CVFEM_CPUS=72 cvfem_run ./run_sshex8_sweep.sh
 ```
-
