@@ -6560,18 +6560,9 @@ def _scalar_crs_matrix_assembly_source(
         value_coefficients=dependencies.value_coefficients,
         gradient_coefficients=dependencies.gradient_coefficients,
     )
-    if state_dependencies.current:
-        params.append("const ptrdiff_t current_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s" % field.name
-            for field in system.fields
-        )
-    if state_dependencies.previous:
-        params.append("const ptrdiff_t previous_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-            for field in system.fields
-        )
+    params.extend(
+        _mesh_stream_parameters(state_dependencies, system.fields, output=False)
+    )
     params.extend(
         [
             "const count_t *const SFEM_RESTRICT rowptr",
@@ -6909,18 +6900,9 @@ def _scalar_crs_matrix_assembly_source(
         packed_params.extend(
             "const scalar_t %s" % parameter for parameter in dependencies.parameters
         )
-        if state_dependencies.current:
-            packed_params.append("const ptrdiff_t current_stride")
-            packed_params.extend(
-                "const scalar_t *const SFEM_RESTRICT %s" % field.name
-                for field in system.fields
-            )
-        if state_dependencies.previous:
-            packed_params.append("const ptrdiff_t previous_stride")
-            packed_params.extend(
-                "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-                for field in system.fields
-            )
+        packed_params.extend(
+            _mesh_stream_parameters(state_dependencies, system.fields, output=False)
+        )
         packed_fill_params = tuple(
             packed_params
             + [
@@ -7327,12 +7309,9 @@ def _scalar_crs_matrix_assembly_source(
                 )
             call_args = ["nelements", "nnodes", "elements", "points"]
             call_args.extend(map(str, dependencies.parameters))
-            if state_dependencies.current:
-                call_args.append("current_stride")
-                call_args.extend(field.name for field in system.fields)
-            if state_dependencies.previous:
-                call_args.append("previous_stride")
-                call_args.extend("%s_old" % field.name for field in system.fields)
+            call_args.extend(
+                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+            )
             call_args.extend(("rowptr", "colidx", "values"))
             lines.extend(
                 [
@@ -7352,12 +7331,9 @@ def _scalar_crs_matrix_assembly_source(
                 )
             call_args = ["nelements", "nnodes", "elements", "points"]
             call_args.extend(map(str, dependencies.parameters))
-            if state_dependencies.current:
-                call_args.append("current_stride")
-                call_args.extend(field.name for field in system.fields)
-            if state_dependencies.previous:
-                call_args.append("previous_stride")
-                call_args.extend("%s_old" % field.name for field in system.fields)
+            call_args.extend(
+                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+            )
             call_args.extend(("rowptr", "colidx", "values"))
             lines.extend(
                 [
@@ -7395,12 +7371,9 @@ def _scalar_crs_matrix_assembly_source(
                 "points",
             ]
             call_args.extend(map(str, dependencies.parameters))
-            if state_dependencies.current:
-                call_args.append("current_stride")
-                call_args.extend(field.name for field in system.fields)
-            if state_dependencies.previous:
-                call_args.append("previous_stride")
-                call_args.extend("%s_old" % field.name for field in system.fields)
+            call_args.extend(
+                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+            )
             call_args.extend(("packed_element_entries", "values"))
             lines.extend(
                 [
@@ -7447,12 +7420,9 @@ def _scalar_crs_matrix_assembly_source(
             ]
             fill_args = common_args + ["points"]
             fill_args.extend(map(str, dependencies.parameters))
-            if state_dependencies.current:
-                fill_args.append("current_stride")
-                fill_args.extend(field.name for field in system.fields)
-            if state_dependencies.previous:
-                fill_args.append("previous_stride")
-                fill_args.extend("%s_old" % field.name for field in system.fields)
+            fill_args.extend(
+                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+            )
             fill_args.extend(("packed_element_entries", "values"))
             lines.extend(
                 [
@@ -7598,18 +7568,9 @@ def _scalar_coo_triplet_matrix_assembly_source(
         value_coefficients=dependencies.value_coefficients,
         gradient_coefficients=dependencies.gradient_coefficients,
     )
-    if state_dependencies.current:
-        params.append("const ptrdiff_t current_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s" % field.name
-            for field in system.fields
-        )
-    if state_dependencies.previous:
-        params.append("const ptrdiff_t previous_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-            for field in system.fields
-        )
+    params.extend(
+        _mesh_stream_parameters(state_dependencies, system.fields, output=False)
+    )
     if n_fields != 1:
         params.append("const ptrdiff_t out_stride")
     params.extend(
@@ -7936,12 +7897,9 @@ def _scalar_coo_triplet_matrix_assembly_source(
             )
         call_args = ["nelements", "nnodes", "elements", "points"]
         call_args.extend(map(str, dependencies.parameters))
-        if state_dependencies.current:
-            call_args.append("current_stride")
-            call_args.extend(field.name for field in system.fields)
-        if state_dependencies.previous:
-            call_args.append("previous_stride")
-            call_args.extend("%s_old" % field.name for field in system.fields)
+        call_args.extend(
+            _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+        )
         if n_fields != 1:
             call_args.append("out_stride")
         call_args.extend(("rows", "cols", "values"))
