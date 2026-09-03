@@ -60,10 +60,11 @@ from codegen.framework.plans.generation import (
     DataStreamLayout,
     DataStreamRole,
 )
-from codegen.framework.plans.generation import LocalPhase
+from codegen.framework.plans.generation import LocalPhase, MeshPhase
 from codegen.framework.plans.residual_structure import (
     jacobian_block_plan,
     residual_local_phase_plans,
+    residual_mesh_phase_plans,
 )
 from codegen.framework.plans.streams import local_kernel_stream_plans
 from codegen.framework.plans.streams import field_stream_groups
@@ -3165,6 +3166,26 @@ _QUADRATURE_SCOPE = "quadrature"
 _LANE_SCOPE = "lane"
 
 
+def _assemble_mesh_phases(sections):
+    """Order a mesh operator's phases the way the plan says.
+
+    ``residual_mesh_phase_plans`` states the sequence: gather the element's
+    fields, prepare its geometry, call the local kernel, scatter the result.
+    This walks that order and asks ``sections`` for the lines of each.
+
+    Unlike the local phases these are still lines rather than nodes, and the
+    computations that feed them stay interleaved where they were -- several
+    cross phase boundaries, and untangling that is a separate change from
+    deciding the order.  What this fixes is that the order was previously
+    implicit in the sequence of ``lines.extend`` calls, so nothing stated it
+    and nothing could vary it.
+    """
+    ordered = []
+    for phase_plan in residual_mesh_phase_plans(()):
+        ordered.extend(sections.get(phase_plan.phase, ()))
+    return ordered
+
+
 def _assemble_local_phases(sections):
     """Order a local kernel's phases the way the plan says, and fuse them.
 
@@ -5781,8 +5802,14 @@ def _mesh_operator_source(
             "        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];",
         ]
     )
-    lines.extend(_field_gather_lines(system, dependencies, "        ", field_element_array))
-    lines.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        "), ""])
+    # The element loop runs four phases.  MeshPhasePlan states which and in
+    # what order; this collects the lines of each and lets the plan sequence
+    # them.  The computations between them stay where they are: several
+    # cross phases -- block_stream_args is built here and consumed at the
+    # call -- and moving them would be a different change.
+    gather, geometry, local_call, scatter = [], [], [], []
+    gather.extend(_field_gather_lines(system, dependencies, "        ", field_element_array))
+    gather.extend(["", *_zero_block_output_lines("block_output", n_fields * n_shape, "        "), ""])
     block_stream_lines, block_stream_args = _single_field_block_stream_arguments(
         dependencies,
         n_fields * n_shape,
@@ -5790,7 +5817,7 @@ def _mesh_operator_source(
         "        ",
         force_contiguous=bool(field_element_lines),
     )
-    lines.extend(block_stream_lines)
+    gather.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
     affine_geometry_streams = (
         (
@@ -5808,9 +5835,9 @@ def _mesh_operator_source(
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
     }
-    lines.extend(_affine_geometry_stream_conversion_lines(affine_geometry_streams, "        "))
+    geometry.extend(_affine_geometry_stream_conversion_lines(affine_geometry_streams, "        "))
     if dependencies.uses_adjugate and not uses_cached_affine_metric:
-        lines.extend(
+        geometry.extend(
             [
                 "        const scalar_t *block_adjugate[%d];" % (dim * dim),
                 "        for (int component = 0; component < %d; ++component) {"
@@ -5820,7 +5847,7 @@ def _mesh_operator_source(
             ]
         )
     if uses_cached_affine_metric:
-        lines.append(
+        geometry.append(
             "        const scalar_t *const block_geom_metric[%d] = {%s};"
             % (
                 gradient_metric.metric_components,
@@ -5835,12 +5862,12 @@ def _mesh_operator_source(
                 ),
             )
         )
-        lines.append(
+        geometry.append(
             "        static const scalar_t cached_affine_metric_q_weight[1] = {scalar_t(1)};"
         )
     elif gradient_metric is not None:
-        lines.extend(["", *_work_item_loop_lines("        ")])
-        lines.extend(
+        geometry.extend(["", *_work_item_loop_lines("        ")])
+        geometry.extend(
             _geometry_metric_grouping_lines(
                 dim,
                 "block_affine_geometry_streams[%d][lane]"
@@ -5852,8 +5879,8 @@ def _mesh_operator_source(
                 "metric",
             )
         )
-        lines.append("        }")
-        lines.append(
+        geometry.append("        }")
+        geometry.append(
             "        const scalar_t *const block_geom_metric[%d] = %s;"
             % (
                 gradient_metric.metric_components,
@@ -5905,7 +5932,7 @@ def _mesh_operator_source(
         call_args.append(block_stream_args["direction"])
     call_args.extend(map(str, dependencies.parameters))
     call_args.append(block_stream_args["output"])
-    lines.extend(
+    local_call.extend(
         [
             "",
             "        %s<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(%s);"
@@ -5913,7 +5940,17 @@ def _mesh_operator_source(
             "",
         ]
     )
-    lines.extend(_field_atomic_scatter_lines(system, "        ", field_element_array))
+    scatter.extend(_field_atomic_scatter_lines(system, "        ", field_element_array))
+    lines.extend(
+        _assemble_mesh_phases(
+            {
+                MeshPhase.GATHER: gather,
+                MeshPhase.GEOMETRY: geometry,
+                MeshPhase.LOCAL_CALL: local_call,
+                MeshPhase.SCATTER: scatter,
+            }
+        )
+    )
     lines.extend(
         [
             "    }",

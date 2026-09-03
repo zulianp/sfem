@@ -99,6 +99,13 @@ UNCONSUMED_PLAN_TYPES = frozenset(
         # supplies nodes per phase, where the order used to be implicit in
         # which list things were appended to.
         "LocalPhasePlan",
+        # Gather, geometry, local call, scatter: the mesh operator's phase
+        # order now comes from the plan rather than being implicit in the
+        # sequence of lines.extend calls.  These phases are still lines, not
+        # nodes, and the computations feeding them stay interleaved -- several
+        # cross phase boundaries.  Untangling that is what putting the mesh
+        # operator in the IR would need, and it is a separate change.
+        "MeshPhasePlan",
     }
 )
 
@@ -115,6 +122,7 @@ PLAN_FACTORIES = {
     ),
     "DataStreamPlan": ("local_kernel_stream_plans",),
     "LocalPhasePlan": ("residual_local_phase_plans",),
+    "MeshPhasePlan": ("residual_mesh_phase_plans",),
 }
 
 
@@ -188,7 +196,7 @@ class PlansAreConsumedTest(unittest.TestCase):
         )
         self.assertEqual(
             unconsumed,
-            5,
+            4,
             "the number of unread structural plans changed to %d; update this "
             "expectation deliberately, and say why in the commit" % unconsumed,
         )
