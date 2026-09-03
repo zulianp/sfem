@@ -128,14 +128,15 @@ class CLikeKernelASTPrinter:
                 if node.template_arguments
                 else ""
             )
+            arguments = ", ".join(self.render_entity(arg) for arg in node.arguments)
+            if node.wrap_arguments:
+                return (
+                    "%s%s%s(" % (indent, self.render_entity(node.callee), templates),
+                    "%s%s);" % (indent + self.indent_unit * 2, arguments),
+                )
             return (
                 "%s%s%s(%s);"
-                % (
-                    indent,
-                    self.render_entity(node.callee),
-                    templates,
-                    ", ".join(self.render_entity(arg) for arg in node.arguments),
-                ),
+                % (indent, self.render_entity(node.callee), templates, arguments),
             )
         if isinstance(node, GatherNode):
             return (
