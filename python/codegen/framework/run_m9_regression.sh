@@ -59,6 +59,13 @@ else
     echo "Generated-source snapshot gate: skipped; set SFEM_CODEGEN_SNAPSHOT=1 to run it (~3 min)"
 fi
 
+if [[ "${SFEM_REPRODUCIBILITY:-0}" == "1" ]]; then
+    echo "Input-output reproducibility gate: every kernel's answers against the baseline"
+    "$PYTHON_BIN" -m codegen.framework.tools.reproducibility --all
+else
+    echo "Input-output reproducibility gate: skipped; set SFEM_REPRODUCIBILITY=1 to run it (needs a C++ compiler)"
+fi
+
 if [[ "${SFEM_APPLY_BENCH:-0}" == "1" ]]; then
     echo "Matrix-free apply gate: parity and throughput"
     "$PYTHON_BIN" -m codegen.framework.tools.apply_bench --element HEX8 --refine 30

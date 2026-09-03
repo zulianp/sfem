@@ -516,7 +516,7 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Thirteen, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Fourteen, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 0</div>
@@ -667,6 +667,19 @@
       <p>If a form ever read both roles here the two gathers would write the same memory, and the kernel would linearize about the wrong state. <b>No shipped material reaches it.</b> Both emitters are guarded by <code>len(system.fields) != 1 or not dependencies.direction</code>, so they only produce single-field action kernels, and no single-field material has a previous state: <code>pack_previous</code> appears in none of the 520 generated sources. That is why it has survived, and why the byte-identity gate cannot see it.</p>
       <p>Preserved verbatim in the loop rather than corrected, with the reasoning at the site. Correcting it is a one-character change — the slot should be <code>role.index + 1</code>, which is what the equivalent multi-field gather already uses — but it changes emitted text for a case nothing generates, so it cannot be proven by this branch's gate and would be an unreviewable no-op in the snapshot. It wants a material that exercises it, which is the same argument OP 11 makes for a different reason.</p>
       <div class="op-facts"><span><i>sites</i> 2</span><span><i>reachable today</i> no</span><span><i>fix</i> one character</span><span><i>needs</i> a single-field form with a previous state</span></div>
+    </div>
+  </div>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 14</div>
+    <div class="body">
+      <div class="op-title">The gate for changes that are meant to alter the output <span class="chip c-part">built — 54 kernels, 5 materials</span></div>
+      <p>Byte-identity has carried every step of this branch, and it is the strongest statement available while it holds. It is also unavailable for everything left: OP 10 hoists a check out of the kernels, OP 11 deletes dead declarations, OP 12 changes a scratch slot, OP 13 reconciles a name, and every loop-structure pass the IR is supposed to hold rewrites the text by design. For all of those, byte-identity is not the proof — it is the thing that must break.</p>
+      <p><code>tools/reproducibility.py</code> is the gate that replaces it, asking the only question that survives an intended output change: <b>given the same inputs, does the kernel still produce the same numbers?</b> It generates each material, compiles the real entry points, drives every one it can bind over a Cartesian grid, and compares an l1/l2 digest per kernel against a committed baseline. <code>--record</code> rewrites that baseline, and the diff it produces is the reviewable statement of exactly which kernels moved.</p>
+      <p><b>Nothing in it knows any physics.</b> The generated manifest lists every C ABI entry point with its full declaration, and the parameter names in those declarations are the ABI <code>plans/streams.py</code> defines — <code>nelements</code>, <code>elements</code>, <code>g_jacobian_adjugate&lt;i&gt;</code>, <code>&lt;role&gt;_stride</code>, <code>&lt;field&gt;_direction</code>, <code>&lt;field&gt;_out</code>. Binding a call is reading names, so a material added tomorrow is driven without touching the tool. That the boundary work of this session made those names a single definition is what makes this possible at all.</p>
+      <p>It carries a second check for free. The grid is affine, so a kernel pair differing only in geometry mode <i>must</i> agree — 24 such pairs, asserted rather than assumed. A digest alone would record a broken adjugate routing as the new correct answer; the parity check will not.</p>
+      <p><b>What it does not cover, stated rather than hidden.</b> Packed variants want a mesh partition, matrix assembly wants a sparsity pattern, and the diagnostics entry points have no numerical output at all — each is skipped with its reason printed. Three materials are out of reach: poro-elasticity and Stokes are Taylor–Hood and want an element topology this grid does not build, and two-phase flow's per-form operators each define the same element-generic entry points, so they cannot be linked into one driver. That last one is a fact about the generated code worth its own look.</p>
+      <div class="op-facts"><span><i>kernels</i> 54</span><span><i>materials</i> 5 of 8</span><span><i>geometry parity</i> 24 pairs</span><span><i>run</i> SFEM_REPRODUCIBILITY=1</span><span><i>unblocks</i> OP 10 · OP 11 · OP 12 · OP 13 · phase 3</span></div>
     </div>
   </div>
 
