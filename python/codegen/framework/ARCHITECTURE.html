@@ -500,7 +500,7 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Nine, ordered by what unblocks what. One is closed and two are under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Nine, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 0</div>
@@ -524,17 +524,18 @@
       <p>Measured effect: <b>the largest emitter contains zero free-symbol analysis</b>, down from six references, and its text-free helper count has fallen from 32 to 18. <code>residual_codegen.py</code> is 9,875 lines, from 10,074. The boundary emitter is down from eight symbol scans to two, both argument validation rather than planning.</p>
       <p><b>Done: kernel file naming.</b> Which files a kernel produces and what they are called — <code>LocalKernelPlan.name</code>/<code>.header</code> and <code>MeshKernelPlan.name</code>/<code>.source</code> were already the definition, and the emitters rebuilt both from format strings. The idempotence rule the emitter carried privately (a prefix already naming its element does not get a second one) moved into the plan factory with it. <b>This is the first move that changes the plan-consumption count: 13 unread, now 11.</b></p>
       <p><b>Remaining: the rest of the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, and geometry mode. These are the genuinely hard ones: unlike everything moved so far, they are not code that lifts out whole but structure that exists only as the shape of the emitter's control flow. The mesh phases, for instance, are spread across six large emission functions, each interleaving gather and scatter with buffer declarations that depend on the dependency set. They are what OP 2 and OP 4 wait on.</p>
-      <div class="op-facts"><span><i>emitters</i> 18,344 LOC in two modules</span><span><i>plans unread</i> 13 → 10</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP2, OP3 — OP4 started without it</span></div>
+      <div class="op-facts"><span><i>emitters</i> 18,344 LOC in two modules</span><span><i>plans unread</i> 13 → 10</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP3 — OP2 done, OP4 under way</span></div>
     </div>
   </div>
 
-  <div class="op blocked">
+  <div class="op ready">
     <div class="rail"></div><div class="num">OP 2</div>
     <div class="body">
-      <div class="op-title">Delete <code>_target()</code> <span class="chip c-gap">blocked by OP 1</span></div>
-      <p><code>emitters/residual_codegen.py:74</code> is still <code>def _target(): return OpenMPTarget()</code>, with a twin in the boundary emitter — 14 call sites through eight zero-argument wrappers. It is no longer a layering violation, since an emitter may name a target, but it is what keeps a CUDA residual kernel a fork rather than an argument.</p>
-      <p>Threading a target parameter reaches <b>43 functions transitively</b>, every one of them emitter internals that OP 1 is meant to collapse into a printer. Doing it first is work OP 1 undoes. Deferred deliberately, not overlooked.</p>
-      <div class="op-facts"><span><i>cost now</i> 43 function signatures</span><span><i>cost after OP 1</i> one argument</span></div>
+      <div class="op-title">Delete <code>_target()</code> <span class="chip c-ok">done — the binding replaced it</span></div>
+      <p>The defect was sharper than recorded here. The driver <i>already</i> mapped <code>KernelTarget.CUDA</code> onto a backend built with <code>CUDATarget</code>, and <code>KernelTarget.AVX512</code> onto one built with <code>AVX512Target</code>. That target reached a language check and the energy emitter, and nothing else: the residual emitters constructed their own <code>OpenMPTarget</code> and ignored it. A decision made in the right layer, discarded by the layer that needed it — the same shape as the scheduler's <code>hoist_scope</code>.</p>
+      <p><code>targets/context.py</code> binds the target for the duration of an emission; backends bind theirs in <code>emit()</code>, and the four emitter modules that built their own now read it. Bound rather than threaded, on purpose: 112 call sites in 49 functions ask for a qualifier or a pragma, and none of them <i>chooses</i> a target, so 49 extra parameters would record plumbing rather than a decision.</p>
+      <p>Proven by driving a probe target through the real backend: <b>39 of 90</b> lane-loop pragmas take the probe's spelling. The other 51 do not, because 66 pragmas were written as string literals that bypass the target — 24 converted, 42 under a shrink-only ratchet. No generated output changes, because the AVX512 and ARM targets spell everything exactly as OpenMP does: the wiring was <i>dead rather than wrong</i>.</p>
+      <div class="op-facts"><span><i>cost as feared</i> 43 signatures</span><span><i>actual</i> one binding, four modules</span><span><i>literal pragmas</i> 66 → 42, ratcheted</span><span><i>gate</i> byte-identity holds</span></div>
     </div>
   </div>
 
