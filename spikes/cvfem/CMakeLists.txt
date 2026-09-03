@@ -172,6 +172,13 @@ target_compile_options(cvfem_ns_op_isolation PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_op_isolation)
 add_test(NAME cvfem_ns_op_isolation COMMAND cvfem_ns_op_isolation)
 
+# The frontend-driven solver: same channel problem through sfem::Function, on the way to
+# the semi-structured multigrid hierarchy.
+add_executable(cvfem_hex8_ns_ssgmg cvfem_hex8_ns_ssgmg.cpp)
+target_link_libraries(cvfem_hex8_ns_ssgmg PRIVATE cvfem_ns_op)
+target_compile_options(cvfem_hex8_ns_ssgmg PRIVATE ${_cvfem_perf_opts})
+cvfem_subpar_target(cvfem_hex8_ns_ssgmg)
+
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
