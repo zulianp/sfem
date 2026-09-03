@@ -789,6 +789,7 @@ def generate(
         _replace_legacy_tensor_product_sources_with_proteus_aliases(files)
 
     files = _relocate_generated_primitive_headers(files, out_dir, material.name)
+    files = _collapse_duplicate_operators(files)
     source_paths = _write_files(out_dir, files)
     object_paths = _compile_operators(source_paths) if compile else ()
     return GenerationResult(source_paths, object_paths, codegen_plan, plan_dump)
@@ -2003,6 +2004,60 @@ def _as_equation_systems(systems):
     if isinstance(systems, (tuple, list)):
         return EquationSystems(*systems)
     raise TypeError("CodeGenerator requires EquationSystem or EquationSystems")
+
+
+def _collapse_duplicate_operators(outputs):
+    """Keep one copy of an operator source that several units emitted alike.
+
+    Emission runs once per unit, so a coupled system produces one operator per
+    form, each genuinely different.  The tensor-product alias rewrite then
+    replaces every one of them with the same forwarding source, because a HEX8
+    operator is an alias onto the PROTEUS_HEX8 one regardless of which form it
+    was emitted for.  Two-phase flow ends with seven byte-identical translation
+    units -- six forms plus the material's own -- each defining the same
+    ``extern "C"`` symbols, so linking any two together fails with duplicate
+    definitions and the material cannot be linked at all.
+
+    This runs after that rewrite for exactly that reason: before it the sources
+    still differ, and there is nothing to collapse.
+
+    Nothing names these files: the manifest does not mention them and every
+    consumer globs ``*_operator.cpp``, so collapsing the duplicates is invisible
+    except that the material now links.  Only exact duplicates within one
+    directory are collapsed, which is the per-form case and nothing else; two
+    elements' operators differ in their symbols and are left alone.  The name
+    kept is the shortest, which is the one without a form segment -- the same
+    ``<material>_<element>_operator.cpp`` every single-form material produces.
+
+    The deeper fix is that a form-specific name should not survive a rewrite
+    that erases everything form-specific about the content.  This is the narrow
+    correction, placed where the duplication becomes true rather than inside the
+    alias rewrite that creates it.
+    """
+    by_directory = {}
+    for filename, source in outputs.items():
+        if not filename.endswith("_operator.cpp"):
+            continue
+        directory = os.path.dirname(filename)
+        # _write_files normalises trailing whitespace, so two sources that
+        # differ only there land on disk identical; compare what will be
+        # written rather than what was produced.
+        by_directory.setdefault((directory, source.rstrip()), []).append(filename)
+
+    dropped = set()
+    for filenames in by_directory.values():
+        if len(filenames) < 2:
+            continue
+        keep = min(filenames, key=lambda name: (len(os.path.basename(name)), name))
+        dropped.update(name for name in filenames if name != keep)
+
+    if not dropped:
+        return outputs
+    return {
+        filename: source
+        for filename, source in outputs.items()
+        if filename not in dropped
+    }
 
 
 def _merge_files(outputs, files):
