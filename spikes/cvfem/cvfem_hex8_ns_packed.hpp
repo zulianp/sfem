@@ -18,36 +18,20 @@
 // carry a divergent trimmed copy of them.
 #include "cvfem_hex8_pack_common.hpp"
 
+// After the kernel headers, which steady.cpp includes before this file.
+#include "cvfem_hex8_pack_helpers.hpp"
+
 
 
 
 
 
 static void cvfem_hex8_precompute_affine_geometry(MeshData &d) {
-    for (int c = 0; c < 9; ++c) d.jacobian_adjugate[c].resize((size_t)d.nelements);
-    d.jacobian_determinant.resize((size_t)d.nelements);
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t x[8], y[8], z[8], adj[9], det;
-        const auto *const px = d.points[0];
-        const auto *const py = d.points[1];
-        const auto *const pz = d.points[2];
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
-            x[a]                 = scalar_t(px[g]);
-            y[a]                 = scalar_t(py[g]);
-            z[a]                 = scalar_t(pz[g]);
-        }
-        cvfem_hex8_affine_adj(x, y, z, adj, &det);
-        for (int c = 0; c < 9; ++c) d.jacobian_adjugate[c][(size_t)e] = adj[c];
-        d.jacobian_determinant[(size_t)e] = det;
-    }
+    precompute_affine_geometry(d);
 }
 
 static SFEM_INLINE void cvfem_hex8_load_adj(const MeshData &d, const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {
-    for (int c = 0; c < 9; ++c) adj[c] = d.jacobian_adjugate[c][(size_t)e];
-    *det = d.jacobian_determinant[(size_t)e];
+    load_hex8_adj(d, e, adj, det);
 }
 
 static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const MeshData               &d,
@@ -63,30 +47,7 @@ static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const MeshData               &
                                                   scalar_t *const SFEM_RESTRICT cof7,
                                                   scalar_t *const SFEM_RESTRICT cof8,
                                                   scalar_t *const SFEM_RESTRICT det) {
-    const size_t n = (size_t)nlanes * sizeof(scalar_t);
-    std::memcpy(cof0, d.jacobian_adjugate[0].data() + begin, n);
-    std::memcpy(cof1, d.jacobian_adjugate[1].data() + begin, n);
-    std::memcpy(cof2, d.jacobian_adjugate[2].data() + begin, n);
-    std::memcpy(cof3, d.jacobian_adjugate[3].data() + begin, n);
-    std::memcpy(cof4, d.jacobian_adjugate[4].data() + begin, n);
-    std::memcpy(cof5, d.jacobian_adjugate[5].data() + begin, n);
-    std::memcpy(cof6, d.jacobian_adjugate[6].data() + begin, n);
-    std::memcpy(cof7, d.jacobian_adjugate[7].data() + begin, n);
-    std::memcpy(cof8, d.jacobian_adjugate[8].data() + begin, n);
-    std::memcpy(det, d.jacobian_determinant.data() + begin, n);
-    if (nlanes < CVFEM_HEX8_VEC_SIZE) {
-        const size_t pad = (size_t)(CVFEM_HEX8_VEC_SIZE - nlanes) * sizeof(scalar_t);
-        std::memset(cof0 + nlanes, 0, pad);
-        std::memset(cof1 + nlanes, 0, pad);
-        std::memset(cof2 + nlanes, 0, pad);
-        std::memset(cof3 + nlanes, 0, pad);
-        std::memset(cof4 + nlanes, 0, pad);
-        std::memset(cof5 + nlanes, 0, pad);
-        std::memset(cof6 + nlanes, 0, pad);
-        std::memset(cof7 + nlanes, 0, pad);
-        std::memset(cof8 + nlanes, 0, pad);
-        for (int lane = nlanes; lane < CVFEM_HEX8_VEC_SIZE; ++lane) det[lane] = scalar_t(1);
-    }
+    gather_hex8_adj_soa(d, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
 }
 
 static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
@@ -198,16 +159,7 @@ static SFEM_INLINE void cvfem_hex8_scatter_simd_to_pack(pack_idx_t **const SFEM_
                                                         const ptrdiff_t                  begin,
                                                         const int                        nlanes,
                                                         const Hex8ResidualPack          &out) {
-    for (int lane = 0; lane < nlanes; ++lane) {
-        const ptrdiff_t e = begin + lane;
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            scalar_t *const SFEM_RESTRICT dst = pack_out + (ptrdiff_t)elems[a][e] * N_FIELDS;
-            dst[0] += out.rx[a][lane];
-            dst[1] += out.ry[a][lane];
-            dst[2] += out.rz[a][lane];
-            dst[3] += out.rc[a][lane];
-        }
-    }
+    scatter_hex8_simd_to_pack(elems, pack_out, begin, nlanes, out);
 }
 
 static SFEM_INLINE void cvfem_hex8_fill_pack_xyz_pgrad(const PackedData                  &p,
