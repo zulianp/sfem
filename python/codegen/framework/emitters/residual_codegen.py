@@ -66,7 +66,10 @@ from codegen.framework.plans.residual_structure import (
     residual_local_phase_plans,
     residual_mesh_phase_plans,
 )
-from codegen.framework.plans.streams import local_kernel_stream_plans
+from codegen.framework.plans.streams import (
+    local_kernel_stream_plans,
+    mesh_kernel_stream_plans,
+)
 from codegen.framework.plans.streams import field_stream_groups
 from codegen.framework.symbolic.residual import (
     coupled_residual_weak_coefficients,
@@ -821,19 +824,7 @@ def _affine_mesh_public_wrapper_lines(
         if not uses_cached_affine_metric:
             call_args.append("g_jacobian_determinant0")
         call_args.extend(map(str, dependencies.parameters))
-        if dependencies.current:
-            call_args.append("current_stride")
-            call_args.extend(field.name for field in system.fields)
-        if dependencies.previous:
-            call_args.append("previous_stride")
-            call_args.extend("%s_old" % field.name for field in system.fields)
-        if dependencies.direction:
-            call_args.append("direction_stride")
-            call_args.extend(
-                "%s_direction" % field.name for field in system.fields
-            )
-        call_args.append("out_stride")
-        call_args.extend("%s_out" % field.name for field in system.fields)
+        call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
         lines.extend(
             [
                 ") {",
@@ -2612,6 +2603,31 @@ def _mixed_local_field_evaluation_lines(
                     _physical_gradient_lines(field.name + group.symbol_suffix, dim, indent)
                 )
     return lines
+
+
+def _declare_mesh_stream(stream):
+    """Spell one mesh-boundary stream as a C parameter declaration."""
+    if stream.source == "stride":
+        return "const ptrdiff_t %s" % stream.name
+    if stream.role is DataStreamRole.OUTPUT:
+        return "scalar_t *const SFEM_RESTRICT %s" % stream.name
+    return "const scalar_t *const SFEM_RESTRICT %s" % stream.name
+
+
+def _mesh_stream_parameters(dependencies, fields, output=True):
+    """The mesh kernel's field parameters, from the plan that decides them."""
+    return [
+        _declare_mesh_stream(stream)
+        for stream in mesh_kernel_stream_plans(dependencies, fields, output)
+    ]
+
+
+def _mesh_stream_arguments(dependencies, fields, output=True):
+    """The matching call arguments -- same plan, so they cannot disagree."""
+    return [
+        stream.name
+        for stream in mesh_kernel_stream_plans(dependencies, fields, output)
+    ]
 
 
 def _stream_call_arguments(streams, spell):
@@ -5633,29 +5649,7 @@ def _mesh_operator_source(
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    if dependencies.current:
-        params.append("const ptrdiff_t current_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s" % field.name
-            for field in system.fields
-        )
-    if dependencies.previous:
-        params.append("const ptrdiff_t previous_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-            for field in system.fields
-        )
-    if dependencies.direction:
-        params.append("const ptrdiff_t direction_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
-            for field in system.fields
-        )
-    params.append("const ptrdiff_t out_stride")
-    params.extend(
-        "scalar_t *const SFEM_RESTRICT %s_out" % field.name
-        for field in system.fields
-    )
+    params.extend(_mesh_stream_parameters(dependencies, system.fields))
     for index, param in enumerate(params):
         lines.append(
             "        %s%s" % (param, "," if index + 1 < len(params) else "")
@@ -5981,19 +5975,7 @@ def _mesh_operator_source(
         if not uses_cached_affine_metric:
             call_args.append("g_jacobian_determinant0")
         call_args.extend(map(str, dependencies.parameters))
-        if dependencies.current:
-            call_args.append("current_stride")
-            call_args.extend(field.name for field in system.fields)
-        if dependencies.previous:
-            call_args.append("previous_stride")
-            call_args.extend("%s_old" % field.name for field in system.fields)
-        if dependencies.direction:
-            call_args.append("direction_stride")
-            call_args.extend(
-                "%s_direction" % field.name for field in system.fields
-            )
-        call_args.append("out_stride")
-        call_args.extend("%s_out" % field.name for field in system.fields)
+        call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
         lines.extend(
             [
                 ") {",
@@ -8357,29 +8339,7 @@ def _isoparametric_mesh_operator_source(
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    if dependencies.current:
-        params.append("const ptrdiff_t current_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s" % field.name
-            for field in system.fields
-        )
-    if dependencies.previous:
-        params.append("const ptrdiff_t previous_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-            for field in system.fields
-        )
-    if dependencies.direction:
-        params.append("const ptrdiff_t direction_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
-            for field in system.fields
-        )
-    params.append("const ptrdiff_t out_stride")
-    params.extend(
-        "scalar_t *const SFEM_RESTRICT %s_out" % field.name
-        for field in system.fields
-    )
+    params.extend(_mesh_stream_parameters(dependencies, system.fields))
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -8636,19 +8596,7 @@ def _isoparametric_mesh_operator_source(
             )
         call_args = ["nelements", "nnodes", "elements", "points"]
         call_args.extend(map(str, dependencies.parameters))
-        if dependencies.current:
-            call_args.append("current_stride")
-            call_args.extend(field.name for field in system.fields)
-        if dependencies.previous:
-            call_args.append("previous_stride")
-            call_args.extend("%s_old" % field.name for field in system.fields)
-        if dependencies.direction:
-            call_args.append("direction_stride")
-            call_args.extend(
-                "%s_direction" % field.name for field in system.fields
-            )
-        call_args.append("out_stride")
-        call_args.extend("%s_out" % field.name for field in system.fields)
+        call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
         lines.extend(
             [
                 ") {",

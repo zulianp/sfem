@@ -44,7 +44,7 @@ PLAN_INPUTS = (
 
 #: Decisions still made in the emission layer.  Shrink-only: lower it when a
 #: decision moves, and never raise it to make a change fit.
-BUDGET = 313
+BUDGET = 298
 
 
 def _decision_branches():

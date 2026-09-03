@@ -248,3 +248,76 @@ def local_kernel_stream_plans(
         )
     )
     return tuple(streams)
+
+
+#: How each field stream's per-field arrays are named at the mesh boundary,
+#: and the stride that precedes them.  The suffix is part of the ABI.
+MESH_FIELD_STREAMS = (
+    ("current", ""),
+    ("previous", "_old"),
+    ("direction", "_direction"),
+)
+
+
+def mesh_kernel_stream_plans(dependencies, fields, include_output=True):
+    """Which field streams cross a mesh kernel's boundary, and in what order.
+
+    Every mesh-level kernel is handed a stride and one pointer per field for
+    each live stream, then the same for its output.  Which streams are live
+    follows from the lowered form; the order is the kernel's ABI.
+
+    Eight signatures and nine call sites derive this independently, each with
+    its own ``if dependencies.current`` chain.  They agree, but nothing makes
+    them: a signature and its call could disagree, and seventeen copies is
+    seventeen places to miss when a stream is added.
+
+    ``include_output`` is false for matrix assembly, which writes into a
+    sparse structure rather than a field output and takes rowptr/colidx/values
+    instead.  The emitter adds those, because which matrix format is in play
+    is not this plan's decision.
+    """
+    streams = []
+    for name, suffix in MESH_FIELD_STREAMS:
+        if not getattr(dependencies, name, False):
+            continue
+        streams.append(
+            DataStreamPlan(
+                name="%s_stride" % name,
+                role=DataStreamRole.TEMPORARY,
+                layout=DataStreamLayout.SCALAR,
+                source="stride",
+            )
+        )
+        streams.extend(
+            DataStreamPlan(
+                name="%s%s" % (field.name, suffix),
+                role=(
+                    DataStreamRole.DIRECTION
+                    if name == "direction"
+                    else DataStreamRole.FIELD
+                ),
+                layout=DataStreamLayout.SOA,
+                source=name,
+            )
+            for field in fields
+        )
+    if not include_output:
+        return tuple(streams)
+    streams.append(
+        DataStreamPlan(
+            name="out_stride",
+            role=DataStreamRole.TEMPORARY,
+            layout=DataStreamLayout.SCALAR,
+            source="stride",
+        )
+    )
+    streams.extend(
+        DataStreamPlan(
+            name="%s_out" % field.name,
+            role=DataStreamRole.OUTPUT,
+            layout=DataStreamLayout.SOA,
+            source="output",
+        )
+        for field in fields
+    )
+    return tuple(streams)
