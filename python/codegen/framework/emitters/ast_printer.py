@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from codegen.framework.ir.passes import VectorizationContractPass
+
 from codegen.framework.ir.kernel_ast import (
     AssignmentNode,
     BufferDeclNode,
@@ -13,6 +15,7 @@ from codegen.framework.ir.kernel_ast import (
     Literal,
     LoopIncrementKind,
     KernelAST,
+    KernelASTPassPipeline,
     LoopHeaderNode,
     LoopNode,
     RawLinesNode,
@@ -238,6 +241,20 @@ class CLikeKernelASTPrinter:
         return str(entity)
 
 
-def render_kernel_ast_lines(name, nodes, printer=None):
+#: Analyses every kernel passes through on its way to text.  Kept here, at the
+#: one place every AST is rendered, so no emitter can route around it.
+DEFAULT_PASSES = KernelASTPassPipeline((VectorizationContractPass(),))
+
+
+def render_kernel_ast_lines(name, nodes, printer=None, passes=DEFAULT_PASSES):
+    """Render a kernel, after the pass pipeline has had a look at it.
+
+    The pipeline runs before printing rather than after, so a kernel that
+    breaks a contract never becomes a file.  ``passes=None`` skips it, which
+    exists for tests that construct deliberately invalid trees.
+    """
     printer = CLikeKernelASTPrinter() if printer is None else printer
-    return printer.print_ast(KernelAST(name=name, nodes=tuple(nodes)))
+    ast = KernelAST(name=name, nodes=tuple(nodes))
+    if passes is not None:
+        ast, _results = passes.apply(ast)
+    return printer.print_ast(ast)

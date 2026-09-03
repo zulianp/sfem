@@ -190,12 +190,12 @@
 <header class="masthead">
   <div class="eyebrow"><b>Prescriptive</b> — what the layers must own &nbsp;·&nbsp; <i>Descriptive</i> — what is built today &nbsp;·&nbsp; Open points</div>
   <h1>SFEM Codegen Architecture</h1>
-  <p class="standfirst">The layer graph is clean and enforced, and the matrix-free apply path is now measured as well as described. The emission layer still holds 22,727 lines that should be a printer.</p>
+  <p class="standfirst">The layer graph is clean and enforced, and the matrix-free apply path is now measured as well as described. The emission layer still holds 23,468 lines that should be a printer — up from 22,727, because node construction is longer than string appends.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 30 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 42 commits from 060684ff</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
-    <span><b>Date</b> 2026-09-03</span>
+    <span><b>Date</b> 2026-09-03 (second pass)</span>
   </div>
 </header>
 
@@ -280,7 +280,7 @@
         <rect x="500" y="414" width="416" height="78" class="d-gapb" rx="2"/>
         <text x="516" y="438" class="d-name">ir/</text>
         <text x="516" y="458" class="d-sub">930 LOC · complete and well formed</text>
-        <text x="516" y="476" class="d-gapt">2 kernel bodies on the residual path</text>
+        <text x="516" y="476" class="d-gapt">every residual kernel is a tree</text>
         <text x="902" y="438" class="d-gapt" text-anchor="end">PARTIAL</text>
 
         <!-- L5 -->
@@ -483,7 +483,7 @@
         <rect x="24" y="140" width="180" height="90" class="d-gapb" rx="2"/>
         <text x="38" y="162" class="d-name">ir/ (L4)</text>
         <text x="38" y="182" class="d-sub">KernelAST · 930 LOC</text>
-        <text x="38" y="202" class="d-gapt">2 kernel bodies on this path</text>
+        <text x="38" y="202" class="d-gapt">every residual kernel; energy started</text>
         <text x="38" y="220" class="d-dim">energy path uses 4 fragments</text>
 
         <text x="24" y="376" class="d-dim">The chain along the top is correct and enforced. Everything below it is the gap: one layer describing the kernel, another re-deriving it.</text>
@@ -494,6 +494,22 @@
     </div>
     <figcaption><b>Figure 3.</b> The top row is the architecture working: a closed collection, a planning layer, a narrow model, an emitter. Below it, the same kernel is described twice — once by plan objects nobody reads, once by control flow inside the emitter. <b>Closing that duplication is the whole of the remaining work.</b></figcaption>
   </figure>
+
+  <h3>Where it stands after the IR work</h3>
+  <p>The kernel IR went from a well-formed subsystem nobody called to the thing every residual kernel is made of. Three measures moved, and three did not, and the ones that did not are the more informative half.</p>
+  <div class="tbl-wrap">
+  <table>
+    <tr><th>Measure</th><th>Before</th><th>Now</th><th>Reading</th></tr>
+    <tr><td>IR node kinds</td><td class="n">8</td><td class="n">34</td><td>function, block, loop header, return, conditional — each added for a shape real generated code already had</td></tr>
+    <tr><td>Residual kernels as trees</td><td class="n">0</td><td class="n">all</td><td>signature included; zero un-migrated bodies</td></tr>
+    <tr><td>Pragmas bypassing the target</td><td class="n">66</td><td class="n">28</td><td>the rest are structure or deprioritised formats</td></tr>
+    <tr><td><b>emitters/ lines</b></td><td class="n">22,727</td><td class="n">23,468</td><td><b>grew.</b> Node construction is longer than string appends; the layer that should be a printer got bigger</td></tr>
+    <tr><td><b>Structural plans unread</b></td><td class="n">10 of 13</td><td class="n">10 of 13</td><td><b>unmoved.</b> Emitters build trees but still decide what the tree is</td></tr>
+    <tr><td><b>Passes over the IR</b></td><td class="n">0</td><td class="n">0</td><td><b>unmoved.</b> Build-and-print only: no AST is inspected or transformed</td></tr>
+  </table>
+  </div>
+  <p><b>The shape is right; the direction of data flow is not.</b> L3 computes the structure, L4 can now represent it, L6 prints it — and L6 still originates it. That is the same defect found and fixed twice in narrow places this session: the scheduler computed <code>hoist_scope</code> and the emitters re-derived the loop nest by hand; the driver selected a target and the emitters constructed their own. Both are closed. The general case is not.</p>
+  <p>Converting strings to nodes was a prerequisite for plan-driven emission, not a substitute for it, which is why the unread-plans measure correctly refused to move all the way through this work.</p>
 </section>
 
 <!-- ============================ PART 3 ============================ -->
@@ -535,7 +551,7 @@
       <p>The defect was sharper than recorded here. The driver <i>already</i> mapped <code>KernelTarget.CUDA</code> onto a backend built with <code>CUDATarget</code>, and <code>KernelTarget.AVX512</code> onto one built with <code>AVX512Target</code>. That target reached a language check and the energy emitter, and nothing else: the residual emitters constructed their own <code>OpenMPTarget</code> and ignored it. A decision made in the right layer, discarded by the layer that needed it — the same shape as the scheduler's <code>hoist_scope</code>.</p>
       <p><code>targets/context.py</code> binds the target for the duration of an emission; backends bind theirs in <code>emit()</code>, and the four emitter modules that built their own now read it. Bound rather than threaded, on purpose: 112 call sites in 49 functions ask for a qualifier or a pragma, and none of them <i>chooses</i> a target, so 49 extra parameters would record plumbing rather than a decision.</p>
       <p>Proven by driving a probe target through the real backend: <b>39 of 90</b> lane-loop pragmas take the probe's spelling. The other 51 do not, because 66 pragmas were written as string literals that bypass the target — 35 converted, 31 under a shrink-only ratchet — 24 in the residual emitter, 11 more once <code>energy_codegen</code>'s leaf pragmas moved onto the <code>source_builder</code> it already receives. No generated output changes, because the AVX512 and ARM targets spell everything exactly as OpenMP does: the wiring was <i>dead rather than wrong</i>. The 31 that remain are held back by three distinct reasons, recorded in the ratchet: 7 are parallel regions with a work-sharing <code>for</code> inside, which are structure rather than spelling and would compile into a serial loop in a bare block if an accessor returned nothing; 7 sit in scatter helpers that take no builder; 1 is OpenMP-specific thread-scratch infrastructure; the other 16 are in the residual emitter, which has no accessor for them yet.</p>
-      <div class="op-facts"><span><i>cost as feared</i> 43 signatures</span><span><i>actual</i> one binding, four modules</span><span><i>literal pragmas</i> 66 → 31, ratcheted</span><span><i>gate</i> byte-identity holds</span></div>
+      <div class="op-facts"><span><i>cost as feared</i> 43 signatures</span><span><i>actual</i> one binding, four modules</span><span><i>literal pragmas</i> 66 → 28, ratcheted</span><span><i>gate</i> byte-identity holds</span></div>
     </div>
   </div>
 
@@ -640,7 +656,7 @@
       <tr><td>Emitter input</td><td class="m">a symbolic system</td><td class="m">an 8-member model</td><td><span class="chip c-ok">severed</span></td></tr>
       <tr><td>Driver and packaging</td><td class="m">outside the framework</td><td class="m">pipeline/ · package/</td><td><span class="chip c-ok">inside</span></td></tr>
       <tr><td>Residual paths: shared functions</td><td class="n">26</td><td class="n">48</td><td><span class="chip c-part">upper bound</span></td></tr>
-      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">22,727</td><td><span class="chip c-gap">grew — see below</span></td></tr>
+      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">23,468</td><td><span class="chip c-gap">grew — see below</span></td></tr>
     </tbody>
   </table>
   </div>
