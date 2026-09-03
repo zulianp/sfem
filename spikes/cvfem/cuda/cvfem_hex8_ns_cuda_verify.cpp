@@ -250,16 +250,21 @@ int main(int argc, char **argv) {
         // The matrix is the memory limit at these sizes -- at n=192 it is ~25 GiB -- so
         // build it only while it still fits alongside everything else, and report the
         // matrix-free rows regardless.
+        // The connectivity goes up unconditionally: the standard-mesh kernels need it and
+        // do not need the matrix, so they must keep working past the size where the
+        // matrix stops fitting.
+        std::vector<int32_t> eg2((size_t)8 * d.nelements);
+        for (int v = 0; v < 8; ++v)
+            for (ptrdiff_t e = 0; e < d.nelements; ++e)
+                eg2[(size_t)v * d.nelements + e] = d.elems[v][e];
+        if (cvfem_cuda_attach_elements_global(ctx, eg2.data()) != 0) return 1;
+
         const double bsr_gib = (double)d.nnodes * 27.0 * 16.0 * sizeof(double) / (1 << 30);
         bool with_bsr = false;
         BSR4 tbsr;
         if (bsr_gib < 20.0) {
             tbsr = make_bsr4(d.mesh);
             precompute_element_bsr_slots(d, tbsr);
-            std::vector<int32_t> eg2((size_t)8 * d.nelements);
-            for (int v = 0; v < 8; ++v)
-                for (ptrdiff_t e = 0; e < d.nelements; ++e)
-                    eg2[(size_t)v * d.nelements + e] = d.elems[v][e];
             with_bsr = (cvfem_cuda_bsr_attach(ctx, tbsr.nnz, eg2.data(),
                                               tbsr.element_slots.data(),
                                               tbsr.rowptr, tbsr.colidx) == 0);

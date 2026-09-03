@@ -1777,6 +1777,14 @@ extern "C" double cvfem_cuda_time_jacobian_action_global(cvfem_cuda_ctx *ctx, do
     return time_global_mf(ctx, rho, mu, geom, true, block_size, repeat);
 }
 
+// The standard-mesh matrix-free kernels need the global connectivity but not the matrix.
+// bsr_attach uploads both together, which is fine when a matrix is wanted and wrong when
+// the problem is too large to hold one -- exactly the sizes a saturation sweep reaches.
+extern "C" int cvfem_cuda_attach_elements_global(cvfem_cuda_ctx *ctx, const int32_t *elements) {
+    if (ctx->elements_global) return 0;
+    return device_dup(&ctx->elements_global, elements, (size_t)8 * ctx->nelements);
+}
+
 extern "C" int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
                                         const double *px, const double *py, const double *pz) {
     if (ctx->px) return 0;  // already uploaded, by this or by boundary_attach

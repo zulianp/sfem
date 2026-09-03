@@ -170,6 +170,11 @@ int    cvfem_cuda_jacobian_action_global(cvfem_cuda_ctx *ctx, double rho, double
 double cvfem_cuda_time_jacobian_action_global(cvfem_cuda_ctx *ctx, double rho, double mu,
                                               int geom, int block_size, int repeat);
 
+// Upload the global element->node connectivity on its own. bsr_attach also does this,
+// but it allocates the matrix at the same time, which is not possible at the largest
+// sizes; the standard-mesh matrix-free kernels need the connectivity and not the matrix.
+int cvfem_cuda_attach_elements_global(cvfem_cuda_ctx *ctx, const int32_t *elements);
+
 int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
                              const double *px, const double *py, const double *pz);
 
