@@ -220,8 +220,18 @@ class OpenMPEnergySoASourceBuilder:
     def work_item_loop_lines(self, indent):
         return self.target.work_item_loop_lines(indent)
 
-    def parallel_for_lines(self):
-        return self.target.parallel_element_loop_lines("static")
+    def parallel_for_lines(self, reduction=None):
+        return self.target.parallel_element_loop_lines("static", reduction)
+
+    def atomic_update_lines(self):
+        """The atomic-update pragma, or nothing where the target has none.
+
+        A tuple rather than a string so a target without the concept -- CUDA,
+        which uses ``atomicAdd`` instead -- contributes no line, matching
+        ``simd_lines``.
+        """
+        pragma = self.target.atomic_update_pragma()
+        return () if pragma is None else (pragma,)
 
     def effective_vector_size(self, vector_size):
         return int(vector_size)
@@ -347,7 +357,11 @@ class CUDAEnergySoASourceBuilder:
     def work_item_loop_lines(self, indent):
         return self.target.work_item_loop_lines(indent)
 
-    def parallel_for_lines(self):
+    def parallel_for_lines(self, reduction=None):
+        return ()
+
+    def atomic_update_lines(self):
+        """Nothing: CUDA scatters with ``atomicAdd``, not a pragma."""
         return ()
 
     def effective_vector_size(self, vector_size):

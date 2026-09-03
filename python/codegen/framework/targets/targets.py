@@ -79,7 +79,7 @@ class TargetPlatform:
     def restrict_qualifier(self):
         return ""
 
-    def parallel_for_pragma(self, schedule=None):
+    def parallel_for_pragma(self, schedule=None, reduction=None):
         return None
 
     def vectorize_pragma(self):
@@ -140,8 +140,8 @@ class TargetPlatform:
         )
         return tuple(lines)
 
-    def parallel_element_loop_lines(self, schedule=None):
-        pragma = self.parallel_for_pragma(schedule)
+    def parallel_element_loop_lines(self, schedule=None, reduction=None):
+        pragma = self.parallel_for_pragma(schedule, reduction)
         return () if pragma is None else (pragma,)
 
     def scatter_add_lines(self, lhs, rhs, indent):
@@ -204,10 +204,13 @@ class OpenMPTarget(TargetPlatform):
     def restrict_qualifier(self):
         return "SFEM_RESTRICT"
 
-    def parallel_for_pragma(self, schedule=None):
+    def parallel_for_pragma(self, schedule=None, reduction=None):
+        pragma = "#pragma omp parallel for"
         if schedule:
-            return "#pragma omp parallel for schedule(%s)" % str(schedule)
-        return "#pragma omp parallel for"
+            pragma += " schedule(%s)" % str(schedule)
+        if reduction:
+            pragma += " reduction(%s)" % str(reduction)
+        return pragma
 
     def vectorize_pragma(self):
         return "#pragma omp simd"
@@ -328,7 +331,7 @@ class CUDATarget(TargetPlatform):
     def restrict_qualifier(self):
         return "__restrict__"
 
-    def parallel_for_pragma(self, schedule=None):
+    def parallel_for_pragma(self, schedule=None, reduction=None):
         return None
 
     def vectorize_pragma(self):
