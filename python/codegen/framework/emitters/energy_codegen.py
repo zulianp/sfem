@@ -23,6 +23,7 @@ from codegen.framework.emitters.ast_printer import (
     render_kernel_ast_lines,
 )
 from codegen.framework.targets import current_target
+from codegen.framework.plans.matrix_formats import BSRAssemblyPlan
 from codegen.framework.symbolic.core import (
     ExpressionRole,
     KernelExpressions,
@@ -5604,8 +5605,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
         packed_discover_params = tuple(
             packed_common_params
             + [
-                "const count_t *const SFEM_RESTRICT rowptr",
-                "const idx_t *const SFEM_RESTRICT colidx",
+                "const count_t *const SFEM_RESTRICT %s" % row_pointer,
+                "const idx_t *const SFEM_RESTRICT %s" % column_index,
                 "count_t *const SFEM_RESTRICT packed_element_entries",
             ]
         )
@@ -6206,8 +6207,26 @@ def _counting_loop(name, begin, end, body):
     )
 
 
-def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes):
+def _bsr_reduction_is_atomic(reduction_policy):
+    """How the plan's reduction policy is spelled for this target."""
+    if str(reduction_policy) != "atomic_add":
+        raise ValueError(
+            "unsupported BSR reduction policy '%s'; the emitter can spell "
+            "atomic_add only" % reduction_policy
+        )
+    return True
+
+
+def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=None):
     """Scatter one element block into a BSR matrix.
+
+    The stream names and the reduction come from ``BSRAssemblyPlan``, which is
+    where they are defined; this function spells them.  Its defaults are the
+    names the generated kernels have always used, so the emitted text is
+    unchanged -- but the plan is now the definition point, and changing it
+    changes the kernel rather than requiring an edit here.  That is the same
+    arrangement ``_scalar_crs_matrix_scatter_lines`` has, and it is what takes
+    BSRAssemblyPlan off the unread list.
 
     The format vector problems use, so the one worth having in the IR.  It
     still carries the per-element graph validation OP 10 is about removing:
@@ -6217,6 +6236,12 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes):
     the check goes, what disappears is the IfNode below and the flag it sets,
     and the locate loop simply keeps its result.
     """
+    assembly = BSRAssemblyPlan() if assembly is None else assembly
+    row_pointer = assembly.row_pointer
+    column_index = assembly.column_index
+    value_stream = assembly.value_stream
+    atomic = _bsr_reduction_is_atomic(assembly.reduction_policy)
+
     missing = expr_ref("ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]")
     report = CallNode(
         "std::fprintf",
@@ -6256,7 +6281,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes):
             expr_ref("block[bi * DIM + bj]"),
             expr_ref("element_matrix[row * (DIM * N_SHAPE) + col]"),
             "+=",
-            atomic=True,
+            atomic=atomic,
         ),
     ]
     body = [
@@ -6272,19 +6297,19 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes):
             [
                 BufferDeclNode("const idx_t", "dof_i", (), expr_ref("ev[i]")),
                 BufferDeclNode(
-                    "const count_t", "row_begin", (), expr_ref("rowptr[dof_i]")
+                    "const count_t", "row_begin", (), expr_ref("%s[dof_i]" % row_pointer)
                 ),
                 BufferDeclNode(
                     "const int",
                     "lenrow",
                     (),
-                    expr_ref("(int)(rowptr[dof_i + 1] - row_begin)"),
+                    expr_ref("(int)(%s[dof_i + 1] - row_begin)" % row_pointer),
                 ),
                 BufferDeclNode(
                     "const idx_t *const SFEM_RESTRICT",
                     "cols",
                     (),
-                    expr_ref("&colidx[row_begin]"),
+                    expr_ref("&%s[row_begin]" % column_index),
                 ),
                 CallNode(
                     "%s_find_cols" % function_base, ("ev", "cols", "lenrow", "ks")
@@ -6311,7 +6336,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes):
                             "scalar_t *const",
                             "block",
                             (),
-                            expr_ref("&values[entries[i * N_SHAPE + j] * DIM * DIM]"),
+                            expr_ref("&%s[entries[i * N_SHAPE + j] * DIM * DIM]" % value_stream),
                         ),
                         _counting_loop(
                             "bi",
