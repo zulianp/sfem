@@ -15,8 +15,10 @@ from codegen.framework.plans.generation import (
 from codegen.framework.plans.matrix_formats import CRSAssemblyPlan
 from codegen.framework.ir.kernel_ast import (
     BufferDeclNode,
+    FunctionDefNode,
     LoopKind,
     LoopNode,
+    RawLinesNode,
     ScatterNode,
     expr_ref,
     iteration_range,
@@ -2665,31 +2667,29 @@ def _local_function(
         "int N_SHAPE",
         "int VECTOR_SIZE",
     ]
-    lines = [
-        "template <%s>" % ", ".join(template_params),
-        "%s void %s(" % (_function_qualifier(), function_name),
+    body = [
+        BufferDeclNode("static constexpr int", "DIM", (), expr_ref(str(dim))),
+        BufferDeclNode(
+            "static constexpr int", "N_FIELDS", (), expr_ref(str(n_fields))
+        ),
     ]
-    for index, param in enumerate(params):
-        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
-    lines.extend(
-        [
-            ") {",
-            "    static constexpr int DIM = %d;" % dim,
-            "    static constexpr int N_FIELDS = %d;" % n_fields,
-        ]
-    )
     if tensor_product:
-        lines.extend(
-            _tensor_local_body(
-                system,
-                local_prefix,
-                coefficients,
-                dependencies,
-                stream_layout=stream_layout,
+        body.append(
+            RawLinesNode(
+                tuple(
+                    _tensor_local_body(
+                        system,
+                        local_prefix,
+                        coefficients,
+                        dependencies,
+                        stream_layout=stream_layout,
+                    )
+                ),
+                reason="tensor-product body: hand-written loop nest, not yet IR",
             )
         )
     else:
-        lines.extend(
+        body.extend(
             _simplex_local_body(
                 system,
                 rule,
@@ -2700,8 +2700,34 @@ def _local_function(
                 constant_p1_gradient_expansion=constant_p1_gradient_expansion,
             )
         )
-    lines.append("}")
-    return lines
+
+    # The whole kernel is one tree now: signature and body together, with the
+    # qualifier coming from the target at print time rather than from a string
+    # this function concatenates.  Bodies that have not migrated ride along as
+    # RawLinesNode, which a ratchet counts.
+    return _print_kernel_function(
+        FunctionDefNode(
+            function_name,
+            params=tuple(params),
+            body=tuple(body),
+            qualifier=_function_qualifier(),
+            template_params=tuple(template_params),
+        )
+    )
+
+
+def _print_kernel_function(node):
+    """Render one ``FunctionDefNode``, with the target's vectorize pragma."""
+    target = _target()
+    policy = target.loop_lowering_policy()
+    pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
+    return list(
+        render_kernel_ast_lines(
+            node.name,
+            (node,),
+            printer=CLikeKernelASTPrinter(vectorize_pragma=pragma or ""),
+        )
+    )
 
 
 def _simplex_local_body(
@@ -2716,14 +2742,16 @@ def _simplex_local_body(
     if gradient_metric is None and allow_gradient_metric:
         gradient_metric = simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
     if gradient_metric is not None:
-        return _simplex_gradient_metric_body(system, rule, dependencies, gradient_metric)
+        return (_simplex_gradient_metric_body(system, rule, dependencies, gradient_metric),)
     reference_gradients = constant_p1_simplex_reference_gradients(rule)
     if constant_p1_gradient_expansion and _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
-        return _constant_p1_gradient_expanded_body(
-            system,
-            coefficients,
-            dependencies,
-            reference_gradients,
+        return (
+            _constant_p1_gradient_expanded_body(
+                system,
+                coefficients,
+                dependencies,
+                reference_gradients,
+            ),
         )
 
     dim = system.dim
@@ -2882,7 +2910,7 @@ def _simplex_local_body(
                 % (row, " + ".join(terms))
             )
     lines.extend(["            }", "        }", "    }"])
-    return lines
+    return (RawLinesNode(tuple(lines), reason="generic simplex body: hand-written loop nest, not yet IR"),)
 
 
 def _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
@@ -3024,58 +3052,70 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
                     )
                 )
 
-    return _quadrature_lane_kernel_lines(
-        body, indent="    ", name="constant_p1_gradient_expanded_body"
+    return _quadrature_lane_kernel_node(
+        body, name="constant_p1_gradient_expanded_body"
     )
 
 
-def _quadrature_lane_kernel_lines(lane_body, indent="    ", name="quadrature_lane_body"):
-    """Print a quadrature loop over a vector-lane loop over ``lane_body``.
+def _quadrature_lane_kernel_node(lane_body, name="quadrature_lane_body"):
+    """The quadrature-over-lane loop nest as a node, ready to nest in a function.
 
-    The loop nest is built as a ``KernelAST`` and rendered by the shared
-    printer, rather than assembled as strings.  The lane loop's index, type and
-    vectorisation come from the target's lowering policy, so the emitted text is
-    the same one ``Target.work_item_loop_lines`` produces -- the difference is
-    that the structure is now a tree the printer walks rather than a list of
-    lines this function concatenates.
+    The lane loop's index, type and vectorisation come from the target's
+    lowering policy, so the printed text is the one
+    ``Target.work_item_loop_lines`` produces -- the difference is that the
+    structure is a tree rather than a list of lines.
 
-    Targets whose policy emits no lane loop keep the previous string path: they
-    open a bare block instead of a loop, which the IR has no node for.
+    A target whose policy emits no lane loop opens a bare block instead, which
+    the IR has no node for; that path comes back as a ``RawLinesNode`` so the
+    caller can still treat every kernel body uniformly, and so the gap is
+    counted rather than hidden.
     """
     target = _target()
     policy = target.loop_lowering_policy()
     if not policy.emits_lane_loop:
-        lines = ["%sfor (int q = 0; q < N_QP; ++q) {" % indent]
-        lines.extend(target.work_item_loop_lines(indent + "    "))
         printer = CLikeKernelASTPrinter()
+        lines = ["    for (int q = 0; q < N_QP; ++q) {"]
+        lines.extend(target.work_item_loop_lines("        "))
         for node in lane_body:
-            lines.extend(printer.print_node(node, indent + "        "))
-        lines.extend(["%s    }" % indent, "%s}" % indent])
-        return lines
+            lines.extend(printer.print_node(node, "            "))
+        lines.extend(["        }", "    }"])
+        return RawLinesNode(
+            tuple(lines),
+            reason="target opens a bare work-item block; the IR has no block node",
+        )
 
     lane = iterator(policy.lane_index, policy.lane_index_type)
     quadrature = iterator("q", "int")
     pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
-    ast_lines = render_kernel_ast_lines(
-        name,
-        (
+    return LoopNode(
+        LoopKind.QUADRATURE,
+        quadrature,
+        iteration_range(0, expr_ref("N_QP", "quadrature_count")),
+        pre_increment(quadrature),
+        body=(
             LoopNode(
-                LoopKind.QUADRATURE,
-                quadrature,
-                iteration_range(0, expr_ref("N_QP", "quadrature_count")),
-                pre_increment(quadrature),
-                body=(
-                    LoopNode(
-                        LoopKind.SIMD,
-                        lane,
-                        iteration_range(0, expr_ref("nelems", "tile_extent")),
-                        pre_increment(lane),
-                        body=tuple(lane_body),
-                        vectorized=bool(pragma),
-                    ),
-                ),
+                LoopKind.SIMD,
+                lane,
+                iteration_range(0, expr_ref("nelems", "tile_extent")),
+                pre_increment(lane),
+                body=tuple(lane_body),
+                vectorized=bool(pragma),
             ),
         ),
+    )
+
+
+def _quadrature_lane_kernel_lines(lane_body, indent="    ", name="quadrature_lane_body"):
+    """The printed view of :func:`_quadrature_lane_kernel_node`."""
+    node = _quadrature_lane_kernel_node(lane_body, name=name)
+    if isinstance(node, RawLinesNode):
+        return list(node.lines)
+    target = _target()
+    policy = target.loop_lowering_policy()
+    pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
+    ast_lines = render_kernel_ast_lines(
+        name,
+        (node,),
         printer=CLikeKernelASTPrinter(vectorize_pragma=pragma or ""),
     )
     return ["%s%s" % (indent, line) for line in ast_lines]
@@ -3193,9 +3233,7 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
                 )
             )
 
-    return _quadrature_lane_kernel_lines(
-        body, indent="    ", name="simplex_gradient_metric_body"
-    )
+    return _quadrature_lane_kernel_node(body, name="simplex_gradient_metric_body")
 
 
 def _scaled_cpp_term(factor, expression):

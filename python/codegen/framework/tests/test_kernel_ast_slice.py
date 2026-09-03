@@ -181,13 +181,13 @@ class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
 
     def _capture(self, material_name, element):
         captured = {}
-        original = residual_codegen._quadrature_lane_kernel_lines
+        original = residual_codegen._quadrature_lane_kernel_node
 
-        def capture(lane_body, indent="    ", name="quadrature_lane_body"):
+        def capture(lane_body, name="quadrature_lane_body"):
             captured.setdefault(name, []).extend(lane_body)
-            return original(lane_body, indent=indent, name=name)
+            return original(lane_body, name=name)
 
-        residual_codegen._quadrature_lane_kernel_lines = capture
+        residual_codegen._quadrature_lane_kernel_node = capture
         try:
             import importlib
 
@@ -201,7 +201,7 @@ class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
             plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
             gen.CodeGenerationStage(user_input, plan).run()
         finally:
-            residual_codegen._quadrature_lane_kernel_lines = original
+            residual_codegen._quadrature_lane_kernel_node = original
         return captured
 
     def _assert_all_nodes(self, statements):
