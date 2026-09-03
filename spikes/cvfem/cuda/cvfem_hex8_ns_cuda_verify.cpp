@@ -19,9 +19,7 @@
 
 #include "cvfem_hex8_layout_common.hpp"
 #include "cvfem_hex8_layout_atomic.hpp"
-#include "cvfem_hex8_layout_packed.hpp"
 #include "cvfem_pack_coloring.hpp"
-#include "cvfem_hex8_layout_store.hpp"
 #include "cvfem_hex8_boundary_scs.hpp"
 #include "cvfem_element_coloring.hpp"
 

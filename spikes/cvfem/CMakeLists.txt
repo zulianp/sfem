@@ -97,16 +97,6 @@ foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baselin
     target_include_directories(${_cvfem_tgt} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
-set(_cvfem_solver_opts)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    list(APPEND _cvfem_solver_opts -O3 -DNDEBUG -funroll-loops)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
-        list(APPEND _cvfem_solver_opts -mcpu=native -mtune=native)
-    else()
-        list(APPEND _cvfem_solver_opts -march=native -mtune=native)
-    endif()
-endif()
-
 # How much of the matrix the velocity-dependent half ever touches.
 add_executable(nlcover nlcover.cpp)
 target_link_libraries(nlcover PRIVATE SFEM::sfem
