@@ -1,6 +1,12 @@
 #ifndef CVFEM_HEX8_LAYOUT_COMMON_HPP
 #define CVFEM_HEX8_LAYOUT_COMMON_HPP
 
+// See the note at the top of cvfem_hex8_ns_core.hpp: this benchmark family and the
+// solver core share sixteen names and disagree on the physics behind several of them.
+#if defined(CVFEM_HEX8_NS_CORE_HPP)
+#error "cvfem_hex8_layout_*.hpp (benchmark) and cvfem_hex8_ns_core.hpp (solver) define the same names with different physics -- include one family per translation unit."
+#endif
+
 // Shared foundation for the HEX8 CVFEM Navier-Stokes assembly/apply layouts.
 //
 // Holds everything the layouts have in common: the mesh and matrix containers,

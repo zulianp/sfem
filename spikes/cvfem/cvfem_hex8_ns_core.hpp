@@ -1,4 +1,17 @@
 #pragma once
+
+// Two families of HEX8 CVFEM headers live in this directory and they are not
+// interchangeable. This one backs the steady solver and the sfem::Op; the
+// cvfem_hex8_layout_*.hpp family backs the throughput benchmark. They define sixteen
+// of the same names -- MeshData, BSR4, GeomKind, assemble_jacobian_atomic_sumfact and
+// the residual entry points among them -- and the assembly ones differ in physics, not
+// just in layout: the benchmark's carry no boundary sub-control-surface or Rhie-Chow
+// terms, because the benchmark has no boundaries to close. Including both would
+// otherwise produce a page of redefinition errors that says nothing about why.
+#if defined(CVFEM_HEX8_LAYOUT_COMMON_HPP)
+#error "cvfem_hex8_ns_core.hpp (solver) and cvfem_hex8_layout_*.hpp (benchmark) define the same names with different physics -- include one family per translation unit. Drivers that only need the operator should include cvfem_hex8_ns_op.hpp instead, which exposes neither."
+#endif
+#define CVFEM_HEX8_NS_CORE_HPP
 // Core of the HEX8 CVFEM Navier-Stokes spike: mesh state, kernels, assembly and
 // the verification helpers. Split out of cvfem_hex8_ns_steady.cpp so that a second
 // translation unit -- the sfem::Op wrapper -- can drive the same code. Moving code

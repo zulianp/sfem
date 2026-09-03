@@ -1,5 +1,8 @@
 #include "cvfem_hex8_ns_op.hpp"
 
+// The core is included here and nowhere a driver can see it. See the note in the header.
+#include "cvfem_hex8_ns_core.hpp"
+
 #include "smesh_mesh.hpp"
 
 #include <algorithm>
@@ -7,7 +10,36 @@
 
 namespace sfem {
 
-    CVFEMNavierStokes::CVFEMNavierStokes(const std::shared_ptr<FunctionSpace> &space) : space_(space) {}
+    static_assert(sizeof(real_t) == sizeof(scalar_t),
+                  "CVFEMNavierStokes hands sfem buffers straight to the CVFEM kernels, which are compiled "
+                  "for double; a float32 real_t build would need a conversion layer.");
+
+    namespace {
+        GeomKind to_geom_kind(const CVFEMGeometry g) {
+            return (g == CVFEMGeometry::Isoparam) ? GeomKind::Isoparam : GeomKind::Affine;
+        }
+    }  // namespace
+
+    class CVFEMNavierStokes::Impl {
+    public:
+        std::shared_ptr<FunctionSpace> space;
+        MeshData                       d;
+        // MeshData holds bare pointers into these, so the Op has to own them.
+        PackedData   packed;
+        PackColoring coloring;
+        BSR4         bsr;  // slot caches only; values come from the caller
+        bool         initialized{false};
+
+        // Scratch for the block-diagonal assembly, kept so a smoother rebuilding the
+        // preconditioner each Newton step does not reallocate n_nodes * 16 every time.
+        std::vector<scalar_t> diag_scratch;
+    };
+
+    CVFEMNavierStokes::CVFEMNavierStokes(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
+        impl_->space = space;
+    }
+
+    CVFEMNavierStokes::~CVFEMNavierStokes() = default;
 
     std::unique_ptr<Op> CVFEMNavierStokes::create(const std::shared_ptr<FunctionSpace> &space) {
         if (space->block_size() != N_FIELDS) {
@@ -17,114 +49,113 @@ namespace sfem {
         return std::make_unique<CVFEMNavierStokes>(space);
     }
 
-    void CVFEMNavierStokes::sync_scheme_parameters() {
-        d_.rhie_chow_scale = rhie_chow_scale;
-    }
+    ptrdiff_t CVFEMNavierStokes::n_dofs_domain() const { return impl_->space->n_dofs(); }
+    ptrdiff_t CVFEMNavierStokes::n_dofs_image() const { return impl_->space->n_dofs(); }
 
     int CVFEMNavierStokes::initialize(const std::vector<std::string> & /*block_names*/) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::initialize");
 
-        auto mesh = space_->mesh_ptr();
+        auto &d    = impl_->d;
+        auto  mesh = impl_->space->mesh_ptr();
         if (!mesh || mesh->element_type(0) != smesh::HEX8) {
             SFEM_ERROR("cvfem:NavierStokes requires a HEX8 mesh\n");
             return SFEM_FAILURE;
         }
 
-        d_.mesh      = mesh;
-        d_.nnodes    = mesh->n_nodes();
-        d_.nelements = mesh->n_elements(0);
-        d_.elems     = mesh->elements(0)->data();
-        d_.points    = mesh->points()->data();
+        d.mesh      = mesh;
+        d.nnodes    = mesh->n_nodes();
+        d.nelements = mesh->n_elements(0);
+        d.elems     = mesh->elements(0)->data();
+        d.points    = mesh->points()->data();
 
         // The boundary sub-control-surface treatment closes the control volumes on the
-        // domain faces, and it identifies those faces by comparing node coordinates
-        // against the extents. The driver passes them in from its own channel geometry;
-        // here they come from the mesh, so the Op works on any box without being told.
+        // domain faces, and identifies those faces by comparing node coordinates against
+        // the extents. The driver passes them in from its own channel geometry; here they
+        // come from the mesh, so the Op works on any box without being told.
         {
-            const auto *const px = d_.points[0];
-            const auto *const py = d_.points[1];
-            const auto *const pz = d_.points[2];
+            const auto *const px    = d.points[0];
+            const auto *const py    = d.points[1];
+            const auto *const pz    = d.points[2];
             scalar_t          hi[3] = {0, 0, 0};
-            for (ptrdiff_t i = 0; i < d_.nnodes; ++i) {
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
                 hi[0] = std::max(hi[0], (scalar_t)px[i]);
                 hi[1] = std::max(hi[1], (scalar_t)py[i]);
                 hi[2] = std::max(hi[2], (scalar_t)pz[i]);
             }
-            d_.Lx = hi[0];
-            d_.Ly = hi[1];
-            d_.Lz = hi[2];
+            d.Lx = hi[0];
+            d.Ly = hi[1];
+            d.Lz = hi[2];
         }
 
-        sync_scheme_parameters();
+        d.rhie_chow_scale = rhie_chow_scale;
 
-        d_.ux.assign((size_t)d_.nnodes, scalar_t(0));
-        d_.uy.assign((size_t)d_.nnodes, scalar_t(0));
-        d_.uz.assign((size_t)d_.nnodes, scalar_t(0));
-        d_.p.assign((size_t)d_.nnodes, scalar_t(0));
-        d_.rx.assign((size_t)d_.nnodes, scalar_t(0));
-        d_.ry.assign((size_t)d_.nnodes, scalar_t(0));
-        d_.rz.assign((size_t)d_.nnodes, scalar_t(0));
-        d_.rc.assign((size_t)d_.nnodes, scalar_t(0));
+        d.ux.assign((size_t)d.nnodes, scalar_t(0));
+        d.uy.assign((size_t)d.nnodes, scalar_t(0));
+        d.uz.assign((size_t)d.nnodes, scalar_t(0));
+        d.p.assign((size_t)d.nnodes, scalar_t(0));
+        d.rx.assign((size_t)d.nnodes, scalar_t(0));
+        d.ry.assign((size_t)d.nnodes, scalar_t(0));
+        d.rz.assign((size_t)d.nnodes, scalar_t(0));
+        d.rc.assign((size_t)d.nnodes, scalar_t(0));
 
-        if (geom == GeomKind::Affine) {
-            cvfem_hex8_precompute_affine_geometry(d_);
+        if (to_geom_kind(geom) == GeomKind::Affine) {
+            cvfem_hex8_precompute_affine_geometry(d);
             if (pack_size > 0) {
-                packed_    = make_packed(d_.mesh, pack_size);
-                d_.packed  = &packed_;
-                coloring_  = cvfem_build_pack_coloring(packed_.n_packs,
-                                                      packed_.owned_nodes_ptr,
-                                                      packed_.ghost_ptr,
-                                                      packed_.ghost_idx);
-                d_.coloring = &coloring_;
+                impl_->packed   = make_packed(d.mesh, pack_size);
+                d.packed        = &impl_->packed;
+                impl_->coloring = cvfem_build_pack_coloring(impl_->packed.n_packs,
+                                                           impl_->packed.owned_nodes_ptr,
+                                                           impl_->packed.ghost_ptr,
+                                                           impl_->packed.ghost_idx);
+                d.coloring      = &impl_->coloring;
             }
         }
 
-        // The sparsity is the space's own node-to-node graph, which is also what
-        // hessian_bsr is handed, so the element-to-slot map can be built once here.
-        bsr_.graph  = d_.mesh->node_to_node_graph();
-        bsr_.rowptr = bsr_.graph->rowptr()->data();
-        bsr_.colidx = bsr_.graph->colidx()->data();
-        bsr_.nnz    = bsr_.graph->nnz();
-        precompute_element_bsr_slots(d_, bsr_);
+        // The sparsity is the mesh's node-to-node graph, which is also what hessian_bsr
+        // is handed, so the element-to-slot map can be built once here.
+        impl_->bsr.graph  = d.mesh->node_to_node_graph();
+        impl_->bsr.rowptr = impl_->bsr.graph->rowptr()->data();
+        impl_->bsr.colidx = impl_->bsr.graph->colidx()->data();
+        impl_->bsr.nnz    = impl_->bsr.graph->nnz();
+        precompute_element_bsr_slots(d, impl_->bsr);
 
-        initialized_ = true;
+        impl_->initialized = true;
         return SFEM_SUCCESS;
     }
 
     int CVFEMNavierStokes::update(const real_t *const x) {
-        if (!initialized_) return SFEM_FAILURE;
-        sync_scheme_parameters();
-        unpack_fields(d_, x);
-        assemble_nodal_p_grad(d_, geom);
+        if (!impl_->initialized) return SFEM_FAILURE;
+        impl_->d.rhie_chow_scale = rhie_chow_scale;
+        unpack_fields(impl_->d, x);
+        assemble_nodal_p_grad(impl_->d, to_geom_kind(geom));
         return SFEM_SUCCESS;
     }
 
     int CVFEMNavierStokes::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::gradient");
-        if (!initialized_) return SFEM_FAILURE;
-        sync_scheme_parameters();
-        unpack_fields(d_, x);
-        apply_residual(d_, rho, mu, geom);
+        if (!impl_->initialized) return SFEM_FAILURE;
+        impl_->d.rhie_chow_scale = rhie_chow_scale;
+        unpack_fields(impl_->d, x);
+        apply_residual(impl_->d, rho, mu, to_geom_kind(geom));
         // sfem::Op accumulates into out, so add rather than overwrite.
-        add_residual(d_, out);
+        add_residual(impl_->d, out);
         return SFEM_SUCCESS;
     }
 
     int CVFEMNavierStokes::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::apply");
-        if (!initialized_) return SFEM_FAILURE;
-        sync_scheme_parameters();
-        unpack_fields(d_, x);
-        assemble_nodal_p_grad(d_, geom);
-        apply_jacobian_action_accumulate(d_, rho, mu, geom, h, out);
+        if (!impl_->initialized) return SFEM_FAILURE;
+        impl_->d.rhie_chow_scale = rhie_chow_scale;
+        unpack_fields(impl_->d, x);
+        assemble_nodal_p_grad(impl_->d, to_geom_kind(geom));
+        apply_jacobian_action_accumulate(impl_->d, rho, mu, to_geom_kind(geom), h, out);
         return SFEM_SUCCESS;
     }
 
-    int CVFEMNavierStokes::value(const real_t * /*x*/, real_t *const out) {
+    int CVFEMNavierStokes::value(const real_t * /*x*/, real_t *const /*out*/) {
         // Steady Navier-Stokes is not the stationary point of an energy, so there is no
-        // value to report. Returning zero rather than erroring keeps Function::value
+        // value to contribute. Succeeding rather than erroring keeps Function::value
         // usable for the other operators in the same Function.
-        if (out) *out += 0;
         return SFEM_SUCCESS;
     }
 
@@ -141,40 +172,40 @@ namespace sfem {
                                        const idx_t *const   colidx,
                                        real_t *const        values) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::hessian_bsr");
-        if (!initialized_) return SFEM_FAILURE;
-        sync_scheme_parameters();
-        unpack_fields(d_, x);
+        if (!impl_->initialized) return SFEM_FAILURE;
+        impl_->d.rhie_chow_scale = rhie_chow_scale;
+        unpack_fields(impl_->d, x);
 
-        // The slot caches were built against the space's graph in initialize(); assembly
-        // writes through external_values into the caller's buffer.
-        bsr_.rowptr          = rowptr;
-        bsr_.colidx          = colidx;
-        bsr_.external_values = values;
-        // Accumulate: Function::hessian_bsr shares one buffer across operators.
-        assemble_jacobian(d_, bsr_, rho, mu, geom, /*zero_first=*/false);
-        bsr_.external_values = nullptr;
+        // The slot caches were built against the mesh graph in initialize(); assembly
+        // writes through external_values into the caller's buffer. Accumulate, because
+        // Function::hessian_bsr shares one buffer across operators.
+        impl_->bsr.rowptr          = rowptr;
+        impl_->bsr.colidx          = colidx;
+        impl_->bsr.external_values = values;
+        assemble_jacobian(impl_->d, impl_->bsr, rho, mu, to_geom_kind(geom), /*zero_first=*/false);
+        impl_->bsr.external_values = nullptr;
         return SFEM_SUCCESS;
     }
 
     int CVFEMNavierStokes::hessian_block_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::hessian_block_diag");
-        if (!initialized_) return SFEM_FAILURE;
-        sync_scheme_parameters();
-        unpack_fields(d_, x);
-        std::vector<scalar_t> blocks;
-        assemble_block_diag(d_, rho, mu, geom, blocks);
+        if (!impl_->initialized) return SFEM_FAILURE;
+        impl_->d.rhie_chow_scale = rhie_chow_scale;
+        unpack_fields(impl_->d, x);
+        assemble_block_diag(impl_->d, rho, mu, to_geom_kind(geom), impl_->diag_scratch);
+        const auto &blocks = impl_->diag_scratch;
         for (size_t i = 0; i < blocks.size(); ++i) values[i] += blocks[i];
         return SFEM_SUCCESS;
     }
 
     int CVFEMNavierStokes::hessian_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::hessian_diag");
-        if (!initialized_) return SFEM_FAILURE;
-        sync_scheme_parameters();
-        unpack_fields(d_, x);
-        std::vector<scalar_t> blocks;
-        assemble_block_diag(d_, rho, mu, geom, blocks);
-        for (ptrdiff_t i = 0; i < d_.nnodes; ++i) {
+        if (!impl_->initialized) return SFEM_FAILURE;
+        impl_->d.rhie_chow_scale = rhie_chow_scale;
+        unpack_fields(impl_->d, x);
+        assemble_block_diag(impl_->d, rho, mu, to_geom_kind(geom), impl_->diag_scratch);
+        const auto &blocks = impl_->diag_scratch;
+        for (ptrdiff_t i = 0; i < impl_->d.nnodes; ++i) {
             const scalar_t *const blk = blocks.data() + (size_t)i * 16;
             for (int c = 0; c < N_FIELDS; ++c) values[(size_t)i * N_FIELDS + c] += blk[c * 4 + c];
         }
@@ -183,23 +214,20 @@ namespace sfem {
 
     std::shared_ptr<Op> CVFEMNavierStokes::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::derefine_op");
-        // Rediscretisation, not Galerkin coarsening. That is not a stylistic choice here:
-        // the Rhie-Chow coefficient carries h^2/(2 mu) explicitly, so the coarse pressure
+        // Rediscretisation, not Galerkin coarsening. Not a stylistic choice: the
+        // Rhie-Chow coefficient carries h^2/(2 mu) explicitly, so the coarse pressure
         // operator differs from the fine one by roughly 8x per level in 3D. Assembling
         // the CVFEM operator on the coarse mesh gets that right; P^T A P would inherit
         // the fine-grid stabilisation and be inconsistent.
-        auto ret             = std::make_shared<CVFEMNavierStokes>(space);
-        ret->rho             = rho;
-        ret->mu              = mu;
-        ret->rhie_chow_scale = rhie_chow_scale;
-        ret->geom            = geom;
-        ret->pack_size       = pack_size;
+        auto ret = std::static_pointer_cast<CVFEMNavierStokes>(clone_onto(space));
         ret->initialize();
         return ret;
     }
 
-    std::shared_ptr<Op> CVFEMNavierStokes::clone() const {
-        auto ret             = std::make_shared<CVFEMNavierStokes>(space_);
+    std::shared_ptr<Op> CVFEMNavierStokes::clone() const { return clone_onto(impl_->space); }
+
+    std::shared_ptr<Op> CVFEMNavierStokes::clone_onto(const std::shared_ptr<FunctionSpace> &space) const {
+        auto ret             = std::make_shared<CVFEMNavierStokes>(space);
         ret->rho             = rho;
         ret->mu              = mu;
         ret->rhie_chow_scale = rhie_chow_scale;

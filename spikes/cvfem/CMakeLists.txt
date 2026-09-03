@@ -163,6 +163,15 @@ target_compile_options(cvfem_ns_op_gate PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_op_gate)
 add_test(NAME cvfem_ns_op_gate COMMAND cvfem_ns_op_gate)
 
+# Compile-time proof that the operator header is usable from any driver: it leaks none
+# of the solver core, and it coexists with the benchmark's layout family. Failure mode
+# is a build error, which is the point.
+add_executable(cvfem_ns_op_isolation cvfem_ns_op_isolation.cpp)
+target_link_libraries(cvfem_ns_op_isolation PRIVATE cvfem_ns_op)
+target_compile_options(cvfem_ns_op_isolation PRIVATE ${_cvfem_perf_opts})
+cvfem_subpar_target(cvfem_ns_op_isolation)
+add_test(NAME cvfem_ns_op_isolation COMMAND cvfem_ns_op_isolation)
+
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 

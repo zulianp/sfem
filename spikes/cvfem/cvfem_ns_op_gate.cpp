@@ -12,6 +12,10 @@
 
 #include "cvfem_hex8_ns_op.hpp"
 
+// The gate needs the reference path too, so unlike a driver it includes the core
+// deliberately. Anything that only wants the operator includes the header above alone.
+#include "cvfem_hex8_ns_core.hpp"
+
 #include "sfem_context.hpp"
 
 #include <cmath>
@@ -139,7 +143,8 @@ int main(int argc, char **argv) {
             op->rho             = rho;
             op->mu              = mu;
             op->rhie_chow_scale = rc_scale;
-            op->geom            = geom;
+            op->geom            = (geom == GeomKind::Isoparam) ? sfem::CVFEMGeometry::Isoparam
+                                                              : sfem::CVFEMGeometry::Affine;
             op->pack_size       = pack_size;
             op->initialize();
 
