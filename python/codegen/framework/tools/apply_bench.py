@@ -110,6 +110,8 @@ DRIVER = r"""
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
+#include <utility>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -135,6 +137,29 @@ int @PREFIX@_jacobian_action_affine_mesh_soa(
     const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const, const geom_t *const, const geom_t *const,
     const geom_t *const,
+    const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
+int @PREFIX@_jacobian_action_packed_affine_mesh_soa(
+    const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t,
+    uint16_t **const, const ptrdiff_t *const, const ptrdiff_t *const,
+    const ptrdiff_t *const, const idx_t *const,
+    const geom_t *const, const geom_t *const, const geom_t *const,
+    const geom_t *const, const geom_t *const, const geom_t *const,
+    const geom_t *const, const geom_t *const, const geom_t *const,
+    const geom_t *const,
+    const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
+int @PREFIX@_jacobian_action_packed_isoparametric_mesh_soa(
+    const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t,
+    uint16_t **const, const ptrdiff_t *const, const ptrdiff_t *const,
+    const ptrdiff_t *const, const idx_t *const,
+    const geom_t *const *const,
+    const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
+int @PREFIX@_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
+    const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t, const ptrdiff_t,
+    uint16_t **const, const ptrdiff_t *const, const ptrdiff_t *const,
+    const ptrdiff_t *const, const idx_t *const,
+    const ptrdiff_t, const ptrdiff_t, const ptrdiff_t *const, const ptrdiff_t *const,
+    const idx_t *const, double *const,
+    const geom_t *const *const,
     const double, const ptrdiff_t, const double *const, const ptrdiff_t, double *const);
 int @PREFIX@_jacobian_action_affine_mesh_soa_float(
     const ptrdiff_t, const ptrdiff_t, idx_t **const,
@@ -204,6 +229,115 @@ static Mesh build_grid(int n) {
     return m;
 }
 
+// A packed partition of the grid.
+//
+// The kernel requires each pack's owned nodes to be one contiguous *global*
+// range, and the owned nodes that other packs also touch to sit at the END of
+// that range (the write-back loop does the first n_contiguous - n_shared
+// non-atomically and the rest atomically).  Node layers make that work: layer j
+// is owned by the pack holding element layer j-1, so a pack owns layers
+// [p*L+1, top] -- contiguous -- and its single shared layer is the top one,
+// which the next pack ghosts.  Pack 0 additionally owns layer 0.
+struct Packed {
+    ptrdiff_t n_packs = 0, n_elements_per_pack = 0, max_nodes_per_pack = 0;
+    std::vector<std::vector<uint16_t>> elements;   // local indices, 8 rows
+    std::vector<uint16_t *> element_ptrs;
+    std::vector<ptrdiff_t> owned_nodes_ptr;        // n_packs + 1
+    std::vector<ptrdiff_t> n_shared_nodes;         // n_packs
+    std::vector<ptrdiff_t> ghost_ptr;              // n_packs + 1
+    std::vector<idx_t> ghost_idx;
+    // Two-pass ghost reduction, grouping ghost slots by destination node.
+    ptrdiff_t n_ghost_entries = 0, n_ghost_reduce_rows = 0;
+    std::vector<ptrdiff_t> ghost_reduce_ptr;
+    std::vector<ptrdiff_t> ghost_reduce_idx;
+    std::vector<idx_t> ghost_reduce_dest;
+    std::vector<double> ghost_buf;
+};
+
+static Packed build_packed(const Mesh &m, int n, int layers_per_pack) {
+    Packed p;
+    const int nn = n + 1;
+    const ptrdiff_t layer_nodes = (ptrdiff_t)nn * nn;
+    const int L = std::max(1, layers_per_pack);
+    p.n_packs = (n + L - 1) / L;
+    p.n_elements_per_pack = (ptrdiff_t)L * n * n;
+    p.elements.assign(8, std::vector<uint16_t>(m.nelements));
+    p.owned_nodes_ptr.assign(p.n_packs + 1, 0);
+    p.n_shared_nodes.assign(p.n_packs, 0);
+    p.ghost_ptr.assign(p.n_packs + 1, 0);
+
+    // Owned node layers per pack: [first, last] inclusive.
+    std::vector<int> first(p.n_packs), last(p.n_packs);
+    for (ptrdiff_t q = 0; q < p.n_packs; ++q) {
+        first[q] = (q == 0) ? 0 : (int)(q * L + 1);
+        last[q] = (int)std::min<ptrdiff_t>((q + 1) * L, n);
+    }
+    for (ptrdiff_t q = 0; q < p.n_packs; ++q) {
+        p.owned_nodes_ptr[q + 1] =
+            p.owned_nodes_ptr[q] + (ptrdiff_t)(last[q] - first[q] + 1) * layer_nodes;
+        // The top layer is ghosted by the next pack, so it is shared; the last
+        // pack's top layer belongs to nobody else.
+        p.n_shared_nodes[q] = (q + 1 < p.n_packs) ? layer_nodes : 0;
+        const ptrdiff_t n_ghost = (q == 0) ? 0 : layer_nodes;
+        p.ghost_ptr[q + 1] = p.ghost_ptr[q] + n_ghost;
+    }
+    p.ghost_idx.resize(p.ghost_ptr[p.n_packs]);
+    for (ptrdiff_t q = 1; q < p.n_packs; ++q) {
+        const ptrdiff_t base = (ptrdiff_t)(q * L) * layer_nodes;  // the ghosted layer
+        for (ptrdiff_t k = 0; k < layer_nodes; ++k)
+            p.ghost_idx[p.ghost_ptr[q] + k] = (idx_t)(base + k);
+    }
+
+    // Local index of a global node within its pack.
+    auto local_of = [&](ptrdiff_t q, idx_t global) -> uint16_t {
+        const ptrdiff_t owned_begin = (ptrdiff_t)first[q] * layer_nodes;
+        const ptrdiff_t owned_end = (ptrdiff_t)(last[q] + 1) * layer_nodes;
+        if (global >= owned_begin && global < owned_end)
+            return (uint16_t)(global - owned_begin);
+        const ptrdiff_t n_contiguous = p.owned_nodes_ptr[q + 1] - p.owned_nodes_ptr[q];
+        const ptrdiff_t ghost_base = (ptrdiff_t)(q * L) * layer_nodes;
+        return (uint16_t)(n_contiguous + (global - ghost_base));
+    };
+
+    for (ptrdiff_t e = 0; e < m.nelements; ++e) {
+        const ptrdiff_t q = e / p.n_elements_per_pack;
+        for (int i = 0; i < 8; ++i)
+            p.elements[i][e] = local_of(q, m.elements[i][e]);
+    }
+    for (auto &row : p.elements) p.element_ptrs.push_back(row.data());
+    for (ptrdiff_t q = 0; q < p.n_packs; ++q) {
+        const ptrdiff_t total = (p.owned_nodes_ptr[q + 1] - p.owned_nodes_ptr[q]) +
+                                (p.ghost_ptr[q + 1] - p.ghost_ptr[q]);
+        p.max_nodes_per_pack = std::max(p.max_nodes_per_pack, total);
+    }
+
+    // Two-pass reduction. Instead of atomics on the ghost write-back, each pack
+    // deposits its ghost contributions at ghost_buf[ghost_ptr[pack] + k], and a
+    // second pass sums every slot belonging to the same destination node. That
+    // needs the inverse of ghost_idx: slots grouped by the node they land on.
+    p.n_ghost_entries = p.ghost_ptr[p.n_packs];
+    std::vector<std::pair<idx_t, ptrdiff_t>> by_dest;
+    by_dest.reserve(p.n_ghost_entries);
+    for (ptrdiff_t s = 0; s < p.n_ghost_entries; ++s)
+        by_dest.emplace_back(p.ghost_idx[s], s);
+    std::sort(by_dest.begin(), by_dest.end());
+    p.ghost_reduce_ptr.push_back(0);
+    for (size_t i = 0; i < by_dest.size();) {
+        const idx_t dest = by_dest[i].first;
+        size_t j = i;
+        while (j < by_dest.size() && by_dest[j].first == dest) {
+            p.ghost_reduce_idx.push_back(by_dest[j].second);
+            ++j;
+        }
+        p.ghost_reduce_dest.push_back(dest);
+        p.ghost_reduce_ptr.push_back((ptrdiff_t)p.ghost_reduce_idx.size());
+        i = j;
+    }
+    p.n_ghost_reduce_rows = (ptrdiff_t)p.ghost_reduce_dest.size();
+    p.ghost_buf.assign(std::max<ptrdiff_t>(p.n_ghost_entries, 1), 0.0);
+    return p;
+}
+
 static double norm_inf(const std::vector<double> &a) {
     double worst = 0.0;
     for (double v : a) worst = std::fmax(worst, std::fabs(v));
@@ -223,8 +357,12 @@ static double rel_diff(const std::vector<double> &a, const std::vector<double> &
 // that derive the element metric differently therefore agree only to geometry
 // precision, even when both compute in double.
 enum class Tolerance {
-    EXACT,      // same geometry path, same precision: must agree bit for bit
-    GEOMETRY,   // different geometry path: limited by float geom_t
+    EXACT,      // identical arithmetic in identical order: must agree bit for bit
+    ROUNDOFF,   // same mathematics, different summation order -- a packed
+                // traversal accumulates per pack and then reduces, and floating
+                // point addition is not associative, so it lands within a few
+                // ulp rather than exactly
+    GEOMETRY,   // different metric derivation: limited by float geom_t
     FLOAT,      // single-precision kernel: limited by the accumulation
 };
 
@@ -238,6 +376,7 @@ struct Result {
 static double tolerance_value(Tolerance t) {
     switch (t) {
         case Tolerance::EXACT: return 0.0;
+        case Tolerance::ROUNDOFF: return 1e-13;
         case Tolerance::GEOMETRY: return 1e-5;
         case Tolerance::FLOAT: return 1e-4;
     }
@@ -247,6 +386,7 @@ static double tolerance_value(Tolerance t) {
 static const char *tolerance_name(Tolerance t) {
     switch (t) {
         case Tolerance::EXACT: return "exact";
+        case Tolerance::ROUNDOFF: return "roundoff";
         case Tolerance::GEOMETRY: return "geometry(float)";
         case Tolerance::FLOAT: return "float";
     }
@@ -254,6 +394,8 @@ static const char *tolerance_name(Tolerance t) {
 }
 
 int main(int argc, char **argv) {
+    // Unbuffered: if a kernel faults, the progress printed so far must survive.
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
     const int n = (argc > 1) ? std::atoi(argv[1]) : 12;
     const int repeats = (argc > 2) ? std::atoi(argv[2]) : 5;
     Mesh m = build_grid(n);
@@ -333,6 +475,38 @@ int main(int argc, char **argv) {
         return @PREFIX@_jacobian_action_isoparametric_mesh_aos_float(
             m.nelements, m.nnodes, m.element_ptrs.data(), m.point_ptrs.data(),
             parameters_f, xf.data(), o.data()); });
+
+    Packed pk = build_packed(m, n, std::max(1, n / 8));
+    std::printf("packed: %lld packs of %lld elements, max %lld nodes per pack\n\n",
+                (long long)pk.n_packs, (long long)pk.n_elements_per_pack,
+                (long long)pk.max_nodes_per_pack);
+
+    run_double("packed_affine_mesh_soa", Tolerance::GEOMETRY, [&](std::vector<double> &o) {
+        return @PREFIX@_jacobian_action_packed_affine_mesh_soa(
+            pk.n_packs, pk.n_elements_per_pack, m.nelements, m.nnodes, pk.max_nodes_per_pack,
+            pk.element_ptrs.data(), pk.owned_nodes_ptr.data(), pk.n_shared_nodes.data(),
+            pk.ghost_ptr.data(), pk.ghost_idx.data(),
+            m.adjugate[0].data(), m.adjugate[1].data(), m.adjugate[2].data(),
+            m.adjugate[3].data(), m.adjugate[4].data(), m.adjugate[5].data(),
+            m.adjugate[6].data(), m.adjugate[7].data(), m.adjugate[8].data(),
+            m.determinant.data(), kappa, 1, x.data(), 1, o.data()); });
+
+    run_double("packed_isoparametric_mesh_soa", Tolerance::ROUNDOFF, [&](std::vector<double> &o) {
+        return @PREFIX@_jacobian_action_packed_isoparametric_mesh_soa(
+            pk.n_packs, pk.n_elements_per_pack, m.nelements, m.nnodes, pk.max_nodes_per_pack,
+            pk.element_ptrs.data(), pk.owned_nodes_ptr.data(), pk.n_shared_nodes.data(),
+            pk.ghost_ptr.data(), pk.ghost_idx.data(),
+            m.point_ptrs.data(), kappa, 1, x.data(), 1, o.data()); });
+
+    run_double("packed_two_pass_isoparametric_mesh_soa", Tolerance::ROUNDOFF, [&](std::vector<double> &o) {
+        std::fill(pk.ghost_buf.begin(), pk.ghost_buf.end(), 0.0);
+        return @PREFIX@_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
+            pk.n_packs, pk.n_elements_per_pack, m.nelements, m.nnodes, pk.max_nodes_per_pack,
+            pk.element_ptrs.data(), pk.owned_nodes_ptr.data(), pk.n_shared_nodes.data(),
+            pk.ghost_ptr.data(), pk.ghost_idx.data(),
+            pk.n_ghost_entries, pk.n_ghost_reduce_rows, pk.ghost_reduce_ptr.data(),
+            pk.ghost_reduce_idx.data(), pk.ghost_reduce_dest.data(), pk.ghost_buf.data(),
+            m.point_ptrs.data(), kappa, 1, x.data(), 1, o.data()); });
 
     std::printf("throughput\n");
     for (const Result &r : results)
