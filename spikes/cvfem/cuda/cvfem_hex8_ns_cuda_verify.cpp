@@ -771,6 +771,52 @@ int main(int argc, char **argv) {
         if (t_pack_r > 0 && t_glob_r > 0)
             std::printf("packed mesh is %.2fx the standard mesh on the residual, %.2fx on J*v\n",
                         t_glob_r / t_pack_r, (t_pack_j > 0 && t_glob_j > 0) ? t_glob_j / t_pack_j : 0.0);
+
+        // ---- the same question for assembly ---------------------------------
+        //
+        // Assembly writes 64 blocks x 16 doubles per element and reads 32 doubles, so
+        // the write side dominates and is identical in both forms. What is being
+        // compared is purely the gather.
+        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        std::vector<double> asm_ref(bsr.values->data(), bsr.values->data() + (size_t)bsr.nnz * 16);
+        double amax = 0;
+        for (double v : asm_ref) amax = std::fmax(amax, std::fabs(v));
+        std::vector<double> asm_dev(asm_ref.size());
+
+        struct ARow { const char *name; bool packed; int variant; };
+        const ARow rows_asm[] = {
+            {"assembly, standard mesh (handwritten)", false, CVFEM_CUDA_JAC_HANDWRITTEN},
+            {"assembly, packed mesh   (handwritten)", true,  CVFEM_CUDA_JAC_HANDWRITTEN},
+            {"assembly, standard mesh (sympy)",       false, CVFEM_CUDA_JAC_SYMPY},
+            {"assembly, packed mesh   (sympy)",       true,  CVFEM_CUDA_JAC_SYMPY},
+        };
+        double t_asm[4] = {0, 0, 0, 0};
+        int    ai       = 0;
+        for (const auto &ar : rows_asm) {
+            const int rc = ar.packed
+                    ? cvfem_cuda_assemble_packed(ctx, rho, mu, ar.variant, 0, block_size, nullptr)
+                    : cvfem_cuda_assemble(ctx, rho, mu, ar.variant, block_size, nullptr);
+            if (rc != 0 || cvfem_cuda_synchronize() != 0) {
+                std::printf("%-38s launch failed\n", ar.name); fail = 1; ++ai; continue;
+            }
+            if (cvfem_cuda_download_values(ctx, asm_dev.data()) != 0) return 1;
+            const double rel = max_abs_diff(asm_ref, asm_dev) / (amax > 0 ? amax : 1.0);
+            const bool   ok  = rel <= 1e-12;
+            fail |= !ok;
+            const double t = ar.packed
+                    ? cvfem_cuda_time_assemble_packed(ctx, rho, mu, ar.variant, 0, block_size, repeat)
+                    : cvfem_cuda_time_assemble(ctx, rho, mu, ar.variant, block_size, repeat);
+            t_asm[ai++] = t;
+            std::printf("%-38s %12.3e %12.1f %10.2e %s\n", ar.name, t,
+                        t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0, rel, ok ? "OK" : "FAIL");
+            csv_rows.push_back(mkrow("assemble", ar.packed ? "cuda_packed" : "cuda_standard",
+                                     cvfem_cuda_jac_variant_name(ar.variant), t));
+        }
+        if (t_asm[0] > 0 && t_asm[1] > 0)
+            std::printf("packed mesh is %.2fx the standard mesh on assembly (handwritten), "
+                        "%.2fx (sympy)\n",
+                        t_asm[0] / t_asm[1],
+                        (t_asm[2] > 0 && t_asm[3] > 0) ? t_asm[2] / t_asm[3] : 0.0);
     }
 
     std::printf("\n=== isoparametric geometry (warp = %.3f) ===\n", warp_amp);

@@ -135,6 +135,19 @@ int cvfem_cuda_download_values(cvfem_cuda_ctx *ctx, double *values);
 //
 // Upload the coordinates once before calling any of them. This is a no-op if
 // cvfem_cuda_boundary_attach has already uploaded them.
+// ---- packed-mesh assembly ---------------------------------------------------
+//
+// A pack-local BSR cannot be staged in shared memory -- one element alone produces 64
+// blocks x 16 doubles -- so this stages the pack's *fields* and gathers them through the
+// packed mesh's uint16 local ids, writing into the global BSR exactly as the
+// element-parallel form does. Both write identically, so comparing them measures what
+// the packed mesh addressing is worth on the read side, which is the only side it can
+// affect for assembly.
+int    cvfem_cuda_assemble_packed(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                  int variant, int geom, int block_size, void *stream);
+double cvfem_cuda_time_assemble_packed(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                       int variant, int geom, int block_size, int repeat);
+
 // ---- standard-mesh matrix-free, the baseline the packed form has to beat --------
 //
 // One thread per element, grid-stride, global node ids, atomicAdd straight into the
