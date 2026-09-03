@@ -1612,14 +1612,15 @@ def _append_sfem_soa_tensor_weak_form_lines(
         "grad_u",
     )
     if form.name == "objective":
-        _append_cse_array_assignments(
+        _append_weak_objective_accumulation(
             lines,
-            [weak_form.energy_density.xreplace(deformation_gradient_substitutions)],
-            ["value[%s] %s" % (work_item, "+=" if form.output_mode == "accumulate" else "=")],
-            "weak_obj_tmp",
-            scale="qw * %s" % geometry_value("jacobian_determinant", 0),
+            form,
+            weak_form,
+            deformation_gradient_substitutions,
+            work_item,
+            geometry_value,
+            ["        }", "    }"],
         )
-        lines.extend(["        }", "    }"])
         return
 
     material = _weak_form_material_expression(
@@ -1795,14 +1796,15 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                 )
 
     if form.name == "objective":
-        _append_cse_array_assignments(
+        _append_weak_objective_accumulation(
             lines,
-            [weak_form.energy_density.xreplace(deformation_gradient_substitutions)],
-            ["value[%s] %s" % (work_item, "+=" if form.output_mode == "accumulate" else "=")],
-            "weak_obj_tmp",
-            scale="qw * %s" % geometry_value("jacobian_determinant", 0),
+            form,
+            weak_form,
+            deformation_gradient_substitutions,
+            work_item,
+            geometry_value,
+            ["            }", "        }"],
         )
-        lines.extend(["            }", "        }"])
         return
 
     material = _weak_form_material_expression(
@@ -2004,14 +2006,15 @@ def _append_sfem_soa_weak_form_lines(
                 )
 
     if form.name == "objective":
-        _append_cse_array_assignments(
+        _append_weak_objective_accumulation(
             lines,
-            [weak_form.energy_density.xreplace(deformation_gradient_substitutions)],
-            ["value[%s] %s" % (work_item, "+=" if form.output_mode == "accumulate" else "=")],
-            "weak_obj_tmp",
-            scale="qw * %s" % geometry_value("jacobian_determinant", 0),
+            form,
+            weak_form,
+            deformation_gradient_substitutions,
+            work_item,
+            geometry_value,
+            ["            }", "        }"],
         )
-        lines.extend(["            }", "        }"])
         return
 
     material = _weak_form_material_expression(
@@ -2158,6 +2161,35 @@ def _weak_form_material_expression(
         return first_piola_at_trial
     return linearized
 
+
+def _append_weak_objective_accumulation(
+    lines, form, weak_form, substitutions, work_item, geometry_value, closing
+):
+    """Accumulate the energy density into an objective's scalar output.
+
+    An objective is the one form whose output is a single number rather than a
+    stream per shape function, so every weak-form emitter reaches this point
+    and stops: there is no test contraction to follow.  Three of them carried
+    the block character for character, differing only in how deep the loops
+    they close are, which ``closing`` now says.
+
+    ``output_mode`` decides accumulate-into versus assign-over, and that is the
+    form's property rather than the emitter's -- it is read here, not decided.
+    ``geometry_value`` is passed in because each emitter defines its own: the
+    determinant is spelled differently depending on how that kernel reaches its
+    geometry, which is the caller's fact and not this block's.
+    """
+    _append_cse_array_assignments(
+        lines,
+        [weak_form.energy_density.xreplace(substitutions)],
+        [
+            "value[%s] %s"
+            % (work_item, "+=" if form.output_mode == "accumulate" else "=")
+        ],
+        "weak_obj_tmp",
+        scale="qw * %s" % geometry_value("jacobian_determinant", 0),
+    )
+    lines.extend(closing)
 
 def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix, scale=None):
     temps, reduced = sp.cse(
