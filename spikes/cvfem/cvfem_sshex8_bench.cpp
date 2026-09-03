@@ -10,6 +10,10 @@
 // numbers taken below saturation, so nothing here is measured at a single point.
 
 #include "cvfem_sshex8_ns.hpp"
+
+#ifdef CVFEM_ENABLE_SUBPAR
+#include "cvfem_sshex8_em.hpp"
+#endif
 #include "cvfem_ns_channel_case.hpp"
 
 #include "sfem_context.hpp"
@@ -106,17 +110,23 @@ int main(int argc, char **argv) {
             sscvfem_apply_macro_local_affine(d, rho, mu, dir.data(), y_aff.data());
             std::vector<scalar_t> y_hoi((size_t)ndof, 0), y_em((size_t)ndof, 0);
             sscvfem_apply_macro_local_hoisted(d, rho, mu, dir.data(), y_hoi.data());
+#ifdef CVFEM_ENABLE_SUBPAR
             sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
+#endif
             std::vector<scalar_t> y_emf((size_t)ndof, 0);
+#ifdef CVFEM_ENABLE_SUBPAR
             sscvfem_apply_macro_local_emfull(d, rho, mu, dir.data(), y_emf.data());
+#endif
 
             double dmax = 0, amax = 0;
             for (ptrdiff_t i = 0; i < ndof; ++i) {
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_macro[(size_t)i]));
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_aff[(size_t)i]));
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_hoi[(size_t)i]));
+#ifdef CVFEM_ENABLE_SUBPAR
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_em[(size_t)i]));
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_emf[(size_t)i]));
+#endif
                 amax = std::max(amax, std::fabs(y_naive[(size_t)i]));
             }
             const double rel = (amax > 0) ? dmax / amax : dmax;
@@ -151,15 +161,24 @@ int main(int argc, char **argv) {
                 sscvfem_apply_macro_local_hoisted(d, rho, mu, dir.data(), y_hoi.data());
             });
 
+#ifdef CVFEM_ENABLE_SUBPAR
             const double t_em = time_it([&] {
                 std::fill(y_em.begin(), y_em.end(), scalar_t(0));
                 sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
             });
+#else
+            const double t_em = 0;  // subpar; rebuild with -DCVFEM_ENABLE_SUBPAR=ON
+#endif
+#ifdef CVFEM_ENABLE_SUBPAR
             const double t_emf = time_it([&] {
                 std::fill(y_emf.begin(), y_emf.end(), scalar_t(0));
                 sscvfem_apply_macro_local_emfull(d, rho, mu, dir.data(), y_emf.data());
             });
             const double t_best = std::min(std::min(t_macro, t_aff), std::min(std::min(t_hoi, t_em), t_emf));
+#else
+            const double t_emf  = 0;
+            const double t_best = std::min(std::min(t_macro, t_aff), t_hoi);
+#endif
 
             std::printf("%-4d %-10td %-12.3f %-12.3f %-12.3f %-12.3f %-12.3f %-12.3f %-9.2f %-12.1f %.3e%s\n",
                         L,
