@@ -38,3 +38,20 @@ removes the atomics and is only 16% faster, and it is *slower* than atomics for 
 hand-written kernel (166.6 against 218.2) — because `atomicAdd` compiles to a
 fire-and-forget reduction instruction while the plain `+=` that colouring permits has to
 wait on the load.
+
+## Element colouring with the hand-written kernel
+
+Not a separate file — it is `CVFEM_CUDA_JAC_HANDWRITTEN` in `launch_ecolored`, compiled
+only under `CVFEM_ENABLE_SUBPAR`.
+
+**Why it lost.** 166.6 MDOF/s against 218.2 for the same kernel on the atomic path.
+Colouring buys the right to accumulate with a plain `+=` instead of `atomicAdd`, and on
+Hopper that is the wrong trade: `atomicAdd` compiles to a fire-and-forget reduction
+instruction, while `+=` is a read-modify-write that has to wait on the load.
+
+**Why the other colouring stayed.** The trade pays once there is enough arithmetic per
+write to hide the dependency. With `sympy_block` element colouring reaches **277.3
+MDOF/s**, 18% above the same kernel on the atomic path and the fastest GPU assembly
+measured anywhere in this spike. So element colouring is kept — for the fused kernels
+only, which is the answer to "does removing the atomics help?": only when the kernel is
+busy enough not to notice the atomics in the first place.
