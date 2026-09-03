@@ -22,7 +22,7 @@
 #   sbatch bench_hex8_alps.sbatch
 #
 # Common overrides:
-#   SIZES="48 64 96" THREADS="72" sbatch bench_hex8_alps.sbatch
+#   SIZES="48 64 96 128 160 192" THREADS="72" sbatch bench_hex8_alps.sbatch
 #   SWEEPS="layout threads" sbatch bench_hex8_alps.sbatch
 #   TRIALS=5 sbatch bench_hex8_alps.sbatch          # best-of-N per configuration
 #   FORCE_BUILD=1 sbatch bench_hex8_alps.sbatch
@@ -62,7 +62,13 @@ WARMUP="${WARMUP:-3}"
 # which sweeps to run
 SWEEPS="${SWEEPS:-layout packsize threads size kernel breakdown}"
 
-SIZES="${SIZES:-48 64 96}"                    # cube_n; 96 -> 912 673 nodes, ~2.9 GiB BSR
+# cube_n. The old default stopped at 96, which is below saturation on a GH200: at n=64
+# the mesh has 262k elements against 132 SMs, roughly one element per resident thread,
+# so throughput measured there is still climbing with problem size. The range now runs
+# to 192 (7.2 M nodes, ~25 GiB BSR) so the plateau is inside it. Assembled runs at the
+# top of the range are matrix-size bound, not compute bound -- drop SIZES if the node
+# has less memory.
+SIZES="${SIZES:-48 64 96 128 160 192}"
 MAIN_N="${MAIN_N:-64}"                        # the size used by the non-size sweeps
 THREADS="${THREADS:-1 2 4 9 18 36 72}"
 PACK_SIZES="${PACK_SIZES:-128 256 384 512 768 1024 2048 4096}"
