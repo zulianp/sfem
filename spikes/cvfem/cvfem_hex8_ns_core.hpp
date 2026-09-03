@@ -511,9 +511,15 @@ inline SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &
                     scalar_t           adj[9], det;
                     cvfem_hex8_load_adj(d, e, adj, &det);
                     const smesh::count_t *const SFEM_RESTRICT es = slots + (size_t)e * 64;
-                    cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(
-                            rho, mu, adj, det, ux, uy, uz, reinterpret_cast<const int *>(es), values);
-                    cvfem_hex8_ns_upwind_jacobian_add_rhie_chow<false>(rho, mu, adj, rc, ux, uy, uz, pp, es, values);
+                    // One rc-aware kernel instead of the SymPy kernel plus a separate
+                    // Rhie-Chow pass. The SymPy kernel picks the upwind direction from
+                    // rho (u.A) alone, while the residual and the matrix-free action use
+                    // rho (u.A) + mdot_rc, so the two operators disagreed wherever the
+                    // Rhie-Chow flux could flip the sign. This kernel takes rc and p and
+                    // routes mdot_rc into the same switch, so assembled and matrix-free
+                    // are the same operator by construction.
+                    cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
+                            rho, mu, adj, det, ux, uy, uz, es, values, rc, pp);
                     boundary_scs_add_jacobian<false>(
                             rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, es, values);
                 }
@@ -537,10 +543,10 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
-        cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(
-                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
-        cvfem_hex8_ns_upwind_jacobian_add_rhie_chow<true>(
-                rho, mu, adj, rc, ux, uy, uz, p, slots + (size_t)e * 64, values);
+        // See the note in assemble_jacobian_colored_sumfact: rc and p go through the same
+        // upwind switch the residual uses, so this matches the matrix-free action.
+        cvfem_hex8_ns_upwind_jacobian_add_slots<true>(
+                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, rc, p);
         boundary_scs_add_jacobian<true>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
@@ -620,8 +626,7 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         } else {
             scalar_t adj[9], det;
             cvfem_hex8_load_adj(d, e, adj, &det);
-            cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, adj, det, ux, uy, uz, sl, loc);
-            cvfem_hex8_ns_upwind_jacobian_add_rhie_chow<false>(rho, mu, adj, rc, ux, uy, uz, p, sl, loc);
+            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj, det, ux, uy, uz, sl, loc, rc, p);
             boundary_scs_add_jacobian<false>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc);
         }
 

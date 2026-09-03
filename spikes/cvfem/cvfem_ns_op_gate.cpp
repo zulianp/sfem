@@ -184,23 +184,42 @@ int main(int argc, char **argv) {
             std::vector<real_t> op_sd((size_t)ndof, 0);
             op->hessian_diag(x.data(), op_sd.data());
 
+            // The assembled Jacobian and the matrix-free action must be the SAME operator,
+            // not merely two things that each match a reference. They were not: the affine
+            // SymPy kernel took the upwind direction from rho (u.A) while the action used
+            // rho (u.A) + mdot_rc, so they disagreed by 1e-4 wherever the Rhie-Chow flux
+            // could flip the sign -- and by exactly zero at a zero interior velocity,
+            // which is the only state SFEM_CHECK_JV in the standalone driver ever tests.
+            // Checked here at the same non-trivial state as everything else.
+            std::vector<scalar_t> spmv((size_t)ndof, scalar_t(0));
+            for (ptrdiff_t row = 0; row < d.nnodes; ++row) {
+                for (smesh::count_t k = b.rowptr[row]; k < b.rowptr[row + 1]; ++k) {
+                    const scalar_t *const blk = ref_h.data() + (ptrdiff_t)k * 16;
+                    const scalar_t *const xx  = dir.data() + (size_t)b.colidx[k] * 4;
+                    for (int r = 0; r < 4; ++r)
+                        for (int c = 0; c < 4; ++c) spmv[(size_t)row * 4 + r] += blk[r * 4 + c] * xx[c];
+                }
+            }
+            const Diff dc = compare(spmv, std::vector<real_t>(op_jv.begin(), op_jv.end()));
+
             const Diff dr = compare(ref_r, op_r);
             const Diff dh = compare(ref_h, op_h);
             const Diff dj = compare(ref_jv, op_jv);
             const Diff db = compare(ref_bd, op_bd);
             const Diff ds = compare(ref_sd, op_sd);
 
-            std::printf("%-9s pack=%-5d  grad=%.3e  bsr=%.3e  apply=%.3e  blockdiag=%.3e  diag=%.3e\n",
+            std::printf("%-9s pack=%-5d  grad=%.3e  bsr=%.3e  apply=%.3e  blockdiag=%.3e  diag=%.3e  asm_vs_mf=%.3e\n",
                         gname,
                         pack_size,
                         dr.max_rel,
                         dh.max_rel,
                         dj.max_rel,
                         db.max_rel,
-                        ds.max_rel);
+                        ds.max_rel,
+                        dc.max_rel);
 
             const bool ok = dr.max_rel < tol && dh.max_rel < tol && dj.max_rel < tol && db.max_rel < tol &&
-                            ds.max_rel < tol;
+                            ds.max_rel < tol && dc.max_rel < tol;
             if (!ok) {
                 std::printf("  FAIL (tol %.1e)  |ref|_inf: grad %.6e  hess %.6e  apply %.6e\n",
                             tol,
