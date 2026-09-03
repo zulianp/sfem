@@ -122,8 +122,8 @@ static void usage(const char *argv0) {
                  "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
                  "  SFEM_PC_PSCALE       Schur scaling of the pressure block:\n"
                  "                       inv_pp = PSCALE / V_p (default 0 = use 1/A_pp).\n"
-                 "                       Tuned, not physical: ~0.1 at rc_scale=1, and it\n"
-                 "                       scales with 1/rc_scale. Helps at high Re only.\n"
+                 "                       Tuned, not physical: PSCALE * rc_scale ~ 0.1 over\n"
+                 "                       rc_scale 0.5..2. Helps at high Re only.\n"
                  "  SFEM_PC_PDAMP        damping on the 1 / A_pp pressure block (default 1)\n"
                  "  SFEM_NL_CONTINUATION 0: skip the Re=1 continuation stage (default 1)\n"
                  "  SFEM_PC_SIMPLE       1: pressure block from the SIMPLE Schur diagonal\n"
@@ -920,11 +920,20 @@ static void build_block_jacobi(const BSR4                  &b,
                 // approximation does not supply.
                 //
                 // PSCALE is therefore a tuned coefficient, not a physical constant. It is
-                // dimensional and it tracks the stabilisation: A_pp is proportional to
-                // rc_scale, and sweeping SFEM_RHIE_CHOW_SCALE moves the optimum the other
-                // way (0.1 at rc=1, 0.3 at rc=0.25). Positive is the correct sign for the
-                // continuity row as assembled here; negative diverges. Default 0 keeps
-                // plain 1 / A_pp.
+                // dimensional and it tracks the stabilisation. A_pp is proportional to
+                // rc_scale, and sweeping SFEM_RHIE_CHOW_SCALE moves the optimum inversely,
+                // so the product is what is conserved:
+                //
+                //   rc_scale   0.25   0.5    1      2
+                //   PSCALE     0.3    0.2    0.1    0.05
+                //   product    0.075  0.10   0.10   0.10
+                //
+                // The three points from 0.5 to 2 are exact. Only rc=0.25 is off, and it
+                // was swept on a grid of {0.1, 0.3, 1.0} that never tested the predicted
+                // 0.4, so read it as unresolved rather than as a departure from the law.
+                //
+                // Positive is the correct sign for the continuity row as assembled here;
+                // negative diverges. Default 0 keeps plain 1 / A_pp.
                 inv[15] = pscale / v;
             } else {
                 // A_pp is only structurally zero without Rhie-Chow, a configuration whose
