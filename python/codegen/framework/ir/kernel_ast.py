@@ -16,6 +16,7 @@ class KernelASTNodeKind(str, Enum):
     BLOCK = "block"
     LOOP_HEADER = "loop_header"
     RETURN = "return"
+    IF = "if"
 
 
 class GeometryNodeKind(str, Enum):
@@ -440,6 +441,37 @@ class LocalComputationNode:
             "output_name": self.output_name,
             "statement_count": len(tuple(getattr(self.evaluation_plan, "statements", ()))),
             "cost": None if self.cost is None else _cost_to_dict(self.cost),
+        }
+
+
+@dataclass(frozen=True)
+class IfNode:
+    """A conditional, with an optional else branch.
+
+    Control flow a kernel IR needs on its own merits -- a scatter that has to
+    locate its entry, a boundary term that applies on some faces, a variant
+    that guards a fast path.  ``inline_body`` prints the then-branch on the
+    same line as the condition, which is how the emitters spell a single-
+    statement guard such as ``if (!ok) return SFEM_FAILURE;``.
+    """
+
+    condition: object
+    body: tuple = ()
+    orelse: tuple = ()
+    inline_body: bool = False
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.IF, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "condition", _as_expr(self.condition))
+        object.__setattr__(self, "body", tuple(self.body))
+        object.__setattr__(self, "orelse", tuple(self.orelse))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "condition": _entity_to_dict(self.condition),
+            "body": [_entity_to_dict(node) for node in self.body],
+            "orelse": [_entity_to_dict(node) for node in self.orelse],
         }
 
 

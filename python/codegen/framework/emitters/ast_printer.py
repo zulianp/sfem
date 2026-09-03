@@ -8,6 +8,7 @@ from codegen.framework.ir.kernel_ast import (
     CallNode,
     ExpressionRef,
     FunctionDefNode,
+    IfNode,
     GatherNode,
     Literal,
     LoopIncrementKind,
@@ -105,6 +106,21 @@ class CLikeKernelASTPrinter:
                 lines.append("%s) {" % indent)
             for body_node in node.body:
                 lines.extend(self.print_node(body_node, indent + self.indent_unit))
+            lines.append("%s}" % indent)
+            return tuple(lines)
+        if isinstance(node, IfNode):
+            condition = self.render_entity(node.condition)
+            if node.inline_body and len(node.body) == 1 and not node.orelse:
+                inner = self.print_node(node.body[0], "")
+                if len(inner) == 1:
+                    return ("%sif (%s) %s" % (indent, condition, inner[0]),)
+            lines = ["%sif (%s) {" % (indent, condition)]
+            for child in node.body:
+                lines.extend(self.print_node(child, indent + self.indent_unit))
+            if node.orelse:
+                lines.append("%s} else {" % indent)
+                for child in node.orelse:
+                    lines.extend(self.print_node(child, indent + self.indent_unit))
             lines.append("%s}" % indent)
             return tuple(lines)
         if isinstance(node, ReturnNode):
