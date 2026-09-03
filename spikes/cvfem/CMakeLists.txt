@@ -179,6 +179,13 @@ target_link_libraries(cvfem_hex8_ns_ssgmg PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_hex8_ns_ssgmg PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_hex8_ns_ssgmg)
 
+# Throughput of the operator kernels on their own, swept across sizes so the saturated
+# figure is a plateau rather than an assumption. Baseline for the semi-structured work.
+add_executable(cvfem_ns_apply_bench cvfem_ns_apply_bench.cpp)
+target_link_libraries(cvfem_ns_apply_bench PRIVATE cvfem_ns_op)
+target_compile_options(cvfem_ns_apply_bench PRIVATE ${_cvfem_perf_opts})
+cvfem_subpar_target(cvfem_ns_apply_bench)
+
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
