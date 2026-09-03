@@ -60,7 +60,11 @@ from codegen.framework.plans.generation import (
     DataStreamLayout,
     DataStreamRole,
 )
-from codegen.framework.plans.residual_structure import jacobian_block_plan
+from codegen.framework.plans.generation import LocalPhase
+from codegen.framework.plans.residual_structure import (
+    jacobian_block_plan,
+    residual_local_phase_plans,
+)
 from codegen.framework.plans.streams import local_kernel_stream_plans
 from codegen.framework.plans.streams import field_stream_groups
 from codegen.framework.symbolic.residual import (
@@ -2861,8 +2865,9 @@ def _simplex_local_body(
                 _shape_loop_node("trial", [_work_item_loop_node(trial_body)])
             )
 
-    # Read the staged values back, evaluate the coefficients, stage them too.
-    evaluate = [
+    # TRANSFORM_REFERENCE: read the staged values back and take them to the
+    # physical element.
+    transform = [
         BufferDeclNode(
             "const ptrdiff_t",
             "geometry_offset",
@@ -2874,7 +2879,7 @@ def _simplex_local_body(
         ),
     ]
     if dependencies.uses_adjugate:
-        evaluate.extend(
+        transform.extend(
             BufferDeclNode(
                 "const scalar_t",
                 "adj%d" % i,
@@ -2887,13 +2892,13 @@ def _simplex_local_body(
         for group in groups:
             stem = field.name + group.symbol_suffix
             if group.uses_value:
-                evaluate.append(
+                transform.append(
                     BufferDeclNode(
                         "const scalar_t", stem, (), expr_ref("%s_values[lane]" % stem)
                     )
                 )
             if group.uses_gradient:
-                evaluate.extend(
+                transform.extend(
                     BufferDeclNode(
                         "const scalar_t",
                         "%s_grad_%d_ref" % (stem, d),
@@ -2902,19 +2907,22 @@ def _simplex_local_body(
                     )
                     for d in range(dim)
                 )
-                evaluate.extend(_physical_gradient_nodes(stem, dim))
-    evaluate.extend(
+                transform.extend(_physical_gradient_nodes(stem, dim))
+
+    # EVALUATE_MATERIAL: the constitutive evaluation, staged for the contraction.
+    material = []
+    material.extend(
         _coefficient_evaluation_nodes(system, coefficients, dependencies)
     )
     for row, _field in enumerate(system.fields):
         if dependencies.value_coefficients[row]:
-            evaluate.append(
+            material.append(
                 AssignmentNode(
                     expr_ref("value_coeff%d_values[lane]" % row),
                     expr_ref("value_coeff%d" % row),
                 )
             )
-        evaluate.extend(
+        material.extend(
             AssignmentNode(
                 expr_ref("grad_coeff%d_%d_values[lane]" % (row, d)),
                 expr_ref("grad_coeff%d_%d" % (row, d)),
@@ -2982,6 +2990,18 @@ def _simplex_local_body(
                 )
             )
 
+    # Which phases a local kernel runs, and in what order, is the plan's
+    # decision.  This supplies the nodes for each and lets the plan sequence
+    # them.
+    sections = {
+        LocalPhase.EVALUATE_TRIAL: (_QUADRATURE_SCOPE, tuple(staging) + tuple(gather)),
+        LocalPhase.TRANSFORM_REFERENCE: (_LANE_SCOPE, tuple(transform)),
+        LocalPhase.EVALUATE_MATERIAL: (_LANE_SCOPE, tuple(material)),
+        LocalPhase.CONTRACT_TEST: (
+            _QUADRATURE_SCOPE,
+            (_shape_loop_node("test", [_work_item_loop_node(test_body)]),),
+        ),
+    }
     quadrature = iterator("q", "int")
     return (
         LoopNode(
@@ -2989,10 +3009,7 @@ def _simplex_local_body(
             quadrature,
             iteration_range(0, expr_ref("N_QP", "quadrature_count")),
             pre_increment(quadrature),
-            body=tuple(staging)
-            + tuple(gather)
-            + (_work_item_loop_node(evaluate),)
-            + (_shape_loop_node("test", [_work_item_loop_node(test_body)]),),
+            body=_assemble_local_phases(sections),
         ),
     )
 
@@ -3139,6 +3156,49 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
     return _quadrature_lane_kernel_node(
         body, name="constant_p1_gradient_expanded_body"
     )
+
+
+#: Where a local phase's statements sit.  A phase is either emitted at
+#: quadrature scope or inside the work-item loop; nothing else is needed to
+#: place the four phases a residual kernel runs.
+_QUADRATURE_SCOPE = "quadrature"
+_LANE_SCOPE = "lane"
+
+
+def _assemble_local_phases(sections):
+    """Order a local kernel's phases the way the plan says, and fuse them.
+
+    ``residual_local_phase_plans`` states the sequence: evaluate the trial
+    functions, transform to the physical element, evaluate the material,
+    contract against the test functions.  This walks that order and asks
+    ``sections`` for the nodes of each, so the emitter contributes statements
+    and the plan decides where they go.
+
+    Adjacent phases at lane scope are fused into a single work-item loop
+    rather than getting one each.  That is a real scheduling decision and it
+    is made here, once, instead of being implied by the order somebody happened
+    to append things in: transform and material share a loop because they read
+    the same staged values, and splitting them would reload every one.
+    """
+    body = []
+    pending = []
+
+    def flush():
+        if pending:
+            body.append(_work_item_loop_node(tuple(pending)))
+            del pending[:]
+
+    for phase_plan in residual_local_phase_plans():
+        scope, nodes = sections[phase_plan.phase]
+        if not nodes:
+            continue
+        if scope == _LANE_SCOPE:
+            pending.extend(nodes)
+            continue
+        flush()
+        body.extend(nodes)
+    flush()
+    return tuple(body)
 
 
 def _work_item_loop_node(body):
