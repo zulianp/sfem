@@ -60,6 +60,7 @@ from codegen.framework.plans.generation import (
     DataStreamLayout,
     DataStreamRole,
 )
+from codegen.framework.plans.residual_structure import jacobian_block_plan
 from codegen.framework.plans.streams import local_kernel_stream_plans
 from codegen.framework.plans.streams import field_stream_groups
 from codegen.framework.symbolic.residual import (
@@ -1683,7 +1684,7 @@ def generate_coupled_residual_sfem_files(
             "%s_residual_element_soa" % element_prefix,
         ]
         expected_diagnostics.extend(
-            "%s_%s" % (element_prefix, block.name)
+            "%s_%s" % (element_prefix, jacobian_block_plan(block).name)
             for block in system.jacobian_blocks()
         )
         expected_diagnostics.append("%s_jacobian_action_element_soa" % element_prefix)
@@ -5244,9 +5245,11 @@ def _residual_diagnostics_lines(system, prefix, specialization):
     ]
     block_expressions = system.jacobian_blocks()
     for block in block_expressions:
+        # What a block is called is the plan's decision, not this function's.
+        block_plan = jacobian_block_plan(block)
         diagnostics.append(
             (
-                "%s_%s" % (prefix, block.name),
+                "%s_%s" % (prefix, block_plan.name),
                 jacobian_block_diagnostic_cost(system, block),
                 system.dependencies_for_expressions((block.expression,)),
             )
