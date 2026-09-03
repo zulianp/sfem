@@ -500,7 +500,7 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Nine, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Ten, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 0</div>
@@ -534,8 +534,8 @@
       <div class="op-title">Delete <code>_target()</code> <span class="chip c-ok">done — the binding replaced it</span></div>
       <p>The defect was sharper than recorded here. The driver <i>already</i> mapped <code>KernelTarget.CUDA</code> onto a backend built with <code>CUDATarget</code>, and <code>KernelTarget.AVX512</code> onto one built with <code>AVX512Target</code>. That target reached a language check and the energy emitter, and nothing else: the residual emitters constructed their own <code>OpenMPTarget</code> and ignored it. A decision made in the right layer, discarded by the layer that needed it — the same shape as the scheduler's <code>hoist_scope</code>.</p>
       <p><code>targets/context.py</code> binds the target for the duration of an emission; backends bind theirs in <code>emit()</code>, and the four emitter modules that built their own now read it. Bound rather than threaded, on purpose: 112 call sites in 49 functions ask for a qualifier or a pragma, and none of them <i>chooses</i> a target, so 49 extra parameters would record plumbing rather than a decision.</p>
-      <p>Proven by driving a probe target through the real backend: <b>39 of 90</b> lane-loop pragmas take the probe's spelling. The other 51 do not, because 66 pragmas were written as string literals that bypass the target — 24 converted, 42 under a shrink-only ratchet. No generated output changes, because the AVX512 and ARM targets spell everything exactly as OpenMP does: the wiring was <i>dead rather than wrong</i>.</p>
-      <div class="op-facts"><span><i>cost as feared</i> 43 signatures</span><span><i>actual</i> one binding, four modules</span><span><i>literal pragmas</i> 66 → 42, ratcheted</span><span><i>gate</i> byte-identity holds</span></div>
+      <p>Proven by driving a probe target through the real backend: <b>39 of 90</b> lane-loop pragmas take the probe's spelling. The other 51 do not, because 66 pragmas were written as string literals that bypass the target — 35 converted, 31 under a shrink-only ratchet — 24 in the residual emitter, 11 more once <code>energy_codegen</code>'s leaf pragmas moved onto the <code>source_builder</code> it already receives. No generated output changes, because the AVX512 and ARM targets spell everything exactly as OpenMP does: the wiring was <i>dead rather than wrong</i>. The 31 that remain are held back by three distinct reasons, recorded in the ratchet: 7 are parallel regions with a work-sharing <code>for</code> inside, which are structure rather than spelling and would compile into a serial loop in a bare block if an accessor returned nothing; 7 sit in scatter helpers that take no builder; 1 is OpenMP-specific thread-scratch infrastructure; the other 16 are in the residual emitter, which has no accessor for them yet.</p>
+      <div class="op-facts"><span><i>cost as feared</i> 43 signatures</span><span><i>actual</i> one binding, four modules</span><span><i>literal pragmas</i> 66 → 31, ratcheted</span><span><i>gate</i> byte-identity holds</span></div>
     </div>
   </div>
 
@@ -607,6 +607,18 @@
       <p>The <code>mooney_rivlin_kelvin_voigt_newmark</code> material and generator, <code>scripts/</code>, <code>KERNELS.md</code>, <code>M11.md</code>, <code>docs/</code> and <code>twophaseflow/run_m43.sh</code> are now tracked on this branch. A fresh clone can run its own tests: <code>scripts/</code> is imported by the matrix-format tests and the mooney material is part of the set the snapshot regenerates.</p>
       <p>Only the repository-root <code>CLAUDE.md</code> is still untracked — tooling configuration rather than framework code, and yours to place.</p>
       <div class="op-facts"><span><i>added</i> 292 LOC of code + 4 documents</span></div>
+    </div>
+  </div>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 10</div>
+    <div class="body">
+      <div class="op-title">Kernels validate the matrix graph per element <span class="chip c-gap">unwanted overhead</span></div>
+      <p>Raised by Patrick, not found by this analysis. The generated Hessian assembly checks that the sparsity pattern contains every entry it needs <i>while assembling</i>. Each element's <code>_scatter_bsr</code> walks <code>N_SHAPE&nbsp;&times;&nbsp;N_SHAPE</code> candidate entries and tests each one with a three-condition branch, keeps a <code>valid_block_graph</code> flag, and calls <code>std::fprintf(stderr, …)</code> from inside an OpenMP parallel region on failure. The caller folds the status per element into <code>invalid_matrix_graph</code> and reduces it across threads with <code>reduction(|:invalid_matrix_graph)</code>.</p>
+      <p>Graph validity is a property of the mesh and the sparsity pattern together — invariant across every element and across the whole assembly call. Establishing it once costs <b>O(nnz)</b>; re-testing it inside the loop costs <b>O(elements &times; N_SHAPE²)</b>, which is 100 branches per element for TET10 and far more for the higher-order hexes. Kernels must be correct, but preconditions belong to the caller: a kernel should be lean, and the priority inside an element loop is throughput.</p>
+      <p>Two facts shape the work. The check is <i>fused into the sparsity search</i> rather than sitting beside it — <code>ks[j]</code> is the search result and the branch validates it in the same pass — so removal keeps the search and drops the test, the flag and the I/O, rather than deleting a loop. And the CRS form carries the same pattern but is not currently emitted for any shipped material, so the real removal is smaller than the emitter source suggests.</p>
+      <p>Note that the <code>reduction</code> clause plumbed through <code>parallel_for_pragma</code> in OP&nbsp;2 exists to reproduce this check byte-for-byte. That was the right transitional move under a byte-identity gate, and it is not settled design: if the check is hoisted, the clause and its target API go with it.</p>
+      <div class="op-facts"><span><i>files carrying the flag</i> 36</span><span><i>per element</i> N_SHAPE² branches</span><span><i>hoisted cost</i> O(nnz), once</span><span><i>blocks</i> nothing</span></div>
     </div>
   </div>
 </section>
