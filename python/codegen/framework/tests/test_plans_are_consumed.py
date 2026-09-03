@@ -76,6 +76,11 @@ UNCONSUMED_PLAN_TYPES = frozenset(
         # vector problems use, so it is the assembly plan worth connecting
         # first.
         "BSRAssemblyPlan",
+        # The residual emitter no longer invents the strings "affine" and
+        # "isoparametric" -- 81 hand-written literals -- and checks the
+        # geometry plans it is handed against the modes it spells, so a plan
+        # that changed its mind stops generation instead of being ignored.
+        "GeometryPlan",
     }
 )
 
@@ -158,7 +163,7 @@ class PlansAreConsumedTest(unittest.TestCase):
         )
         self.assertEqual(
             unconsumed,
-            9,
+            8,
             "the number of unread structural plans changed to %d; update this "
             "expectation deliberately, and say why in the commit" % unconsumed,
         )

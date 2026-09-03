@@ -68,6 +68,7 @@ from codegen.framework.emitters.tensor_product_geometry import (
     tensor_product_gradient_isoparametric_geometry_lines,
 )
 from codegen.framework.emitters.tensor_product_kernels import sfem_tensor_product_kernels_header_source
+from codegen.framework.fem.geometry import GeometryMode
 from codegen.framework.targets import current_target
 from codegen.framework.fem.reference import (
     sfem_mesh_reference_data,
@@ -115,6 +116,36 @@ from codegen.framework.plans.scheduling import (
     build_jacobian_action_graph,
     build_residual_graph,
 )
+
+
+#: The geometry mode identifiers this emitter spells.  ``GeometryMode`` is
+#: where they are defined and ``GeometryPlan`` is what carries the choice, so
+#: the emitter takes the spelling from there rather than inventing its own.
+#: Eighty-one literal AFFINE_MODE/ISOPARAMETRIC_MODE strings used to be written out
+#: by hand, which meant the emitter could disagree with the plan and nothing
+#: would say so.
+AFFINE_MODE = GeometryMode.AFFINE.value
+ISOPARAMETRIC_MODE = GeometryMode.ISOPARAMETRIC.value
+
+
+def _assert_geometry_plans_agree(emission_plan):
+    """Emission is subordinate to the geometry plans it is handed.
+
+    The plan decides affine versus isoparametric; this emitter only spells the
+    decision.  Checking here means a plan that changed its mind would stop
+    generation rather than silently produce kernels named for a mode the plan
+    no longer describes.
+    """
+    for geometry, expected in (
+        (emission_plan.affine_geometry, GeometryMode.AFFINE),
+        (emission_plan.isoparametric_geometry, GeometryMode.ISOPARAMETRIC),
+    ):
+        if geometry.mode is not expected:
+            raise ValueError(
+                "emission plan geometry disagrees with the emitter: expected %s, "
+                "plan says %s" % (expected.value, geometry.mode.value)
+            )
+    return emission_plan.affine_geometry, emission_plan.isoparametric_geometry
 
 
 def _target():
@@ -1625,6 +1656,7 @@ def generate_coupled_residual_sfem_files(
         residual_coeffs = coupled_residual_weak_coefficients(system, False)
     if action_coeffs is None:
         action_coeffs = coupled_residual_weak_coefficients(system, True)
+    _assert_geometry_plans_agree(emission_plan)
     family = emission_plan.basis_family
     geometry_family = emission_plan.geometry_family
     # Which files exist and what they are called is a structural decision, so
@@ -1745,6 +1777,7 @@ def generate_mixed_residual_sfem_files(
         residual_coeffs = coupled_residual_weak_coefficients(system, False)
     if action_coeffs is None:
         action_coeffs = coupled_residual_weak_coefficients(system, True)
+    _assert_geometry_plans_agree(emission_plan)
     family = emission_plan.basis_family
     geometry_family = emission_plan.geometry_family
     if reference_data_plan is not None:
@@ -3866,14 +3899,14 @@ def _operator_source(
     lines.extend(
         quadrature_reference_struct_lines(
             prefix,
-            "affine",
+            AFFINE_MODE,
             sfem_mesh_reference_data(affine_specialization.quadrature_rule),
         )
     )
     lines.extend(
         quadrature_reference_struct_lines(
             prefix,
-            "isoparametric",
+            ISOPARAMETRIC_MODE,
             sfem_mesh_reference_data(rule),
         )
     )
@@ -3983,36 +4016,36 @@ def _operator_source(
             if tensor_product:
                 call_args.append(
                     quadrature_reference_accessor(
-                        prefix, "isoparametric", "shape_1d", scalar_type
+                        prefix, ISOPARAMETRIC_MODE, "shape_1d", scalar_type
                     )
                 )
                 if dependencies.uses_reference_gradients:
                     call_args.append(
                         quadrature_reference_accessor(
-                            prefix, "isoparametric", "grad_1d", scalar_type
+                            prefix, ISOPARAMETRIC_MODE, "grad_1d", scalar_type
                         )
                     )
                 call_args.append(
                     quadrature_reference_accessor(
-                        prefix, "isoparametric", "q_weight_1d", scalar_type
+                        prefix, ISOPARAMETRIC_MODE, "q_weight_1d", scalar_type
                     )
                 )
             else:
                 call_args.append(
-                    quadrature_reference_accessor(prefix, "isoparametric", "shape", scalar_type)
+                    quadrature_reference_accessor(prefix, ISOPARAMETRIC_MODE, "shape", scalar_type)
                 )
                 if dependencies.uses_reference_gradients:
                     call_args.extend(
                         quadrature_reference_accessor(
                             prefix,
-                            "isoparametric",
+                            ISOPARAMETRIC_MODE,
                             sfem_simplex_grad_ref_name("grad_ref", d),
                             scalar_type,
                         )
                         for d in range(dim)
                     )
                 call_args.append(
-                    quadrature_reference_accessor(prefix, "isoparametric", "q_weight", scalar_type)
+                    quadrature_reference_accessor(prefix, ISOPARAMETRIC_MODE, "q_weight", scalar_type)
                 )
             if dependencies.current:
                 call_args.append("current")
@@ -4153,8 +4186,8 @@ def _mixed_operator_source(
             "",
         ]
     )
-    lines.extend(_mixed_reference_data_lines(prefix, "affine", rule, system, field_element_types, basis_family))
-    lines.extend(_mixed_reference_data_lines(prefix, "isoparametric", rule, system, field_element_types, basis_family))
+    lines.extend(_mixed_reference_data_lines(prefix, AFFINE_MODE, rule, system, field_element_types, basis_family))
+    lines.extend(_mixed_reference_data_lines(prefix, ISOPARAMETRIC_MODE, rule, system, field_element_types, basis_family))
     lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
     lines.extend(
         _mixed_residual_diagnostics_lines(
@@ -4197,7 +4230,7 @@ def _mixed_operator_source(
                 local_prefix,
                 element,
                 rule,
-                "affine",
+                AFFINE_MODE,
                 cell_specialization.vector_size,
                 field_element_types,
                 form,
@@ -4212,7 +4245,7 @@ def _mixed_operator_source(
                 local_prefix,
                 element,
                 rule,
-                "isoparametric",
+                ISOPARAMETRIC_MODE,
                 cell_specialization.vector_size,
                 field_element_types,
                 form,
@@ -4942,7 +4975,7 @@ def _mixed_coo_triplet_matrix_assembly_source(
     stream_to_tensor_order = _stream_to_tensor_order(field_stream_order)
     row_tensor_streams = tuple(stream_to_tensor_order[stream] for stream in row_streams)
     column_tensor_streams = tuple(stream_to_tensor_order[stream] for stream in column_streams)
-    reference_stage = "isoparametric"
+    reference_stage = ISOPARAMETRIC_MODE
     reference_data = "%s_%s_reference_data<scalar_t>" % (prefix, reference_stage)
     params = [
         "const ptrdiff_t nelements",
@@ -5663,7 +5696,7 @@ def _mesh_operator_source(
         _mesh_reference_alias_lines(
             prefix,
             rule,
-            "affine",
+            AFFINE_MODE,
             emit_reference_basis=not omit_simplex_reference_basis_inputs,
         )
     )
@@ -5800,17 +5833,17 @@ def _mesh_operator_source(
     if dependencies.uses_adjugate and gradient_metric is None:
         call_args.append("block_adjugate")
     if tensor_product:
-        call_args.append(_mesh_reference_name("affine", "shape_1d"))
+        call_args.append(_mesh_reference_name(AFFINE_MODE, "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name("affine", "grad_1d"))
-        call_args.append(_mesh_reference_name("affine", "q_weight_1d"))
+            call_args.append(_mesh_reference_name(AFFINE_MODE, "grad_1d"))
+        call_args.append(_mesh_reference_name(AFFINE_MODE, "q_weight_1d"))
     else:
         if not omit_simplex_reference_basis_inputs:
-            call_args.append(_mesh_reference_name("affine", "shape"))
+            call_args.append(_mesh_reference_name(AFFINE_MODE, "shape"))
             if dependencies.uses_reference_gradients:
                 call_args.extend(
                     _mesh_reference_name(
-                        "affine",
+                        AFFINE_MODE,
                         sfem_simplex_grad_ref_name("grad_ref", d),
                     )
                     for d in range(dim)
@@ -5818,7 +5851,7 @@ def _mesh_operator_source(
         call_args.append(
             "cached_affine_metric_q_weight"
             if uses_cached_affine_metric
-            else _mesh_reference_name("affine", "q_weight")
+            else _mesh_reference_name(AFFINE_MODE, "q_weight")
         )
     if dependencies.current:
         call_args.append(block_stream_args["current"])
@@ -6540,7 +6573,7 @@ def _scalar_crs_matrix_assembly_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
     lines.extend(field_element_lines)
     lines.extend(coordinate_element_lines)
     lines.extend(
@@ -6633,8 +6666,8 @@ def _scalar_crs_matrix_assembly_source(
                     for component in range(dim * dim)
                 ),
                 determinant_stream="block_determinant",
-                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
-                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+                shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
+                grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
             )
         )
     else:
@@ -6656,7 +6689,7 @@ def _scalar_crs_matrix_assembly_source(
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
-                            "isoparametric",
+                            ISOPARAMETRIC_MODE,
                             sfem_simplex_grad_ref_name("grad_ref", j),
                         ),
                         shape,
@@ -6741,21 +6774,21 @@ def _scalar_crs_matrix_assembly_source(
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
     if tensor_product:
-        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
     else:
-        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
         if dependencies.uses_reference_gradients:
             call_args.extend(
                 _mesh_reference_name(
-                    "isoparametric",
+                    ISOPARAMETRIC_MODE,
                     sfem_simplex_grad_ref_name("grad_ref", d),
                 )
                 for d in range(dim)
             )
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
     if state_dependencies.current:
         call_args.append(state_stream_args["current"])
     if state_dependencies.previous:
@@ -6907,7 +6940,7 @@ def _scalar_crs_matrix_assembly_source(
                 "    (void)n_shared_nodes;",
             ]
         )
-        lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+        lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
         packed_coordinate_element_lines, packed_coordinate_element_array = (
             _coordinate_element_alias_lines(
                 dim,
@@ -7075,8 +7108,8 @@ def _scalar_crs_matrix_assembly_source(
                         for component in range(dim * dim)
                     ),
                     determinant_stream="block_determinant",
-                    shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
-                    grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+                    shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
+                    grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
                 )
             )
         else:
@@ -7098,7 +7131,7 @@ def _scalar_crs_matrix_assembly_source(
                         % (
                             shape * dim + i,
                             _mesh_reference_name(
-                                "isoparametric",
+                                ISOPARAMETRIC_MODE,
                                 sfem_simplex_grad_ref_name("grad_ref", j),
                             ),
                             shape,
@@ -7559,7 +7592,7 @@ def _scalar_coo_triplet_matrix_assembly_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
     field_element_lines, field_element_array = _single_field_element_alias_lines(
         n_shape,
         field_shape_order,
@@ -7666,8 +7699,8 @@ def _scalar_coo_triplet_matrix_assembly_source(
                     for component in range(dim * dim)
                 ),
                 determinant_stream="block_determinant",
-                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
-                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+                shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
+                grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
             )
         )
     else:
@@ -7689,7 +7722,7 @@ def _scalar_coo_triplet_matrix_assembly_source(
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
-                            "isoparametric",
+                            ISOPARAMETRIC_MODE,
                             sfem_simplex_grad_ref_name("grad_ref", j),
                         ),
                         shape,
@@ -7774,21 +7807,21 @@ def _scalar_coo_triplet_matrix_assembly_source(
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
     if tensor_product:
-        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
     else:
-        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
         if dependencies.uses_reference_gradients:
             call_args.extend(
                 _mesh_reference_name(
-                    "isoparametric",
+                    ISOPARAMETRIC_MODE,
                     sfem_simplex_grad_ref_name("grad_ref", d),
                 )
                 for d in range(dim)
             )
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
     if state_dependencies.current:
         call_args.append(state_stream_args["current"])
     if state_dependencies.previous:
@@ -7992,7 +8025,7 @@ def _scalar_dia_matrix_assembly_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
     coordinate_element_lines, coordinate_element_array = (
         _coordinate_element_alias_lines(
             dim,
@@ -8053,8 +8086,8 @@ def _scalar_dia_matrix_assembly_source(
                     for component in range(dim * dim)
                 ),
                 determinant_stream="block_determinant",
-                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
-                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+                shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
+                grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
             )
         )
     else:
@@ -8076,7 +8109,7 @@ def _scalar_dia_matrix_assembly_source(
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
-                            "isoparametric",
+                            ISOPARAMETRIC_MODE,
                             sfem_simplex_grad_ref_name("grad_ref", j),
                         ),
                         shape,
@@ -8130,21 +8163,21 @@ def _scalar_dia_matrix_assembly_source(
         "block_adjugate",
     ]
     if tensor_product:
-        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
     else:
-        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
         if dependencies.uses_reference_gradients:
             call_args.extend(
                 _mesh_reference_name(
-                    "isoparametric",
+                    ISOPARAMETRIC_MODE,
                     sfem_simplex_grad_ref_name("grad_ref", d),
                 )
                 for d in range(dim)
             )
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
     call_args.append(direction_arg)
     call_args.extend(map(str, dependencies.parameters))
     call_args.append(output_arg)
@@ -8295,7 +8328,7 @@ def _isoparametric_mesh_operator_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
     field_shape_order = _single_field_shape_order(n_shape, n_fields, field_stream_order)
     field_element_lines, field_element_array = _single_field_element_alias_lines(
         n_shape,
@@ -8373,8 +8406,8 @@ def _isoparametric_mesh_operator_source(
                     for component in range(dim * dim)
                 ),
                 determinant_stream="block_determinant",
-                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
-                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+                shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
+                grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
             )
         )
     else:
@@ -8397,7 +8430,7 @@ def _isoparametric_mesh_operator_source(
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
-                            "isoparametric",
+                            ISOPARAMETRIC_MODE,
                             sfem_simplex_grad_ref_name("grad_ref", j),
                         ),
                         shape,
@@ -8472,21 +8505,21 @@ def _isoparametric_mesh_operator_source(
     if dependencies.uses_adjugate and gradient_metric is None:
         call_args.append("block_adjugate")
     if tensor_product:
-        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
     else:
-        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
         if dependencies.uses_reference_gradients:
             call_args.extend(
                 _mesh_reference_name(
-                    "isoparametric",
+                    ISOPARAMETRIC_MODE,
                     sfem_simplex_grad_ref_name("grad_ref", d),
                 )
                 for d in range(dim)
             )
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
     if dependencies.current:
         call_args.append(block_stream_args["current"])
     if dependencies.previous:
@@ -8677,7 +8710,7 @@ def _scalar_packed_jacobian_action_source(
             "    (void)nnodes;",
         ]
     )
-    lines.extend(_mesh_reference_alias_lines(prefix, rule, "isoparametric"))
+    lines.extend(_mesh_reference_alias_lines(prefix, rule, ISOPARAMETRIC_MODE))
     lines.extend(coordinate_element_lines)
     lines.extend(field_element_lines)
     lines.extend(
@@ -8833,8 +8866,8 @@ def _scalar_packed_jacobian_action_source(
                     for component in range(dim * dim)
                 ),
                 determinant_stream="block_determinant",
-                shape_name=_mesh_reference_name("isoparametric", "shape_1d"),
-                grad_name=_mesh_reference_name("isoparametric", "grad_1d"),
+                shape_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"),
+                grad_name=_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"),
             )
         )
     else:
@@ -8857,7 +8890,7 @@ def _scalar_packed_jacobian_action_source(
                     % (
                         shape * dim + i,
                         _mesh_reference_name(
-                            "isoparametric",
+                            ISOPARAMETRIC_MODE,
                             sfem_simplex_grad_ref_name("grad_ref", j),
                         ),
                         shape,
@@ -8882,21 +8915,21 @@ def _scalar_packed_jacobian_action_source(
     if dependencies.uses_adjugate:
         call_args.append("block_adjugate")
     if tensor_product:
-        call_args.append(_mesh_reference_name("isoparametric", "shape_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name("isoparametric", "grad_1d"))
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight_1d"))
+            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
     else:
-        call_args.append(_mesh_reference_name("isoparametric", "shape"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
         if dependencies.uses_reference_gradients:
             call_args.extend(
                 _mesh_reference_name(
-                    "isoparametric",
+                    ISOPARAMETRIC_MODE,
                     sfem_simplex_grad_ref_name("grad_ref", d),
                 )
                 for d in range(dim)
             )
-        call_args.append(_mesh_reference_name("isoparametric", "q_weight"))
+        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
     if dependencies.current:
         call_args.append("block_current")
     if dependencies.previous:
@@ -9859,7 +9892,7 @@ def _scalar_packed_affine_jacobian_action_source(
         _mesh_reference_alias_lines(
             prefix,
             rule,
-            "affine",
+            AFFINE_MODE,
             emit_reference_basis=not omit_simplex_reference_basis_inputs,
         )
     )
@@ -10044,17 +10077,17 @@ def _scalar_packed_affine_jacobian_action_source(
     if dependencies.uses_adjugate and gradient_metric is None:
         call_args.append("block_adjugate")
     if tensor_product:
-        call_args.append(_mesh_reference_name("affine", "shape_1d"))
+        call_args.append(_mesh_reference_name(AFFINE_MODE, "shape_1d"))
         if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name("affine", "grad_1d"))
-        call_args.append(_mesh_reference_name("affine", "q_weight_1d"))
+            call_args.append(_mesh_reference_name(AFFINE_MODE, "grad_1d"))
+        call_args.append(_mesh_reference_name(AFFINE_MODE, "q_weight_1d"))
     else:
         if not omit_simplex_reference_basis_inputs:
-            call_args.append(_mesh_reference_name("affine", "shape"))
+            call_args.append(_mesh_reference_name(AFFINE_MODE, "shape"))
             if dependencies.uses_reference_gradients:
                 call_args.extend(
                     _mesh_reference_name(
-                        "affine",
+                        AFFINE_MODE,
                         sfem_simplex_grad_ref_name("grad_ref", d),
                     )
                     for d in range(dim)
@@ -10062,7 +10095,7 @@ def _scalar_packed_affine_jacobian_action_source(
         call_args.append(
             "cached_affine_metric_q_weight"
             if uses_cached_affine_metric
-            else _mesh_reference_name("affine", "q_weight")
+            else _mesh_reference_name(AFFINE_MODE, "q_weight")
         )
     if dependencies.current:
         call_args.append("block_current")
