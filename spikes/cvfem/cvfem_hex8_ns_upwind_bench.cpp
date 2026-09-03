@@ -351,7 +351,9 @@ int main(int argc, char **argv) {
     // -- so rejecting them on the default kernel name would refuse a run that never uses
     // it. That is exactly what happened: `--jac-action --geom isoparam` inherits the
     // default `sumfact` and was refused for a kernel it does not call.
-    const bool kernel_is_consulted = !(jac_action || bsr_apply);
+    // --assemble-diag dispatches on geometry alone too (see diag_fn), so it belongs on
+    // this list for the same reason.
+    const bool kernel_is_consulted = !(jac_action || bsr_apply || assemble_diag);
     if (kernel_is_consulted && geom_kind == GeomKind::Isoparam &&
         kernel_kind != KernelKind::Current && kernel_kind != KernelKind::Sympy &&
         kernel_kind != KernelKind::Fd && kernel_kind != KernelKind::Split) {
