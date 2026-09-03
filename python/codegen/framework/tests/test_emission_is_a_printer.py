@@ -44,7 +44,37 @@ PLAN_INPUTS = (
 
 #: Decisions still made in the emission layer.  Shrink-only: lower it when a
 #: decision moves, and never raise it to make a change fit.
-BUDGET = 298
+#:
+#: Raised once, 298 -> 412, to correct the measure rather than to accommodate a
+#: change.  The first matcher looked for ``'dependencies'`` quoted inside the
+#: AST dump, so every qualified name missed: ``state_dependencies`` is a
+#: dependency set, ``quadrature_rule`` is a rule and ``matrix_format_plan`` is a
+#: plan, and all 130 such branches read as not-a-decision.  Nothing moved into
+#: emission to cause the rise.
+BUDGET = 412
+
+
+def _tested_names(test):
+    """Every identifier a branch test reads, bare names and attributes alike."""
+    for node in ast.walk(test):
+        if isinstance(node, ast.Name):
+            yield node.id
+        elif isinstance(node, ast.Attribute):
+            yield node.attr
+
+
+def _is_plan_input(identifier):
+    """Whether an identifier names planning-layer input.
+
+    Matched on the identifier itself rather than on a substring of the dump,
+    because the qualified names are most of the population.  A name qualified
+    with an underscore counts; a word that merely ends in the same letters
+    (``transform``, ``platform``) does not.
+    """
+    return any(
+        identifier == word or identifier.endswith("_" + word)
+        for word in PLAN_INPUTS
+    )
 
 
 def _decision_branches():
@@ -58,8 +88,7 @@ def _decision_branches():
         for node in ast.walk(tree):
             if not isinstance(node, (ast.If, ast.IfExp)):
                 continue
-            test = ast.dump(node.test)
-            if any("'%s'" % word in test for word in PLAN_INPUTS):
+            if any(map(_is_plan_input, _tested_names(node.test))):
                 counts[name] += 1
     return counts
 
