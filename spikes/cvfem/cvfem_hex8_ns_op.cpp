@@ -156,6 +156,31 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int CVFEMNavierStokes::hessian_block_diag(const real_t *const x, real_t *const values) {
+        SFEM_TRACE_SCOPE("CVFEMNavierStokes::hessian_block_diag");
+        if (!initialized_) return SFEM_FAILURE;
+        sync_scheme_parameters();
+        unpack_fields(d_, x);
+        std::vector<scalar_t> blocks;
+        assemble_block_diag(d_, rho, mu, geom, blocks);
+        for (size_t i = 0; i < blocks.size(); ++i) values[i] += blocks[i];
+        return SFEM_SUCCESS;
+    }
+
+    int CVFEMNavierStokes::hessian_diag(const real_t *const x, real_t *const values) {
+        SFEM_TRACE_SCOPE("CVFEMNavierStokes::hessian_diag");
+        if (!initialized_) return SFEM_FAILURE;
+        sync_scheme_parameters();
+        unpack_fields(d_, x);
+        std::vector<scalar_t> blocks;
+        assemble_block_diag(d_, rho, mu, geom, blocks);
+        for (ptrdiff_t i = 0; i < d_.nnodes; ++i) {
+            const scalar_t *const blk = blocks.data() + (size_t)i * 16;
+            for (int c = 0; c < N_FIELDS; ++c) values[(size_t)i * N_FIELDS + c] += blk[c * 4 + c];
+        }
+        return SFEM_SUCCESS;
+    }
+
     std::shared_ptr<Op> CVFEMNavierStokes::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::derefine_op");
         // Rediscretisation, not Galerkin coarsening. That is not a stylistic choice here:
