@@ -51,7 +51,7 @@ PLAN_INPUTS = (
 #: dependency set, ``quadrature_rule`` is a rule and ``matrix_format_plan`` is a
 #: plan, and all 130 such branches read as not-a-decision.  Nothing moved into
 #: emission to cause the rise.
-BUDGET = 281
+BUDGET = 259
 
 
 def _tested_names(test):
