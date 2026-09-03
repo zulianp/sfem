@@ -876,7 +876,18 @@ int launch_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu, int variant,
     CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
                                      (size_t)ctx->nnz * 16 * sizeof(double), s));
     switch (variant) {
+        // Element colouring with the hand-written kernel is a measured loss: 166.6 MDOF/s
+        // against 218.2 for the same kernel on the atomic path. Colouring buys the right
+        // to accumulate with a plain `+=` instead of atomicAdd, and on this device that
+        // is the wrong trade -- atomicAdd compiles to a fire-and-forget reduction while
+        // `+=` has to wait on the load. The trade only pays for the fused kernels, where
+        // there is enough arithmetic per write to hide the dependency: sympy_block gains
+        // 18% (277.3 against 235.5) and is the fastest GPU assembly measured.
+        //
+        // Kept behind the subpar option because it is the evidence for that sentence.
+#ifdef CVFEM_ENABLE_SUBPAR
         case CVFEM_CUDA_JAC_HANDWRITTEN: return launch_ecolored_v<CVFEM_CUDA_JAC_HANDWRITTEN>(ctx, rho, mu, block, s);
+#endif
         case CVFEM_CUDA_JAC_SYMPY:       return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY>(ctx, rho, mu, block, s);
         case CVFEM_CUDA_JAC_SYMPY_BLOCK: return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY_BLOCK>(ctx, rho, mu, block, s);
 #ifdef CVFEM_ENABLE_SUBPAR

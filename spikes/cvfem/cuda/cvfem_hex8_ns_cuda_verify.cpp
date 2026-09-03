@@ -619,6 +619,10 @@ int main(int argc, char **argv) {
             std::printf("%-13s %12s %14s %12s %10s\n", "variant", "rel", "s/assemble",
                         "MDOF/s", "vs atomic");
             for (int v = 0; v < CVFEM_CUDA_JAC_N_VARIANTS; ++v) {
+#ifndef CVFEM_ENABLE_SUBPAR
+                // Colouring is only worth it for the fused kernels; see launch_ecolored.
+                if (v == CVFEM_CUDA_JAC_HANDWRITTEN) continue;
+#endif
                 if (cvfem_cuda_assemble_ecolored(ctx, rho, mu, v, block_size, nullptr) != 0 ||
                     cvfem_cuda_synchronize() != 0) {
                     std::printf("%-13s launch failed\n", cvfem_cuda_jac_variant_name(v));
