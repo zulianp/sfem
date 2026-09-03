@@ -770,6 +770,68 @@ int main(int argc, char **argv) {
     // The packed form pays for a staging pass and ghost bookkeeping and gets locality
     // and a cheaper flush; the standard form does none of that and atomics straight to
     // global. This is the same question the CPU answers with `atomic` vs `packed`.
+    // ---- bit-reproducible residual -------------------------------------------
+    //
+    // The open question this closes: neither existing flush mode gives the same bits
+    // twice, because both accumulate a pack's elements with shared-memory atomicAdd.
+    // This mode orders the accumulation instead -- store per element, then gather per
+    // node in element order -- and pays for it in a scratch array.
+    std::printf("\n=== bit-reproducible residual ===\n");
+    {
+        // node -> element CSR, entries in increasing element order so the gather's sum
+        // has a fixed order. enc packs element * 8 + local index.
+        std::vector<ptrdiff_t> n2e_ptr((size_t)d.nnodes + 1, 0);
+        for (ptrdiff_t e = 0; e < d.nelements; ++e)
+            for (int a = 0; a < 8; ++a) n2e_ptr[(size_t)d.elems[a][e] + 1]++;
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) n2e_ptr[i + 1] += n2e_ptr[i];
+        std::vector<int32_t>   n2e_enc((size_t)n2e_ptr[d.nnodes]);
+        std::vector<ptrdiff_t> cur(n2e_ptr.begin(), n2e_ptr.end() - 1);
+        for (ptrdiff_t e = 0; e < d.nelements; ++e)
+            for (int a = 0; a < 8; ++a)
+                n2e_enc[(size_t)cur[d.elems[a][e]]++] = (int32_t)(e * 8 + a);
+
+        if (cvfem_cuda_attach_node_to_element(ctx, n2e_ptr.data(), n2e_enc.data(),
+                                              (ptrdiff_t)n2e_enc.size()) != 0) {
+            std::fprintf(stderr, "attach_node_to_element failed\n");
+            return 1;
+        }
+        std::printf("node->element CSR: %td entries, %.1f MiB scratch for the element store\n",
+                    (ptrdiff_t)n2e_enc.size(),
+                    (double)d.nelements * 32 * sizeof(double) / (1024.0 * 1024.0));
+
+        std::vector<double> det1(ref.size()), det2(ref.size());
+        if (cvfem_cuda_residual_deterministic(ctx, rho, mu, 0, block_size, nullptr) != 0 ||
+            cvfem_cuda_synchronize() != 0 || cvfem_cuda_download_r(ctx, det1.data()) != 0)
+            return 1;
+        // Same call again, and at a different block size: neither may change a bit.
+        if (cvfem_cuda_residual_deterministic(ctx, rho, mu, 0, block_size == 64 ? 256 : 64,
+                                              nullptr) != 0 ||
+            cvfem_cuda_synchronize() != 0 || cvfem_cuda_download_r(ctx, det2.data()) != 0)
+            return 1;
+
+        const bool bitwise = std::memcmp(det1.data(), det2.data(),
+                                         det1.size() * sizeof(double)) == 0;
+        const double rel = max_abs_diff(ref, det1) / (refmax > 0 ? refmax : 1.0);
+        fail |= !(rel <= 1e-12) || !bitwise;
+        std::printf("vs host: rel = %.3e  %s\n", rel, rel <= 1e-12 ? "OK" : "FAIL");
+        std::printf("bit-identical across runs and block sizes: %s\n",
+                    bitwise ? "YES" : "NO -- FAIL");
+
+        const double td = cvfem_cuda_time_residual_deterministic(ctx, rho, mu, 0, block_size, repeat);
+        // Compared against the STANDARD-mesh kernel, not the packed one. The
+        // deterministic kernel is grid-stride over global ids, so that is its structural
+        // twin; timing it against the packed form would flatter it by charging the packed
+        // form's staging overhead to the baseline.
+        const double tg = cvfem_cuda_time_residual_global(ctx, rho, mu, 0, block_size, repeat);
+        std::printf("%-34s %10.4e s %9.1f MDOF/s\n", "deterministic", td,
+                    td > 0 ? (double)(d.nnodes * 4) / td * 1e-6 : 0.0);
+        std::printf("%-34s %10.4e s %9.1f MDOF/s   (reproducibility costs %.2fx)\n",
+                    "standard mesh, same shape", tg,
+                    tg > 0 ? (double)(d.nnodes * 4) / tg * 1e-6 : 0.0,
+                    (td > 0 && tg > 0) ? td / tg : 0.0);
+        csv_rows.push_back(mkrow("residual", "cuda_deterministic", "current", td));
+    }
+
     std::printf("\n=== packed mesh vs standard mesh, matrix-free ===\n");
     {
         // Own direction and own host references, so this section does not depend on

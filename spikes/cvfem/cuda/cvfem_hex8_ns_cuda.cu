@@ -76,6 +76,10 @@ struct cvfem_cuda_ctx {
     bool    jv_optin_done{false};
     // Isoparametric needs three more doubles per node for the coordinates, in both the
     // residual and the J*v kernel, so it carries its own sizes and its own opt-in.
+    // Bit-reproducible flush: per-element scratch and the node->element CSR.
+    double    *elem_r{nullptr};      // [32 * nelements]
+    ptrdiff_t *n2e_ptr{nullptr};     // [nnodes + 1]
+    int32_t   *n2e_enc{nullptr};     // element * 8 + local index
     size_t  iso_shmem_bytes{0}, iso_jv_shmem_bytes{0};
     bool    iso_optin_done{false}, iso_jv_optin_done{false};
 
@@ -556,6 +560,102 @@ int launch_assemble_packed(cvfem_cuda_ctx *ctx, double rho, double mu, int block
             ctx->nelements, ctx->n_elements_per_pack, rho, mu, ctx->elems,
             ctx->owned_nodes_ptr, ctx->ghost_ptr, ctx->ghost_idx, ctx->element_slots,
             ctx->adj, ctx->det, ctx->u, ctx->values, ctx->px, ctx->py, ctx->pz);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+// ------------------------------------------------ bit-reproducible residual
+//
+// Neither existing flush mode is reproducible run to run. The two-pass mode removes the
+// atomics from the global reduction, but both modes still accumulate a pack's elements
+// with atomicAdd into shared memory, and an atomic fixes no summation order. Getting a
+// reproducible answer needs the accumulation itself ordered, which means turning the
+// per-element scatter into a per-node gather.
+//
+// Phase 1 computes each element's 32 residual values and stores them. No accumulation,
+// so nothing to race. Phase 2 gives one thread per node and walks that node's elements
+// in increasing element order through the CSR, so every sum happens in the same order on
+// every run and at every block size.
+//
+// The cost is the scratch: 32 doubles per element written and read back, which is why
+// this is an additional mode and not a replacement for the fast ones.
+template <int GEOM>
+__global__ void cvfem_hex8_residual_store_kernel(
+        const ptrdiff_t nelements, const double rho, const double mu,
+        const int32_t *const __restrict__ elements,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        const double  *const __restrict__ u,
+        double *const __restrict__ elem_r,
+        const double  *const __restrict__ px,
+        const double  *const __restrict__ py,
+        const double  *const __restrict__ pz) {
+    for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
+         e += (ptrdiff_t)blockDim.x * gridDim.x) {
+        double ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES];
+        double uz[CVFEM_HEX8_N_NODES], pe[CVFEM_HEX8_N_NODES];
+        double ex[CVFEM_HEX8_N_NODES], ey[CVFEM_HEX8_N_NODES], ez[CVFEM_HEX8_N_NODES];
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const int32_t g = elements[(ptrdiff_t)a * nelements + e];
+            const double *const nd = &u[(ptrdiff_t)g * CVFEM_CUDA_NF];
+            ux[a] = nd[0]; uy[a] = nd[1]; uz[a] = nd[2]; pe[a] = nd[3];
+            if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) { ex[a] = px[g]; ey[a] = py[g]; ez[a] = pz[g]; }
+        }
+        double re[CVFEM_HEX8_N_DOF];
+        if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) {
+            cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex, ey, ez, ux, uy, uz, pe, re);
+        } else {
+            double adj_e[9];
+#pragma unroll
+            for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+            cvfem_hex8_ns_upwind_residual(rho, mu, adj_e, det[e], ux, uy, uz, pe, re);
+        }
+#pragma unroll
+        for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) elem_r[e * CVFEM_HEX8_N_DOF + i] = re[i];
+    }
+}
+
+__global__ void cvfem_hex8_residual_gather_kernel(
+        const ptrdiff_t nnodes,
+        const ptrdiff_t *const __restrict__ n2e_ptr,
+        const int32_t   *const __restrict__ n2e_enc,
+        const double    *const __restrict__ elem_r,
+        double *const __restrict__ r) {
+    for (ptrdiff_t n = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; n < nnodes;
+         n += (ptrdiff_t)blockDim.x * gridDim.x) {
+        double acc[CVFEM_CUDA_NF] = {0.0, 0.0, 0.0, 0.0};
+        // n2e_enc is built in increasing element order, so this sum is order-fixed.
+        for (ptrdiff_t k = n2e_ptr[n]; k < n2e_ptr[n + 1]; ++k) {
+            const int32_t enc = n2e_enc[k];
+            const double *const src = &elem_r[(ptrdiff_t)(enc >> 3) * CVFEM_HEX8_N_DOF
+                                              + (enc & 7) * CVFEM_CUDA_NF];
+#pragma unroll
+            for (int f = 0; f < CVFEM_CUDA_NF; ++f) acc[f] += src[f];
+        }
+        double *const dst = &r[n * CVFEM_CUDA_NF];
+#pragma unroll
+        for (int f = 0; f < CVFEM_CUDA_NF; ++f) dst[f] = acc[f];
+    }
+}
+
+template <int GEOM>
+int launch_residual_deterministic(cvfem_cuda_ctx *ctx, double rho, double mu, int block_size,
+                                  cudaStream_t s) {
+    if (!ctx->elements_global || !ctx->n2e_ptr) return 1;
+    if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM && !ctx->px) return 1;
+    if (!ctx->elem_r)
+        CVFEM_CUDA_CHECK(cudaMalloc(&ctx->elem_r,
+                                    (size_t)ctx->nelements * CVFEM_HEX8_N_DOF * sizeof(double)));
+    const int block = block_size > 0 ? block_size : 128;
+    const int egrid = (int)((ctx->nelements + block - 1) / block);
+    const int ngrid = (int)((ctx->nnodes + block - 1) / block);
+    cvfem_hex8_residual_store_kernel<GEOM><<<egrid, block, 0, s>>>(
+            ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det, ctx->u,
+            ctx->elem_r, ctx->px, ctx->py, ctx->pz);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    cvfem_hex8_residual_gather_kernel<<<ngrid, block, 0, s>>>(
+            ctx->nnodes, ctx->n2e_ptr, ctx->n2e_enc, ctx->elem_r, ctx->r);
     CVFEM_CUDA_CHECK(cudaGetLastError());
     return 0;
 }
@@ -1519,6 +1619,7 @@ extern "C" int cvfem_cuda_destroy(cvfem_cuda_ctx *ctx) {
     cudaFree(ctx->nl_masks);
     if (ctx->spdesc) cusparseDestroyMatDescr(ctx->spdesc);
     if (ctx->sp) cusparseDestroy(ctx->sp);
+    cudaFree(ctx->elem_r); cudaFree(ctx->n2e_ptr); cudaFree(ctx->n2e_enc);
     cudaFree(ctx->boundary_elems); cudaFree(ctx->px); cudaFree(ctx->py); cudaFree(ctx->pz);
     cudaFree(ctx->pgx); cudaFree(ctx->pgy); cudaFree(ctx->pgz); cudaFree(ctx->pgw);
     delete ctx;
@@ -1741,6 +1842,38 @@ extern "C" double cvfem_cuda_time_jacobian_action_global(cvfem_cuda_ctx *ctx, do
 extern "C" int cvfem_cuda_attach_elements_global(cvfem_cuda_ctx *ctx, const int32_t *elements) {
     if (ctx->elements_global) return 0;
     return device_dup(&ctx->elements_global, elements, (size_t)8 * ctx->nelements);
+}
+
+extern "C" int cvfem_cuda_attach_node_to_element(cvfem_cuda_ctx *ctx,
+                                                const ptrdiff_t *n2e_ptr,
+                                                const int32_t *n2e_enc, ptrdiff_t n_entries) {
+    if (ctx->n2e_ptr) return 0;
+    return device_dup(&ctx->n2e_ptr, n2e_ptr, (size_t)ctx->nnodes + 1) ||
+           device_dup(&ctx->n2e_enc, n2e_enc, (size_t)n_entries);
+}
+
+extern "C" int cvfem_cuda_residual_deterministic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                 int geom, int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return geom == CVFEM_CUDA_GEOM_ISOPARAM
+                   ? launch_residual_deterministic<CVFEM_CUDA_GEOM_ISOPARAM>(ctx, rho, mu, block_size, s)
+                   : launch_residual_deterministic<CVFEM_CUDA_GEOM_AFFINE>(ctx, rho, mu, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_residual_deterministic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                         int geom, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (cvfem_cuda_residual_deterministic(ctx, rho, mu, geom, block_size, nullptr) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (cvfem_cuda_residual_deterministic(ctx, rho, mu, geom, block_size, nullptr) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
 }
 
 extern "C" int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
