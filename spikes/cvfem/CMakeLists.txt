@@ -35,6 +35,32 @@ enable_testing()
 
 option(CVFEM_ENABLE_SUBPAR "Build the quarantined CVFEM variants in subpar/" OFF)
 
+# BLAS for the element-matrix gemm path. Off by default so the build stays dependency
+# free, but worth turning on wherever this is benchmarked: without it
+# packed_elements_matmul falls back to a triple loop, and a "gemm" measurement that is
+# really a hand-rolled loop says nothing about the gemm. Accelerate supplies the Fortran
+# BLAS symbols on Apple; elsewhere the standard BLAS package is used.
+option(CVFEM_ENABLE_BLAS "Use BLAS for the element-matrix gemm path" OFF)
+set(_cvfem_blas_libs)
+if(CVFEM_ENABLE_BLAS)
+    if(APPLE)
+        find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
+        set(_cvfem_blas_libs ${ACCELERATE_FRAMEWORK})
+        message(STATUS "cvfem BLAS: Accelerate")
+    else()
+        find_package(BLAS REQUIRED)
+        set(_cvfem_blas_libs ${BLAS_LIBRARIES})
+        message(STATUS "cvfem BLAS: ${BLAS_LIBRARIES}")
+    endif()
+endif()
+
+function(cvfem_blas_target tgt)
+    if(CVFEM_ENABLE_BLAS)
+        target_compile_definitions(${tgt} PRIVATE SFEM_ENABLE_BLAS)
+        target_link_libraries(${tgt} PRIVATE ${_cvfem_blas_libs})
+    endif()
+endfunction()
+
 # Applied to every target that can reach a quarantined variant. Without the option the
 # subpar/ headers are not on the include path at all, so a stray #include fails loudly
 # rather than silently resurrecting a removed kernel.
@@ -191,8 +217,11 @@ cvfem_subpar_target(cvfem_ns_apply_bench)
 add_executable(cvfem_sshex8_bench cvfem_sshex8_bench.cpp)
 target_link_libraries(cvfem_sshex8_bench PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_sshex8_bench PRIVATE ${_cvfem_perf_opts})
-target_include_directories(cvfem_sshex8_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(cvfem_sshex8_bench PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../operators)
 cvfem_subpar_target(cvfem_sshex8_bench)
+cvfem_blas_target(cvfem_sshex8_bench)
 add_test(NAME cvfem_sshex8_agree COMMAND cvfem_sshex8_bench)
 set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0")
 

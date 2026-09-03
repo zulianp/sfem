@@ -113,6 +113,17 @@ extern void sgemm_(const char  *transa,
 }
 #endif
 
+// WARNING: the two branches of this function do not compute the same thing, and the
+// difference is invisible for a symmetric element matrix.
+//
+// The fallback below evaluates Y_j[i] = sum_k element_matrix[i*K + k] * X_j[k], reading
+// the element matrix row-major. This branch passes transa='N' with lda=k, so column-major
+// dgemm reads that same buffer as its transpose and computes element_matrix^T * X_j. Both
+// are dimensionally valid when m == k and neither errors, so the disagreement only shows
+// up in the values -- and only for a matrix that is not its own transpose. Every element
+// matrix that has used this routine so far, linear elasticity included, is symmetric.
+//
+// Use packed_elements_matmul_nonsym below for anything that is not.
 static SFEM_INLINE void packed_elements_matmul(const int                           m,
                                                const int                           n,
                                                const int                           k,
@@ -160,6 +171,40 @@ static SFEM_INLINE void packed_elements_matmul(const int                        
     }
 }
 
+
+// Row-major element matrix, applied without an implicit transpose: computes
+// Y_j = element_matrix * X_j for every one of the n right-hand sides, matching the
+// fallback branch exactly. The only difference from the routine above is transa='T',
+// which undoes the column-major reinterpretation of a row-major buffer.
+static SFEM_INLINE void packed_elements_matmul_nonsym(const int                           m,
+                                                      const int                           n,
+                                                      const int                           k,
+                                                      const scalar_t *const SFEM_RESTRICT element_matrix,
+                                                      const scalar_t *const SFEM_RESTRICT X,
+                                                      scalar_t *const SFEM_RESTRICT       Y) {
+    char transa = 'T';
+    char transb = 'N';
+    int  ldm    = k;
+    int  ldx    = k;
+    int  ldy    = m;
+
+    if (sizeof(scalar_t) == 8) {
+        double alpha = 1;
+        double beta  = 0;
+        dgemm_(&transa, &transb, &m, &n, &k, &alpha,
+               reinterpret_cast<const double *>(element_matrix), &ldm,
+               reinterpret_cast<const double *>(X), &ldx, &beta,
+               reinterpret_cast<double *>(Y), &ldy);
+    } else {
+        float alpha = 1;
+        float beta  = 0;
+        sgemm_(&transa, &transb, &m, &n, &k, &alpha,
+               reinterpret_cast<const float *>(element_matrix), &ldm,
+               reinterpret_cast<const float *>(X), &ldx, &beta,
+               reinterpret_cast<float *>(Y), &ldy);
+    }
+}
+
 #else
 
 static SFEM_INLINE void packed_elements_matmul(const int                           M,
@@ -180,6 +225,16 @@ static SFEM_INLINE void packed_elements_matmul(const int                        
             Yj[i] = acc;
         }
     }
+}
+
+static SFEM_INLINE void packed_elements_matmul_nonsym(const int                           M,
+                                                      const int                           N,
+                                                      const int                           K,
+                                                      const scalar_t *const SFEM_RESTRICT element_matrix,
+                                                      const scalar_t *const SFEM_RESTRICT X,
+                                                      scalar_t *const SFEM_RESTRICT       Y) {
+    // The fallback already reads the element matrix row-major, so this is the same loop.
+    packed_elements_matmul(M, N, K, element_matrix, X, Y);
 }
 
 // TODO SME version
