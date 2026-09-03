@@ -320,10 +320,23 @@ int main(int argc, char **argv) {
     // The flat sympy kernel now has an isoparametric form; the blockwise, rowwise and
     // facewise CSE arrangements do not, so those combinations are still rejected rather
     // than silently falling back to a different kernel.
-    if (geom_kind == GeomKind::Isoparam && kernel_uses_sympy_residual(kernel_kind) &&
-        kernel_kind != KernelKind::Sympy) {
+    // Isoparametric geometry has exactly two element kernels -- the hand-written one
+    // (`current`) and the generated one (`sympy`) -- plus the finite-difference reference
+    // and the split. Sum factorisation has no isoparametric form at all: it exists
+    // because an affine element has one constant Jacobian to factor out, which is
+    // precisely what isoparametric geometry does not have. The other CSE arrangements
+    // were never generated isoparametrically.
+    //
+    // These are rejected rather than mapped onto the hand-written kernel. Mapping them is
+    // what the atomic layout used to do, and it meant `--kernel sumfact --geom isoparam`
+    // reported the hand-written kernel's throughput under the name `sumfact`.
+    if (geom_kind == GeomKind::Isoparam && kernel_kind != KernelKind::Current &&
+        kernel_kind != KernelKind::Sympy && kernel_kind != KernelKind::Fd &&
+        kernel_kind != KernelKind::Split) {
         std::fprintf(stderr,
-                     "--geom isoparam supports --kernel sympy, but not sympy_block/row/face\n");
+                     "--geom isoparam supports --kernel current|sympy|fd|split; '%s' has no "
+                     "isoparametric form\n",
+                     kernel.c_str());
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -587,7 +600,11 @@ int main(int argc, char **argv) {
                 assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
             else if (kernel_kind == KernelKind::Sympy)
                 assemble_jacobian_atomic_isoparam_sympy(d, bsr, rho, mu);
+            else if (kernel_kind == KernelKind::Fd)
+                assemble_jacobian_atomic_fd_isoparam(d, bsr, rho, mu);
             else
+                // Current: the hand-written isoparametric kernel. Every other name is
+                // rejected during validation, so this is not a fallback.
                 assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
         } else if (layout == "store") {
             assemble_jacobian_store(d, packed, bsr, rho, mu, kernel_kind, GeomKind::Affine);

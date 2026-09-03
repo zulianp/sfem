@@ -184,6 +184,45 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, cons
     }
 }
 
+// Finite-difference Jacobian on isoparametric geometry. The affine layout has had this
+// since the beginning; the isoparametric atomic path did not, so `--kernel fd --geom
+// isoparam --layout atomic` silently ran the hand-written kernel and reported its speed
+// under the name `fd`. The kernel it needs already existed and was already used by the
+// packed layout (cvfem_hex8_layout_packed.hpp), which is why that layout reported the
+// honest -- and much slower, as a finite-difference Jacobian should be -- figure.
+static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
+                                                               BSR4          &b,
+                                                               const scalar_t rho,
+                                                               const scalar_t mu) {
+    zero_bsr4(b);
+    scalar_t *const SFEM_RESTRICT values = b.values->data();
+    const smesh::count_t *const SFEM_RESTRICT slots =
+            b.element_slots.empty() ? nullptr : b.element_slots.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        scalar_t ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        cvfem_hex8_ns_upwind_jacobian_fd_isoparam(rho, mu, x, y, z, ux, uy, uz, p, ke);
+
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t row = d.elems[a][e];
+            for (int bnode = 0; bnode < CVFEM_HEX8_N_NODES; ++bnode) {
+                const smesh::count_t slot =
+                        slots ? slots[(size_t)e * 64 + a * 8 + bnode]
+                              : find_bsr_slot(b.rowptr, b.colidx, row, d.elems[bnode][e]);
+                scalar_t *const blk = values + (ptrdiff_t)slot * 16;
+                for (int rf = 0; rf < 4; ++rf)
+                    for (int cf = 0; cf < 4; ++cf)
+                        CVFEM_ATOMIC_ADD(blk[rf * 4 + cf],
+                                         ke[(a * 4 + rf) * CVFEM_HEX8_N_DOF + (bnode * 4 + cf)]);
+            }
+        }
+    }
+}
+
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
