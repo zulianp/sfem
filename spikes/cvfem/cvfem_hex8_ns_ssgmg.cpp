@@ -54,7 +54,7 @@ namespace {
                      "  SFEM_GEOM            affine | isoparam (default affine)\n"
                      "  SFEM_NL_MAX_IT SFEM_NL_RTOL SFEM_NL_ATOL\n"
                      "  SFEM_LSOLVE_RTOL SFEM_LSOLVE_ATOL SFEM_LSOLVE_MAX_IT\n"
-                     "  SFEM_PACK_SIZE       affine packed SIMD (default 0 = atomic; see note in source)\n"
+                     "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
                      "  SFEM_VERIFY_TOL      fail if velocity Linf exceeds this (default 1e-2)\n",
                      argv0);
     }
@@ -180,12 +180,7 @@ int main(int argc, char **argv) {
     const real_t      lin_rtol   = smesh::Env::read<real_t>("SFEM_LSOLVE_RTOL", 1e-8);
     const real_t      lin_atol   = smesh::Env::read<real_t>("SFEM_LSOLVE_ATOL", 1e-14);
     const int         lin_max_it = smesh::Env::read<int>("SFEM_LSOLVE_MAX_IT", 1000);
-    // Defaults to the atomic path, unlike the standalone driver, because the packed one
-    // segfaults from here. Known and unresolved: the same operator with the same pack
-    // size runs clean in cvfem_ns_op_gate, so it is not the packed kernels themselves.
-    // The crash is inside cvfem_hex8_fill_pack_xyz_pgrad on the first residual, reading
-    // through the pack's node lists. Set SFEM_PACK_SIZE=2048 to reproduce.
-    const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 0);
+    const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
     const real_t      verify_tol = smesh::Env::read<real_t>("SFEM_VERIFY_TOL", 1e-2);
 
     FlowCase flow;
@@ -216,9 +211,14 @@ int main(int argc, char **argv) {
     if (op->initialize() != SFEM_SUCCESS) return EXIT_FAILURE;
     f->add_operator(op);
 
-    const ptrdiff_t nnodes = mesh->n_nodes();
-    const ptrdiff_t ndof   = nnodes * N_FIELDS;
+    const ptrdiff_t     nnodes = mesh->n_nodes();
+    const ptrdiff_t     ndof   = nnodes * N_FIELDS;
+    std::vector<real_t> p_exact;
 
+    // Built after op->initialize(), and that order is required rather than incidental:
+    // initialize() renumbers the mesh nodes for the packed layout, so node indices taken
+    // before it would refer to the old numbering.
+    //
     // Boundary conditions, node by node, matching mark_constraints in the standalone
     // driver: no-slip and inlet/outlet fix all three velocity components to the exact
     // profile, the spanwise planes fix uz alone, and the pressure gets a single pin
@@ -230,6 +230,7 @@ int main(int argc, char **argv) {
 
         std::vector<idx_t>  uvw_nodes, uz_nodes;
         std::vector<real_t> uvw_ux, uvw_uy, uvw_uz, uz_vals;
+        p_exact.assign((size_t)nnodes, real_t(0));
         ptrdiff_t           pin  = 0;
         real_t              best = 1e300;
 
@@ -242,6 +243,7 @@ int main(int argc, char **argv) {
 
             real_t ux, uy, uz, p;
             cvfem_case::exact_state(flow, mu, U, Lx, Ly, x, y, z, ux, uy, uz, p);
+            p_exact[(size_t)i] = p;
 
             const bool wall_y = cvfem_case::on_plane(y, real_t(0), Ly) || cvfem_case::on_plane(y, Ly, Ly);
             const bool inlet  = cvfem_case::on_plane(x, real_t(0), Lx);
@@ -309,6 +311,13 @@ int main(int argc, char **argv) {
     std::vector<real_t> r((size_t)ndof, 0), dx((size_t)ndof, 0), rhs((size_t)ndof, 0);
     std::fill(x, x + ndof, real_t(0));
     f->apply_constraints(x);
+    // Seed the whole pressure field with the analytic pressure, not just the pinned node.
+    // The standalone driver's init_fields does the same -- velocity respects the
+    // constraint mask, pressure is set everywhere -- and it matters: starting from p = 0
+    // leaves Newton converging linearly at a far worse rate, needing several times the
+    // iterations for the same answer. Verification drivers against an analytic solution
+    // are entitled to the better initial guess; the two must simply agree about it.
+    for (ptrdiff_t i = 0; i < nnodes; ++i) x[(size_t)i * 4 + 3] = p_exact[(size_t)i];
 
     std::vector<mask_t> cmask(mask_count(ndof), 0);
     f->constraints_mask(cmask.data());

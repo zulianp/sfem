@@ -46,6 +46,16 @@ namespace sfem {
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;
 
+        // WARNING: this renumbers the mesh's nodes when the packed path is enabled
+        // (pack_size > 0 with affine geometry). The packed kernels address the global
+        // arrays as `owned_nodes_ptr[pack] + k`, which is only a node id because packing
+        // made each pack's owned nodes contiguous, so the renumbering is part of the
+        // layout rather than an optimisation that could be skipped.
+        //
+        // Anything indexed by node must therefore be built AFTER this call -- Dirichlet
+        // node sets, initial conditions, anything reading mesh->points(). Building them
+        // first leaves them referring to the old numbering, silently. Set pack_size = 0
+        // to keep the mesh untouched at the cost of the packed kernels.
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
         // Refreshes the nodal pressure gradient Rhie-Chow interpolation needs. The

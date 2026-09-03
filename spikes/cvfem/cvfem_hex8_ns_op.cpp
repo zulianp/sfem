@@ -62,7 +62,26 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        d.mesh      = mesh;
+        d.mesh = mesh;
+
+        // Packing comes first, and the mesh pointers are read only afterwards.
+        //
+        // make_packed builds a PackedMesh with modify_mesh = true, and that renumbers the
+        // mesh nodes in place (smesh_packed_mesh.cpp: mesh->renumber_nodes(node_map)).
+        // The renumbering is load-bearing rather than incidental: the packed kernels index
+        // the global arrays as `owned_nodes_ptr[pack] + k`, which is only a valid node id
+        // because each pack's owned nodes were made contiguous. Capturing elems/points
+        // before this leaves them pointing at the pre-renumbering arrays.
+        if (to_geom_kind(geom) == GeomKind::Affine && pack_size > 0) {
+            impl_->packed   = make_packed(d.mesh, pack_size);
+            d.packed        = &impl_->packed;
+            impl_->coloring = cvfem_build_pack_coloring(impl_->packed.n_packs,
+                                                       impl_->packed.owned_nodes_ptr,
+                                                       impl_->packed.ghost_ptr,
+                                                       impl_->packed.ghost_idx);
+            d.coloring      = &impl_->coloring;
+        }
+
         d.nnodes    = mesh->n_nodes();
         d.nelements = mesh->n_elements(0);
         d.elems     = mesh->elements(0)->data();
@@ -98,18 +117,7 @@ namespace sfem {
         d.rz.assign((size_t)d.nnodes, scalar_t(0));
         d.rc.assign((size_t)d.nnodes, scalar_t(0));
 
-        if (to_geom_kind(geom) == GeomKind::Affine) {
-            cvfem_hex8_precompute_affine_geometry(d);
-            if (pack_size > 0) {
-                impl_->packed   = make_packed(d.mesh, pack_size);
-                d.packed        = &impl_->packed;
-                impl_->coloring = cvfem_build_pack_coloring(impl_->packed.n_packs,
-                                                           impl_->packed.owned_nodes_ptr,
-                                                           impl_->packed.ghost_ptr,
-                                                           impl_->packed.ghost_idx);
-                d.coloring      = &impl_->coloring;
-            }
-        }
+        if (to_geom_kind(geom) == GeomKind::Affine) cvfem_hex8_precompute_affine_geometry(d);
 
         // The sparsity is the mesh's node-to-node graph, which is also what hessian_bsr
         // is handed, so the element-to-slot map can be built once here.

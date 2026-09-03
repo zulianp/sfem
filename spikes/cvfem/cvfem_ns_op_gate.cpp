@@ -83,7 +83,23 @@ int main(int argc, char **argv) {
 
             auto mesh = smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
 
-            // ---- reference: exactly what the driver sets up ----
+            // The Op is built and initialized FIRST, before the reference path touches the
+            // mesh. That ordering is the whole point: initialize() renumbers the nodes for
+            // the packed layout, and a gate that let the reference pack the mesh first
+            // would find the mesh already renumbered and never exercise the case a real
+            // driver hits. This gate did exactly that once, and passed while the frontend
+            // driver segfaulted on the same code.
+            auto fs = sfem::FunctionSpace::create(mesh, N_FIELDS);
+            auto op = std::make_shared<sfem::CVFEMNavierStokes>(fs);
+            op->rho             = rho;
+            op->mu              = mu;
+            op->rhie_chow_scale = rc_scale;
+            op->geom            = (geom == GeomKind::Isoparam) ? sfem::CVFEMGeometry::Isoparam
+                                                               : sfem::CVFEMGeometry::Affine;
+            op->pack_size       = pack_size;
+            op->initialize();
+
+            // ---- reference: exactly what the driver sets up, on the mesh as the Op left it ----
             MeshData     d;
             PackedData   packed;
             PackColoring coloring;
@@ -136,17 +152,6 @@ int main(int argc, char **argv) {
             std::vector<scalar_t> ref_jv((size_t)ndof, 0);
             assemble_nodal_p_grad(d, geom);
             apply_jacobian_action_accumulate(d, rho, mu, geom, dir.data(), ref_jv.data());
-
-            // ---- the Op, through a FunctionSpace ----
-            auto fs = sfem::FunctionSpace::create(mesh, N_FIELDS);
-            auto op = std::make_shared<sfem::CVFEMNavierStokes>(fs);
-            op->rho             = rho;
-            op->mu              = mu;
-            op->rhie_chow_scale = rc_scale;
-            op->geom            = (geom == GeomKind::Isoparam) ? sfem::CVFEMGeometry::Isoparam
-                                                              : sfem::CVFEMGeometry::Affine;
-            op->pack_size       = pack_size;
-            op->initialize();
 
             std::vector<real_t> op_r((size_t)ndof, 0);
             op->gradient(x.data(), op_r.data());
