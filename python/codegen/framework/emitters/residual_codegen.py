@@ -2631,6 +2631,75 @@ def _mesh_stream_arguments(dependencies, fields, output=True):
     ]
 
 
+def _block_stream_plans(
+    dependencies, dim, n_fields, tensor_product, gradient_metric=None
+):
+    """The streams a block call site hands its local kernel, in the plan's order.
+
+    This is the same plan that decides the local kernel's signature.  Four call
+    sites were each rebuilding its geometry-and-reference prefix by hand --
+    metric or determinant, adjugate when the form needs one, one-dimensional or
+    simplex reference basis -- in four near-identical copies that nothing held
+    to the signature they were calling.
+    """
+    return local_kernel_stream_plans(
+        dependencies,
+        dim=dim,
+        n_fields=n_fields,
+        tensor_product=tensor_product,
+        uses_gradient_metric=gradient_metric is not None,
+        metric_components=symmetric_metric_component_count(dim),
+        grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
+    )
+
+
+def _block_call_argument(stream, mode, names=None):
+    """Spell one of those streams as a block call site names it.
+
+    Reference data is addressed through the mesh's reference tables and
+    material parameters by their own name; everything else is a block-local
+    buffer and carries the ``block_`` prefix those buffers use.  ``names``
+    overrides the sites that pass something else -- a stream pointer array, an
+    offset into a shared output, a geometry stream read out of the affine
+    bundle, or the quadrature weights a cached affine metric carries with it.
+
+    A name given by the site wins over every default, including for reference
+    data, because the override is the site saying where its copy of that stream
+    actually lives.
+    """
+    if names and stream.name in names:
+        return names[stream.name]
+    if stream.role is DataStreamRole.REFERENCE:
+        return _mesh_reference_name(mode, stream.name)
+    if stream.role is DataStreamRole.MATERIAL_PARAMETER:
+        return str(stream.name)
+    return "block_%s" % stream.name
+
+
+def _affine_block_names(geometry_stream_indices, uses_cached_affine_metric, names=None):
+    """What an affine block call site calls the streams it spells differently.
+
+    The determinant arrives inside the affine geometry bundle rather than as
+    its own buffer, and a cached affine metric carries the quadrature weights
+    with it instead of reading the mesh's reference table.  Both are questions
+    of where this site keeps the stream, not of which streams there are.
+
+    A gradient-metric kernel is handed the metric in place of the determinant,
+    and its affine bundle then carries no determinant to index.  The plan emits
+    no determinant stream in that case either, so the two agree: an override is
+    offered only for a stream that is actually there.
+    """
+    spelled = dict(names or {})
+    if "jacobian_determinant0" in geometry_stream_indices:
+        spelled["determinant"] = (
+            "block_affine_geometry_streams[%d]"
+            % geometry_stream_indices["jacobian_determinant0"]
+        )
+    if uses_cached_affine_metric:
+        spelled["q_weight"] = "cached_affine_metric_q_weight"
+    return spelled
+
+
 def _stream_call_arguments(streams, spell):
     """A local kernel's call arguments, in the plan's order.
 
@@ -5865,48 +5934,21 @@ def _mesh_operator_source(
                 ),
             )
         )
-    call_args = [
-        "nelems",
-        "0",
-    ]
-    if gradient_metric is not None:
-        call_args.append("block_geom_metric")
-    else:
-        call_args.append(
-            "block_affine_geometry_streams[%d]"
-            % affine_geometry_stream_indices["jacobian_determinant0"]
+    call_args = ["nelems", "0"]
+    call_args.extend(
+        _stream_call_arguments(
+            _block_stream_plans(
+                dependencies, dim, n_fields, tensor_product, gradient_metric
+            ),
+            lambda stream: _block_call_argument(
+                stream,
+                AFFINE_MODE,
+            _affine_block_names(
+                affine_geometry_stream_indices, uses_cached_affine_metric, block_stream_args
+            ),
+            ),
         )
-    if dependencies.uses_adjugate and gradient_metric is None:
-        call_args.append("block_adjugate")
-    if tensor_product:
-        call_args.append(_mesh_reference_name(AFFINE_MODE, "shape_1d"))
-        if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name(AFFINE_MODE, "grad_1d"))
-        call_args.append(_mesh_reference_name(AFFINE_MODE, "q_weight_1d"))
-    else:
-        if not omit_simplex_reference_basis_inputs:
-            call_args.append(_mesh_reference_name(AFFINE_MODE, "shape"))
-            if dependencies.uses_reference_gradients:
-                call_args.extend(
-                    _mesh_reference_name(
-                        AFFINE_MODE,
-                        sfem_simplex_grad_ref_name("grad_ref", d),
-                    )
-                    for d in range(dim)
-                )
-        call_args.append(
-            "cached_affine_metric_q_weight"
-            if uses_cached_affine_metric
-            else _mesh_reference_name(AFFINE_MODE, "q_weight")
-        )
-    if dependencies.current:
-        call_args.append(block_stream_args["current"])
-    if dependencies.previous:
-        call_args.append(block_stream_args["previous"])
-    if dependencies.direction:
-        call_args.append(block_stream_args["direction"])
-    call_args.extend(map(str, dependencies.parameters))
-    call_args.append(block_stream_args["output"])
+    )
     local_call.extend(
         [
             "",
@@ -6788,36 +6830,21 @@ def _scalar_crs_matrix_assembly_source(
         "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
         % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
     )
-    call_args = [
-        "1",
-        "1",
-        "block_determinant",
-    ]
-    if dependencies.uses_adjugate:
-        call_args.append("block_adjugate")
-    if tensor_product:
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
-        if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
-    else:
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
-        if dependencies.uses_reference_gradients:
-            call_args.extend(
-                _mesh_reference_name(
-                    ISOPARAMETRIC_MODE,
-                    sfem_simplex_grad_ref_name("grad_ref", d),
+    call_args = ["1", "1"]
+    call_args.extend(
+        _stream_call_arguments(
+            _block_stream_plans(
+                jacobian_action_dependencies(dependencies), dim, n_fields, tensor_product
+            ),
+            lambda stream: _block_call_argument(
+                stream, ISOPARAMETRIC_MODE, dict(
+                    state_stream_args,
+                    direction=direction_arg,
+                    output=output_arg,
                 )
-                for d in range(dim)
-            )
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
-    if state_dependencies.current:
-        call_args.append(state_stream_args["current"])
-    if state_dependencies.previous:
-        call_args.append(state_stream_args["previous"])
-    call_args.append(direction_arg)
-    call_args.extend(map(str, dependencies.parameters))
-    call_args.append(output_arg)
+            ),
+        )
+    )
     lines.extend([""])
     lines.extend(_local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, "        "))
     lines.extend(_local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, "        "))
@@ -7778,36 +7805,21 @@ def _scalar_coo_triplet_matrix_assembly_source(
         "        const scalar_t *const block_adjugate[DIM * DIM] = {%s};"
         % ", ".join("block_adjugate_data[%d]" % i for i in range(dim * dim))
     )
-    call_args = [
-        "1",
-        "1",
-        "block_determinant",
-    ]
-    if dependencies.uses_adjugate:
-        call_args.append("block_adjugate")
-    if tensor_product:
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
-        if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
-    else:
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
-        if dependencies.uses_reference_gradients:
-            call_args.extend(
-                _mesh_reference_name(
-                    ISOPARAMETRIC_MODE,
-                    sfem_simplex_grad_ref_name("grad_ref", d),
+    call_args = ["1", "1"]
+    call_args.extend(
+        _stream_call_arguments(
+            _block_stream_plans(
+                jacobian_action_dependencies(dependencies), dim, n_fields, tensor_product
+            ),
+            lambda stream: _block_call_argument(
+                stream, ISOPARAMETRIC_MODE, dict(
+                    state_stream_args,
+                    direction=direction_arg,
+                    output=output_arg,
                 )
-                for d in range(dim)
-            )
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
-    if state_dependencies.current:
-        call_args.append(state_stream_args["current"])
-    if state_dependencies.previous:
-        call_args.append(state_stream_args["previous"])
-    call_args.append(direction_arg)
-    call_args.extend(map(str, dependencies.parameters))
-    call_args.append(output_arg)
+            ),
+        )
+    )
     lines.extend(
         [
             "",
@@ -8448,40 +8460,17 @@ def _isoparametric_mesh_operator_source(
                 ),
             )
         )
-    call_args = [
-        "nelems",
-        "VECTOR_SIZE",
-    ]
-    if gradient_metric is not None:
-        call_args.append("block_geom_metric")
-    else:
-        call_args.append("block_determinant")
-    if dependencies.uses_adjugate and gradient_metric is None:
-        call_args.append("block_adjugate")
-    if tensor_product:
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
-        if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
-    else:
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
-        if dependencies.uses_reference_gradients:
-            call_args.extend(
-                _mesh_reference_name(
-                    ISOPARAMETRIC_MODE,
-                    sfem_simplex_grad_ref_name("grad_ref", d),
-                )
-                for d in range(dim)
-            )
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
-    if dependencies.current:
-        call_args.append(block_stream_args["current"])
-    if dependencies.previous:
-        call_args.append(block_stream_args["previous"])
-    if dependencies.direction:
-        call_args.append(block_stream_args["direction"])
-    call_args.extend(map(str, dependencies.parameters))
-    call_args.append(block_stream_args["output"])
+    call_args = ["nelems", "VECTOR_SIZE"]
+    call_args.extend(
+        _stream_call_arguments(
+            _block_stream_plans(
+                dependencies, dim, n_fields, tensor_product, gradient_metric
+            ),
+            lambda stream: _block_call_argument(
+                stream, ISOPARAMETRIC_MODE, block_stream_args
+            ),
+        )
+    )
     lines.extend(
         [
             "",
@@ -8836,32 +8825,17 @@ def _scalar_packed_jacobian_action_source(
                 for component in range(dim * dim)
             )
         )
-    call_args = ["nelems", "VECTOR_SIZE", "block_determinant"]
-    if dependencies.uses_adjugate:
-        call_args.append("block_adjugate")
-    if tensor_product:
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape_1d"))
-        if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "grad_1d"))
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight_1d"))
-    else:
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "shape"))
-        if dependencies.uses_reference_gradients:
-            call_args.extend(
-                _mesh_reference_name(
-                    ISOPARAMETRIC_MODE,
-                    sfem_simplex_grad_ref_name("grad_ref", d),
-                )
-                for d in range(dim)
-            )
-        call_args.append(_mesh_reference_name(ISOPARAMETRIC_MODE, "q_weight"))
-    if dependencies.current:
-        call_args.append("block_current")
-    if dependencies.previous:
-        call_args.append("block_previous")
-    call_args.append("block_direction")
-    call_args.extend(map(str, dependencies.parameters))
-    call_args.append("block_output")
+    call_args = ["nelems", "VECTOR_SIZE"]
+    call_args.extend(
+        _stream_call_arguments(
+            _block_stream_plans(
+                jacobian_action_dependencies(dependencies), dim, n_fields, tensor_product
+            ),
+            lambda stream: _block_call_argument(
+                stream, ISOPARAMETRIC_MODE
+            ),
+        )
+    )
     lines.extend(
         [
             "",
@@ -9970,43 +9944,20 @@ def _scalar_packed_affine_jacobian_action_source(
             )
         )
     call_args = ["nelems", "0"]
-    if gradient_metric is not None:
-        call_args.append("block_geom_metric")
-    else:
-        call_args.append(
-            "block_affine_geometry_streams[%d]"
-            % affine_geometry_stream_indices["jacobian_determinant0"]
+    call_args.extend(
+        _stream_call_arguments(
+            _block_stream_plans(
+                jacobian_action_dependencies(dependencies), dim, n_fields, tensor_product, gradient_metric
+            ),
+            lambda stream: _block_call_argument(
+                stream,
+                AFFINE_MODE,
+            _affine_block_names(
+                affine_geometry_stream_indices, uses_cached_affine_metric
+            ),
+            ),
         )
-    if dependencies.uses_adjugate and gradient_metric is None:
-        call_args.append("block_adjugate")
-    if tensor_product:
-        call_args.append(_mesh_reference_name(AFFINE_MODE, "shape_1d"))
-        if dependencies.uses_reference_gradients:
-            call_args.append(_mesh_reference_name(AFFINE_MODE, "grad_1d"))
-        call_args.append(_mesh_reference_name(AFFINE_MODE, "q_weight_1d"))
-    else:
-        if not omit_simplex_reference_basis_inputs:
-            call_args.append(_mesh_reference_name(AFFINE_MODE, "shape"))
-            if dependencies.uses_reference_gradients:
-                call_args.extend(
-                    _mesh_reference_name(
-                        AFFINE_MODE,
-                        sfem_simplex_grad_ref_name("grad_ref", d),
-                    )
-                    for d in range(dim)
-                )
-        call_args.append(
-            "cached_affine_metric_q_weight"
-            if uses_cached_affine_metric
-            else _mesh_reference_name(AFFINE_MODE, "q_weight")
-        )
-    if dependencies.current:
-        call_args.append("block_current")
-    if dependencies.previous:
-        call_args.append("block_previous")
-    call_args.append("block_direction")
-    call_args.extend(map(str, dependencies.parameters))
-    call_args.append("block_output")
+    )
     lines.extend(
         [
             "",
