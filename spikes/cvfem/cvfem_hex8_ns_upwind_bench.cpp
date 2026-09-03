@@ -317,8 +317,13 @@ int main(int argc, char **argv) {
         return 1;
     }
     const GeomKind geom_kind = parse_geom(geom);
-    if (geom_kind == GeomKind::Isoparam && kernel_uses_sympy_residual(kernel_kind)) {
-        std::fprintf(stderr, "--geom isoparam is incompatible with sympy kernels\n");
+    // The flat sympy kernel now has an isoparametric form; the blockwise, rowwise and
+    // facewise CSE arrangements do not, so those combinations are still rejected rather
+    // than silently falling back to a different kernel.
+    if (geom_kind == GeomKind::Isoparam && kernel_uses_sympy_residual(kernel_kind) &&
+        kernel_kind != KernelKind::Sympy) {
+        std::fprintf(stderr,
+                     "--geom isoparam supports --kernel sympy, but not sympy_block/row/face\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -431,6 +436,22 @@ int main(int argc, char **argv) {
         pack_residual(d, isoparam_r);
         const scalar_t iso_err = max_abs_diff(current_r.data(), isoparam_r.data(), (ptrdiff_t)current_r.size());
         std::printf("verify_isoparam_residual_vs_affine_abs: %.6e\n", iso_err);
+
+        // The generated isoparametric kernel against the hand-written one. Both compute
+        // the same discretisation, so this must be at rounding level -- unlike the
+        // comparison above, which is isoparametric against affine and is a property of
+        // the mesh rather than of the code.
+        apply_residual_atomic_isoparam_sympy(d, rho, mu);
+        std::vector<scalar_t> isoparam_sympy_r;
+        pack_residual(d, isoparam_sympy_r);
+        const scalar_t iso_sympy_err = max_abs_diff(isoparam_r.data(), isoparam_sympy_r.data(),
+                                                    (ptrdiff_t)isoparam_r.size());
+        std::printf("verify_sympy_isoparam_residual_vs_handwritten_abs: %.6e\n", iso_sympy_err);
+        if (iso_sympy_err > 1.0e-12) {
+            std::fprintf(stderr, "HEX8 sympy isoparametric residual mismatch\n");
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
         if (warp == scalar_t(0)) {
             if (iso_err > 1.0e-12) {
                 std::fprintf(stderr, "HEX8 cube isoparam residual mismatch vs affine\n");
@@ -539,6 +560,8 @@ int main(int argc, char **argv) {
                 apply_residual_colored(d, packed, colors, rho, mu, kernel_kind, GeomKind::Isoparam);
             else if (layout == "packed" || layout == "store")
                 apply_residual_packed(d, packed, rho, mu, kernel_kind, GeomKind::Isoparam);
+            else if (kernel_kind == KernelKind::Sympy)
+                apply_residual_atomic_isoparam_sympy(d, rho, mu);
             else
                 apply_residual_atomic_isoparam(d, rho, mu);
         } else if (layout == "colored")
@@ -562,6 +585,8 @@ int main(int argc, char **argv) {
                 assemble_jacobian_packed(d, packed, bsr, rho, mu, kernel_kind, GeomKind::Isoparam);
             else if (kernel_kind == KernelKind::Split)
                 assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
+            else if (kernel_kind == KernelKind::Sympy)
+                assemble_jacobian_atomic_isoparam_sympy(d, bsr, rho, mu);
             else
                 assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
         } else if (layout == "store") {

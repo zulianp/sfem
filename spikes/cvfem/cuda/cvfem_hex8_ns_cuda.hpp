@@ -108,6 +108,10 @@ enum {
     // alternative CSE arrangement of the same element matrix -- it computes a different
     // one -- so it must not be swept alongside the five above.
     CVFEM_CUDA_JAC_ISOPARAM    = 16,
+    // Generated (CSE) isoparametric kernel. Separate from the five affine CSE shapes for
+    // the same reason as above: it computes a different element matrix, not a different
+    // arrangement of the same one.
+    CVFEM_CUDA_JAC_ISOPARAM_SYMPY = 17,
 };
 
 const char *cvfem_cuda_jac_variant_name(int variant);
@@ -193,6 +197,11 @@ int    cvfem_cuda_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                     int block_size, void *stream);
 double cvfem_cuda_time_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,
                                          int block_size, int repeat);
+
+int    cvfem_cuda_assemble_isoparam_sympy(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                          int block_size, void *stream);
+double cvfem_cuda_time_assemble_isoparam_sympy(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                               int block_size, int repeat);
 
 // The same BSR-assembly strategies the affine path has, on isoparametric geometry.
 //

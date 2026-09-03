@@ -43,6 +43,41 @@ DN_REF = (
 )
 
 
+# Sub-control-surface reference points, matching CVFEM_HEX8_SCS_XI in the C++ header.
+# The reference element is the unit cube, so these are exact rationals.
+_H = sp.Rational(1, 2)
+_Q = sp.Rational(1, 4)
+_T = sp.Rational(3, 4)
+SCS_XI = (
+    (_H, _Q, _Q), (_H, _T, _Q), (_H, _Q, _T), (_H, _T, _T),
+    (_Q, _H, _Q), (_T, _H, _Q), (_Q, _H, _T), (_T, _H, _T),
+    (_Q, _Q, _H), (_T, _Q, _H), (_T, _T, _H), (_Q, _T, _H),
+)
+
+
+def dn_ref_at(xi, eta, zeta):
+    """Trilinear shape-function derivatives on the unit cube.
+
+    Mirrors cvfem_hex8_dn_ref exactly. The affine generator uses the element centre
+    for every face, which is what makes one velocity gradient serve all twelve; the
+    isoparametric one evaluates this at each sub-control surface instead, and that
+    is the whole of the difference between the two.
+    """
+    x0 = 1 - xi
+    y0 = 1 - eta
+    z0 = 1 - zeta
+    return (
+        (-y0 * z0,   -x0 * z0,   -x0 * y0),
+        ( y0 * z0,   -xi * z0,   -xi * y0),
+        ( eta * z0,   xi * z0,   -xi * eta),
+        (-eta * z0,   x0 * z0,   -x0 * eta),
+        (-y0 * zeta, -x0 * zeta,  x0 * y0),
+        ( y0 * zeta, -xi * zeta,  xi * y0),
+        ( eta * zeta, xi * zeta,  xi * eta),
+        (-eta * zeta, x0 * zeta,  x0 * eta),
+    )
+
+
 class ScalarPrinter(C99CodePrinter):
     def _print_Rational(self, expr: sp.Rational) -> str:
         return f"scalar_t({expr.p}) / scalar_t({expr.q})"
@@ -79,6 +114,11 @@ def build_symbols() -> dict[str, object]:
         "mu": sp.Symbol("mu"),
         "det": sp.Symbol("det"),
         "cof": sp.symbols("cof0:9"),
+        # Isoparametric: one adjugate and determinant per sub-control surface. The
+        # caller evaluates them with cvfem_hex8_geom_at; the generated body treats
+        # them as opaque symbols exactly as the affine body treats cof/det.
+        "cof_s": tuple(sp.symbols(f"c{s}_0:9") for s in range(12)),
+        "det_s": tuple(sp.Symbol(f"d{s}") for s in range(12)),
         "ux": sp.symbols("ux0:8"),
         "uy": sp.symbols("uy0:8"),
         "uz": sp.symbols("uz0:8"),
@@ -87,8 +127,9 @@ def build_symbols() -> dict[str, object]:
     }
 
 
-def area(sym: dict[str, object], ar: tuple[sp.Rational, sp.Rational, sp.Rational]) -> tuple[sp.Expr, sp.Expr, sp.Expr]:
-    cof = sym["cof"]
+def area(sym: dict[str, object], ar: tuple[sp.Rational, sp.Rational, sp.Rational],
+         face: int | None = None) -> tuple[sp.Expr, sp.Expr, sp.Expr]:
+    cof = sym["cof"] if face is None else sym["cof_s"][face]
     ar0, ar1, ar2 = ar
     return (
         cof[0] * ar0 + cof[3] * ar1 + cof[6] * ar2,
@@ -97,9 +138,16 @@ def area(sym: dict[str, object], ar: tuple[sp.Rational, sp.Rational, sp.Rational
     )
 
 
-def velocity_gradient(sym: dict[str, object]) -> tuple[sp.Expr, ...]:
-    cof = sym["cof"]
-    det = sym["det"]
+def velocity_gradient(sym: dict[str, object], face: int | None = None) -> tuple[sp.Expr, ...]:
+    """Affine (face=None) evaluates once at the element centre and every face shares it.
+
+    Isoparametric evaluates per face, with that face's geometry and that face's shape
+    derivatives, so nothing is shared between faces -- which is exactly why the
+    isoparametric body is bigger and why CSE has less to work with.
+    """
+    cof = sym["cof"] if face is None else sym["cof_s"][face]
+    det = sym["det"] if face is None else sym["det_s"][face]
+    dn = DN_REF if face is None else dn_ref_at(*SCS_XI[face])
     inv_det = 1 / det
     out: list[sp.Expr] = []
     for comp in (sym["ux"], sym["uy"], sym["uz"]):
@@ -107,9 +155,9 @@ def velocity_gradient(sym: dict[str, object]) -> tuple[sp.Expr, ...]:
         ds = sp.Integer(0)
         dt = sp.Integer(0)
         for a in range(N_NODE):
-            dr += comp[a] * DN_REF[a][0]
-            ds += comp[a] * DN_REF[a][1]
-            dt += comp[a] * DN_REF[a][2]
+            dr += comp[a] * dn[a][0]
+            ds += comp[a] * dn[a][1]
+            dt += comp[a] * dn[a][2]
         out.extend(
             (
                 (cof[0] * dr + cof[3] * ds + cof[6] * dt) * inv_det,
@@ -120,7 +168,7 @@ def velocity_gradient(sym: dict[str, object]) -> tuple[sp.Expr, ...]:
     return tuple(out)
 
 
-def face_residual_expr(sym: dict[str, object], s: int) -> tuple[list[sp.Expr], sp.Expr]:
+def face_residual_expr(sym: dict[str, object], s: int, isoparam: bool = False) -> tuple[list[sp.Expr], sp.Expr]:
     rho = sym["rho"]
     mu = sym["mu"]
     ux = sym["ux"]
@@ -130,9 +178,10 @@ def face_residual_expr(sym: dict[str, object], s: int) -> tuple[list[sp.Expr], s
     sgn = sym["sgn"]
 
     r = [sp.Integer(0)] * N_DOF
-    g00, g01, g02, g10, g11, g12, g20, g21, g22 = velocity_gradient(sym)
+    face = s if isoparam else None
+    g00, g01, g02, g10, g11, g12, g20, g21, g22 = velocity_gradient(sym, face)
     i, j, ar = SCS[s]
-    ax, ay, az = area(sym, ar)
+    ax, ay, az = area(sym, ar, face)
     adv_x = sp.Rational(1, 2) * (ux[i] + ux[j])
     adv_y = sp.Rational(1, 2) * (uy[i] + uy[j])
     adv_z = sp.Rational(1, 2) * (uz[i] + uz[j])
@@ -161,11 +210,11 @@ def face_residual_expr(sym: dict[str, object], s: int) -> tuple[list[sp.Expr], s
     return r, mdot
 
 
-def residual_exprs(sym: dict[str, object]) -> tuple[list[sp.Expr], list[sp.Expr]]:
+def residual_exprs(sym: dict[str, object], isoparam: bool = False) -> tuple[list[sp.Expr], list[sp.Expr]]:
     r = [sp.Integer(0)] * N_DOF
     mdots: list[sp.Expr] = []
     for s in range(len(SCS)):
-        fr, mdot = face_residual_expr(sym, s)
+        fr, mdot = face_residual_expr(sym, s, isoparam)
         mdots.append(mdot)
         for i in range(N_DOF):
             r[i] += fr[i]
@@ -213,6 +262,29 @@ def input_locals(include_pressure: bool) -> str:
 
 def geom_locals() -> str:
     lines = [f"    const scalar_t cof{i} = adj[{i}];" for i in range(9)]
+    return "\n".join(lines)
+
+
+def geom_locals_isoparam() -> str:
+    """Evaluate the twelve sub-control-surface geometries, then name their components.
+
+    This part is deliberately not generated symbolically. Expressing the adjugate as a
+    polynomial in the 24 nodal coordinates and letting it feed the whole element matrix
+    makes the expressions explode; calling cvfem_hex8_geom_at twelve times is what the
+    hand-written isoparametric kernel does, costs the same arithmetic, and keeps the
+    generated body to the algebra that CSE can actually improve.
+    """
+    lines = [
+        "    scalar_t adjs[CVFEM_HEX8_N_SCS][9], dets[CVFEM_HEX8_N_SCS];",
+        "    for (int s_ = 0; s_ < CVFEM_HEX8_N_SCS; ++s_) {",
+        "        cvfem_hex8_geom_at<scalar_t>(x, y, z, CVFEM_HEX8_SCS_XI[s_][0], "
+        "CVFEM_HEX8_SCS_XI[s_][1], CVFEM_HEX8_SCS_XI[s_][2], adjs[s_], &dets[s_]);",
+        "    }",
+    ]
+    for s in range(12):
+        for i in range(9):
+            lines.append(f"    const scalar_t c{s}_{i} = adjs[{s}][{i}];")
+        lines.append(f"    const scalar_t d{s} = dets[{s}];")
     return "\n".join(lines)
 
 
@@ -322,6 +394,13 @@ def generate() -> str:
         face_residual, _mdot = face_residual_expr(sym, s)
         face_jacs.append([sp.diff(row, col) for row in face_residual for col in q])
 
+    # Isoparametric: the same expressions with per-face geometry. Every face carries its
+    # own adjugate, determinant and shape derivatives, so nothing is shared between
+    # faces and CSE has far less to exploit than in the affine case -- which is the
+    # substance of the comparison these kernels exist to make.
+    iso_residual, iso_mdots = residual_exprs(sym, isoparam=True)
+    iso_jac = [sp.diff(row, col) for row in iso_residual for col in q]
+
     return f"""#ifndef CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP
 #define CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP
 
@@ -408,6 +487,48 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
 {input_locals(include_pressure=False)}
 {sign_locals(mdots)}
 {cse_add_facewise_bsr_slots_code(face_jacs, atomic=True)}
+}}
+
+// ---------------------------------------------------------------- isoparametric
+//
+// Same algebra, per-face geometry. The twelve sub-control-surface Jacobians are
+// evaluated by ordinary code rather than generated: expressing the adjugate as a
+// polynomial in the 24 nodal coordinates and letting it feed the element matrix makes
+// the expressions explode, and it would not save any arithmetic, since the hand-written
+// kernel evaluates exactly the same twelve geometries.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_residual_isoparam(const scalar_t rho,
+                                                            const scalar_t mu,
+                                                            const scalar_t *const SFEM_RESTRICT x,
+                                                            const scalar_t *const SFEM_RESTRICT y,
+                                                            const scalar_t *const SFEM_RESTRICT z,
+                                                            const scalar_t *const SFEM_RESTRICT ux,
+                                                            const scalar_t *const SFEM_RESTRICT uy,
+                                                            const scalar_t *const SFEM_RESTRICT uz,
+                                                            const scalar_t *const SFEM_RESTRICT p,
+                                                            scalar_t *const SFEM_RESTRICT r) {{
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+{geom_locals_isoparam()}
+{input_locals(include_pressure=True)}
+{sign_locals(iso_mdots)}
+{cse_code(iso_residual, residual_outputs(), op="+=")}
+}}
+
+template <typename scalar_t, typename Slot>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_isoparam(const scalar_t rho,
+                                                                                   const scalar_t mu,
+                                                                                   const scalar_t *const SFEM_RESTRICT x,
+                                                                                   const scalar_t *const SFEM_RESTRICT y,
+                                                                                   const scalar_t *const SFEM_RESTRICT z,
+                                                                                   const scalar_t *const SFEM_RESTRICT ux,
+                                                                                   const scalar_t *const SFEM_RESTRICT uy,
+                                                                                   const scalar_t *const SFEM_RESTRICT uz,
+                                                                                   const Slot *const SFEM_RESTRICT slots,
+                                                                                   scalar_t *const SFEM_RESTRICT values) {{
+{geom_locals_isoparam()}
+{input_locals(include_pressure=False)}
+{sign_locals(iso_mdots)}
+{cse_add_bsr_slots_code(iso_jac, "flat", atomic=True)}
 }}
 
 template <typename scalar_t>
