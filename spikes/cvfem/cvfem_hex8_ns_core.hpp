@@ -93,6 +93,13 @@ struct BSR4 {
     std::vector<smesh::count_t>                   element_slots;
     std::vector<smesh::count_t>                   diag_slots;
     ptrdiff_t                                     nnz{0};
+
+    // When set, assembly writes here instead of into `values`. The sfem::Op wrapper
+    // is handed a values buffer by its caller and owns neither the buffer nor the
+    // graph, so it points this at the caller's array and reuses the slot caches.
+    scalar_t *external_values{nullptr};
+
+    scalar_t *data() const { return external_values ? external_values : values->data(); }
 };
 
 inline void usage(const char *argv0) {
@@ -202,7 +209,7 @@ inline BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
     return b;
 }
 
-inline void zero_bsr4(BSR4 &b) { cvfem_zero_scalars(b.values->data(), b.nnz * 16); }
+inline void zero_bsr4(BSR4 &b) { cvfem_zero_scalars(b.data(), b.nnz * 16); }
 
 SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f, const smesh::idx_t id, const scalar_t value) {
     CVFEM_ATOMIC_ADD(f[id], value);
@@ -469,7 +476,7 @@ SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &d,
                                                             const scalar_t      mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_colored_sumfact");
     zero_bsr4(b);
-    scalar_t *const SFEM_RESTRICT             values = b.values->data();
+    scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel
@@ -506,7 +513,7 @@ SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &d,
 SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_sumfact");
     zero_bsr4(b);
-    scalar_t *const SFEM_RESTRICT             values = b.values->data();
+    scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
@@ -530,7 +537,7 @@ SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const 
 SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_isoparam");
     zero_bsr4(b);
-    scalar_t *const SFEM_RESTRICT             values = b.values->data();
+    scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
@@ -639,12 +646,13 @@ SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, const scal
     }
 }
 
-inline void apply_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
-                                  const std::vector<uint8_t> &constrained, const scalar_t *const SFEM_RESTRICT dir,
-                                  scalar_t *const SFEM_RESTRICT jv) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action");
-    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
-    cvfem_zero_scalars(jv, ndof);
+// Element contributions only: no zeroing of jv and no constraint handling, so the
+// caller decides both. The driver wants neither left to it and uses the wrapper below;
+// sfem::Op wants exactly this, because Op::apply accumulates and the Function owns the
+// constraints.
+inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
+                                             const scalar_t *const SFEM_RESTRICT dir,
+                                             scalar_t *const SFEM_RESTRICT       jv) {
     if (geom == GeomKind::Isoparam) {
         apply_jacobian_action_atomic_isoparam(d, rho, mu, dir, jv);
     } else if (d.packed) {
@@ -653,6 +661,15 @@ inline void apply_jacobian_action(MeshData &d, const scalar_t rho, const scalar_
     } else {
         apply_jacobian_action_atomic_sumfact(d, rho, mu, dir, jv);
     }
+}
+
+inline void apply_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
+                                  const std::vector<uint8_t> &constrained, const scalar_t *const SFEM_RESTRICT dir,
+                                  scalar_t *const SFEM_RESTRICT jv) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action");
+    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    cvfem_zero_scalars(jv, ndof);
+    apply_jacobian_action_accumulate(d, rho, mu, geom, dir, jv);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < ndof; ++i) {
         if (constrained[(size_t)i]) jv[i] = dir[i];
@@ -689,6 +706,17 @@ inline void pack_residual(const MeshData &d, scalar_t *const SFEM_RESTRICT r) {
     }
 }
 
+// Accumulating counterpart of pack_residual, for sfem::Op::gradient.
+inline void add_residual(const MeshData &d, scalar_t *const SFEM_RESTRICT r) {
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        r[(size_t)i * 4 + 0] += d.rx[i];
+        r[(size_t)i * 4 + 1] += d.ry[i];
+        r[(size_t)i * 4 + 2] += d.rz[i];
+        r[(size_t)i * 4 + 3] += d.rc[i];
+    }
+}
+
 inline void apply_dirichlet_residual(const std::vector<uint8_t> &constrained, scalar_t *const r, const ptrdiff_t ndof) {
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < ndof; ++i) {
@@ -708,7 +736,7 @@ inline void apply_dirichlet_fields(const std::vector<uint8_t>  &constrained,
 
 inline void apply_dirichlet_bsr(BSR4 &b, const std::vector<uint8_t> &constrained, const ptrdiff_t nnodes) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_dirichlet_bsr");
-    scalar_t *const SFEM_RESTRICT values = b.values->data();
+    scalar_t *const SFEM_RESTRICT values = b.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < nnodes; ++row) {
@@ -811,7 +839,7 @@ inline int cvfem_report_schur = 1;
 inline void build_schur_diag(const BSR4 &b, const ptrdiff_t nnodes, std::vector<scalar_t> &schur) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_schur_diag");
     schur.assign((size_t)nnodes, scalar_t(0));
-    const scalar_t *const SFEM_RESTRICT values = b.values->data();
+    const scalar_t *const SFEM_RESTRICT values = b.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < nnodes; ++row) {
@@ -868,7 +896,7 @@ inline void build_block_jacobi(const BSR4                  &b,
                                std::vector<scalar_t>       &inv_diag) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_block_jacobi");
     inv_diag.assign((size_t)nnodes * 16, scalar_t(0));
-    const scalar_t *const SFEM_RESTRICT values = b.values->data();
+    const scalar_t *const SFEM_RESTRICT values = b.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < nnodes; ++row) {
