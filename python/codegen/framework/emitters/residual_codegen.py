@@ -13,6 +13,20 @@ from codegen.framework.plans.generation import (
     mesh_kernel_plan_for_element,
 )
 from codegen.framework.plans.matrix_formats import CRSAssemblyPlan
+from codegen.framework.ir.kernel_ast import (
+    BufferDeclNode,
+    LoopKind,
+    LoopNode,
+    ScatterNode,
+    expr_ref,
+    iteration_range,
+    iterator,
+    pre_increment,
+)
+from codegen.framework.emitters.ast_printer import (
+    CLikeKernelASTPrinter,
+    render_kernel_ast_lines,
+)
 from codegen.framework.plans.apply_variants import precision_axis
 from codegen.framework.plans.diagnostics import (
     jacobian_action_diagnostic_cost,
@@ -2983,23 +2997,86 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
     return lines
 
 
+def _quadrature_lane_kernel_lines(lane_body, indent="    "):
+    """Print a quadrature loop over a vector-lane loop over ``lane_body``.
+
+    The loop nest is built as a ``KernelAST`` and rendered by the shared
+    printer, rather than assembled as strings.  The lane loop's index, type and
+    vectorisation come from the target's lowering policy, so the emitted text is
+    the same one ``Target.work_item_loop_lines`` produces -- the difference is
+    that the structure is now a tree the printer walks rather than a list of
+    lines this function concatenates.
+
+    Targets whose policy emits no lane loop keep the previous string path: they
+    open a bare block instead of a loop, which the IR has no node for.
+    """
+    target = _target()
+    policy = target.loop_lowering_policy()
+    if not policy.emits_lane_loop:
+        lines = ["%sfor (int q = 0; q < N_QP; ++q) {" % indent]
+        lines.extend(target.work_item_loop_lines(indent + "    "))
+        printer = CLikeKernelASTPrinter()
+        for node in lane_body:
+            lines.extend(printer.print_node(node, indent + "        "))
+        lines.extend(["%s    }" % indent, "%s}" % indent])
+        return lines
+
+    lane = iterator(policy.lane_index, policy.lane_index_type)
+    quadrature = iterator("q", "int")
+    pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
+    ast_lines = render_kernel_ast_lines(
+        "simplex_gradient_metric_body",
+        (
+            LoopNode(
+                LoopKind.QUADRATURE,
+                quadrature,
+                iteration_range(0, expr_ref("N_QP", "quadrature_count")),
+                pre_increment(quadrature),
+                body=(
+                    LoopNode(
+                        LoopKind.SIMD,
+                        lane,
+                        iteration_range(0, expr_ref("nelems", "tile_extent")),
+                        pre_increment(lane),
+                        body=tuple(lane_body),
+                        vectorized=bool(pragma),
+                    ),
+                ),
+            ),
+        ),
+        printer=CLikeKernelASTPrinter(vectorize_pragma=pragma or ""),
+    )
+    return ["%s%s" % (indent, line) for line in ast_lines]
+
+
 def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
+    """The constant-P1 simplex gradient-metric kernel body, built as a KernelAST.
+
+    This is the first kernel whose structure is expressed in the IR rather than
+    assembled as strings.  The loop nest comes from the plan: every statement
+    here is scoped either to the quadrature loop or to the vector lane, which is
+    exactly what ``EvaluationStatement.hoist_scope`` records, and the printer
+    turns the two ``LoopNode``\ s and their statements into text.
+
+    Expressions remain opaque C strings from ``_sfem_ccode``.  An expression IR
+    is a separate subsystem; carrying pre-rendered strings is what keeps this
+    step small enough to prove byte-identical.
+    """
     dim = system.dim
     field = system.fields[0]
     group = _dependency_stream_group_by_name(dependencies, specialization.stream_group_name)
     field_index = specialization.field_index
     scale = _sfem_ccode(specialization.scale)
-    lines = ["    for (int q = 0; q < N_QP; ++q) {"]
-    lines.extend(_work_item_loop_lines("        "))
+
+    def declare(name, expression):
+        return BufferDeclNode("const scalar_t", name, (), expr_ref(expression))
+
+    body = []
     for trial in range(rule.n_shape):
-        lines.append(
-            "            const scalar_t coeff_%s_%s_%d = %s[%d][lane];"
-            % (
-                group.name,
-                field.name,
-                trial,
-                group.name,
-                trial * len(system.fields) + field_index,
+        body.append(
+            declare(
+                "coeff_%s_%s_%d" % (group.name, field.name, trial),
+                "%s[%d][lane]" % (group.name, trial * len(system.fields) + field_index),
             )
         )
     for d in range(dim):
@@ -3014,45 +3091,48 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
                     "coeff_%s_%s_%d" % (group.name, field.name, trial),
                 )
             )
-        value = _sum_cpp_terms(terms)
-        lines.append(
-            "            const scalar_t %s%s_grad_%d_ref_value = %s;"
-            % (field.name, group.symbol_suffix, d, value)
+        body.append(
+            declare(
+                "%s%s_grad_%d_ref_value" % (field.name, group.symbol_suffix, d),
+                _sum_cpp_terms(terms),
+            )
         )
-    lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + lane;")
-    if scale == "1":
-        lines.append("            const scalar_t metric_factor = q_weight[q];")
-    else:
-        lines.append("            const scalar_t metric_factor = q_weight[q] * (%s);" % scale)
+    body.append(
+        BufferDeclNode(
+            "const ptrdiff_t",
+            "geometry_offset",
+            (),
+            expr_ref("q * geometry_stride + lane"),
+        )
+    )
+    body.append(
+        declare(
+            "metric_factor",
+            "q_weight[q]" if scale == "1" else "q_weight[q] * (%s)" % scale,
+        )
+    )
     for left in range(dim):
         for right in range(left, dim):
-            lines.append(
-                "            const scalar_t geom_metric%d%d = metric_factor * geom_metric[%d][geometry_offset];"
-                % (
-                    left,
-                    right,
-                    specialization.metric_component(left, right),
+            body.append(
+                declare(
+                    "geom_metric%d%d" % (left, right),
+                    "metric_factor * geom_metric[%d][geometry_offset]"
+                    % specialization.metric_component(left, right),
                 )
             )
     for left in range(dim):
         terms = []
         for right in range(dim):
-            metric = "geom_metric%d%d" % (
-                min(left, right),
-                max(left, right),
+            terms.append(
+                "%s * %s"
+                % (
+                    "geom_metric%d%d" % (min(left, right), max(left, right)),
+                    "%s%s_grad_%d_ref_value" % (field.name, group.symbol_suffix, right),
+                )
             )
-            trial_grad = "%s%s_grad_%d_ref_value" % (
-                field.name,
-                group.symbol_suffix,
-                right,
-            )
-            terms.append("%s * %s" % (metric, trial_grad))
-        lines.append(
-            "            const scalar_t %s%s_metric_grad_%d_ref_value = %s;"
-            % (
-                field.name,
-                group.symbol_suffix,
-                left,
+        body.append(
+            declare(
+                "%s%s_metric_grad_%d_ref_value" % (field.name, group.symbol_suffix, left),
                 _sum_cpp_terms(terms),
             )
         )
@@ -3066,20 +3146,22 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
                 _scaled_cpp_term(
                     test_factor,
                     "%s%s_metric_grad_%d_ref_value"
-                    % (
-                        field.name,
-                        group.symbol_suffix,
-                        left,
-                    ),
+                    % (field.name, group.symbol_suffix, left),
                 )
             )
         if terms:
-            lines.append(
-                "            output[%d][lane] += %s;"
-                % (test * len(system.fields) + field_index, _sum_cpp_terms(terms))
+            body.append(
+                ScatterNode(
+                    expr_ref(
+                        "output[%d][lane]" % (test * len(system.fields) + field_index),
+                        "scatter_target",
+                    ),
+                    expr_ref(_sum_cpp_terms(terms), "scatter_value"),
+                    "+=",
+                )
             )
-    lines.extend(["        }", "    }"])
-    return lines
+
+    return _quadrature_lane_kernel_lines(body, indent="    ")
 
 
 def _scaled_cpp_term(factor, expression):
