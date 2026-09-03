@@ -150,7 +150,8 @@ namespace sfem {
         bsr_.rowptr          = rowptr;
         bsr_.colidx          = colidx;
         bsr_.external_values = values;
-        assemble_jacobian(d_, bsr_, rho, mu, geom);
+        // Accumulate: Function::hessian_bsr shares one buffer across operators.
+        assemble_jacobian(d_, bsr_, rho, mu, geom, /*zero_first=*/false);
         bsr_.external_values = nullptr;
         return SFEM_SUCCESS;
     }

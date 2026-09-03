@@ -358,7 +358,7 @@ SFEM_INLINE void gather_element_dir(const MeshData &d, const ptrdiff_t e, const 
                                            scalar_t *const SFEM_RESTRICT vx, scalar_t *const SFEM_RESTRICT vy,
                                            scalar_t *const SFEM_RESTRICT vz, scalar_t *const SFEM_RESTRICT q);
 
-SFEM_NOINLINE void apply_boundary_scs_residual(MeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void apply_boundary_scs_residual(MeshData &d, const scalar_t rho, const scalar_t mu,
                                                       const int isoparam) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_boundary_scs_residual");
 #pragma omp parallel for schedule(static)
@@ -384,7 +384,7 @@ SFEM_NOINLINE void apply_boundary_scs_residual(MeshData &d, const scalar_t rho, 
     }
 }
 
-SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu,
                                                              const int isoparam, const scalar_t *const SFEM_RESTRICT dir,
                                                              scalar_t *const SFEM_RESTRICT jv) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_boundary_scs_jacobian_action");
@@ -412,7 +412,7 @@ SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const scalar_
     }
 }
 
-SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu) {
+inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_sumfact");
     reset_residual(d);
 
@@ -439,7 +439,7 @@ SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho
     }
 }
 
-SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu) {
+inline SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_isoparam");
     reset_residual(d);
 
@@ -468,14 +468,13 @@ SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rh
 // kernels can accumulate straight into the global BSR with plain (non-atomic)
 // updates. Compared with the atomic sweep this drops ~1024 atomic
 // read-modify-writes per element and keeps each pack's rows cache-resident.
-SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &d,
+inline SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &d,
                                                             const PackedData   &p,
                                                             const PackColoring &c,
                                                             BSR4               &b,
                                                             const scalar_t      rho,
                                                             const scalar_t      mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_colored_sumfact");
-    zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
@@ -510,9 +509,8 @@ SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &d,
     }
 }
 
-SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+inline SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_sumfact");
-    zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
@@ -534,9 +532,8 @@ SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const 
     }
 }
 
-SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian_isoparam");
-    zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT             values = b.data();
     const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
@@ -571,8 +568,14 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     apply_residual_atomic_sumfact(d, rho, mu);
 }
 
-inline void assemble_jacobian(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu, const GeomKind geom) {
+// zero_first=false accumulates into whatever is already in b. sfem::Function::hessian_bsr
+// runs every operator over one shared values buffer without clearing it between them, so
+// an Op that cleared would silently drop the operators assembled before it. The element
+// scatter accumulates either way, so this costs nothing but the skipped memset.
+inline void assemble_jacobian(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu, const GeomKind geom,
+                              const bool zero_first = true) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_jacobian");
+    if (zero_first) zero_bsr4(b);
     assemble_nodal_p_grad(d, geom);
     if (geom == GeomKind::Isoparam)
         assemble_jacobian_atomic_isoparam(d, b, rho, mu);
@@ -594,7 +597,7 @@ SFEM_INLINE void gather_element_dir(const MeshData &d, const ptrdiff_t e, const 
     }
 }
 
-SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu,
                                                                const scalar_t *const SFEM_RESTRICT dir,
                                                                scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_sumfact");
@@ -621,7 +624,7 @@ SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, const scala
     }
 }
 
-SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu,
                                                                 const scalar_t *const SFEM_RESTRICT dir,
                                                                 scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_isoparam");
