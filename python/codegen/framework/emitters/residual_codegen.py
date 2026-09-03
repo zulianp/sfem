@@ -2137,45 +2137,18 @@ def _mixed_local_function(
         if quantity.is_indexed
     )
     params.extend(_mixed_local_reference_params(rule, layout.n_reference_fields, dim, dependencies, basis_family))
-    if dependencies.current:
-        if stream_layout == "contiguous":
-            params.append(
-                "const scalar_t current[%d][VECTOR_SIZE]" % layout.total_streams
-            )
-        else:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT current[%d]"
-                % layout.total_streams
-            )
-    if dependencies.previous:
-        if stream_layout == "contiguous":
-            params.append(
-                "const scalar_t previous[%d][VECTOR_SIZE]" % layout.total_streams
-            )
-        else:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT previous[%d]"
-                % layout.total_streams
-            )
-    if dependencies.direction:
-        if stream_layout == "contiguous":
-            params.append(
-                "const scalar_t direction[%d][VECTOR_SIZE]" % layout.total_streams
-            )
-        else:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT direction[%d]"
-                % layout.total_streams
-            )
+    params.extend(
+        _mixed_stream_declaration(role.name, layout.total_streams, stream_layout)
+        for role in live_field_roles(dependencies)
+    )
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    if stream_layout == "contiguous":
-        params.append("scalar_t output[%d][VECTOR_SIZE]" % layout.total_streams)
-    else:
-        params.append(
-            "scalar_t *const SFEM_RESTRICT output[%d]" % layout.total_streams
+    params.append(
+        _mixed_stream_declaration(
+            "output", layout.total_streams, stream_layout, mutable=True
         )
+    )
     template_params = [
         "typename scalar_t",
         "int N_QP",
@@ -2315,22 +2288,13 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         )
     if not dependencies.uses_test_coefficients:
         return lines
-    tensor_evaluate_name = (
-        "tensor_evaluate_contiguous" if stream_layout == "contiguous" else "tensor_evaluate"
-    )
-    tensor_evaluate_value_name = (
-        "tensor_evaluate_value_contiguous"
-        if stream_layout == "contiguous"
-        else "tensor_evaluate_value"
-    )
-    tensor_integrate_name = (
-        "tensor_integrate_contiguous" if stream_layout == "contiguous" else "tensor_integrate"
-    )
-    tensor_integrate_value_name = (
-        "tensor_integrate_value_contiguous"
-        if stream_layout == "contiguous"
-        else "tensor_integrate_value"
-    )
+    # One fact -- whether the streams arrive contiguous -- decided once and
+    # spelled into four helper names, rather than asked four times.
+    contiguous_suffix = "_contiguous" if stream_layout == "contiguous" else ""
+    tensor_evaluate_name = "tensor_evaluate" + contiguous_suffix
+    tensor_evaluate_value_name = "tensor_evaluate_value" + contiguous_suffix
+    tensor_integrate_name = "tensor_integrate" + contiguous_suffix
+    tensor_integrate_value_name = "tensor_integrate_value" + contiguous_suffix
 
     for field_index, field in enumerate(system.fields):
         reference_index = layout.reference_index(field_index)
@@ -2728,6 +2692,21 @@ def _geometry_buffer_arguments(dependencies, dim, names):
         for quantity in local_geometry_quantities(dependencies, dim)
         if quantity.name in names
     ]
+
+
+def _mixed_stream_declaration(name, total_streams, stream_layout, mutable=False):
+    """How C declares one of a mixed local kernel's stream parameters.
+
+    Which streams exist is the plan's decision; whether each arrives as a
+    contiguous tile or an array of pointers is how the caller laid them out,
+    and either way this is the one place that writes the declaration down.  It
+    was written out seven times, once per role and once for the output, with
+    the layout choice repeated inside each.
+    """
+    qualifier = "scalar_t" if mutable else "const scalar_t"
+    if stream_layout == "contiguous":
+        return "%s %s[%d][VECTOR_SIZE]" % (qualifier, name, total_streams)
+    return "%s *const SFEM_RESTRICT %s[%d]" % (qualifier, name, total_streams)
 
 
 def _stream_call_arguments(streams, spell):
