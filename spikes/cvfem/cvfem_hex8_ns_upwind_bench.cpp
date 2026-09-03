@@ -207,6 +207,7 @@ int main(int argc, char **argv) {
     std::string csv_tag    = "run";
     scalar_t    warp       = 0;
     int         pack_size  = 2048;
+    int         assemble_diag = 0;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -232,6 +233,8 @@ int main(int argc, char **argv) {
             pack_size = std::atoi(argv[++i]);
         else if (arg == "--assemble")
             assemble = 1;
+        else if (arg == "--assemble-diag")
+            assemble_diag = 1;
         else if (arg == "--jac-action")
             jac_action = 1;
         else if (arg == "--bsr-apply")
@@ -257,6 +260,7 @@ int main(int argc, char **argv) {
                     "usage: %s [--n N] [--repeat N] [--warmup N] [--assemble] [--jac-action] [--bsr-apply]\n"
                     "          [--verify] [--verify-jac] [--layout packed|atomic|colored|store]\n"
                     "          [--kernel sumfact|current|fd|sympy|sympy_block|sympy_row|sympy_face|split]\n"
+                     "          [--assemble-diag]  block diagonal only, for block-Jacobi\n"
                     "          [--geom affine|isoparam] [--warp EPS] [--pack-size N] [--no-sfc]\n"
                     "          [--breakdown] [--kernel-only] [--dense-flush]\n"
                     "          [--csv FILE] [--tag NAME]\n"
@@ -300,8 +304,9 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
-    if ((assemble ? 1 : 0) + (jac_action ? 1 : 0) + (bsr_apply ? 1 : 0) > 1) {
-        std::fprintf(stderr, "specify at most one of --assemble, --jac-action, --bsr-apply\n");
+    if ((assemble ? 1 : 0) + (jac_action ? 1 : 0) + (bsr_apply ? 1 : 0) + (assemble_diag ? 1 : 0) > 1) {
+        std::fprintf(stderr,
+                     "specify at most one of --assemble, --assemble-diag, --jac-action, --bsr-apply\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -382,7 +387,10 @@ int main(int argc, char **argv) {
         if (kernel_kind == KernelKind::Split) {
             // One-time cost in a Newton loop, so it is built before the timed region.
             precompute_element_bsr_slots(d, bsr);
-            assemble_jacobian_atomic_linear(d, bsr, mu, jac_linear);
+            if (geom_kind == GeomKind::Isoparam)
+                assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear);
+            else
+                assemble_jacobian_atomic_linear(d, bsr, mu, jac_linear);
         }
         if (layout == "store") build_pack_store_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
     }
@@ -552,6 +560,8 @@ int main(int argc, char **argv) {
                 assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, kernel_kind, GeomKind::Isoparam);
             else if (layout == "packed")
                 assemble_jacobian_packed(d, packed, bsr, rho, mu, kernel_kind, GeomKind::Isoparam);
+            else if (kernel_kind == KernelKind::Split)
+                assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
             else
                 assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
         } else if (layout == "store") {
@@ -601,6 +611,16 @@ int main(int argc, char **argv) {
             apply_jacobian_action_atomic_isoparam(d, rho, mu, jac_dir.data(), jac_out.data());
         else
             apply_jacobian_action_atomic(d, rho, mu, jac_dir.data(), jac_out.data());
+    };
+
+    // Block diagonal, for the block-Jacobi preconditioner. Assembles only the 4x4
+    // diagonal blocks -- 16 doubles per node instead of the whole matrix.
+    std::vector<scalar_t> diag_blocks;
+    auto diag_fn = [&]() {
+        if (geom_kind == GeomKind::Isoparam)
+            assemble_diag_atomic_isoparam(d, rho, mu, diag_blocks);
+        else
+            assemble_diag_atomic(d, rho, mu, diag_blocks);
     };
 
     if (bsr_apply) jac_fn();
@@ -653,9 +673,59 @@ int main(int argc, char **argv) {
         }
     }
 
+    // Verify the two strategies that reuse the full element kernel through a modified
+    // slot array: they must reproduce the full assembly exactly, not approximately.
+    if (verify_jac && (assemble_diag || kernel_kind == KernelKind::Split)) {
+        if (geom_kind == GeomKind::Isoparam)
+            assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
+        else
+            assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        const scalar_t *const ref = bsr.values->data();
+
+        if (assemble_diag) {
+            // Pull the diagonal blocks out of the full matrix and compare.
+            std::vector<scalar_t> ref_diag((size_t)d.nnodes * 16, scalar_t(0));
+            for (ptrdiff_t r = 0; r < d.nnodes; ++r)
+                for (smesh::count_t j = bsr.rowptr[r]; j < bsr.rowptr[r + 1]; ++j)
+                    if (bsr.colidx[j] == (smesh::idx_t)r)
+                        std::memcpy(&ref_diag[(size_t)r * 16], &ref[(size_t)j * 16],
+                                    16 * sizeof(scalar_t));
+            diag_fn();
+            scalar_t dmax = 0;
+            for (scalar_t v : ref_diag) dmax = std::max(dmax, std::fabs(v));
+            const scalar_t rel =
+                    max_abs_diff(ref_diag.data(), diag_blocks.data(), (ptrdiff_t)ref_diag.size()) /
+                    (dmax > 0 ? dmax : scalar_t(1));
+            std::printf("verify_diag_vs_full_assembly_rel: %.6e\n", rel);
+            if (rel > 1.0e-12) {
+                std::fprintf(stderr, "HEX8 block-diagonal mismatch\n");
+                if (own_mpi) MPI_Finalize();
+                return 1;
+            }
+        } else if (geom_kind == GeomKind::Isoparam) {
+            // Isoparametric split: linear + nonlinear must reproduce the full assembly.
+            std::vector<scalar_t> full(ref, ref + (size_t)bsr.nnz * 16);
+            scalar_t              fmax = 0;
+            for (scalar_t v : full) fmax = std::max(fmax, std::fabs(v));
+            assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear);
+            assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
+            const scalar_t rel =
+                    max_abs_diff(full.data(), bsr.values->data(), (ptrdiff_t)full.size()) /
+                    (fmax > 0 ? fmax : scalar_t(1));
+            std::printf("verify_split_isoparam_vs_full_rel: %.6e\n", rel);
+            if (rel > 1.0e-12) {
+                std::fprintf(stderr, "HEX8 isoparametric split mismatch\n");
+                if (own_mpi) MPI_Finalize();
+                return 1;
+            }
+        }
+    }
+
     for (int i = 0; i < warmup; ++i) {
         if (assemble)
             jac_fn();
+        else if (assemble_diag)
+            diag_fn();
         else if (jac_action)
             jac_action_fn();
         else if (bsr_apply)
@@ -669,6 +739,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < repeat; ++i) {
         if (assemble)
             jac_fn();
+        else if (assemble_diag)
+            diag_fn();
         else if (jac_action)
             jac_action_fn();
         else if (bsr_apply)

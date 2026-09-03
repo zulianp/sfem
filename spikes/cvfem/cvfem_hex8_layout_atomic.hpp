@@ -328,4 +328,106 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
     }
 }
 
+// ---------------------------------------------------------------------------
+// Block diagonal only, for the block-Jacobi preconditioner.
+//
+// When the preconditioner is all that is being rebuilt, there is no reason to touch
+// the off-diagonal blocks. Passing a slot array that is -1 everywhere except the
+// diagonal makes the existing element kernel drop those writes (cvfem_hex8_bsr_acc
+// returns on a negative slot), so this reuses the full element kernel rather than
+// duplicating it -- the same trick the CUDA path uses.
+//
+// The destination is indexed by node, 16 doubles per node, not by BSR block.
+static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
+                                               const scalar_t        rho,
+                                               const scalar_t        mu,
+                                               std::vector<scalar_t> &diag) {
+    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
+    scalar_t *const SFEM_RESTRICT values = diag.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        ptrdiff_t sl[64];
+        scalar_t  ux[8], uy[8], uz[8], p[8];
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            for (int b2 = 0; b2 < CVFEM_HEX8_N_NODES; ++b2) sl[a * 8 + b2] = -1;
+            sl[a * 8 + a] = (ptrdiff_t)d.elems[a][e];
+        }
+        gather_element_fields(d, e, ux, uy, uz, p);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+        cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, values);
+        (void)p;
+    }
+}
+
+static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
+                                                        const scalar_t        rho,
+                                                        const scalar_t        mu,
+                                                        std::vector<scalar_t> &diag) {
+    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
+    scalar_t *const SFEM_RESTRICT values = diag.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        ptrdiff_t sl[64];
+        scalar_t  x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            for (int b2 = 0; b2 < CVFEM_HEX8_N_NODES; ++b2) sl[a * 8 + b2] = -1;
+            sl[a * 8 + a] = (ptrdiff_t)d.elems[a][e];
+        }
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
+                rho, mu, x, y, z, ux, uy, uz, sl, values);
+        (void)p;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Split assembly on isoparametric geometry.
+//
+// The viscous block depends on geometry and mu only, so it is constant across Newton
+// iterations even though the geometry is rebuilt at each sub-control surface. The two
+// halves are selected out of one kernel body by the Part parameter, so linear +
+// nonlinear reproduces the full assembly by construction.
+static SFEM_NOINLINE void assemble_jacobian_atomic_linear_isoparam(MeshData             &d,
+                                                                   BSR4                 &b,
+                                                                   const scalar_t        mu,
+                                                                   std::vector<scalar_t> &linear) {
+    linear.assign((size_t)b.nnz * 16, scalar_t(0));
+    scalar_t *const SFEM_RESTRICT             values = linear.data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, CVFEM_HEX8_PART_LINEAR>(
+                scalar_t(0), mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
+        (void)p;
+    }
+}
+
+static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
+        MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu,
+        const std::vector<scalar_t> &linear) {
+    scalar_t *const SFEM_RESTRICT             values = b.values->data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+    // Restore the constant part, then add only what the velocity changes.
+    std::memcpy(values, linear.data(), linear.size() * sizeof(scalar_t));
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, CVFEM_HEX8_PART_NONLINEAR>(
+                rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
+        (void)p;
+    }
+}
+
 #endif  // CVFEM_HEX8_LAYOUT_ATOMIC_HPP
