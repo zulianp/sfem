@@ -446,6 +446,117 @@ __global__ void cvfem_hex8_ghost_reduce_kernel(
     }
 }
 
+// --------------------------------------------------- packed-mesh assembly
+//
+// Assembly on the packed mesh, for comparison against the element-parallel form that
+// uses global ids. A pack-local BSR cannot be staged -- one element alone produces 64
+// blocks x 16 doubles = 8 KiB and a pack holds thousands of blocks -- so what is staged
+// is the *read* side: the pack's fields go into shared memory once and the element loop
+// gathers them through the packed mesh's uint16 local ids. The write side is unchanged,
+// straight into the global BSR through element_slots with atomicAdd.
+//
+// That makes the comparison a clean one. Both forms write identically, so the difference
+// measures exactly what the packed mesh addresses: how the fields are read.
+template <int VARIANT, int GEOM>
+__global__ void cvfem_hex8_assemble_packed_kernel(
+        const ptrdiff_t nelements, const ptrdiff_t n_elements_per_pack,
+        const double rho, const double mu,
+        const uint16_t  *const __restrict__ elems,
+        const ptrdiff_t *const __restrict__ owned_nodes_ptr,
+        const ptrdiff_t *const __restrict__ ghost_ptr,
+        const int32_t   *const __restrict__ ghost_idx,
+        const int32_t   *const __restrict__ slots,
+        const double    *const __restrict__ adj,
+        const double    *const __restrict__ det,
+        const double    *const __restrict__ u,
+        double *const __restrict__ values,
+        const double    *const __restrict__ px,
+        const double    *const __restrict__ py,
+        const double    *const __restrict__ pz) {
+    extern __shared__ double smem[];
+    constexpr bool ISO = (GEOM == CVFEM_CUDA_GEOM_ISOPARAM);
+
+    const ptrdiff_t p            = blockIdx.x;
+    const ptrdiff_t owned        = owned_nodes_ptr[p];
+    const ptrdiff_t n_contiguous = owned_nodes_ptr[p + 1] - owned;
+    const ptrdiff_t gbegin       = ghost_ptr[p];
+    const ptrdiff_t n_ghost      = ghost_ptr[p + 1] - gbegin;
+    const ptrdiff_t total_nodes  = n_contiguous + n_ghost;
+
+    double *const s_u   = smem;
+    double *const s_xyz = smem + (ptrdiff_t)CVFEM_CUDA_NF * total_nodes;
+
+    for (ptrdiff_t i = threadIdx.x; i < total_nodes; i += blockDim.x) {
+        const ptrdiff_t g = (i < n_contiguous) ? (owned + i)
+                                               : (ptrdiff_t)ghost_idx[gbegin + i - n_contiguous];
+        const double *const src = &u[g * CVFEM_CUDA_NF];
+        double *const       dst = &s_u[i * CVFEM_CUDA_NF];
+#pragma unroll
+        for (int f = 0; f < CVFEM_CUDA_NF; ++f) dst[f] = src[f];
+        if (ISO) {
+            double *const c = &s_xyz[i * 3];
+            c[0] = px[g]; c[1] = py[g]; c[2] = pz[g];
+        }
+    }
+    __syncthreads();
+
+    const ptrdiff_t e_start = p * n_elements_per_pack;
+    const ptrdiff_t e_end   = min(nelements, (p + 1) * n_elements_per_pack);
+
+    for (ptrdiff_t e = e_start + threadIdx.x; e < e_end; e += blockDim.x) {
+        double ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES];
+        double uz[CVFEM_HEX8_N_NODES], pe[CVFEM_HEX8_N_NODES];
+        double ex[CVFEM_HEX8_N_NODES], ey[CVFEM_HEX8_N_NODES], ez[CVFEM_HEX8_N_NODES];
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const uint16_t l  = elems[(ptrdiff_t)a * nelements + e];
+            const double *const nd = &s_u[(ptrdiff_t)l * CVFEM_CUDA_NF];
+            ux[a] = nd[0]; uy[a] = nd[1]; uz[a] = nd[2]; pe[a] = nd[3];
+            if (ISO) {
+                const double *const c = &s_xyz[(ptrdiff_t)l * 3];
+                ex[a] = c[0]; ey[a] = c[1]; ez[a] = c[2];
+            }
+        }
+        const int32_t *const es = &slots[e * 64];
+        if constexpr (ISO) {
+            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
+                    rho, mu, ex, ey, ez, ux, uy, uz, es, values);
+        } else {
+            double adj_e[9];
+#pragma unroll
+            for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+            if constexpr (VARIANT == CVFEM_CUDA_JAC_HANDWRITTEN)
+                cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+            else
+                cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+        }
+        (void)pe;
+    }
+}
+
+template <int VARIANT, int GEOM>
+int launch_assemble_packed(cvfem_cuda_ctx *ctx, double rho, double mu, int block_size,
+                           cudaStream_t s) {
+    if (!ctx->values || !ctx->element_slots) return 1;
+    if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM && !ctx->px) return 1;
+    const size_t shmem = (size_t)ctx->max_pack_nodes *
+                         (CVFEM_CUDA_NF + (GEOM == CVFEM_CUDA_GEOM_ISOPARAM ? 3 : 0)) *
+                         sizeof(double);
+    if (shmem > 48u * 1024u)
+        CVFEM_CUDA_CHECK(cudaFuncSetAttribute(
+                cvfem_hex8_assemble_packed_kernel<VARIANT, GEOM>,
+                cudaFuncAttributeMaxDynamicSharedMemorySize, (int)shmem));
+    const int block = block_size > 0 ? block_size : 128;
+    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
+                                     (size_t)ctx->nnz * 16 * sizeof(double), s));
+    cvfem_hex8_assemble_packed_kernel<VARIANT, GEOM><<<(int)ctx->n_packs, block, shmem, s>>>(
+            ctx->nelements, ctx->n_elements_per_pack, rho, mu, ctx->elems,
+            ctx->owned_nodes_ptr, ctx->ghost_ptr, ctx->ghost_idx, ctx->element_slots,
+            ctx->adj, ctx->det, ctx->u, ctx->values, ctx->px, ctx->py, ctx->pz);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
 // ------------------------------------------- standard-mesh matrix-free baseline
 //
 // The same residual and J*v computed WITHOUT the packed mesh: one thread per element,
@@ -1581,6 +1692,38 @@ extern "C" int cvfem_cuda_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
 // The element kernels were already __host__ __device__ and templated after the
 // portability phase, so these entry points wire up the geometry the device did not yet
 // have rather than introducing new math. Call cvfem_cuda_attach_coords first.
+
+// ---- packed-mesh assembly, for comparison against the element-parallel form -------
+//
+// `variant` takes CVFEM_CUDA_JAC_HANDWRITTEN or CVFEM_CUDA_JAC_SYMPY; `geom` 0 or 1.
+extern "C" int cvfem_cuda_assemble_packed(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                          int variant, int geom, int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    if (geom == CVFEM_CUDA_GEOM_ISOPARAM)
+        return launch_assemble_packed<CVFEM_CUDA_JAC_HANDWRITTEN, CVFEM_CUDA_GEOM_ISOPARAM>(
+                ctx, rho, mu, block_size, s);
+    if (variant == CVFEM_CUDA_JAC_SYMPY)
+        return launch_assemble_packed<CVFEM_CUDA_JAC_SYMPY, CVFEM_CUDA_GEOM_AFFINE>(
+                ctx, rho, mu, block_size, s);
+    return launch_assemble_packed<CVFEM_CUDA_JAC_HANDWRITTEN, CVFEM_CUDA_GEOM_AFFINE>(
+            ctx, rho, mu, block_size, s);
+}
+
+extern "C" double cvfem_cuda_time_assemble_packed(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                  int variant, int geom, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (cvfem_cuda_assemble_packed(ctx, rho, mu, variant, geom, block_size, nullptr) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (cvfem_cuda_assemble_packed(ctx, rho, mu, variant, geom, block_size, nullptr) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
 
 // ---- standard-mesh matrix-free baseline, for comparison against the packed form ----
 
