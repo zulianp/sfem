@@ -116,14 +116,22 @@ class ResidualPathCapabilitiesTest(unittest.TestCase):
         )
 
     def test_the_two_paths_remain_nearly_disjoint(self):
-        """A falling number here means the paths are converging, which is the goal."""
+        """A rising number here means the paths are converging, which is the goal.
+
+        Read it as an upper bound rather than a measurement.  Reachability is
+        static, so a function the shared code calls on only one branch --
+        ``_local_function``, which ``_local_header`` reaches only when the
+        fields share a shape count -- counts as shared even though the
+        mixed-order path never executes it.  The capability matrix above is the
+        honest statement of what each path can actually produce.
+        """
         functions = _functions()
         coupled = _reachable(functions, COUPLED_ENTRY)
         mixed = _reachable(functions, MIXED_ENTRY)
         shared = coupled & mixed
         self.assertGreaterEqual(
             len(shared),
-            26,
+            48,
             "the residual paths share fewer functions than before; unifying "
             "them should only ever increase this",
         )

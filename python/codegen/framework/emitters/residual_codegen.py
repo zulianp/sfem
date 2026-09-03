@@ -1793,7 +1793,60 @@ def generate_mixed_residual_sfem_files(
     )
 
 
-def _local_header(system, local_prefix, specialization, residual_coeffs, action_coeffs, basis_family=None):
+def _local_header(
+    system,
+    local_prefix,
+    specialization,
+    residual_coeffs,
+    action_coeffs,
+    basis_family=None,
+    field_element_types=None,
+):
+    """The element-local header for one kernel.
+
+    One generator serves both the equal-order and the mixed-order paths.  They
+    differ in exactly two ways, and both are parameters rather than a second
+    copy of the file:
+
+      * a mixed-order kernel emits its local functions through
+        ``_mixed_local_function``, which takes the per-field element types,
+        because its fields do not share a shape count;
+
+      * the constant-P1 affine specialisation applies only to the equal-order
+        path.  It is a specialisation of a uniform simplex kernel and has no
+        mixed-order counterpart.
+
+    Everything else -- the include guard, the dependency pruning, the four
+    residual and action functions in their block and contiguous forms, the
+    namespace scaffolding -- was duplicated line for line.
+    """
+    mixed = field_element_types is not None
+
+    def emit_local(name, spec, coeffs, dependencies, specialized=False, **kwargs):
+        if mixed:
+            return _mixed_local_function(
+                system,
+                name,
+                spec,
+                field_element_types,
+                coeffs,
+                dependencies=dependencies,
+                basis_family=basis_family,
+                **kwargs
+            )
+        return _local_function(
+            system,
+            name,
+            spec,
+            coeffs,
+            dependencies=dependencies,
+            local_prefix=local_prefix,
+            basis_family=basis_family,
+            allow_simplex_gradient_metric=specialized,
+            constant_p1_gradient_expansion=specialized,
+            **kwargs
+        )
+
     rule = specialization.quadrature_rule
     residual_dependencies = residual_codegen_dependencies(
         system,
@@ -1837,125 +1890,95 @@ def _local_header(system, local_prefix, specialization, residual_coeffs, action_
         "",
     ]
     lines.extend(
-        _local_function(
-            system,
+        emit_local(
             "%s_residual_block" % local_prefix,
             specialization,
             residual_coeffs,
             dependencies=residual_dependencies,
-            local_prefix=local_prefix,
-            basis_family=basis_family,
-            allow_simplex_gradient_metric=False,
-            constant_p1_gradient_expansion=False,
+            specialized=False,
         )
     )
     lines.append("")
     lines.extend(
-        _local_function(
-            system,
+        emit_local(
             "%s_residual_block_contiguous" % local_prefix,
             specialization,
             residual_coeffs,
             dependencies=residual_dependencies,
-            local_prefix=local_prefix,
-            basis_family=basis_family,
-            allow_simplex_gradient_metric=False,
-            constant_p1_gradient_expansion=False,
+            specialized=False,
             stream_layout="contiguous",
         )
     )
     lines.append("")
-    specialized = _constant_p1_affine_specialized_local(
-        local_prefix,
-        specialization,
+    specialized = (
+        None if mixed else _constant_p1_affine_specialized_local(
+            local_prefix,
+            specialization,
+        )
     )
     specialized_prefix = specialized[0] if specialized is not None else None
     specialized_specialization = specialized[1] if specialized is not None else None
     if specialized_prefix is not None:
         lines.extend(
-            _local_function(
-                system,
+            emit_local(
                 "%s_residual_block" % specialized_prefix,
                 specialized_specialization,
                 residual_coeffs,
                 dependencies=residual_dependencies,
-                local_prefix=local_prefix,
-                basis_family=basis_family,
-                allow_simplex_gradient_metric=True,
-                constant_p1_gradient_expansion=True,
+                specialized=True,
             )
         )
         lines.append("")
         lines.extend(
-            _local_function(
-                system,
+            emit_local(
                 "%s_residual_block_contiguous" % specialized_prefix,
                 specialized_specialization,
                 residual_coeffs,
                 dependencies=residual_dependencies,
-                local_prefix=local_prefix,
-                basis_family=basis_family,
-                allow_simplex_gradient_metric=True,
-                constant_p1_gradient_expansion=True,
+                specialized=True,
                 stream_layout="contiguous",
             )
         )
         lines.append("")
     lines.extend(
-        _local_function(
-            system,
+        emit_local(
             "%s_jacobian_action_block" % local_prefix,
             specialization,
             action_coeffs,
             dependencies=action_dependencies,
-            local_prefix=local_prefix,
-            basis_family=basis_family,
-            allow_simplex_gradient_metric=False,
-            constant_p1_gradient_expansion=False,
+            specialized=False,
         )
     )
     lines.append("")
     lines.extend(
-        _local_function(
-            system,
+        emit_local(
             "%s_jacobian_action_block_contiguous" % local_prefix,
             specialization,
             action_coeffs,
             dependencies=action_dependencies,
-            local_prefix=local_prefix,
-            basis_family=basis_family,
-            allow_simplex_gradient_metric=False,
-            constant_p1_gradient_expansion=False,
+            specialized=False,
             stream_layout="contiguous",
         )
     )
     if specialized_prefix is not None:
         lines.append("")
         lines.extend(
-            _local_function(
-                system,
+            emit_local(
                 "%s_jacobian_action_block" % specialized_prefix,
                 specialized_specialization,
                 action_coeffs,
                 dependencies=action_dependencies,
-                local_prefix=local_prefix,
-                basis_family=basis_family,
-                allow_simplex_gradient_metric=True,
-                constant_p1_gradient_expansion=True,
+                specialized=True,
             )
         )
         lines.append("")
         lines.extend(
-            _local_function(
-                system,
+            emit_local(
                 "%s_jacobian_action_block_contiguous" % specialized_prefix,
                 specialized_specialization,
                 action_coeffs,
                 dependencies=action_dependencies,
-                local_prefix=local_prefix,
-                basis_family=basis_family,
-                allow_simplex_gradient_metric=True,
-                constant_p1_gradient_expansion=True,
+                specialized=True,
                 stream_layout="contiguous",
             )
         )
@@ -2014,100 +2037,21 @@ def _mixed_local_header(
     action_coeffs,
     basis_family=None,
 ):
-    residual_dependencies = residual_codegen_dependencies(
+    """The mixed-order element-local header.
+
+    A configuration of ``_local_header``, not a second implementation: the two
+    were duplicated line for line apart from which local-function generator they
+    call and the equal-order-only constant-P1 specialisation.
+    """
+    return _local_header(
         system,
+        local_prefix,
+        specialization,
         residual_coeffs,
-        system.residual_dependencies(),
-    )
-    action_dependencies = residual_codegen_dependencies(
-        system,
         action_coeffs,
-        system.jacobian_action_dependencies(),
+        basis_family=basis_family,
+        field_element_types=field_element_types,
     )
-    guard = ("%s_LOCAL_HPP" % local_prefix).upper()
-    lines = [
-        "#ifndef %s" % guard,
-        "#define %s" % guard,
-        "",
-        "#include <math.h>",
-        "#include <stddef.h>",
-        "#if defined(__has_include)",
-        '#if __has_include("sfem_base.hpp")',
-        '#include "sfem_base.hpp"',
-        "#define SFEM_GENERATED_SCALAR_T",
-        "#endif",
-        "#endif",
-        '#include "kernel_math.hpp"',
-        '#include "tensor_product_kernels.hpp"',
-        "",
-        *_inline_definition_lines(),
-        "#ifndef SFEM_RESTRICT",
-        "#define SFEM_RESTRICT",
-        "#endif",
-        "#ifndef SFEM_GENERATED_SCALAR_T",
-        "#define SFEM_GENERATED_SCALAR_T",
-        "typedef double real_t;",
-        "typedef ptrdiff_t idx_t;",
-        "typedef double geom_t;",
-        "#endif",
-        "",
-        "namespace sfem {",
-        "namespace codegen {",
-        "",
-    ]
-    lines.extend(
-        _mixed_local_function(
-            system,
-            "%s_residual_block" % local_prefix,
-            specialization,
-            field_element_types,
-            residual_coeffs,
-            dependencies=residual_dependencies,
-            basis_family=basis_family,
-        )
-    )
-    lines.append("")
-    lines.extend(
-        _mixed_local_function(
-            system,
-            "%s_residual_block_contiguous" % local_prefix,
-            specialization,
-            field_element_types,
-            residual_coeffs,
-            dependencies=residual_dependencies,
-            basis_family=basis_family,
-            stream_layout="contiguous",
-        )
-    )
-    lines.append("")
-    lines.extend(
-        _mixed_local_function(
-            system,
-            "%s_jacobian_action_block" % local_prefix,
-            specialization,
-            field_element_types,
-            action_coeffs,
-            dependencies=action_dependencies,
-            basis_family=basis_family,
-        )
-    )
-    lines.append("")
-    lines.extend(
-        _mixed_local_function(
-            system,
-            "%s_jacobian_action_block_contiguous" % local_prefix,
-            specialization,
-            field_element_types,
-            action_coeffs,
-            dependencies=action_dependencies,
-            basis_family=basis_family,
-            stream_layout="contiguous",
-        )
-    )
-    lines.extend(
-        ["", "} // namespace codegen", "} // namespace sfem", "", "#endif", ""]
-    )
-    return "\n".join(lines)
 
 
 def _mixed_local_function(
