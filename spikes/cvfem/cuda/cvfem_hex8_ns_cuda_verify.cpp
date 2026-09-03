@@ -699,6 +699,80 @@ int main(int argc, char **argv) {
     // sub-control-surface points. On a sheared mesh the two give genuinely different
     // answers, so each device kernel is checked against its own host counterpart rather
     // than against the affine result.
+    // ---- packed mesh against standard mesh -----------------------------------
+    //
+    // Both compute the same operator; they differ only in how the mesh is addressed.
+    // The packed form pays for a staging pass and ghost bookkeeping and gets locality
+    // and a cheaper flush; the standard form does none of that and atomics straight to
+    // global. This is the same question the CPU answers with `atomic` vs `packed`.
+    std::printf("\n=== packed mesh vs standard mesh, matrix-free ===\n");
+    {
+        // Own direction and own host references, so this section does not depend on
+        // buffers left behind by an earlier block.
+        std::vector<double> gvh((size_t)d.nnodes * 4), jv_ref((size_t)d.nnodes * 4, 0.0);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            gvh[i * 4 + 0] = 0.7 * std::sin(0.011 * (double)i);
+            gvh[i * 4 + 1] = 0.3 * std::cos(0.017 * (double)i);
+            gvh[i * 4 + 2] = 0.5 * std::sin(0.023 * (double)i + 1.0);
+            gvh[i * 4 + 3] = 0.9 * std::cos(0.007 * (double)i + 2.0);
+        }
+        apply_jacobian_action_atomic(d, rho, mu, gvh.data(), jv_ref.data());
+        if (cvfem_cuda_upload_v(ctx, gvh.data()) != 0) return 1;
+
+        std::printf("%-38s %12s %12s %10s\n", "operator / mesh", "s/call", "MDOF/s", "rel");
+
+        struct Row { const char *name; bool jv; bool packed; };
+        const Row rows_mf[] = {
+            {"residual, packed mesh",   false, true},
+            {"residual, standard mesh", false, false},
+            {"J*v, packed mesh",        true,  true},
+            {"J*v, standard mesh",      true,  false},
+        };
+        double t_pack_r = 0, t_glob_r = 0, t_pack_j = 0, t_glob_j = 0;
+        for (const auto &rw : rows_mf) {
+            int rc;
+            if (rw.packed)
+                rc = rw.jv ? cvfem_cuda_jacobian_action(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC,
+                                                        block_size, nullptr)
+                           : cvfem_cuda_residual(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC,
+                                                 block_size, nullptr);
+            else
+                rc = rw.jv ? cvfem_cuda_jacobian_action_global(ctx, rho, mu, 0, block_size, nullptr)
+                           : cvfem_cuda_residual_global(ctx, rho, mu, 0, block_size, nullptr);
+            if (rc != 0 || cvfem_cuda_synchronize() != 0) {
+                std::printf("%-38s launch failed\n", rw.name); fail = 1; continue;
+            }
+            if (cvfem_cuda_download_r(ctx, dev.data()) != 0) return 1;
+
+            // Against the host reference for the matching operator.
+            const std::vector<double> &hostref = rw.jv ? jv_ref : ref;
+            const double hmax = max_abs(hostref);
+            const double rel  = max_abs_diff(hostref, dev) / (hmax > 0 ? hmax : 1.0);
+            const bool   ok   = rel <= 1e-12;
+            fail |= !ok;
+
+            const double t = rw.packed
+                    ? (rw.jv ? cvfem_cuda_time_jacobian_action(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC,
+                                                               block_size, repeat)
+                             : cvfem_cuda_time_residual(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC,
+                                                        block_size, repeat))
+                    : (rw.jv ? cvfem_cuda_time_jacobian_action_global(ctx, rho, mu, 0, block_size, repeat)
+                             : cvfem_cuda_time_residual_global(ctx, rho, mu, 0, block_size, repeat));
+            if (rw.jv && rw.packed)  t_pack_j = t;
+            if (rw.jv && !rw.packed) t_glob_j = t;
+            if (!rw.jv && rw.packed)  t_pack_r = t;
+            if (!rw.jv && !rw.packed) t_glob_r = t;
+
+            std::printf("%-38s %12.3e %12.1f %10.2e %s\n", rw.name, t,
+                        t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0, rel, ok ? "OK" : "FAIL");
+            csv_rows.push_back(mkrow(rw.jv ? "jac_action" : "residual",
+                                     rw.packed ? "cuda_packed" : "cuda_standard", "current", t));
+        }
+        if (t_pack_r > 0 && t_glob_r > 0)
+            std::printf("packed mesh is %.2fx the standard mesh on the residual, %.2fx on J*v\n",
+                        t_glob_r / t_pack_r, (t_pack_j > 0 && t_glob_j > 0) ? t_glob_j / t_pack_j : 0.0);
+    }
+
     std::printf("\n=== isoparametric geometry (warp = %.3f) ===\n", warp_amp);
     {
         std::vector<double> cx((size_t)d.nnodes), cy((size_t)d.nnodes), cz((size_t)d.nnodes);

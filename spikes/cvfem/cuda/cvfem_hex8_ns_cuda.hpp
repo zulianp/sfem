@@ -135,6 +135,24 @@ int cvfem_cuda_download_values(cvfem_cuda_ctx *ctx, double *values);
 //
 // Upload the coordinates once before calling any of them. This is a no-op if
 // cvfem_cuda_boundary_attach has already uploaded them.
+// ---- standard-mesh matrix-free, the baseline the packed form has to beat --------
+//
+// One thread per element, grid-stride, global node ids, atomicAdd straight into the
+// global vector: no packs, no shared memory, no ghost reduction. This is what the
+// operators look like on an ordinary element->node connectivity, and it is what the
+// CPU's `atomic` layout has always been -- so it makes the packed-vs-standard question
+// answerable on the device the same way it already was on the host.
+//
+// `geom` takes 0 for affine, 1 for isoparametric.
+int    cvfem_cuda_residual_global(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                  int geom, int block_size, void *stream);
+double cvfem_cuda_time_residual_global(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                       int geom, int block_size, int repeat);
+int    cvfem_cuda_jacobian_action_global(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                         int geom, int block_size, void *stream);
+double cvfem_cuda_time_jacobian_action_global(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                              int geom, int block_size, int repeat);
+
 int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
                              const double *px, const double *py, const double *pz);
 

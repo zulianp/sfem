@@ -446,6 +446,134 @@ __global__ void cvfem_hex8_ghost_reduce_kernel(
     }
 }
 
+// ------------------------------------------- standard-mesh matrix-free baseline
+//
+// The same residual and J*v computed WITHOUT the packed mesh: one thread per element,
+// grid-stride, global node ids, accumulating straight into the global vector with
+// atomicAdd. No packs, no shared memory, no ghost machinery -- this is what the
+// operators look like on an ordinary element->node connectivity, and it is the
+// baseline the block-per-pack kernels have to beat.
+//
+// The CPU has had this comparison all along, because its `atomic` layout is exactly
+// this and its `packed` layout is the pack-based one. The device had only the packed
+// form, so what the format was worth here had never been measured.
+template <int GEOM>
+__global__ void cvfem_hex8_residual_global_kernel(
+        const ptrdiff_t nelements, const double rho, const double mu,
+        const int32_t *const __restrict__ elements,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        const double  *const __restrict__ u,
+        double *const __restrict__ r,
+        const double  *const __restrict__ px,
+        const double  *const __restrict__ py,
+        const double  *const __restrict__ pz) {
+    for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
+         e += (ptrdiff_t)blockDim.x * gridDim.x) {
+        int32_t gid[CVFEM_HEX8_N_NODES];
+        double  ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES];
+        double  uz[CVFEM_HEX8_N_NODES], pe[CVFEM_HEX8_N_NODES];
+        double  ex[CVFEM_HEX8_N_NODES], ey[CVFEM_HEX8_N_NODES], ez[CVFEM_HEX8_N_NODES];
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const int32_t g = elements[(ptrdiff_t)a * nelements + e];
+            gid[a]          = g;
+            const double *const nd = &u[(ptrdiff_t)g * CVFEM_CUDA_NF];
+            ux[a] = nd[0]; uy[a] = nd[1]; uz[a] = nd[2]; pe[a] = nd[3];
+            if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) { ex[a] = px[g]; ey[a] = py[g]; ez[a] = pz[g]; }
+        }
+
+        double re[CVFEM_HEX8_N_DOF];
+        if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) {
+            cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex, ey, ez, ux, uy, uz, pe, re);
+        } else {
+            double adj_e[9];
+#pragma unroll
+            for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+            cvfem_hex8_ns_upwind_residual(rho, mu, adj_e, det[e], ux, uy, uz, pe, re);
+        }
+
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            double *const dst = &r[(ptrdiff_t)gid[a] * CVFEM_CUDA_NF];
+#pragma unroll
+            for (int f = 0; f < CVFEM_CUDA_NF; ++f) atomicAdd(&dst[f], re[a * 4 + f]);
+        }
+    }
+}
+
+template <int GEOM>
+__global__ void cvfem_hex8_jacobian_action_global_kernel(
+        const ptrdiff_t nelements, const double rho, const double mu,
+        const int32_t *const __restrict__ elements,
+        const double  *const __restrict__ adj,
+        const double  *const __restrict__ det,
+        const double  *const __restrict__ u,
+        const double  *const __restrict__ vin,
+        double *const __restrict__ r,
+        const double  *const __restrict__ px,
+        const double  *const __restrict__ py,
+        const double  *const __restrict__ pz) {
+    for (ptrdiff_t e = blockIdx.x * (ptrdiff_t)blockDim.x + threadIdx.x; e < nelements;
+         e += (ptrdiff_t)blockDim.x * gridDim.x) {
+        int32_t gid[CVFEM_HEX8_N_NODES];
+        double  ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES], uz[CVFEM_HEX8_N_NODES];
+        double  vx[CVFEM_HEX8_N_NODES], vy[CVFEM_HEX8_N_NODES], vz[CVFEM_HEX8_N_NODES];
+        double  q[CVFEM_HEX8_N_NODES];
+        double  ex[CVFEM_HEX8_N_NODES], ey[CVFEM_HEX8_N_NODES], ez[CVFEM_HEX8_N_NODES];
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const int32_t g = elements[(ptrdiff_t)a * nelements + e];
+            gid[a]          = g;
+            const double *const nu = &u[(ptrdiff_t)g * CVFEM_CUDA_NF];
+            const double *const nv = &vin[(ptrdiff_t)g * CVFEM_CUDA_NF];
+            ux[a] = nu[0]; uy[a] = nu[1]; uz[a] = nu[2];
+            vx[a] = nv[0]; vy[a] = nv[1]; vz[a] = nv[2]; q[a] = nv[3];
+            if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) { ex[a] = px[g]; ey[a] = py[g]; ez[a] = pz[g]; }
+        }
+
+        double re[CVFEM_HEX8_N_DOF];
+        if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) {
+            cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, ex, ey, ez, ux, uy, uz,
+                                                          vx, vy, vz, q, re);
+        } else {
+            double adj_e[9];
+#pragma unroll
+            for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
+            cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj_e, det[e], ux, uy, uz,
+                                                 vx, vy, vz, q, re);
+        }
+
+#pragma unroll
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            double *const dst = &r[(ptrdiff_t)gid[a] * CVFEM_CUDA_NF];
+#pragma unroll
+            for (int f = 0; f < CVFEM_CUDA_NF; ++f) atomicAdd(&dst[f], re[a * 4 + f]);
+        }
+    }
+}
+
+template <int GEOM, bool JV>
+int launch_global_mf(cvfem_cuda_ctx *ctx, double rho, double mu, int block_size, cudaStream_t s) {
+    if (!ctx->elements_global) return 1;
+    if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM && !ctx->px) return 1;
+    if (JV && !ctx->v) return 1;
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->r, 0,
+                                     (size_t)ctx->nnodes * CVFEM_CUDA_NF * sizeof(double), s));
+    if (JV)
+        cvfem_hex8_jacobian_action_global_kernel<GEOM><<<grid, block, 0, s>>>(
+                ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det,
+                ctx->u, ctx->v, ctx->r, ctx->px, ctx->py, ctx->pz);
+    else
+        cvfem_hex8_residual_global_kernel<GEOM><<<grid, block, 0, s>>>(
+                ctx->nelements, rho, mu, ctx->elements_global, ctx->adj, ctx->det,
+                ctx->u, ctx->r, ctx->px, ctx->py, ctx->pz);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
 // ---------------------------------------------------------------- assembly
 
 // Element-parallel, grid-stride, writing straight into the global BSR with atomicAdd.
@@ -1453,6 +1581,54 @@ extern "C" int cvfem_cuda_assemble(cvfem_cuda_ctx *ctx, double rho, double mu,
 // The element kernels were already __host__ __device__ and templated after the
 // portability phase, so these entry points wire up the geometry the device did not yet
 // have rather than introducing new math. Call cvfem_cuda_attach_coords first.
+
+// ---- standard-mesh matrix-free baseline, for comparison against the packed form ----
+
+extern "C" int cvfem_cuda_residual_global(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                          int geom, int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return geom == CVFEM_CUDA_GEOM_ISOPARAM
+                   ? launch_global_mf<CVFEM_CUDA_GEOM_ISOPARAM, false>(ctx, rho, mu, block_size, s)
+                   : launch_global_mf<CVFEM_CUDA_GEOM_AFFINE, false>(ctx, rho, mu, block_size, s);
+}
+
+extern "C" int cvfem_cuda_jacobian_action_global(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                 int geom, int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    return geom == CVFEM_CUDA_GEOM_ISOPARAM
+                   ? launch_global_mf<CVFEM_CUDA_GEOM_ISOPARAM, true>(ctx, rho, mu, block_size, s)
+                   : launch_global_mf<CVFEM_CUDA_GEOM_AFFINE, true>(ctx, rho, mu, block_size, s);
+}
+
+static double time_global_mf(cvfem_cuda_ctx *ctx, double rho, double mu, int geom, bool jv,
+                             int block_size, int repeat) {
+    auto once = [&]() {
+        return jv ? cvfem_cuda_jacobian_action_global(ctx, rho, mu, geom, block_size, nullptr)
+                  : cvfem_cuda_residual_global(ctx, rho, mu, geom, block_size, nullptr);
+    };
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (once() != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (once() != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
+extern "C" double cvfem_cuda_time_residual_global(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                  int geom, int block_size, int repeat) {
+    return time_global_mf(ctx, rho, mu, geom, false, block_size, repeat);
+}
+
+extern "C" double cvfem_cuda_time_jacobian_action_global(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                         int geom, int block_size, int repeat) {
+    return time_global_mf(ctx, rho, mu, geom, true, block_size, repeat);
+}
 
 extern "C" int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
                                         const double *px, const double *py, const double *pz) {
