@@ -88,6 +88,11 @@ UNCONSUMED_PLAN_TYPES = frozenset(
         # first of these connections that moved logic rather than re-routing
         # a name.
         "DataStreamPlan",
+        # What a Jacobian block is called is BlockPlan's decision.  The
+        # emitter used to reach into the form block for its name; the plan
+        # factory that produces it also moved out of pipeline/driver.py,
+        # where emission could not have reached it even in principle.
+        "BlockPlan",
     }
 )
 
@@ -97,6 +102,12 @@ UNCONSUMED_PLAN_TYPES = frozenset(
 PLAN_FACTORIES = {
     "LocalKernelPlan": ("local_kernel_plan_for",),
     "MeshKernelPlan": ("mesh_kernel_plan_for_element", "mesh_kernel_plan_from_context"),
+    "BlockPlan": (
+        "block_plan_from_form_block",
+        "block_plans_from_form_collection",
+        "jacobian_block_plan",
+    ),
+    "DataStreamPlan": ("local_kernel_stream_plans",),
 }
 
 
@@ -170,7 +181,7 @@ class PlansAreConsumedTest(unittest.TestCase):
         )
         self.assertEqual(
             unconsumed,
-            7,
+            6,
             "the number of unread structural plans changed to %d; update this "
             "expectation deliberately, and say why in the commit" % unconsumed,
         )

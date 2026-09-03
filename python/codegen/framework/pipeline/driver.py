@@ -222,6 +222,16 @@ from codegen.framework.targets import (
 from codegen.framework.plans.scheduling import build_expression_graph
 
 
+from codegen.framework.plans.residual_structure import (
+    block_plan_from_form_block as _block_plan_from_form_block,
+    block_plans_from_form_collection as _block_plans_from_form_collection,
+    residual_local_phase_plans as _residual_local_phase_plans,
+    residual_local_phases as _residual_local_phases,
+    residual_mesh_phase_plans as _residual_mesh_phase_plans,
+    residual_mesh_phases as _residual_mesh_phases,
+)
+
+
 DEFAULT_VECTOR_SIZE = 16
 OPENMP_SOA_BACKEND = _OpenMPSoABackend()
 CUDA_SOA_BACKEND = _CUDASoABackend()
@@ -1197,46 +1207,6 @@ def _metadata_blocks(collection, order):
     if metadata is None:
         return ()
     return metadata.blocks
-
-
-def _block_plans_from_form_collection(collection):
-    return tuple(_block_plan_from_form_block(block) for block in collection.blocks)
-
-
-def _block_plan_from_form_block(block):
-    return BlockPlan(
-        block.name,
-        block.row_field,
-        block.column_field or "",
-        block.order,
-        local_phase_plans=_residual_local_phase_plans(),
-    )
-
-
-def _residual_local_phase_plans():
-    return (
-        LocalPhasePlan(LocalPhase.EVALUATE_TRIAL),
-        LocalPhasePlan(LocalPhase.TRANSFORM_REFERENCE),
-        LocalPhasePlan(LocalPhase.EVALUATE_MATERIAL),
-        LocalPhasePlan(LocalPhase.CONTRACT_TEST),
-    )
-
-
-def _residual_local_phases():
-    return tuple(plan.phase for plan in _residual_local_phase_plans())
-
-
-def _residual_mesh_phase_plans(blocks):
-    return (
-        MeshPhasePlan(MeshPhase.GATHER),
-        MeshPhasePlan(MeshPhase.GEOMETRY),
-        MeshPhasePlan(MeshPhase.LOCAL_CALL, blocks=tuple(blocks)),
-        MeshPhasePlan(MeshPhase.SCATTER),
-    )
-
-
-def _residual_mesh_phases():
-    return tuple(plan.phase for plan in _residual_mesh_phase_plans(()))
 
 
 def _block_codegen_units(material_name, dim, evaluated, blocks):
