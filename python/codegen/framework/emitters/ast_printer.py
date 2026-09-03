@@ -4,6 +4,7 @@ from codegen.framework.ir.kernel_ast import (
     AssignmentNode,
     BufferDeclNode,
     BufferAccess,
+    BlockNode,
     CallNode,
     ExpressionRef,
     FunctionDefNode,
@@ -11,6 +12,7 @@ from codegen.framework.ir.kernel_ast import (
     Literal,
     LoopIncrementKind,
     KernelAST,
+    LoopHeaderNode,
     LoopNode,
     RawLinesNode,
     ScatterNode,
@@ -30,6 +32,31 @@ class CLikeKernelASTPrinter:
         lines = []
         for node in ast.nodes:
             lines.extend(self.print_node(node))
+        return tuple(lines)
+
+    def print_loop_header(self, node, indent=""):
+        """The pragma and opening line of a loop, without its closing brace.
+
+        Shared by ``LoopNode``, which closes what this opens, and
+        ``LoopHeaderNode``, which leaves the brace to a caller still building
+        its body as lines.
+        """
+        lines = []
+        if node.vectorized and self.vectorize_pragma:
+            lines.append("%s%s" % (indent, self.vectorize_pragma))
+        iterator_name = self.render_entity(node.iterator.symbol)
+        lines.append(
+            "%sfor (%s %s = %s; %s < %s; %s) {"
+            % (
+                indent,
+                self.render_entity(node.iterator.index_type),
+                iterator_name,
+                self.render_entity(node.iteration_range.begin),
+                iterator_name,
+                self.render_entity(node.iteration_range.end),
+                self.render_increment(node.increment),
+            )
+        )
         return tuple(lines)
 
     def print_node(self, node, indent=""):
@@ -54,27 +81,19 @@ class CLikeKernelASTPrinter:
                 lines.extend(self.print_node(body_node, indent + self.indent_unit))
             lines.append("%s}" % indent)
             return tuple(lines)
+        if isinstance(node, BlockNode):
+            lines = ["%s{" % indent]
+            for body_node in node.body:
+                lines.extend(self.print_node(body_node, indent + self.indent_unit))
+            lines.append("%s}" % indent)
+            return tuple(lines)
+        if isinstance(node, LoopHeaderNode):
+            return self.print_loop_header(node.loop, indent)
         if isinstance(node, LoopNode):
-            lines = []
-            if node.vectorized and self.vectorize_pragma:
-                lines.append("%s%s" % (indent, self.vectorize_pragma))
-            iterator_name = self.render_entity(node.iterator.symbol)
-            lines.append(
-                "%sfor (%s %s = %s; %s < %s; %s) {"
-                % (
-                    indent,
-                    self.render_entity(node.iterator.index_type),
-                    iterator_name,
-                    self.render_entity(node.iteration_range.begin),
-                    iterator_name,
-                    self.render_entity(node.iteration_range.end),
-                    self.render_increment(node.increment),
-                )
-            )
-            if node.body:
-                for body_node in node.body:
-                    lines.extend(self.print_node(body_node, indent + self.indent_unit))
-                lines.append("%s}" % indent)
+            lines = list(self.print_loop_header(node, indent))
+            for body_node in node.body:
+                lines.extend(self.print_node(body_node, indent + self.indent_unit))
+            lines.append("%s}" % indent)
             return tuple(lines)
         if isinstance(node, AssignmentNode):
             return (

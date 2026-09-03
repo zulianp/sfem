@@ -33,6 +33,7 @@ from codegen.framework.ir.kernel_ast import (
     KernelAST,
     KernelASTPass,
     KernelASTPassPipeline,
+    LoopHeaderNode,
     LoopKind,
     LoopNode,
     PartialAssemblyStrategy,
@@ -264,14 +265,20 @@ class GenApiTest(unittest.TestCase):
         ast = KernelAST(
             "parity_smoke",
             nodes=(
-                LoopNode(
-                    LoopKind.TILE,
-                    iterator("evbegin", "ptrdiff_t"),
-                    iteration_range(0, expr_ref("nelements", "element_count")),
-                    add_assign_increment(
+                # The tile loop is a header: the mesh loop's body is emitted
+                # separately and closes the brace itself, which
+                # ``LoopHeaderNode`` now states instead of leaving it implied
+                # by an empty body.  This mirrors OpenMPEnergySoASourceBuilder.
+                LoopHeaderNode(
+                    LoopNode(
+                        LoopKind.TILE,
                         iterator("evbegin", "ptrdiff_t"),
-                        expr_ref("VECTOR_SIZE", "vector_width"),
-                    ),
+                        iteration_range(0, expr_ref("nelements", "element_count")),
+                        add_assign_increment(
+                            iterator("evbegin", "ptrdiff_t"),
+                            expr_ref("VECTOR_SIZE", "vector_width"),
+                        ),
+                    )
                 ),
                 BufferDeclNode(
                     "const int",
@@ -319,11 +326,13 @@ class GenApiTest(unittest.TestCase):
             ),
         )
         dump = ast.to_dict()
-        self.assertEqual(dump["nodes"][0]["kind"], "loop")
-        self.assertEqual(dump["nodes"][0]["loop_kind"], "tile")
-        self.assertEqual(dump["nodes"][0]["iterator"]["kind"], "iterator")
-        self.assertEqual(dump["nodes"][0]["range"]["kind"], "range")
-        self.assertEqual(dump["nodes"][0]["increment"]["kind"], "add_assign")
+        self.assertEqual(dump["nodes"][0]["kind"], "loop_header")
+        header = dump["nodes"][0]["loop"]
+        self.assertEqual(header["kind"], "loop")
+        self.assertEqual(header["loop_kind"], "tile")
+        self.assertEqual(header["iterator"]["kind"], "iterator")
+        self.assertEqual(header["range"]["kind"], "range")
+        self.assertEqual(header["increment"]["kind"], "add_assign")
         self.assertTrue(dump["nodes"][2]["vectorized"])
         self.assertNotIn("pragma", dump["nodes"][2])
         self.assertTrue(dump["nodes"][3]["atomic"])

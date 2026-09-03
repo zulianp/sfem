@@ -96,38 +96,54 @@ class QuadratureLaneKernelTest(unittest.TestCase):
         self.assertEqual(sum(l.count("{") for l in lines), sum(l.count("}") for l in lines))
 
 
-class PrinterHandlesRealBodiesTest(unittest.TestCase):
-    def test_nested_loops_with_bodies_close_their_braces(self):
-        """Guards the trap: the printer omits `}` only for an empty body.
+class PrinterClosesWhatItOpensTest(unittest.TestCase):
+    """The trap this file used to guard is gone; the contract replaced it.
 
-        Six existing call sites rely on that, using body-less loops as header
-        generators and closing the brace themselves.  This kernel relies on the
-        opposite, so both behaviours have to keep working.
-        """
-        printer = CLikeKernelASTPrinter(vectorize_pragma="#pragma omp simd")
+    This test previously asserted the opposite: that a body-less ``LoopNode``
+    printed **no** closing brace, because five call sites used it as a header
+    generator and wrote the ``}`` themselves.  That made a genuinely empty
+    loop emit unbalanced braces, and nothing in the IR distinguished "header
+    only" from "no statements".
+
+    ``LoopHeaderNode`` now says which is meant, so ``LoopNode`` always closes
+    what it opens.  Kept as a test rather than deleted because the old
+    behaviour is exactly the kind a future change could reintroduce by
+    accident.
+    """
+
+    def _loop(self, body=()):
         from codegen.framework.ir.kernel_ast import (
             iteration_range,
             iterator,
             pre_increment,
         )
 
-        empty = iterator("i", "int")
-        header_only = printer.print_node(
-            LoopNode(LoopKind.SIMD, empty, iteration_range(0, expr_ref("n")), pre_increment(empty))
+        index = iterator("i", "int")
+        return LoopNode(
+            LoopKind.SIMD,
+            index,
+            iteration_range(0, expr_ref("n")),
+            pre_increment(index),
+            body=body,
         )
-        self.assertNotIn("}", "".join(header_only))
 
-        outer = iterator("q", "int")
-        with_body = printer.print_node(
-            LoopNode(
-                LoopKind.QUADRATURE,
-                outer,
-                iteration_range(0, expr_ref("N_QP")),
-                pre_increment(outer),
-                body=(ScatterNode(expr_ref("o[0]"), expr_ref("v"), "+="),),
-            )
+    def test_an_empty_loop_closes_its_brace(self):
+        lines = CLikeKernelASTPrinter().print_node(self._loop())
+        text = "".join(lines)
+        self.assertEqual(text.count("{"), text.count("}"), "unbalanced: %r" % (lines,))
+
+    def test_a_loop_with_a_body_closes_its_brace(self):
+        lines = CLikeKernelASTPrinter().print_node(
+            self._loop(body=(ScatterNode(expr_ref("o[0]"), expr_ref("v"), "+="),))
         )
-        self.assertEqual("".join(with_body).count("{"), "".join(with_body).count("}"))
+        text = "".join(lines)
+        self.assertEqual(text.count("{"), text.count("}"))
+
+    def test_only_loop_header_node_omits_the_brace(self):
+        from codegen.framework.ir.kernel_ast import LoopHeaderNode
+
+        lines = CLikeKernelASTPrinter().print_node(LoopHeaderNode(self._loop()))
+        self.assertNotIn("}", "".join(lines))
 
 
 if __name__ == "__main__":

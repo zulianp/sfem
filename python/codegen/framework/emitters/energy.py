@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from codegen.framework.ir.kernel_ast import (
     BufferDeclNode,
+    LoopHeaderNode,
     LoopKind,
     LoopNode,
     add_assign_increment,
@@ -241,14 +242,16 @@ class OpenMPEnergySoASourceBuilder:
         lines = render_kernel_ast_lines(
             "openmp_mesh_tile_loop",
             (
-                LoopNode(
-                    LoopKind.TILE,
-                    tile_iterator,
-                    iteration_range(0, expr_ref("nelements", "element_count")),
-                    add_assign_increment(
+                LoopHeaderNode(
+                    LoopNode(
+                        LoopKind.TILE,
                         tile_iterator,
-                        expr_ref("VECTOR_SIZE", "vector_width"),
-                    ),
+                        iteration_range(0, expr_ref("nelements", "element_count")),
+                        add_assign_increment(
+                            tile_iterator,
+                            expr_ref("VECTOR_SIZE", "vector_width"),
+                        ),
+                    )
                 ),
                 BufferDeclNode(
                     "const int",
@@ -372,20 +375,22 @@ class CUDAEnergySoASourceBuilder:
         lines = render_kernel_ast_lines(
             "cuda_mesh_grid_stride_loop",
             (
-                LoopNode(
-                    LoopKind.KERNEL,
-                    kernel_iterator,
-                    iteration_range(
-                        expr_ref(
-                            "(ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x",
-                            "cuda_thread_start",
-                        ),
-                        expr_ref("nelements", "element_count"),
-                    ),
-                    add_assign_increment(
+                LoopHeaderNode(
+                    LoopNode(
+                        LoopKind.KERNEL,
                         kernel_iterator,
-                        expr_ref("(ptrdiff_t)blockDim.x * gridDim.x", "cuda_grid_stride"),
-                    ),
+                        iteration_range(
+                            expr_ref(
+                                "(ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x",
+                                "cuda_thread_start",
+                            ),
+                            expr_ref("nelements", "element_count"),
+                        ),
+                        add_assign_increment(
+                            kernel_iterator,
+                            expr_ref("(ptrdiff_t)blockDim.x * gridDim.x", "cuda_grid_stride"),
+                        ),
+                    )
                 ),
                 BufferDeclNode("const int", "nelems", (), "1"),
             ),

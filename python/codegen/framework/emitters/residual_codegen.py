@@ -14,6 +14,7 @@ from codegen.framework.plans.generation import (
 )
 from codegen.framework.plans.matrix_formats import CRSAssemblyPlan
 from codegen.framework.ir.kernel_ast import (
+    BlockNode,
     BufferDeclNode,
     FunctionDefNode,
     LoopKind,
@@ -3072,44 +3073,38 @@ def _quadrature_lane_kernel_node(lane_body, name="quadrature_lane_body"):
     """
     target = _target()
     policy = target.loop_lowering_policy()
-    if not policy.emits_lane_loop:
-        printer = CLikeKernelASTPrinter()
-        lines = ["    for (int q = 0; q < N_QP; ++q) {"]
-        lines.extend(target.work_item_loop_lines("        "))
-        for node in lane_body:
-            lines.extend(printer.print_node(node, "            "))
-        lines.extend(["        }", "    }"])
-        return RawLinesNode(
-            tuple(lines),
-            reason="target opens a bare work-item block; the IR has no block node",
-        )
-
-    lane = iterator(policy.lane_index, policy.lane_index_type)
     quadrature = iterator("q", "int")
-    pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
+
+    if policy.emits_lane_loop:
+        lane = iterator(policy.lane_index, policy.lane_index_type)
+        pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
+        work_item = LoopNode(
+            LoopKind.SIMD,
+            lane,
+            iteration_range(0, expr_ref("nelems", "tile_extent")),
+            pre_increment(lane),
+            body=tuple(lane_body),
+            vectorized=bool(pragma),
+        )
+    else:
+        # The lane is a thread rather than an iteration, so the target opens a
+        # bare scope where a CPU target opens a loop.  Before BlockNode this
+        # was the one shape with no node, and the whole nest fell back to
+        # pre-rendered text on exactly the targets the IR exists to serve.
+        work_item = BlockNode(body=tuple(lane_body))
+
     return LoopNode(
         LoopKind.QUADRATURE,
         quadrature,
         iteration_range(0, expr_ref("N_QP", "quadrature_count")),
         pre_increment(quadrature),
-        body=(
-            LoopNode(
-                LoopKind.SIMD,
-                lane,
-                iteration_range(0, expr_ref("nelems", "tile_extent")),
-                pre_increment(lane),
-                body=tuple(lane_body),
-                vectorized=bool(pragma),
-            ),
-        ),
+        body=(work_item,),
     )
 
 
 def _quadrature_lane_kernel_lines(lane_body, indent="    ", name="quadrature_lane_body"):
     """The printed view of :func:`_quadrature_lane_kernel_node`."""
     node = _quadrature_lane_kernel_node(lane_body, name=name)
-    if isinstance(node, RawLinesNode):
-        return list(node.lines)
     target = _target()
     policy = target.loop_lowering_policy()
     pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
