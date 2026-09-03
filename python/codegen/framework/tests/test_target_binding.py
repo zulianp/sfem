@@ -222,13 +222,17 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     serial loop -- code that compiles and is quietly wrong -- which hides the
     portability gap instead of closing it.  Restructuring is the real fix.
 
-    Six ``#pragma omp atomic update`` sit in the ``_sfem_soa_hessian_scatter_*``
-    matrix-format helpers.  These were recorded as blocked on threading a
-    ``source_builder`` through seven functions; the target binding removed
-    that blocker, since a helper can read ``current_target()`` directly.  The
-    seventh is gone: ``_scatter_block_diag_sym`` is built from IR nodes and
-    its atomic comes from the target through ``ScatterNode(atomic=True)``.
-    The rest follow as each helper migrates.
+    Four ``#pragma omp atomic update`` sit in the ``_sfem_soa_hessian_scatter_*``
+    helpers for CRS, DIA and COO.  These were recorded as blocked on threading
+    a ``source_builder`` through seven functions; the target binding removed
+    that blocker, since a helper reads ``current_target()`` directly.  Three
+    are already gone -- ``block_diag_sym``, ``patch`` and ``bsr`` are built
+    from IR nodes and take their atomic from the target through
+    ``ScatterNode(atomic=True)``.
+
+    The three that remain are the non-BSR formats, which are not the target
+    for vector problems, so they are left as strings rather than migrated for
+    parity's sake.
 
     One ``#pragma omp parallel`` is in ``_sfem_packed_thread_scratch_header_source``,
     which preallocates thread-local scratch.  That is OpenMP-specific
@@ -239,7 +243,7 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     #: file -> literal pragmas remaining.  Lower these; never raise them.
     BUDGET = {
         "residual_codegen.py": 17,
-        "energy_codegen.py": 13,
+        "energy_codegen.py": 11,
     }
 
     def _literal_pragmas(self, name):

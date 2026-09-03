@@ -5,6 +5,7 @@ from codegen.framework.ir.kernel_ast import (
     BufferDeclNode,
     CallNode,
     FunctionDefNode,
+    IfNode,
     LoopHeaderNode,
     LoopKind,
     LoopNode,
@@ -6206,56 +6207,145 @@ def _counting_loop(name, begin, end, body):
 
 
 def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes):
-    return [
-        "template <typename scalar_t>",
-        "static SFEM_INLINE int %s_scatter_bsr(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
-        "        const count_t *const SFEM_RESTRICT rowptr,",
-        "        const idx_t *const SFEM_RESTRICT colidx,",
-        "        scalar_t *const SFEM_RESTRICT values) {",
-        "    static constexpr int DIM = %d;" % dim,
-        "    static constexpr int N_SHAPE = %d;" % n_nodes,
-        "    count_t entries[N_SHAPE * N_SHAPE];",
-        "    idx_t ks[N_SHAPE];",
-        "    bool valid_block_graph = true;",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        const idx_t dof_i = ev[i];",
-        "        const count_t row_begin = rowptr[dof_i];",
-        "        const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);",
-        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
-        "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
-        "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {",
-        "                if (valid_block_graph) {",
-        "                    std::fprintf(stderr, \"%s_scatter_bsr missing block graph entry (%%ld, %%ld)\\n\", (long)ev[i], (long)ev[j]);"
-        % function_base,
-        "                }",
-        "                entries[i * N_SHAPE + j] = row_begin;",
-        "                valid_block_graph = false;",
-        "            } else {",
-        "                entries[i * N_SHAPE + j] = row_begin + ks[j];",
-        "            }",
-        "        }",
-        "    }",
-        "    if (!valid_block_graph) return SFEM_FAILURE;",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            scalar_t *const block = &values[entries[i * N_SHAPE + j] * DIM * DIM];",
-        "            for (int bi = 0; bi < DIM; ++bi) {",
-        "                const int row = bi * N_SHAPE + i;",
-        "                for (int bj = 0; bj < DIM; ++bj) {",
-        "                    const int col = bj * N_SHAPE + j;",
-        "#pragma omp atomic update",
-        "                    block[bi * DIM + bj] += element_matrix[row * (DIM * N_SHAPE) + col];",
-        "                }",
-        "            }",
-        "        }",
-        "    }",
-        "    return SFEM_SUCCESS;",
-        "}",
-        "",
+    """Scatter one element block into a BSR matrix.
+
+    The format vector problems use, so the one worth having in the IR.  It
+    still carries the per-element graph validation OP 10 is about removing:
+    the locate loop tests every candidate entry and reports the first failure
+    through ``std::fprintf`` from inside whatever parallel region the caller
+    opened.  Represented faithfully here rather than quietly dropped -- when
+    the check goes, what disappears is the IfNode below and the flag it sets,
+    and the locate loop simply keeps its result.
+    """
+    missing = expr_ref("ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]")
+    report = CallNode(
+        "std::fprintf",
+        (
+            "stderr",
+            '"%s_scatter_bsr missing block graph entry (%%ld, %%ld)\\n"' % function_base,
+            "(long)ev[i]",
+            "(long)ev[j]",
+        ),
+    )
+    locate = _counting_loop(
+        "j",
+        0,
+        expr_ref("N_SHAPE"),
+        [
+            IfNode(
+                missing,
+                body=(
+                    IfNode(expr_ref("valid_block_graph"), body=(report,)),
+                    AssignmentNode(
+                        expr_ref("entries[i * N_SHAPE + j]"), expr_ref("row_begin")
+                    ),
+                    AssignmentNode(expr_ref("valid_block_graph"), expr_ref("false")),
+                ),
+                orelse=(
+                    AssignmentNode(
+                        expr_ref("entries[i * N_SHAPE + j]"),
+                        expr_ref("row_begin + ks[j]"),
+                    ),
+                ),
+            )
+        ],
+    )
+    accumulate = [
+        BufferDeclNode("const int", "col", (), expr_ref("bj * N_SHAPE + j")),
+        ScatterNode(
+            expr_ref("block[bi * DIM + bj]"),
+            expr_ref("element_matrix[row * (DIM * N_SHAPE) + col]"),
+            "+=",
+            atomic=True,
+        ),
     ]
+    body = [
+        BufferDeclNode("static constexpr int", "DIM", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
+        BufferDeclNode("count_t", "entries", ("N_SHAPE * N_SHAPE",)),
+        BufferDeclNode("idx_t", "ks", ("N_SHAPE",)),
+        BufferDeclNode("bool", "valid_block_graph", (), expr_ref("true")),
+        _counting_loop(
+            "i",
+            0,
+            expr_ref("N_SHAPE"),
+            [
+                BufferDeclNode("const idx_t", "dof_i", (), expr_ref("ev[i]")),
+                BufferDeclNode(
+                    "const count_t", "row_begin", (), expr_ref("rowptr[dof_i]")
+                ),
+                BufferDeclNode(
+                    "const int",
+                    "lenrow",
+                    (),
+                    expr_ref("(int)(rowptr[dof_i + 1] - row_begin)"),
+                ),
+                BufferDeclNode(
+                    "const idx_t *const SFEM_RESTRICT",
+                    "cols",
+                    (),
+                    expr_ref("&colidx[row_begin]"),
+                ),
+                CallNode(
+                    "%s_find_cols" % function_base, ("ev", "cols", "lenrow", "ks")
+                ),
+                locate,
+            ],
+        ),
+        IfNode(
+            expr_ref("!valid_block_graph"),
+            body=(ReturnNode(expr_ref("SFEM_FAILURE")),),
+            inline_body=True,
+        ),
+        _counting_loop(
+            "i",
+            0,
+            expr_ref("N_SHAPE"),
+            [
+                _counting_loop(
+                    "j",
+                    0,
+                    expr_ref("N_SHAPE"),
+                    [
+                        BufferDeclNode(
+                            "scalar_t *const",
+                            "block",
+                            (),
+                            expr_ref("&values[entries[i * N_SHAPE + j] * DIM * DIM]"),
+                        ),
+                        _counting_loop(
+                            "bi",
+                            0,
+                            expr_ref("DIM"),
+                            [
+                                BufferDeclNode(
+                                    "const int", "row", (), expr_ref("bi * N_SHAPE + i")
+                                ),
+                                _counting_loop("bj", 0, expr_ref("DIM"), accumulate),
+                            ],
+                        ),
+                    ],
+                )
+            ],
+        ),
+        ReturnNode(expr_ref("SFEM_SUCCESS")),
+    ]
+    return _print_scatter_function(
+        FunctionDefNode(
+            "%s_scatter_bsr" % function_base,
+            params=(
+                "const idx_t *const SFEM_RESTRICT ev",
+                "const scalar_t *const SFEM_RESTRICT element_matrix",
+                "const count_t *const SFEM_RESTRICT rowptr",
+                "const idx_t *const SFEM_RESTRICT colidx",
+                "scalar_t *const SFEM_RESTRICT values",
+            ),
+            body=tuple(body),
+            return_type="int",
+            qualifier="static SFEM_INLINE",
+            template_params=("typename scalar_t",),
+        )
+    )
 
 
 def _sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes):
@@ -6568,44 +6658,115 @@ def _sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes):
 
 
 def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes):
-    return [
-        "template <typename scalar_t>",
-        "static SFEM_INLINE int %s_scatter_patch(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
-        "        const count_t *const SFEM_RESTRICT rowptr,",
-        "        const idx_t *const SFEM_RESTRICT colidx,",
-        "        scalar_t *const SFEM_RESTRICT values) {",
-        "    static constexpr int DIM = %d;" % dim,
-        "    static constexpr int N_SHAPE = %d;" % n_nodes,
-        "    count_t entries[N_SHAPE * N_SHAPE];",
-        "    idx_t ks[N_SHAPE];",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        const count_t row_begin = rowptr[ev[i]];",
-        "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
-        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
-        "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
-        "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            entries[i * N_SHAPE + j] = row_begin + ks[j];",
-        "        }",
-        "    }",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            scalar_t *const block = &values[entries[i * N_SHAPE + j] * DIM * DIM];",
-        "            for (int bi = 0; bi < DIM; ++bi) {",
-        "                const int row = bi * N_SHAPE + i;",
-        "                for (int bj = 0; bj < DIM; ++bj) {",
-        "                    const int col = bj * N_SHAPE + j;",
-        "#pragma omp atomic update",
-        "                    block[bi * DIM + bj] += element_matrix[row * (DIM * N_SHAPE) + col];",
-        "                }",
-        "            }",
-        "        }",
-        "    }",
-        "    return SFEM_SUCCESS;",
-        "}",
-        "",
+    """Scatter into a patch-local CRS block.
+
+    Migrated because it carries no graph validation: it locates its entries
+    and uses them.  The BSR, CRS, DIA and COO helpers do validate, and that
+    machinery is what OP 10 is about removing -- see the note in
+    ``RawLinesRatchetTest``.
+    """
+    accumulate = [
+        BufferDeclNode("const int", "col", (), expr_ref("bj * N_SHAPE + j")),
+        ScatterNode(
+            expr_ref("block[bi * DIM + bj]"),
+            expr_ref("element_matrix[row * (DIM * N_SHAPE) + col]"),
+            "+=",
+            atomic=True,
+        ),
     ]
+    body = [
+        BufferDeclNode("static constexpr int", "DIM", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
+        BufferDeclNode("count_t", "entries", ("N_SHAPE * N_SHAPE",)),
+        BufferDeclNode("idx_t", "ks", ("N_SHAPE",)),
+        _counting_loop(
+            "i",
+            0,
+            expr_ref("N_SHAPE"),
+            [
+                BufferDeclNode(
+                    "const count_t", "row_begin", (), expr_ref("rowptr[ev[i]]")
+                ),
+                BufferDeclNode(
+                    "const int",
+                    "lenrow",
+                    (),
+                    expr_ref("(int)(rowptr[ev[i] + 1] - row_begin)"),
+                ),
+                BufferDeclNode(
+                    "const idx_t *const SFEM_RESTRICT",
+                    "cols",
+                    (),
+                    expr_ref("&colidx[row_begin]"),
+                ),
+                CallNode(
+                    "%s_find_cols" % function_base,
+                    ("ev", "cols", "lenrow", "ks"),
+                ),
+                _counting_loop(
+                    "j",
+                    0,
+                    expr_ref("N_SHAPE"),
+                    [
+                        AssignmentNode(
+                            expr_ref("entries[i * N_SHAPE + j]"),
+                            expr_ref("row_begin + ks[j]"),
+                        )
+                    ],
+                ),
+            ],
+        ),
+        _counting_loop(
+            "i",
+            0,
+            expr_ref("N_SHAPE"),
+            [
+                _counting_loop(
+                    "j",
+                    0,
+                    expr_ref("N_SHAPE"),
+                    [
+                        BufferDeclNode(
+                            "scalar_t *const",
+                            "block",
+                            (),
+                            expr_ref("&values[entries[i * N_SHAPE + j] * DIM * DIM]"),
+                        ),
+                        _counting_loop(
+                            "bi",
+                            0,
+                            expr_ref("DIM"),
+                            [
+                                BufferDeclNode(
+                                    "const int", "row", (), expr_ref("bi * N_SHAPE + i")
+                                ),
+                                _counting_loop(
+                                    "bj", 0, expr_ref("DIM"), accumulate
+                                ),
+                            ],
+                        ),
+                    ],
+                )
+            ],
+        ),
+        ReturnNode(expr_ref("SFEM_SUCCESS")),
+    ]
+    return _print_scatter_function(
+        FunctionDefNode(
+            "%s_scatter_patch" % function_base,
+            params=(
+                "const idx_t *const SFEM_RESTRICT ev",
+                "const scalar_t *const SFEM_RESTRICT element_matrix",
+                "const count_t *const SFEM_RESTRICT rowptr",
+                "const idx_t *const SFEM_RESTRICT colidx",
+                "scalar_t *const SFEM_RESTRICT values",
+            ),
+            body=tuple(body),
+            return_type="int",
+            qualifier="static SFEM_INLINE",
+            template_params=("typename scalar_t",),
+        )
+    )
 
 
 def _sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes):
