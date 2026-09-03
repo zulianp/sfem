@@ -29,8 +29,20 @@ enum {
     CVFEM_CUDA_FLUSH_ATOMIC = 0,
     // Two passes. Owned nodes are written directly, ghosts are staged per entry and
     // then gathered through ghost_reduce_*, which visits each destination exactly once.
-    // Atomics-free and therefore bit-deterministic run to run.
+    //
+    // This removes the atomics from the GLOBAL reduction only. It is not bit-reproducible:
+    // both modes still accumulate a pack's element contributions with atomicAdd into
+    // shared memory, and that fixes no order. Measured -- both modes differ run to run.
     CVFEM_CUDA_FLUSH_TWO_PASS = 1,
+    // Bit-reproducible. Each element writes its 32 residual values to a scratch array
+    // with no accumulation at all, and a second pass gives one thread per node, summing
+    // that node's element contributions in increasing element order. Every sum happens in
+    // a fixed order, so the result is identical run to run and across block sizes.
+    //
+    // It is not free: it materialises 32 doubles per element and reads them back, which
+    // is why it is a third mode rather than a fix to the other two. Requires
+    // cvfem_cuda_attach_node_to_element.
+    CVFEM_CUDA_FLUSH_DETERMINISTIC = 2,
 };
 
 int cvfem_cuda_device_info(int *sm_count, int *max_shmem_per_block,
@@ -184,6 +196,17 @@ double cvfem_cuda_time_jacobian_action_global(cvfem_cuda_ctx *ctx, double rho, d
 // but it allocates the matrix at the same time, which is not possible at the largest
 // sizes; the standard-mesh matrix-free kernels need the connectivity and not the matrix.
 int cvfem_cuda_attach_elements_global(cvfem_cuda_ctx *ctx, const int32_t *elements);
+
+// Node-to-element adjacency in CSR, for CVFEM_CUDA_FLUSH_DETERMINISTIC. `enc` holds
+// element * 8 + local_index, so the gather knows which of the element's eight slots the
+// node occupies. Built on the host; see the driver.
+int cvfem_cuda_attach_node_to_element(cvfem_cuda_ctx *ctx, const ptrdiff_t *n2e_ptr,
+                                      const int32_t *n2e_enc, ptrdiff_t n_entries);
+
+int    cvfem_cuda_residual_deterministic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                         int geom, int block_size, void *stream);
+double cvfem_cuda_time_residual_deterministic(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                              int geom, int block_size, int repeat);
 
 int cvfem_cuda_attach_coords(cvfem_cuda_ctx *ctx,
                              const double *px, const double *py, const double *pz);
