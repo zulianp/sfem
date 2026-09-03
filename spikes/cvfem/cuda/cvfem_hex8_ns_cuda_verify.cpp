@@ -116,6 +116,7 @@ void csv_write(const char *path, const char *tag, const char *device,
 
 int main(int argc, char **argv) {
     double warp_amp = 0.05;  // sinusoidal shear; makes the isoparametric path non-trivial
+    int    time_only = 0;    // skip host references; for the large sizes of a saturation sweep
     int mpi_ready = 0;
     MPI_Initialized(&mpi_ready);
     bool own_mpi = false;
@@ -132,6 +133,7 @@ int main(int argc, char **argv) {
         else if (a == "--block-size" && i + 1 < argc) block_size = std::atoi(argv[++i]);
         else if (a == "--repeat" && i + 1 < argc) repeat = std::atoi(argv[++i]);
         else if (a == "--warp" && i + 1 < argc) warp_amp = std::atof(argv[++i]);
+        else if (a == "--time-only") time_only = 1;
         else if (a == "--no-sfc") use_sfc = false;
         else if (a == "--csv" && i + 1 < argc) csv_path = argv[++i];
         else if (a == "--tag" && i + 1 < argc) csv_tag = argv[++i];
@@ -230,6 +232,58 @@ int main(int argc, char **argv) {
     std::vector<double> u_int;
     soa_to_interleaved(d, u_int);
     if (cvfem_cuda_upload_u(ctx, u_int.data()) != 0) return 1;
+
+    // Timing-only path. The host reference passes -- a full CPU assembly and residual --
+    // dominate the run at the sizes needed to saturate the device, and they are not what
+    // a saturation sweep is asking about. Everything here has already been verified at
+    // the smaller sizes; this measures how throughput moves with the problem.
+    if (time_only) {
+        std::vector<double> tv((size_t)d.nnodes * 4);
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            tv[i * 4 + 0] = 0.7 * std::sin(0.011 * (double)i);
+            tv[i * 4 + 1] = 0.3 * std::cos(0.017 * (double)i);
+            tv[i * 4 + 2] = 0.5 * std::sin(0.023 * (double)i + 1.0);
+            tv[i * 4 + 3] = 0.9 * std::cos(0.007 * (double)i + 2.0);
+        }
+        if (cvfem_cuda_upload_v(ctx, tv.data()) != 0) return 1;
+
+        // The matrix is the memory limit at these sizes -- at n=192 it is ~25 GiB -- so
+        // build it only while it still fits alongside everything else, and report the
+        // matrix-free rows regardless.
+        const double bsr_gib = (double)d.nnodes * 27.0 * 16.0 * sizeof(double) / (1 << 30);
+        bool with_bsr = false;
+        BSR4 tbsr;
+        if (bsr_gib < 20.0) {
+            tbsr = make_bsr4(d.mesh);
+            precompute_element_bsr_slots(d, tbsr);
+            std::vector<int32_t> eg2((size_t)8 * d.nelements);
+            for (int v = 0; v < 8; ++v)
+                for (ptrdiff_t e = 0; e < d.nelements; ++e)
+                    eg2[(size_t)v * d.nelements + e] = d.elems[v][e];
+            with_bsr = (cvfem_cuda_bsr_attach(ctx, tbsr.nnz, eg2.data(),
+                                              tbsr.element_slots.data(),
+                                              tbsr.rowptr, tbsr.colidx) == 0);
+        } else {
+            std::printf("skipping assembled rows: the matrix would be %.1f GiB\n", bsr_gib);
+        }
+
+        const double dofs = (double)(d.nnodes * 4);
+        auto row = [&](const char *what, double t) {
+            std::printf("TIMING %-28s n=%-4d dofs=%-12td %10.4e s %10.1f MDOF/s\n",
+                        what, n, d.nnodes * 4, t, t > 0 ? dofs / t * 1e-6 : 0.0);
+        };
+        row("residual packed",  cvfem_cuda_time_residual(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC, block_size, repeat));
+        row("residual standard", cvfem_cuda_time_residual_global(ctx, rho, mu, 0, block_size, repeat));
+        row("jac_action packed", cvfem_cuda_time_jacobian_action(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC, block_size, repeat));
+        row("jac_action standard", cvfem_cuda_time_jacobian_action_global(ctx, rho, mu, 0, block_size, repeat));
+        if (with_bsr) {
+            row("assemble sympy", cvfem_cuda_time_assemble(ctx, rho, mu, CVFEM_CUDA_JAC_SYMPY, block_size, repeat));
+            row("assemble diag",  cvfem_cuda_time_assemble_diag(ctx, rho, mu, block_size, repeat));
+        }
+        cvfem_cuda_destroy(ctx);
+        if (own_mpi) MPI_Finalize();
+        return 0;
+    }
 
     const double refmax = max_abs(ref);
     int          fail   = 0;
