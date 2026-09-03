@@ -59,8 +59,8 @@ int main(int argc, char **argv) {
     const auto macros = parse_list(smesh::Env::read_string("SFEM_BENCH_MACROS", "2,4,6,8"));
     const auto levels = parse_list(smesh::Env::read_string("SFEM_BENCH_LEVELS", "2,4,8"));
 
-    std::printf("%-4s %-10s %-12s %-12s %-12s %-12s %-9s %-12s %s\n",
-                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "sp_hoist", "best_MDOF/s", "agree_rel");
+    std::printf("%-4s %-10s %-12s %-12s %-12s %-12s %-12s %-9s %-12s %s\n",
+                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em_ns/d", "sp_best", "best_MDOF/s", "agree_rel");
 
     int failures = 0;
 
@@ -104,14 +104,16 @@ int main(int argc, char **argv) {
             sscvfem_apply_naive(d, rho, mu, dir.data(), y_naive.data());
             sscvfem_apply_macro_local(d, rho, mu, dir.data(), y_macro.data());
             sscvfem_apply_macro_local_affine(d, rho, mu, dir.data(), y_aff.data());
-            std::vector<scalar_t> y_hoi((size_t)ndof, 0);
+            std::vector<scalar_t> y_hoi((size_t)ndof, 0), y_em((size_t)ndof, 0);
             sscvfem_apply_macro_local_hoisted(d, rho, mu, dir.data(), y_hoi.data());
+            sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
 
             double dmax = 0, amax = 0;
             for (ptrdiff_t i = 0; i < ndof; ++i) {
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_macro[(size_t)i]));
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_aff[(size_t)i]));
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_hoi[(size_t)i]));
+                dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_em[(size_t)i]));
                 amax = std::max(amax, std::fabs(y_naive[(size_t)i]));
             }
             const double rel = (amax > 0) ? dmax / amax : dmax;
@@ -146,15 +148,22 @@ int main(int argc, char **argv) {
                 sscvfem_apply_macro_local_hoisted(d, rho, mu, dir.data(), y_hoi.data());
             });
 
-            std::printf("%-4d %-10td %-12.3f %-12.3f %-12.3f %-12.3f %-9.2f %-12.1f %.3e%s\n",
+            const double t_em = time_it([&] {
+                std::fill(y_em.begin(), y_em.end(), scalar_t(0));
+                sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
+            });
+            const double t_best = std::min(std::min(t_macro, t_aff), std::min(t_hoi, t_em));
+
+            std::printf("%-4d %-10td %-12.3f %-12.3f %-12.3f %-12.3f %-12.3f %-9.2f %-12.1f %.3e%s\n",
                         L,
                         ndof,
                         1e9 * t_naive / (double)ndof,
                         1e9 * t_macro / (double)ndof,
                         1e9 * t_aff / (double)ndof,
                         1e9 * t_hoi / (double)ndof,
-                        t_naive / t_hoi,
-                        1e-6 * (double)ndof / std::min(t_hoi, std::min(t_macro, t_aff)),
+                        1e9 * t_em / (double)ndof,
+                        t_naive / t_best,
+                        1e-6 * (double)ndof / t_best,
                         rel,
                         (rel < tol) ? "" : "  <-- MISMATCH");
             if (rel >= tol) ++failures;
