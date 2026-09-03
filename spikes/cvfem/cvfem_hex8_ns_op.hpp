@@ -2,50 +2,55 @@
 
 // sfem::Op over the HEX8 CVFEM Navier-Stokes kernels.
 //
-// This is the frontend-facing face of cvfem_hex8_ns_core.hpp: it owns a MeshData and
-// delegates to the same residual and assembly the standalone driver uses, so the two
-// stay numerically identical by construction rather than by parallel maintenance.
+// Deliberately opaque. Everything the operator is built from -- MeshData, BSR4, the
+// element kernels, and a file-scope `using scalar_t = double` -- sits behind an Impl in
+// the .cpp, so a driver that includes this header gets the operator and nothing else.
 //
-// The block size is 4 -- (ux, uy, uz, p) per node -- and the element kernels already
-// write that interleaved layout (r[i * 4 + c]), which is the layout sfem::Op expects.
-// What does not match is MeshData's own state, which is stored field by field; update()
-// scatters the incoming vector into it and the residual is gathered back on the way out.
+// That matters more here than it usually would. Two families of HEX8 CVFEM headers live
+// in this directory: cvfem_hex8_ns_core.hpp behind the solver, and the
+// cvfem_hex8_layout_*.hpp family behind the throughput benchmark. They define sixteen of
+// the same names and disagree on the physics behind several of them -- the benchmark's
+// assembly carries no boundary sub-control-surface or Rhie-Chow terms. A header that
+// leaked the core would settle that argument for every driver that included it, and
+// would collide outright with any driver that also wanted the benchmark layouts.
 //
-// Purpose is the semi-structured GMG executable. This step deliberately keeps the flat
-// HEX8 kernels and only puts the Op interface around them, so it can be gated against
-// the driver before the semi-structured element handling changes anything underneath.
-
-#include "cvfem_hex8_ns_core.hpp"
+// Block size is 4 -- (ux, uy, uz, p) per node -- and the element kernels already write
+// that interleaved layout, which is what sfem::Op expects.
+//
+// Parameters are plain public fields rather than a parameter block. They are read at
+// initialize() and again on each call, so they may be set in any order beforehand.
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_Op.hpp"
 
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace sfem {
 
+    // Mirrors the core's GeomKind, restated so a driver need not include the core to say
+    // which geometry treatment it wants.
+    enum class CVFEMGeometry { Affine, Isoparam };
+
     class CVFEMNavierStokes final : public Op {
     public:
-        static_assert(sizeof(real_t) == sizeof(scalar_t),
-                      "CVFEMNavierStokes hands sfem buffers straight to the CVFEM kernels, which are "
-                      "compiled for double; a float32 real_t build would need a conversion layer.");
-
         explicit CVFEMNavierStokes(const std::shared_ptr<FunctionSpace> &space);
-        ~CVFEMNavierStokes() override = default;
+        ~CVFEMNavierStokes() override;
 
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
         const char *name() const override { return "cvfem:NavierStokes"; }
         bool        is_linear() const override { return false; }
 
-        ptrdiff_t n_dofs_domain() const override { return space_->n_dofs(); }
-        ptrdiff_t n_dofs_image() const override { return space_->n_dofs(); }
+        ptrdiff_t n_dofs_domain() const override;
+        ptrdiff_t n_dofs_image() const override;
 
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
-        // Refreshes the nodal pressure gradient that Rhie-Chow interpolation needs. The
-        // driver recomputes it inside apply_residual/assemble_jacobian; here it is also
-        // exposed on the Op's own update hook so a caller can pay for it once.
+        // Refreshes the nodal pressure gradient Rhie-Chow interpolation needs. The
+        // residual and assembly entry points recompute it themselves, so this is only
+        // worth calling to pay for it once across several of them.
         int update(const real_t *const x) override;
 
         int gradient(const real_t *const x, real_t *const out) override;
@@ -70,7 +75,8 @@ namespace sfem {
 
         // Full 4x4 diagonal block per node, 16 values each, matrix-free. Not a base-class
         // virtual: Op offers hessian_block_diag_sym, whose symmetric packing does not fit
-        // a Navier-Stokes block. This is what the block-Jacobi smoother will call.
+        // a Navier-Stokes block. This is what a block-Jacobi smoother wants. `values`
+        // must hold n_nodes * 16 entries and is accumulated into.
         int hessian_block_diag(const real_t *const x, real_t *const values);
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
@@ -78,27 +84,21 @@ namespace sfem {
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
 
-        // Physical and scheme parameters. Public so the driver can set them without a
-        // parameter-block round trip; set_value_in_block covers the yaml path.
-        scalar_t rho{1};
-        scalar_t mu{0.01};
-        scalar_t rhie_chow_scale{1};
-        GeomKind geom{GeomKind::Affine};
+        real_t        rho{1};
+        real_t        mu{0.01};
+        real_t        rhie_chow_scale{1};
+        CVFEMGeometry geom{CVFEMGeometry::Affine};
 
         // Affine packing width, mirroring SFEM_PACK_SIZE in the driver. 0 selects the
         // atomic path. Ignored for isoparametric geometry, which has no packed kernel.
         int pack_size{2048};
 
     private:
-        void sync_scheme_parameters();
+        // Shared by clone() and derefine_op(): same parameters, different space.
+        std::shared_ptr<Op> clone_onto(const std::shared_ptr<FunctionSpace> &space) const;
 
-        std::shared_ptr<FunctionSpace> space_;
-        MeshData                       d_;
-        // MeshData holds bare pointers into these, so the Op has to own them.
-        PackedData                     packed_;
-        PackColoring                   coloring_;
-        BSR4                           bsr_;  // slot caches only; values come from the caller
-        bool                           initialized_{false};
+        class Impl;
+        std::unique_ptr<Impl> impl_;
     };
 
 }  // namespace sfem
