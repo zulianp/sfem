@@ -259,6 +259,48 @@ MESH_FIELD_STREAMS = (
 )
 
 
+@dataclass(frozen=True)
+class MeshFieldRole:
+    """One field role that crosses the mesh boundary, with its ABI names.
+
+    ``suffix`` distinguishes the role's per-field arrays and ``stride`` the
+    element stride that precedes them; both appear in every generated signature
+    and every gather, so they belong with the order rather than being
+    re-spelled wherever a role is emitted.  ``index`` is the role's position in
+    the fixed sequence, which is what the per-thread scratch buffers are keyed
+    on.
+    """
+
+    name: str
+    suffix: str
+    index: int
+
+    @property
+    def stride(self):
+        return "%s_stride" % self.name
+
+    def field_pointer(self, field_name):
+        """The per-element array this role reads for one field."""
+        return "%s%s" % (field_name, self.suffix)
+
+
+def live_field_roles(dependencies):
+    """The field roles this kernel reads, in the order the ABI lists them.
+
+    Emission asks this as an unrolled loop: ``if dependencies.current: ...``
+    followed by ``if dependencies.previous: ...``, the same pair written out
+    wherever a buffer is declared, a gather is emitted, a scratch slot is taken
+    or a stream argument is named.  It is one sequence, and iterating it is the
+    same thing the conditionals spell -- with the difference that a role added
+    here reaches every site instead of the ones somebody remembered.
+    """
+    return tuple(
+        MeshFieldRole(name=name, suffix=suffix, index=index)
+        for index, (name, suffix) in enumerate(MESH_FIELD_STREAMS)
+        if getattr(dependencies, name, False)
+    )
+
+
 def mesh_kernel_stream_plans(dependencies, fields, include_output=True):
     """Which field streams cross a mesh kernel's boundary, and in what order.
 

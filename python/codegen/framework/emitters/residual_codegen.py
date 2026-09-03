@@ -68,6 +68,7 @@ from codegen.framework.plans.residual_structure import (
     residual_mesh_phase_plans,
 )
 from codegen.framework.plans.streams import (
+    live_field_roles,
     local_kernel_stream_plans,
     mesh_kernel_stream_plans,
 )
@@ -6655,10 +6656,10 @@ def _scalar_crs_matrix_assembly_source(
             "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
         ]
     )
-    if state_dependencies.current:
-        lines.append("        scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
-    if state_dependencies.previous:
-        lines.append("        scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+    for role in live_field_roles(state_dependencies):
+        lines.append(
+            "        scalar_t block_%s[N_STREAMS][VECTOR_SIZE];" % role.name
+        )
     lines.extend(
         [
             "        scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
@@ -6675,34 +6676,22 @@ def _scalar_crs_matrix_assembly_source(
             "            }",
         ]
     )
-    if state_dependencies.current:
+    for position, role in enumerate(live_field_roles(state_dependencies)):
         if field_element_lines:
-            lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
+            # The field node index is shared by every role, so the first one
+            # to need it declares it.
+            if position == 0:
+                lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "            block_current[shape * N_FIELDS + %d][0] = %s[field_node * current_stride];"
-                    % (field_index, field.name)
+                    "            block_%s[shape * N_FIELDS + %d][0] = %s[field_node * %s];"
+                    % (role.name, field_index, role.field_pointer(field.name), role.stride)
                 )
         else:
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "            block_current[%d * N_SHAPE + shape][0] = %s[node * current_stride];"
-                    % (field_index, field.name)
-                )
-    if state_dependencies.previous:
-        if field_element_lines and not state_dependencies.current:
-            lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
-        if field_element_lines:
-            for field_index, field in enumerate(system.fields):
-                lines.append(
-                    "            block_previous[shape * N_FIELDS + %d][0] = %s_old[field_node * previous_stride];"
-                    % (field_index, field.name)
-                )
-        else:
-            for field_index, field in enumerate(system.fields):
-                lines.append(
-                    "            block_previous[%d * N_SHAPE + shape][0] = %s_old[node * previous_stride];"
-                    % (field_index, field.name)
+                    "            block_%s[%d * N_SHAPE + shape][0] = %s[node * %s];"
+                    % (role.name, field_index, role.field_pointer(field.name), role.stride)
                 )
     lines.extend(
         [
@@ -6767,11 +6756,10 @@ def _scalar_crs_matrix_assembly_source(
         lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
         lines.extend(["        }"])
     if field_element_lines:
-        state_stream_args = {}
-        if state_dependencies.current:
-            state_stream_args["current"] = "block_current"
-        if state_dependencies.previous:
-            state_stream_args["previous"] = "block_previous"
+        state_stream_args = {
+            role.name: "block_%s" % role.name
+            for role in live_field_roles(state_dependencies)
+        }
         direction_arg = "block_direction"
         output_arg = "block_output"
         block_function = "%s_contiguous" % block
@@ -7008,13 +6996,11 @@ def _scalar_crs_matrix_assembly_source(
                 "        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);",
             ]
         )
-        if state_dependencies.current:
+        for role in live_field_roles(state_dependencies):
+            # Slot 0 holds the coordinates; the roles follow in ABI order.
             lines.append(
-                "        scalar_t *const SFEM_RESTRICT pack_current = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)N_FIELDS * (size_t)max_nodes_per_pack);"
-            )
-        if state_dependencies.previous:
-            lines.append(
-                "        scalar_t *const SFEM_RESTRICT pack_previous = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)N_FIELDS * (size_t)max_nodes_per_pack);"
+                "        scalar_t *const SFEM_RESTRICT pack_%s = sfem::codegen::thread_scratch<scalar_t>(%d, (size_t)N_FIELDS * (size_t)max_nodes_per_pack);"
+                % (role.name, role.index + 1)
             )
         lines.extend(
             [
@@ -7081,10 +7067,11 @@ def _scalar_crs_matrix_assembly_source(
                 "                scalar_t block_determinant[N_QP * VECTOR_SIZE];",
             ]
         )
-        if state_dependencies.current:
-            lines.append("                scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
-        if state_dependencies.previous:
-            lines.append("                scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+        for role in live_field_roles(state_dependencies):
+            lines.append(
+                "                scalar_t block_%s[N_STREAMS][VECTOR_SIZE];"
+                % role.name
+            )
         lines.extend(
             [
                 "                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
@@ -7098,34 +7085,20 @@ def _scalar_crs_matrix_assembly_source(
                 "                }",
             ]
         )
-        if state_dependencies.current:
+        for position, role in enumerate(live_field_roles(state_dependencies)):
             if packed_field_element_lines:
-                lines.append("                    const uint16_t field_packed_node = %s[shape][element];" % packed_field_element_array)
-                for field_index, field in enumerate(system.fields):
+                if position == 0:
+                    lines.append("                    const uint16_t field_packed_node = %s[shape][element];" % packed_field_element_array)
+                for field_index in range(len(system.fields)):
                     lines.append(
-                        "                    block_current[shape * N_FIELDS + %d][0] = pack_current[%d * max_nodes_per_pack + field_packed_node];"
-                        % (field_index, field_index)
+                        "                    block_%s[shape * N_FIELDS + %d][0] = pack_%s[%d * max_nodes_per_pack + field_packed_node];"
+                        % (role.name, field_index, role.name, field_index)
                     )
             else:
-                for field_index, field in enumerate(system.fields):
+                for field_index in range(len(system.fields)):
                     lines.append(
-                        "                    block_current[%d * N_SHAPE + shape][0] = pack_current[%d * max_nodes_per_pack + packed_node];"
-                        % (field_index, field_index)
-                    )
-        if state_dependencies.previous:
-            if packed_field_element_lines and not state_dependencies.current:
-                lines.append("                    const uint16_t field_packed_node = %s[shape][element];" % packed_field_element_array)
-            if packed_field_element_lines:
-                for field_index, field in enumerate(system.fields):
-                    lines.append(
-                        "                    block_previous[shape * N_FIELDS + %d][0] = pack_previous[%d * max_nodes_per_pack + field_packed_node];"
-                        % (field_index, field_index)
-                    )
-            else:
-                for field_index, field in enumerate(system.fields):
-                    lines.append(
-                        "                    block_previous[%d * N_SHAPE + shape][0] = pack_previous[%d * max_nodes_per_pack + packed_node];"
-                        % (field_index, field_index)
+                        "                    block_%s[%d * N_SHAPE + shape][0] = pack_%s[%d * max_nodes_per_pack + packed_node];"
+                        % (role.name, field_index, role.name, field_index)
                     )
         lines.extend(["                }", ""])
         if tensor_product_geometry:
@@ -7630,10 +7603,10 @@ def _scalar_coo_triplet_matrix_assembly_source(
             "        scalar_t block_determinant[N_QP * VECTOR_SIZE];",
         ]
     )
-    if state_dependencies.current:
-        lines.append("        scalar_t block_current[N_STREAMS][VECTOR_SIZE];")
-    if state_dependencies.previous:
-        lines.append("        scalar_t block_previous[N_STREAMS][VECTOR_SIZE];")
+    for role in live_field_roles(state_dependencies):
+        lines.append(
+            "        scalar_t block_%s[N_STREAMS][VECTOR_SIZE];" % role.name
+        )
     lines.extend(
         [
             "        scalar_t block_direction[N_STREAMS][VECTOR_SIZE];",
@@ -7650,34 +7623,22 @@ def _scalar_coo_triplet_matrix_assembly_source(
             "            }",
         ]
     )
-    if state_dependencies.current:
+    for position, role in enumerate(live_field_roles(state_dependencies)):
         if field_element_lines:
-            lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
+            # The field node index is shared by every role, so the first one
+            # to need it declares it.
+            if position == 0:
+                lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "            block_current[shape * N_FIELDS + %d][0] = %s[field_node * current_stride];"
-                    % (field_index, field.name)
+                    "            block_%s[shape * N_FIELDS + %d][0] = %s[field_node * %s];"
+                    % (role.name, field_index, role.field_pointer(field.name), role.stride)
                 )
         else:
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "            block_current[%d * N_SHAPE + shape][0] = %s[node * current_stride];"
-                    % (field_index, field.name)
-                )
-    if state_dependencies.previous:
-        if field_element_lines and not state_dependencies.current:
-            lines.append("            const idx_t field_node = %s[shape][element];" % field_element_array)
-        if field_element_lines:
-            for field_index, field in enumerate(system.fields):
-                lines.append(
-                    "            block_previous[shape * N_FIELDS + %d][0] = %s_old[field_node * previous_stride];"
-                    % (field_index, field.name)
-                )
-        else:
-            for field_index, field in enumerate(system.fields):
-                lines.append(
-                    "            block_previous[%d * N_SHAPE + shape][0] = %s_old[node * previous_stride];"
-                    % (field_index, field.name)
+                    "            block_%s[%d * N_SHAPE + shape][0] = %s[node * %s];"
+                    % (role.name, field_index, role.field_pointer(field.name), role.stride)
                 )
     lines.extend(
         [
@@ -7742,11 +7703,10 @@ def _scalar_coo_triplet_matrix_assembly_source(
         lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
         lines.extend(["        }"])
     if field_element_lines:
-        state_stream_args = {}
-        if state_dependencies.current:
-            state_stream_args["current"] = "block_current"
-        if state_dependencies.previous:
-            state_stream_args["previous"] = "block_previous"
+        state_stream_args = {
+            role.name: "block_%s" % role.name
+            for role in live_field_roles(state_dependencies)
+        }
         direction_arg = "block_direction"
         output_arg = "block_output"
         block_function = "%s_contiguous" % block
