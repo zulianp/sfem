@@ -311,6 +311,22 @@ int main(int argc, char **argv) {
         return 1;
     }
     const KernelKind kernel_kind = parse_kernel(kernel);
+    // sympy_row and sympy_face lost the saturated evaluation and were moved to subpar/.
+    // Rejected by name here, which is what keeps the stubs in cvfem_hex8_layout_common.hpp
+    // unreachable -- and, more to the point, means a run cannot report a throughput under
+    // a kernel name that did not execute. This spike has produced that failure three
+    // times; a rejection is cheap insurance against a fourth.
+#ifndef CVFEM_ENABLE_SUBPAR
+    if (kernel_kind == KernelKind::SympyRow || kernel_kind == KernelKind::SympyFace) {
+        std::fprintf(stderr,
+                     "--kernel %s was moved to subpar/: it is not the fastest kernel in any "
+                     "measured configuration (see subpar/README.md).\n"
+                     "Rebuild with -DCVFEM_ENABLE_SUBPAR=ON to measure it again.\n",
+                     kernel.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+#endif
     if (geom != "affine" && geom != "isoparam") {
         std::fprintf(stderr, "invalid --geom '%s' (expected affine or isoparam)\n", geom.c_str());
         if (own_mpi) MPI_Finalize();

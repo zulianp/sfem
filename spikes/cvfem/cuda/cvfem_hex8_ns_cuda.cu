@@ -26,6 +26,9 @@ using scalar_t = double;
 
 namespace smesh { using count_t = int32_t; }
 #include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#ifdef CVFEM_ENABLE_SUBPAR
+#include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
+#endif
 #include "cvfem_hex8_boundary_scs.hpp"
 
 #include "cvfem_hex8_ns_cuda.hpp"
@@ -735,10 +738,14 @@ __global__ void cvfem_hex8_assemble_bsr_kernel(
             cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
         else if constexpr (VARIANT == CVFEM_CUDA_JAC_SYMPY_BLOCK)
             cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+#ifdef CVFEM_ENABLE_SUBPAR
         else if constexpr (VARIANT == CVFEM_CUDA_JAC_SYMPY_ROW)
             cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+#endif
+#ifdef CVFEM_ENABLE_SUBPAR
         else
             cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+#endif
         (void)pe;
     }
 }
@@ -797,10 +804,14 @@ __global__ void cvfem_hex8_assemble_ecolored_kernel(
             cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
         else if constexpr (VARIANT == CVFEM_CUDA_JAC_SYMPY_BLOCK)
             cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_blockwise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+#ifdef CVFEM_ENABLE_SUBPAR
         else if constexpr (VARIANT == CVFEM_CUDA_JAC_SYMPY_ROW)
             cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+#endif
+#ifdef CVFEM_ENABLE_SUBPAR
         else
             cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
+#endif
         (void)pe;
     }
 }
@@ -868,8 +879,10 @@ int launch_ecolored(cvfem_cuda_ctx *ctx, double rho, double mu, int variant,
         case CVFEM_CUDA_JAC_HANDWRITTEN: return launch_ecolored_v<CVFEM_CUDA_JAC_HANDWRITTEN>(ctx, rho, mu, block, s);
         case CVFEM_CUDA_JAC_SYMPY:       return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY>(ctx, rho, mu, block, s);
         case CVFEM_CUDA_JAC_SYMPY_BLOCK: return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY_BLOCK>(ctx, rho, mu, block, s);
+#ifdef CVFEM_ENABLE_SUBPAR
         case CVFEM_CUDA_JAC_SYMPY_ROW:   return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY_ROW>(ctx, rho, mu, block, s);
         case CVFEM_CUDA_JAC_SYMPY_FACE:  return launch_ecolored_v<CVFEM_CUDA_JAC_SYMPY_FACE>(ctx, rho, mu, block, s);
+#endif
         default: return 1;
     }
 }
@@ -970,91 +983,23 @@ int launch_assemble(cvfem_cuda_ctx *ctx, double rho, double mu, int variant,
         case CVFEM_CUDA_JAC_HANDWRITTEN: return launch_assemble_v<CVFEM_CUDA_JAC_HANDWRITTEN>(ctx, rho, mu, block, s);
         case CVFEM_CUDA_JAC_SYMPY:       return launch_assemble_v<CVFEM_CUDA_JAC_SYMPY>(ctx, rho, mu, block, s);
         case CVFEM_CUDA_JAC_SYMPY_BLOCK: return launch_assemble_v<CVFEM_CUDA_JAC_SYMPY_BLOCK>(ctx, rho, mu, block, s);
+#ifdef CVFEM_ENABLE_SUBPAR
         case CVFEM_CUDA_JAC_SYMPY_ROW:   return launch_assemble_v<CVFEM_CUDA_JAC_SYMPY_ROW>(ctx, rho, mu, block, s);
         case CVFEM_CUDA_JAC_SYMPY_FACE:  return launch_assemble_v<CVFEM_CUDA_JAC_SYMPY_FACE>(ctx, rho, mu, block, s);
+#endif
         default: return 1;
     }
 }
 
-// One block per pack of the current colour, accumulating without atomics.
-//
-// !! CORRECT ONLY WITH blockDim.x == 1. !!
-//
-// Pack colouring removes *inter*-pack races: two packs of the same colour share no
-// nodes, so they cannot write the same BSR block. It does nothing about *intra*-pack
-// races, and on a GPU a pack is a whole block of threads -- two threads working on two
-// elements of the same pack do share nodes, and do write the same block.
-//
-// On the CPU this distinction does not exist because a pack is one thread, which is why
-// the colored layout is correct there. Measured here: with blockDim.x > 1 the result is
-// wrong by a relative 0.54; with blockDim.x == 1 it agrees to 7.7e-16 and runs at
-// 1.2 MDOF/s, roughly 200x slower than the atomic variants.
-//
-// So this kernel does not test the "is assembly atomic-bound?" question. Testing that
-// needs an *element*-level colouring, which is a different and much larger colouring
-// problem than the pack colouring the code already builds. Kept as an executable
-// demonstration of the distinction, not as a performance path.
-template <bool USE_SYMPY>
-__global__ void cvfem_hex8_assemble_colored_kernel(
-        const ptrdiff_t nelements, const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t color_begin, const double rho, const double mu,
-        const ptrdiff_t *const __restrict__ pack_order,
-        const int32_t *const __restrict__ elements,
-        const int32_t *const __restrict__ slots,
-        const double  *const __restrict__ adj,
-        const double  *const __restrict__ det,
-        const double  *const __restrict__ u,
-        double *const __restrict__ values) {
-    const ptrdiff_t p       = pack_order[color_begin + blockIdx.x];
-    const ptrdiff_t e_start = p * n_elements_per_pack;
-    const ptrdiff_t e_end   = min(nelements, (p + 1) * n_elements_per_pack);
+// Pack-coloured assembly lives in subpar/cuda/cvfem_hex8_ns_cuda_colored.cuh: it is
+// correct only with blockDim.x == 1 and is ~200x slower than the atomic path there.
+// Build with -DCVFEM_ENABLE_SUBPAR to compile it. The ctx fields it uses (n_colors,
+// pack_order, color_ptr, h_color_ptr) stay above -- four pointers, freed nullptr-safely
+// by cvfem_cuda_destroy -- so that the quarantined file needs no change to the struct.
+#ifdef CVFEM_ENABLE_SUBPAR
+#include "cvfem_hex8_ns_cuda_colored.cuh"
+#endif
 
-    for (ptrdiff_t e = e_start + threadIdx.x; e < e_end; e += blockDim.x) {
-        double ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES];
-        double uz[CVFEM_HEX8_N_NODES], pe[CVFEM_HEX8_N_NODES];
-#pragma unroll
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const ptrdiff_t g     = elements[(ptrdiff_t)a * nelements + e];
-            const double *const n = &u[g * CVFEM_CUDA_NF];
-            ux[a] = n[0]; uy[a] = n[1]; uz[a] = n[2]; pe[a] = n[3];
-        }
-        double adj_e[9];
-#pragma unroll
-        for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
-
-        const int32_t *const es = &slots[e * 64];
-        if constexpr (USE_SYMPY)
-            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
-        else
-            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj_e, det[e], ux, uy, uz, es, values);
-        (void)pe;
-    }
-}
-
-template <bool USE_SYMPY>
-int launch_colored_v(cvfem_cuda_ctx *ctx, double rho, double mu, int block, cudaStream_t s) {
-    for (int c = 0; c < ctx->n_colors; ++c) {
-        const ptrdiff_t b = ctx->h_color_ptr[c], e = ctx->h_color_ptr[c + 1];
-        const int       n = (int)(e - b);
-        if (n <= 0) continue;
-        cvfem_hex8_assemble_colored_kernel<USE_SYMPY><<<n, block, 0, s>>>(
-                ctx->nelements, ctx->n_elements_per_pack, b, rho, mu, ctx->pack_order,
-                ctx->elements_global, ctx->element_slots, ctx->adj, ctx->det,
-                ctx->u, ctx->values);
-        CVFEM_CUDA_CHECK(cudaGetLastError());
-    }
-    return 0;
-}
-
-int launch_colored(cvfem_cuda_ctx *ctx, double rho, double mu, int use_sympy,
-                   int block_size, cudaStream_t s) {
-    if (!ctx->values || !ctx->pack_order) return 1;
-    const int block = block_size > 0 ? block_size : 128;
-    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
-                                     (size_t)ctx->nnz * 16 * sizeof(double), s));
-    return use_sympy ? launch_colored_v<true>(ctx, rho, mu, block, s)
-                     : launch_colored_v<false>(ctx, rho, mu, block, s);
-}
 
 __global__ void cvfem_hex8_nodal_p_grad_accumulate_kernel(
         const ptrdiff_t nelements,
@@ -1627,8 +1572,10 @@ extern "C" const char *cvfem_cuda_jac_variant_name(int v) {
         case CVFEM_CUDA_JAC_HANDWRITTEN: return "handwritten";
         case CVFEM_CUDA_JAC_SYMPY:       return "sympy";
         case CVFEM_CUDA_JAC_SYMPY_BLOCK: return "sympy_block";
+#ifdef CVFEM_ENABLE_SUBPAR
         case CVFEM_CUDA_JAC_SYMPY_ROW:   return "sympy_row";
         case CVFEM_CUDA_JAC_SYMPY_FACE:  return "sympy_face";
+#endif
         default: return "?";
     }
 }
@@ -2367,39 +2314,6 @@ extern "C" double cvfem_cuda_time_assemble_ecolored(cvfem_cuda_ctx *ctx, double 
     cudaEventRecord(a);
     for (int i = 0; i < repeat; ++i)
         if (launch_ecolored(ctx, rho, mu, variant, block_size, 0) != 0) return -1.0;
-    cudaEventRecord(b);
-    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
-    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
-    cudaEventDestroy(a); cudaEventDestroy(b);
-    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
-}
-
-extern "C" int cvfem_cuda_coloring_attach(cvfem_cuda_ctx *ctx, int n_colors,
-                                          const ptrdiff_t *pack_order,
-                                          const ptrdiff_t *color_ptr) {
-    ctx->n_colors = n_colors;
-    ctx->h_color_ptr.assign(color_ptr, color_ptr + n_colors + 1);
-    if (device_dup(&ctx->pack_order, pack_order, (size_t)ctx->n_packs) ||
-        device_dup(&ctx->color_ptr, color_ptr, (size_t)n_colors + 1))
-        return 1;
-    return 0;
-}
-
-extern "C" int cvfem_cuda_assemble_colored(cvfem_cuda_ctx *ctx, double rho, double mu,
-                                           int use_sympy, int block_size, void *stream) {
-    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
-    return launch_colored(ctx, rho, mu, use_sympy, block_size, s);
-}
-
-extern "C" double cvfem_cuda_time_assemble_colored(cvfem_cuda_ctx *ctx, double rho, double mu,
-                                                   int use_sympy, int block_size, int repeat) {
-    cudaEvent_t a, b;
-    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
-    if (launch_colored(ctx, rho, mu, use_sympy, block_size, 0) != 0) return -1.0;
-    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
-    cudaEventRecord(a);
-    for (int i = 0; i < repeat; ++i)
-        if (launch_colored(ctx, rho, mu, use_sympy, block_size, 0) != 0) return -1.0;
     cudaEventRecord(b);
     if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
     float ms = 0.f; cudaEventElapsedTime(&ms, a, b);

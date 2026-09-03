@@ -33,6 +33,20 @@ endif()
 find_package(OpenMP COMPONENTS CXX)
 enable_testing()
 
+option(CVFEM_ENABLE_SUBPAR "Build the quarantined CVFEM variants in subpar/" OFF)
+
+# Applied to every target that can reach a quarantined variant. Without the option the
+# subpar/ headers are not on the include path at all, so a stray #include fails loudly
+# rather than silently resurrecting a removed kernel.
+function(cvfem_subpar_target tgt)
+    if(CVFEM_ENABLE_SUBPAR)
+        target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_SUBPAR)
+        target_include_directories(${tgt} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/subpar
+            ${CMAKE_CURRENT_SOURCE_DIR}/subpar/cuda)
+    endif()
+endfunction()
+
 set(_cvfem_perf_opts)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
     list(APPEND _cvfem_perf_opts
@@ -95,6 +109,7 @@ foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baselin
             $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
     target_compile_options(${_cvfem_tgt} PRIVATE ${_cvfem_perf_opts})
     target_include_directories(${_cvfem_tgt} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    cvfem_subpar_target(${_cvfem_tgt})
 endforeach()
 
 # How much of the matrix the velocity-dependent half ever touches.
@@ -103,6 +118,7 @@ target_link_libraries(nlcover PRIVATE SFEM::sfem
     $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
 target_compile_options(nlcover PRIVATE ${_cvfem_perf_opts})
 target_include_directories(nlcover PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+cvfem_subpar_target(nlcover)
 
 # Guards the guards. Built with exactly the solver's flags, so it fails if the
 # build's floating-point options have folded cvfem_hex8_ns_steady.cpp's
@@ -123,6 +139,7 @@ target_include_directories(cvfem_hex8_ns_steady PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
+cvfem_subpar_target(cvfem_hex8_ns_steady)
 
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -130,6 +147,10 @@ target_include_directories(cvfem_hex8_ns_steady PRIVATE
 # ---------------------------------------------------------------------- CUDA
 # Off by default: the CPU targets above must keep building on a machine with no
 # CUDA toolkit, which is where most of this spike is developed.
+# Variants that were measured, lost, and were moved to subpar/ rather than deleted.
+# OFF by default; ON keeps them compiling so the removal decisions stay reproducible on
+# other hardware. subpar/README.md records what each one measured and where it lost.
+
 option(CVFEM_ENABLE_CUDA "Build the CVFEM HEX8 CUDA targets" OFF)
 
 if(CVFEM_ENABLE_CUDA)
@@ -166,6 +187,7 @@ if(CVFEM_ENABLE_CUDA)
         target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_CUDA)
         target_include_directories(${tgt} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
+        cvfem_subpar_target(${tgt})
         target_compile_options(${tgt} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:${_cvfem_perf_opts}>
             $<$<COMPILE_LANGUAGE:CUDA>:${_cvfem_cuda_opts}>)
