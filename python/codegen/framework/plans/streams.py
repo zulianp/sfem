@@ -284,7 +284,14 @@ class MeshFieldRole:
         return "%s%s" % (field_name, self.suffix)
 
 
-def live_field_roles(dependencies):
+#: The roles that carry solution state.  A Jacobian action's direction is not
+#: one of them: it is the vector the action is applied to rather than a state
+#: the linearization is taken at, and the kernels that gather state separately
+#: from direction want to say which they mean.
+STATE_FIELD_ROLES = ("current", "previous")
+
+
+def live_field_roles(dependencies, roles=None):
     """The field roles this kernel reads, in the order the ABI lists them.
 
     Emission asks this as an unrolled loop: ``if dependencies.current: ...``
@@ -293,11 +300,17 @@ def live_field_roles(dependencies):
     or a stream argument is named.  It is one sequence, and iterating it is the
     same thing the conditionals spell -- with the difference that a role added
     here reaches every site instead of the ones somebody remembered.
+
+    ``roles`` narrows the sequence to a subset, for the kernels that handle one
+    group of roles apart from the rest; ``STATE_FIELD_ROLES`` is the one that
+    comes up.  The order and the indices are those of the full sequence either
+    way, because both are ABI.
     """
     return tuple(
         MeshFieldRole(name=name, suffix=suffix, index=index)
         for index, (name, suffix) in enumerate(MESH_FIELD_STREAMS)
         if getattr(dependencies, name, False)
+        and (roles is None or name in roles)
     )
 
 

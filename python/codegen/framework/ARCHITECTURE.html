@@ -516,7 +516,7 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Eleven, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Twelve, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 0</div>
@@ -649,6 +649,17 @@
       <p>Both have identifiable causes. <code>_physical_gradient_nodes</code> emits all <code>dim</code> physical components unconditionally, so a form using a subset gets dead ones: <code>u0_grad_1</code> and <code>u0_grad_2</code> are unread while <code>u0_grad_0</code> is live. The dependency set already records which components are needed as <code>dependencies.gradient_coefficients[row][d]</code>, so the emitter has the information and ignores it. The aliases are a material-slot to CSE-temporary mapping that could be substituted at the use sites instead of named.</p>
       <p>This work is <b>deferred until the residuals have been reproduced</b>, and the reason is the verification posture rather than the difficulty. Every change on this branch has been proven by 520 generated files coming back byte-identical. Removing dead declarations changes that text by design, so byte-identity stops being the proof and becomes the thing that must break. The gate becomes the apply bench — parity across all nine variants and the answer digest, both of which must be <i>unchanged</i>, since deleting code nothing reads cannot move a number — and the snapshot is then re-recorded as a deliberate act. Doing that while results are being reproduced would make an output change and a reproduction run indistinguishable.</p>
       <div class="op-facts"><span><i>pure aliases</i> 358</span><span><i>unread declarations</i> 343</span><span><i>files scanned</i> 508</span><span><i>gate changes to</i> parity + digest</span></div>
+    </div>
+  </div>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 12</div>
+    <div class="body">
+      <div class="op-title">Two packed state buffers share one scratch slot <span class="chip c-part">latent — unreachable today</span></div>
+      <p>Found while turning the field-role conditionals into a loop, because writing the two roles as one statement is what made the asymmetry visible. In <code>_scalar_packed_jacobian_action_source</code> and its affine twin, <code>pack_current</code> and <code>pack_previous</code> are both allocated from <code>thread_scratch&lt;scalar_t&gt;(<b>1</b>, …)</code> — the same slot. The direction and output buffers take slots 2 and 3, so the numbering was clearly meant to be one slot per buffer and the second state role was missed.</p>
+      <p>If a form ever read both roles here the two gathers would write the same memory, and the kernel would linearize about the wrong state. <b>No shipped material reaches it.</b> Both emitters are guarded by <code>len(system.fields) != 1 or not dependencies.direction</code>, so they only produce single-field action kernels, and no single-field material has a previous state: <code>pack_previous</code> appears in none of the 520 generated sources. That is why it has survived, and why the byte-identity gate cannot see it.</p>
+      <p>Preserved verbatim in the loop rather than corrected, with the reasoning at the site. Correcting it is a one-character change — the slot should be <code>role.index + 1</code>, which is what the equivalent multi-field gather already uses — but it changes emitted text for a case nothing generates, so it cannot be proven by this branch's gate and would be an unreviewable no-op in the snapshot. It wants a material that exercises it, which is the same argument OP 11 makes for a different reason.</p>
+      <div class="op-facts"><span><i>sites</i> 2</span><span><i>reachable today</i> no</span><span><i>fix</i> one character</span><span><i>needs</i> a single-field form with a previous state</span></div>
     </div>
   </div>
 </section>
