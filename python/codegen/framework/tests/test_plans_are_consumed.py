@@ -67,7 +67,16 @@ STRUCTURAL_PLAN_TYPES = (
 #:   assembly plans follow the same shape and are the obvious next step.
 UNCONSUMED_PLAN_TYPES = frozenset(
     set(STRUCTURAL_PLAN_TYPES)
-    - {"LocalKernelPlan", "MeshKernelPlan", "CRSAssemblyPlan"}
+    - {
+        "LocalKernelPlan",
+        "MeshKernelPlan",
+        "CRSAssemblyPlan",
+        # The BSR scatter now spells its stream names and reduction from
+        # BSRAssemblyPlan instead of hardcoding them.  BSR is the format
+        # vector problems use, so it is the assembly plan worth connecting
+        # first.
+        "BSRAssemblyPlan",
+    }
 )
 
 
@@ -149,7 +158,7 @@ class PlansAreConsumedTest(unittest.TestCase):
         )
         self.assertEqual(
             unconsumed,
-            10,
+            9,
             "the number of unread structural plans changed to %d; update this "
             "expectation deliberately, and say why in the commit" % unconsumed,
         )
