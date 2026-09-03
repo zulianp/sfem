@@ -226,6 +226,17 @@ On the laptop the gather alone was worth 10% and read as a negative result again
 1.48x bar; on Grace it is 44%. Measure layout questions on Grace. The one thing that
 transfers is the invariant hoist, which is arithmetic rather than memory.
 
+### The default
+
+`sscvfem_apply` is the hoisted variant: 1.097 ns/dof on one Grace socket at L=8, 2.29x the
+flat kernel. The gather is worth 1.44x of that and lifting the invariants a further 1.28x.
+
+The element-matrix and gemm variants were measured and lost -- 1.205 ns/dof for the 24x24
+gemm against 1.097 direct -- and moved to `subpar/cvfem_sshex8_em.hpp`, which builds under
+`-DCVFEM_ENABLE_SUBPAR=ON`. `subpar/README.md` records the numbers. The naive and
+intermediate variants stay on the default path: the first is the correctness control the
+benchmark checks everything against, the others are how the 1.44x and 1.28x are attributed.
+
 ```bash
 cvfem_build --target cvfem_sshex8_bench
 CVFEM_CPUS=72 cvfem_run ./run_sshex8_sweep.sh
