@@ -328,6 +328,49 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
     }
 }
 
+// Generated (CSE) kernels on isoparametric geometry. The affine SymPy kernels beat the
+// hand-written ones because all twelve faces share one adjugate, so CSE has a great deal
+// to factor out. Isoparametrically each face carries its own geometry and there is much
+// less to share -- these exist to measure how much of the advantage survives.
+static SFEM_NOINLINE void apply_residual_atomic_isoparam_sympy(MeshData      &d,
+                                                               const scalar_t rho,
+                                                               const scalar_t mu) {
+    reset_residual(d);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        cvfem_hex8_ns_upwind_sympy_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(d.rx.data(), g, r[a * 4 + 0]);
+            atomic_add(d.ry.data(), g, r[a * 4 + 1]);
+            atomic_add(d.rz.data(), g, r[a * 4 + 2]);
+            atomic_add(d.rc.data(), g, r[a * 4 + 3]);
+        }
+    }
+}
+
+static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(MeshData      &d,
+                                                                  BSR4          &b,
+                                                                  const scalar_t rho,
+                                                                  const scalar_t mu) {
+    zero_bsr4(b);
+    scalar_t *const SFEM_RESTRICT             values = b.values->data();
+    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_isoparam(
+                rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
+        (void)p;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Block diagonal only, for the block-Jacobi preconditioner.
 //

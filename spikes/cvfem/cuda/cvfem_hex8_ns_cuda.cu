@@ -716,8 +716,12 @@ __global__ void cvfem_hex8_assemble_bsr_kernel(
         }
         if (GEOM == CVFEM_CUDA_GEOM_ISOPARAM) {
             const int32_t *const es = &slots[(ptrdiff_t)e * 64];
-            cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, PART>(
-                    rho, mu, ex, ey, ez, ux, uy, uz, es, values);
+            if constexpr (VARIANT == CVFEM_CUDA_JAC_ISOPARAM_SYMPY)
+                cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_isoparam(
+                        rho, mu, ex, ey, ez, ux, uy, uz, es, values);
+            else
+                cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, PART>(
+                        rho, mu, ex, ey, ez, ux, uy, uz, es, values);
             continue;
         }
         double adj_e[9];
@@ -1837,6 +1841,40 @@ extern "C" int cvfem_cuda_assemble_isoparam(cvfem_cuda_ctx *ctx, double rho, dou
                                             int block_size, void *stream) {
     cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
     return launch_assemble_isoparam(ctx, rho, mu, block_size, s);
+}
+
+// The generated isoparametric kernel. Same geometry, CSE'd algebra with the twelve sets
+// of reference shape derivatives folded in as literals rather than evaluated per element.
+extern "C" int cvfem_cuda_assemble_isoparam_sympy(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                                  int block_size, void *stream) {
+    cudaStream_t s = stream ? *static_cast<cudaStream_t *>(stream) : cudaStream_t(0);
+    if (!ctx->px) return 1;
+    const int block = block_size > 0 ? block_size : 128;
+    const int grid  = (int)((ctx->nelements + block - 1) / block);
+    CVFEM_CUDA_CHECK(cudaMemsetAsync(ctx->values, 0,
+                                     (size_t)ctx->nnz * 16 * sizeof(double), s));
+    cvfem_hex8_assemble_bsr_kernel<CVFEM_CUDA_JAC_ISOPARAM_SYMPY, CVFEM_CUDA_GEOM_ISOPARAM>
+            <<<grid, block, 0, s>>>(
+                    ctx->nelements, rho, mu, ctx->elements_global, ctx->element_slots,
+                    ctx->adj, ctx->det, ctx->u, ctx->values, ctx->px, ctx->py, ctx->pz);
+    CVFEM_CUDA_CHECK(cudaGetLastError());
+    return 0;
+}
+
+extern "C" double cvfem_cuda_time_assemble_isoparam_sympy(cvfem_cuda_ctx *ctx, double rho,
+                                                          double mu, int block_size, int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (cvfem_cuda_assemble_isoparam_sympy(ctx, rho, mu, block_size, nullptr) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (cvfem_cuda_assemble_isoparam_sympy(ctx, rho, mu, block_size, nullptr) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f; cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
 }
 
 extern "C" int cvfem_cuda_assemble_ecolored_isoparam(cvfem_cuda_ctx *ctx, double rho, double mu,

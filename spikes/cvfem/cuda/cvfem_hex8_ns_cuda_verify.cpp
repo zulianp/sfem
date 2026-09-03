@@ -926,6 +926,7 @@ int main(int argc, char **argv) {
         // computed, not what it computes.
         struct { const char *name; int (*fn)(cvfem_cuda_ctx *, double, double, int, void *); } strat[] = {
             {"element-coloured", cvfem_cuda_assemble_ecolored_isoparam},
+            {"sympy (generated)", cvfem_cuda_assemble_isoparam_sympy},
         };
         for (auto &st : strat) {
             if (st.fn(ctx, rho, mu, block_size, nullptr) != 0 || cvfem_cuda_synchronize() != 0) {
@@ -993,6 +994,8 @@ int main(int argc, char **argv) {
              cvfem_cuda_time_assemble_isoparam(ctx, rho, mu, block_size, repeat)},
             {"assemble isoparam ecoloured",
              cvfem_cuda_time_assemble_ecolored_isoparam(ctx, rho, mu, block_size, repeat)},
+            {"assemble isoparam sympy",
+             cvfem_cuda_time_assemble_isoparam_sympy(ctx, rho, mu, block_size, repeat)},
             {"assemble isoparam split",
              cvfem_cuda_time_assemble_nonlinear_isoparam(ctx, rho, mu, block_size, repeat)},
             {"assemble isoparam diagonal",
