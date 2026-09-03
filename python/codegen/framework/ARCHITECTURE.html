@@ -190,10 +190,10 @@
 <header class="masthead">
   <div class="eyebrow"><b>Prescriptive</b> — what the layers must own &nbsp;·&nbsp; <i>Descriptive</i> — what is built today &nbsp;·&nbsp; Open points</div>
   <h1>SFEM Codegen Architecture</h1>
-  <p class="standfirst">The layer graph is now clean and enforced. The layers themselves are not yet doing the jobs they are named for — one of them holds 22,970 lines that should be a printer.</p>
+  <p class="standfirst">The layer graph is clean and enforced, and the matrix-free apply path is now measured as well as described. The emission layer still holds 22,727 lines that should be a printer.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 20 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 27 commits from 060684ff</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
     <span><b>Date</b> 2026-09-02</span>
   </div>
@@ -267,8 +267,8 @@
         <text x="106" y="390" class="d-sub">streams · phases · layouts · cost · SymPy ends</text>
         <rect x="500" y="328" width="416" height="78" class="d-partb" rx="2"/>
         <text x="516" y="352" class="d-name">plans/</text>
-        <text x="516" y="372" class="d-sub">4,699 LOC · 12 modules · scheduler landed</text>
-        <text x="516" y="390" class="d-gapt">13 plan types + 6 assembly plans unread</text>
+        <text x="516" y="372" class="d-sub">5,481 LOC · 17 modules · scheduler landed</text>
+        <text x="516" y="390" class="d-gapt">10 of 13 structural plans still unread</text>
         <text x="902" y="352" class="d-keyd" text-anchor="end">PARTIAL</text>
 
         <!-- L4 -->
@@ -292,7 +292,7 @@
         <rect x="500" y="500" width="416" height="78" class="d-partb" rx="2"/>
         <text x="516" y="524" class="d-name">targets/</text>
         <text x="516" y="544" class="d-sub">445 LOC · own layer since the split</text>
-        <text x="516" y="562" class="d-gapt">supplies dialect only; _target() hardcoded</text>
+        <text x="516" y="562" class="d-gapt">dialect only; _target() still hardcoded</text>
         <text x="902" y="524" class="d-keyd" text-anchor="end">PARTIAL</text>
 
         <!-- L6 -->
@@ -303,8 +303,8 @@
         <text x="106" y="648" class="d-sub">mechanical · no policy · no decisions</text>
         <rect x="500" y="586" width="416" height="78" class="d-gapb" rx="2"/>
         <text x="516" y="610" class="d-name">emitters/</text>
-        <text x="516" y="630" class="d-sub">22,970 LOC · 13 modules</text>
-        <text x="516" y="648" class="d-gapt">still plans, schedules, lowers, and prints</text>
+        <text x="516" y="630" class="d-sub">22,727 LOC · 13 modules</text>
+        <text x="516" y="648" class="d-gapt">no symbol analysis left; still shapes the loops</text>
         <text x="902" y="610" class="d-gapt" text-anchor="end">DOES NOT CONFORM</text>
 
         <!-- L7 -->
@@ -461,7 +461,7 @@
         <text x="264" y="232" class="d-dim">BlockPlan</text>
         <text x="264" y="248" class="d-dim">GeometryPlan</text>
         <text x="264" y="264" class="d-okt">LocalKernelPlan · MeshKernelPlan  ✓ read</text>
-        <text x="264" y="288" class="d-dim">BSR / DIA / COO /  (CRS ✓ read)</text>
+        <text x="264" y="288" class="d-dim">BSR / DIA / COO / Patch</text>
         <text x="264" y="304" class="d-dim">Patch / BlockDiagSym AssemblyPlan</text>
         <text x="264" y="326" class="d-gapt">10 of 13 read by no emitter</text>
         <path d="M350,140 L350,110" class="d-gline" stroke-dasharray="4 4"/>
@@ -471,10 +471,10 @@
         <text x="616" y="162" class="d-name">decided inside the emitter</text>
         <text x="616" y="186" class="d-sub">loop nest and bounds</text>
         <text x="616" y="204" class="d-sub">scope hoisting and temporaries</text>
-        <text x="616" y="222" class="d-sub">data streams and their layouts</text>
+        <text x="616" y="222" class="d-okt">data streams and layout  ✓ moved to L3</text>
         <text x="616" y="240" class="d-sub">gather / scatter shape</text>
         <text x="616" y="258" class="d-sub">affine vs. isoparametric geometry</text>
-        <text x="616" y="276" class="d-sub">matrix-format scatter (string templates)</text>
+        <text x="616" y="276" class="d-sub">matrix-format scatter (CRS ✓ from plan)</text>
         <text x="616" y="294" class="d-sub">target syntax — <tspan class="d-gapt">_target() → OpenMPTarget()</tspan></text>
         <text x="616" y="322" class="d-gapt">each one belongs in L3, L4 or L5</text>
         <path d="M840,140 L840,110" class="d-gline" marker-end="url(#a2)"/>
@@ -505,12 +505,12 @@
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 0</div>
     <div class="body">
-      <div class="op-title">The matrix-free apply matrix <span class="chip c-part">stated and verified; 1 of 4 axes drives</span></div>
+      <div class="op-title">The matrix-free apply matrix <span class="chip c-part">verified end to end; 1 of 4 axes drives</span></div>
       <p>The matrix-free action is the framework's primary product — <b>219 of the 520 generated files</b> — and every kernel is emitted several times over across four axes: mesh traversal, geometry mode, element data layout, and precision. Which combinations exist was written down nowhere; it was readable only by generating the output and looking at what came out.</p>
       <p><code>plans/apply_variants.py</code> now states the rule, verified against the real tree: <b>181 of 181 apply kernels predicted exactly</b> across all eleven materials. The rule has genuine content — AoS only ever appears with isoparametric geometry, and never for Taylor–Hood formulations, which is why poro-hyperelasticity and Stokes have no AoS variants at all; packed traversal applies to the Jacobian action only, never the residual; and packed isoparametric variants are skipped for TRI3 and TET4, whose isoparametric geometry <em>is</em> affine.</p>
       <p><b>The precision axis drives.</b> It was a literal tuple repeated seventeen times in one emitter; all seventeen now read the plan, and a test proves the difference between consulted and ignored by changing the plan and requiring the kernels to follow — drop a precision and its kernels vanish, add a third and a third full set appears. That is the precondition for the per-thread, per-warp and CUDA/HIP apply variants goal 8 asks for: adding a row is now a plan change.</p>
       <p><b>The other three axes are still decided by the emitters.</b> Precision was the one already expressed as a clean iteration; traversal, geometry and layout are branches woven through emission, and moving them is the harder half.</p>
-      <div class="op-facts"><span><i>apply kernels</i> 219 files · 181 kernels</span><span><i>axes driving</i> 1 of 4</span><span><i>gate</i> byte-identity + drive tests</span></div>
+      <div class="op-facts"><span><i>apply kernels</i> 219 files · 181 kernels</span><span><i>axes driving</i> 1 of 4</span><span><i>gate</i> 9 variants, parity + digest + throughput</span></div>
     </div>
   </div>
 
@@ -569,13 +569,14 @@
     </div>
   </div>
 
-  <div class="op decide">
+  <div class="op ready">
     <div class="rail"></div><div class="num">OP 6</div>
     <div class="body">
-      <div class="op-title">There is no performance gate <span class="chip c-part">needs a decision</span></div>
-      <p>Every step so far has been verified by byte-identical generated output across 11 materials — a stronger claim than a passing test suite, and one that settles performance by construction: identical emitted source compiles to identical kernels.</p>
-      <p>That gate stops applying the moment output changes on purpose, which is exactly what OP 3 stage 2 and most kernel-level optimization do. What replaces it is numerical parity plus throughput measured before and after, and that needs a compiled SFEM build and a benchmark harness. <b>This worktree has neither.</b> Nothing beyond the byte-identity frontier can be honestly verified until it exists.</p>
-      <div class="op-facts"><span><i>needed</i> compiled build + MDOF/s harness</span><span><i>blocks</i> every output-changing step</span></div>
+      <div class="op-title">The performance gate <span class="chip c-ok">closed</span></div>
+      <p><code>tools/apply_bench.py</code> generates a material, compiles the real operator with the real flags, and drives all nine matrix-free apply kernels <code>laplace/HEX8</code> emits over a Cartesian hex grid — six standard-traversal variants and three packed, the latter needing a real mesh partition with contiguous owned node ranges, shared nodes at the end of each range, and a ghost-reduction structure for the two-pass kernel.</p>
+      <p>It catches three independent failure modes: variants disagreeing with each other, the answer moving <em>uniformly</em> (cross-variant parity is blind to that — proved by a negative test that slipped through before the digest was added), and throughput regressing. Packed affine measures <b>30.4 MDOF/s against 23.2</b> for the standard traversal, the first time this branch has confirmed the PRD's claim for it.</p>
+      <p>Tolerances are four classes, not one number, and getting that wrong produced two false failures before it was right: <code>geom_t</code> is float, so kernels deriving the element metric differently agree only to geometry precision, and packed traversal reorders the summation so it agrees to a few ulp rather than bit-for-bit.</p>
+      <div class="op-facts"><span><i>coverage</i> 9 of 9 apply variants</span><span><i>run</i> SFEM_APPLY_BENCH=1</span></div>
     </div>
   </div>
 
@@ -612,24 +613,56 @@
 <!-- ============================ PART 4 ============================ -->
 <section>
   <div class="sec-head"><span class="sec-num d">PART 4</span><h2>What changed, in numbers</h2></div>
-  <p>Seven commits from <code>060684ff</code>. Generated output is byte-identical across all 11 materials at every one of them.</p>
+  <p>Twenty-seven commits from <code>060684ff</code>. Generated output is byte-identical across all 11 materials at every one of them — nothing on this branch has changed a generated kernel.</p>
   <div class="tbl-wrap">
   <table>
-    <thead><tr><th style="width:40%"></th><th style="width:20%">At the start</th><th style="width:20%">Now</th><th style="width:20%"></th></tr></thead>
+    <thead><tr><th style="width:38%"></th><th style="width:18%">At the start</th><th style="width:18%">Now</th><th style="width:26%"></th></tr></thead>
     <tbody>
       <tr><td>Downward import edges</td><td class="n">6</td><td class="n">0</td><td><span class="chip c-ok">enforced</span></td></tr>
       <tr><td>Outgoing edges from <code>symbolic/</code></td><td class="n">4</td><td class="n">0</td><td><span class="chip c-ok">true bottom layer</span></td></tr>
       <tr><td><code>symbolic/core.py</code></td><td class="n">2,556</td><td class="n">1,245</td><td class="m">split five ways</td></tr>
-      <tr><td>L3 kernel planning</td><td class="m">did not exist</td><td class="m">4,699 LOC</td><td><span class="chip c-part">unread by emitters</span></td></tr>
-      <tr><td>L5 targets</td><td class="m">inside backends/</td><td class="m">own layer</td><td><span class="chip c-part">dialect only</span></td></tr>
+      <tr><td>L3 kernel planning</td><td class="m">did not exist</td><td class="m">5,481 LOC · 17 modules</td><td><span class="chip c-part">3 of 13 plans drive</span></td></tr>
+      <tr><td>Symbol analysis in the residual emitter</td><td class="n">6</td><td class="n">0</td><td><span class="chip c-ok">ratcheted</span></td></tr>
       <tr><td><code>FormCollection.source</code></td><td class="m">read by 3 layers</td><td class="m">deleted</td><td><span class="chip c-ok">boundary closed</span></td></tr>
       <tr><td>Emitter input</td><td class="m">a symbolic system</td><td class="m">an 8-member model</td><td><span class="chip c-ok">severed</span></td></tr>
       <tr><td>Driver and packaging</td><td class="m">outside the framework</td><td class="m">pipeline/ · package/</td><td><span class="chip c-ok">inside</span></td></tr>
-      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">22,970</td><td><span class="chip c-gap">grew — OP 1</span></td></tr>
+      <tr><td>Residual paths: shared functions</td><td class="n">26</td><td class="n">48</td><td><span class="chip c-part">upper bound</span></td></tr>
+      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">22,727</td><td><span class="chip c-gap">grew — see below</span></td></tr>
     </tbody>
   </table>
   </div>
-  <p>The last row is honest rather than flattering: the emission layer grew, because two emitter modules misfiled under <code>fem/</code> moved into it. Nothing was removed from it. Every line of the reduction that matters is still ahead, in OP 1.</p>
+  <p>Two rows need reading carefully rather than celebrating. The emission layer <b>grew</b>, because two emitter modules misfiled under <code>fem/</code> moved into it; almost nothing has been removed from it yet. And “shared functions” is static reachability, so it is an upper bound: <code>_local_header</code> statically reaches <code>_local_function</code> even though the mixed-order branch never calls it. The capability matrix below is the honest statement.</p>
+
+  <h3>Gates</h3>
+  <p>Every change above was verified, and what counts as verification changed once output was allowed to move.</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:26%">Gate</th><th style="width:44%">What it catches</th><th style="width:30%">Status</th></tr></thead>
+    <tbody>
+      <tr><td class="m">codegen_snapshot</td><td>Any change to generated text across 11 materials, 520 files. Settles performance by construction while it holds.</td><td><span class="chip c-ok">byte-identical at every commit</span></td></tr>
+      <tr><td class="m">apply_bench parity</td><td>Variants disagreeing with each other, across four tolerance classes — exact, round-off, geometry, float.</td><td><span class="chip c-ok">9 of 9 variants</span></td></tr>
+      <tr><td class="m">apply_bench digest</td><td>The answer moving <em>uniformly</em>, which cross-variant parity cannot see.</td><td><span class="chip c-ok">rel = 0</span></td></tr>
+      <tr><td class="m">apply_bench throughput</td><td>A change that keeps the answer and loses speed.</td><td class="m">iso SoA 10.6 · packed affine 30.4 MDOF/s</td></tr>
+      <tr><td class="m">test_layering</td><td>Any import pointing down the stack.</td><td><span class="chip c-ok">0 violations</span></td></tr>
+      <tr><td class="m">test_module_imports</td><td>A test module that stops loading — caught three real breakages the other gates missed.</td><td><span class="chip c-ok">all load</span></td></tr>
+      <tr><td class="m">test_emitters_do_not_analyse</td><td>An emitter deciding what to emit by analysing symbols.</td><td><span class="chip c-ok">shrink-only</span></td></tr>
+      <tr><td class="m">test_plans_are_consumed</td><td>A plan losing its only consumer.</td><td><span class="chip c-part">10 of 13 unread</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>The residual paths</h3>
+  <p>“Unify the coupled and mixed emitters” turned out to be two jobs wearing one name, and the split is the most useful number in this document:</p>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:46%">Coupled-only code</th><th style="width:18%">LOC</th><th style="width:36%"></th></tr></thead>
+    <tbody>
+      <tr><td>Capabilities the mixed path lacks<br><span class="mono" style="font-size:12px;color:var(--ink-3)">CRS · DIA · COO · packed apply · AoS</span></td><td class="n">3,995</td><td>Not duplication. Giving Taylor–Hood kernels it has never had — and AoS needs an ABI decision first, since mixed-order fields share no node set.</td></tr>
+      <tr><td>Parallel implementation</td><td class="n">2,711</td><td>Genuine duplication. <code>_local_header</code> is merged; the mesh-operator sources are the bulk of the rest.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The gather and scatter primitives, often assumed to be the duplication, already shared one loop generator and differed only in uniform versus per-field setup.</p>
 </section>
 
 <footer>
