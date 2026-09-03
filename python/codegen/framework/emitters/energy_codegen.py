@@ -9,6 +9,7 @@ from codegen.framework.ir.kernel_ast import (
     LoopHeaderNode,
     LoopKind,
     LoopNode,
+    RawLinesNode,
     ReturnNode,
     ScatterNode,
     add_assign_increment,
@@ -934,7 +935,30 @@ def _sfem_soa_direct_hessian_element_matrix_function(
         )
     )
     lines.append("}")
-    return lines
+    # The signature is a tree; the body is not yet.  Splitting the
+    # finished list at its opening brace is deliberately the least
+    # invasive way to get this kernel onto the IR spine: the body
+    # keeps building exactly as before and is carried verbatim.
+    opening = lines.index(") {")
+    return _print_energy_kernel(
+        FunctionDefNode(
+            name,
+            params=tuple(params),
+            body=(
+                RawLinesNode(
+                    tuple(lines[opening + 1 : -1]),
+                    reason="_sfem_soa_direct_hessian_element_matrix_function body: not yet IR",
+                ),
+            ),
+            qualifier="static %s" % _inline_qualifier(source_builder),
+            template_params=(
+                "typename scalar_t",
+                "int N_QP",
+                "int N_SHAPE",
+                "int VECTOR_SIZE",
+            ),
+        )
+    )
 
 
 def _sfem_soa_block_function(
@@ -1264,7 +1288,30 @@ def _sfem_soa_block_function(
     _append_sfem_soa_statement_lines(lines, form.expression_graph, "element_vector")
     _append_sfem_soa_output_lines(lines, form, dim, n_nodes, work_item)
     lines.extend(["    }", "}"])
-    return lines
+    # The signature is a tree; the body is not yet.  Splitting the
+    # finished list at its opening brace is deliberately the least
+    # invasive way to get this kernel onto the IR spine: the body
+    # keeps building exactly as before and is carried verbatim.
+    opening = lines.index(") {")
+    return _print_energy_kernel(
+        FunctionDefNode(
+            name,
+            params=tuple(params),
+            body=(
+                RawLinesNode(
+                    tuple(lines[opening + 1 : -1]),
+                    reason="_sfem_soa_block_function body: not yet IR",
+                ),
+            ),
+            qualifier="static %s" % _inline_qualifier(source_builder),
+            template_params=(
+                "typename scalar_t",
+                "int N_QP",
+                "int N_SHAPE",
+                "int VECTOR_SIZE",
+            ),
+        )
+    )
 
 
 def _sfem_soa_direct_hessian_matrix_assembly_available(
@@ -6178,6 +6225,16 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats):
 SCATTER_LAYOUT = PrinterLayout(
     close_signature_on_last_param=True, atomic_pragma_at_column_zero=True
 )
+
+
+def _print_energy_kernel(node):
+    """Render one energy local kernel.
+
+    Default layout: these signatures close on their own line, unlike the
+    scatter helpers.  The body rides along as RawLinesNode, so no pragma is
+    needed -- it is already spelled in the text it carries.
+    """
+    return list(CLikeKernelASTPrinter().print_node(node))
 
 
 def _print_scatter_function(node):
