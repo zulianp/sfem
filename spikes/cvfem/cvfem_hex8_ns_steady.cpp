@@ -121,9 +121,13 @@ static void usage(const char *argv0) {
                  "  SFEM_RHIE_CHOW_SCALE D_f = scale * h^2 / (2 mu) (default 1)\n"
                  "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
                  "  SFEM_PC_PSCALE       Schur scaling of the pressure block:\n"
-                 "                       inv_pp = PSCALE / V_p (default 0 = use 1/A_pp;\n"
-                 "                       measured optimum 0.1, independent of mu and h)\n"
-                 "  SFEM_PC_PDAMP        damping on the 1 / A_pp pressure block (default 1)\n",
+                 "                       inv_pp = PSCALE / V_p (default 0 = use 1/A_pp).\n"
+                 "                       Tuned, not physical: ~0.1 at rc_scale=1, and it\n"
+                 "                       scales with 1/rc_scale. Helps at high Re only.\n"
+                 "  SFEM_PC_PDAMP        damping on the 1 / A_pp pressure block (default 1)\n"
+                 "  SFEM_NL_CONTINUATION 0: skip the Re=1 continuation stage (default 1)\n"
+                 "  SFEM_PC_SIMPLE       1: pressure block from the SIMPLE Schur diagonal\n"
+                 "                       diag(C - B diag(A_uu)^-1 B^T); overrides PSCALE\n",
                  argv0);
 }
 
@@ -781,10 +785,77 @@ static void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol
     }
 }
 
+static int cvfem_report_schur = 1;
+
+// SIMPLE-style pressure Schur diagonal: diag(C - B diag(A_uu)^-1 B^T).
+//
+// This is the approximation colocated finite-volume codes actually use, and unlike
+// mu * M_p^-1 it makes no assumption about which term dominates -- it reads both the
+// Rhie-Chow pressure operator C and the velocity coupling straight out of the assembled
+// Jacobian. C_ii is block(i,i)[3][3]; B is the continuity row of block(i,j) over the
+// velocity columns; B^T is the momentum rows of block(j,i) over the pressure column.
+//
+// Dirichlet rows are zeroed by apply_dirichlet_bsr before this runs, so a constrained
+// velocity dof contributes B^T = 0 and drops out on its own.
+//
+// This costs O(nnz * row_length) because block(j,i) has to be looked up for each (i,j).
+// That is once per Jacobian, against a linear solve of several hundred iterations, so it
+// is not on the hot path -- but it is not free either, which is why it is opt-in.
+static void build_schur_diag(const BSR4 &b, const ptrdiff_t nnodes, std::vector<scalar_t> &schur) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_schur_diag");
+    schur.assign((size_t)nnodes, scalar_t(0));
+    const scalar_t *const SFEM_RESTRICT values = b.values->data();
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < nnodes; ++row) {
+        const smesh::count_t dslot = find_bsr_slot(b.rowptr, b.colidx, (smesh::idx_t)row, (smesh::idx_t)row);
+        scalar_t             s     = values[(ptrdiff_t)dslot * 16 + 15];
+
+        for (smesh::count_t k = b.rowptr[row]; k < b.rowptr[row + 1]; ++k) {
+            const smesh::idx_t   col   = b.colidx[k];
+            const scalar_t *const bij  = values + (ptrdiff_t)k * 16;
+            const smesh::count_t djj   = find_bsr_slot(b.rowptr, b.colidx, col, col);
+            const smesh::count_t kji   = find_bsr_slot(b.rowptr, b.colidx, col, (smesh::idx_t)row);
+            const scalar_t *const ajj  = values + (ptrdiff_t)djj * 16;
+            const scalar_t *const bji  = values + (ptrdiff_t)kji * 16;
+            for (int c = 0; c < 3; ++c) {
+                const scalar_t auu = ajj[c * 4 + c];
+                if (std::fabs(auu) < scalar_t(1e-30)) continue;
+                s -= bij[3 * 4 + c] * (scalar_t(1) / auu) * bji[c * 4 + 3];
+            }
+        }
+        schur[(size_t)row] = s;
+    }
+
+    // One-shot report of how the two terms of S compare. The question this answers is
+    // whether S is dominated by the Rhie-Chow operator C or by the velocity coupling
+    // B A^-1 B^T, which is what decides whether any S^-1 approximation can differ from
+    // the 1 / A_pp that block-Jacobi already applies.
+    if (cvfem_report_schur) {
+        cvfem_report_schur = 0;
+        double c_sum = 0, bab_sum = 0, s_sum = 0;
+        ptrdiff_t cnt = 0;
+        for (ptrdiff_t row = 0; row < nnodes; ++row) {
+            const smesh::count_t ds = find_bsr_slot(b.rowptr, b.colidx, (smesh::idx_t)row, (smesh::idx_t)row);
+            const double         c  = (double)values[(ptrdiff_t)ds * 16 + 15];
+            if (std::fabs(c) < 1e-30) continue;
+            c_sum += std::fabs(c);
+            bab_sum += std::fabs(c - (double)schur[(size_t)row]);
+            s_sum += std::fabs((double)schur[(size_t)row]);
+            ++cnt;
+        }
+        if (cnt) {
+            std::printf("  schur: mean|C|=%.6e  mean|B A^-1 B^T|=%.6e  mean|S|=%.6e  ratio=%.3e  (n=%td)\n",
+                        c_sum / cnt, bab_sum / cnt, s_sum / cnt, bab_sum / c_sum, cnt);
+        }
+    }
+}
+
 static void build_block_jacobi(const BSR4                  &b,
                                const std::vector<uint8_t>  &constrained,
                                const ptrdiff_t              nnodes,
                                const std::vector<scalar_t> &node_vol,
+                               const std::vector<scalar_t> &schur,
                                const scalar_t               pscale,
                                const scalar_t               pdamp,
                                std::vector<scalar_t>       &inv_diag) {
@@ -819,26 +890,41 @@ static void build_block_jacobi(const BSR4                  &b,
         } else {
             const scalar_t d = blk[15];
             const scalar_t v = node_vol[(size_t)row];
-            if (pscale != scalar_t(0) && v > scalar_t(1e-30)) {
-                // Schur-complement scaling of the pressure block. Left to itself
-                // block-Jacobi inverts A_pp, which on a colocated discretisation is not
-                // the operator that governs convergence -- it is whatever the Rhie-Chow
-                // stabilisation happens to leave on the diagonal. What governs
-                // convergence is the pressure Schur complement S = -B A^-1 B^T, and the
-                // textbook viscous approximation is S^-1 ~ -mu M_p^-1, i.e. -mu / V_p
-                // with the lumped mass matrix.
+            if (!schur.empty()) {
+                // The literature approximation, with no fitted constant.
+                const scalar_t sd = schur[(size_t)row];
+                inv[15] = (std::fabs(sd) > scalar_t(1e-30)) ? scalar_t(1) / sd : scalar_t(1);
+            } else if (pscale != scalar_t(0) && v > scalar_t(1e-30)) {
+                // Pressure block scaled by the control volume instead of by A_pp.
                 //
-                // Measured, the mu does not belong. Sweeping SFEM_PC_PSCALE at mu = 0.01
-                // and mu = 0.1 puts the optimum at the same inv_pp = 0.1 / V_p in both
-                // cases, not at a value ten times apart, so this uses PSCALE / V_p. That
-                // is consistent with the Schur complement here being dominated by the
-                // Rhie-Chow stabilisation, whose D_f = scale * h^2 / (2 mu) cancels the
-                // viscosity, rather than by the viscous operator.
+                // The textbook reading of this is the viscous Schur approximation
+                // S^-1 ~ -mu M_p^-1, which for the lumped mass matrix is -mu / V_p. That
+                // is not what is going on here, and the measurements say so twice over.
                 //
-                // Positive is the correct sign for the continuity row as assembled here:
-                // negative values diverge. The rho, U and domain-size dependence of the
-                // 0.1 is not established, which is why this stays a knob defaulting to
-                // 0 (plain 1 / A_pp) rather than becoming the default preconditioner.
+                // First, S is already what block-Jacobi inverts. Measured from the
+                // assembled Jacobian (SFEM_PC_SIMPLE), diag(B A^-1 B^T) is about 0.19 of
+                // diag(C), so S = C - B A^-1 B^T sits within a fifth of the C = A_pp that
+                // block-Jacobi uses -- and building the real SIMPLE Schur diagonal
+                // changes the iteration count by 0.1%. Approximating S^-1 better is not
+                // where the gain comes from.
+                //
+                // Second, the gain is a high-Reynolds effect, not a viscous one. Split by
+                // continuation stage at N=8, this scaling saves 60% of the linear
+                // iterations in the Re=100 stage and 3% in the Re=10 one. In the Stokes
+                // limit 1 / A_pp is already right, which is exactly where the textbook
+                // approximation is supposed to hold.
+                //
+                // So this is not an S^-1 approximation. What it does is weaken the
+                // pressure block relative to the velocity block by a factor that grows
+                // with Re, which a block-diagonal preconditioner needs and a Schur
+                // approximation does not supply.
+                //
+                // PSCALE is therefore a tuned coefficient, not a physical constant. It is
+                // dimensional and it tracks the stabilisation: A_pp is proportional to
+                // rc_scale, and sweeping SFEM_RHIE_CHOW_SCALE moves the optimum the other
+                // way (0.1 at rc=1, 0.3 at rc=0.25). Positive is the correct sign for the
+                // continuity row as assembled here; negative diverges. Default 0 keeps
+                // plain 1 / A_pp.
                 inv[15] = pscale / v;
             } else {
                 // A_pp is only structurally zero without Rhie-Chow, a configuration whose
@@ -1111,6 +1197,9 @@ int main(int argc, char **argv) {
     scalar_t    pscale      = smesh::Env::read<scalar_t>("SFEM_PC_PSCALE", 0);
     // Damping applied to the plain 1 / A_pp pressure block. 1 = unchanged block-Jacobi.
     scalar_t    pdamp       = smesh::Env::read<scalar_t>("SFEM_PC_PDAMP", 1);
+    // SIMPLE Schur approximation; takes precedence over SFEM_PC_PSCALE when set.
+    int         pc_simple   = smesh::Env::read<int>("SFEM_PC_SIMPLE", 0);
+    int         continuation = smesh::Env::read<int>("SFEM_NL_CONTINUATION", 1);
 
     if (case_name.empty()) {
         std::fprintf(stderr, "SFEM_CASE is required (poiseuille, couette, or coutte)\n");
@@ -1180,6 +1269,7 @@ int main(int argc, char **argv) {
             "- SFEM_PACK_SIZE=%d\n"
             "- SFEM_PC_PSCALE=%g\n"
             "- SFEM_PC_PDAMP=%g\n"
+            "- SFEM_PC_SIMPLE=%d\n"
             "----------------------------------------\n",
             flow_name,
             n,
@@ -1208,7 +1298,8 @@ int main(int argc, char **argv) {
             (rhie_chow == 0) ? scalar_t(0) : rc_scale,
             pack_size,
             pscale,
-            pdamp);
+            pdamp,
+            pc_simple);
 
     MeshData d;
     d.Lx               = Lx;
@@ -1261,6 +1352,8 @@ int main(int argc, char **argv) {
     std::vector<scalar_t> node_vol;
     build_node_volume(d, node_vol);
     std::vector<scalar_t> inv_diag;
+    // Non-empty only when SFEM_PC_SIMPLE is on; build_block_jacobi keys off that.
+    std::vector<scalar_t> schur_diag;
     pack_fields(d, x.data());
 
     const scalar_t Re = rho * U * Ly / mu;
@@ -1327,10 +1420,14 @@ int main(int argc, char **argv) {
     scalar_t       r0        = 0;
     const scalar_t Re_phys   = rho * U * Ly / std::max(mu, scalar_t(1e-30));
     const scalar_t rho_re1   = mu / std::max(U * Ly, scalar_t(1e-30));
-    const int      n_stages  = (rho == scalar_t(0) || Re_phys <= scalar_t(1.5)) ? 1 : 2;
+    // The re1 stage solves with rho = mu / (U Ly), which makes it the same Re=1 problem
+    // whatever mu is -- useful as continuation, but it masks any viscosity dependence in
+    // a measurement that sums over both stages. SFEM_NL_CONTINUATION=0 drops it.
+    const int      n_stages  = (rho == scalar_t(0) || Re_phys <= scalar_t(1.5) || !continuation) ? 1 : 2;
     for (int stage = 0; stage < n_stages && !failed; ++stage) {
         const scalar_t rho_use = (n_stages == 1 || stage == 1) ? rho : rho_re1;
         rho_lin                = rho_use;
+        cvfem_report_schur     = 1;  // one Schur breakdown per stage, not just the first
         std::printf("stage: %s  rho: %g  Re: %g\n",
                     (n_stages == 1 || stage == 1) ? "navier-stokes" : "re1",
                     rho_use,
@@ -1374,7 +1471,10 @@ int main(int argc, char **argv) {
                 assemble_jacobian(d, bsr, rho_use, mu, geom);
                 apply_dirichlet_bsr(bsr, constrained, d.nnodes);
                 if (use_prec)
-                    build_block_jacobi(bsr, constrained, d.nnodes, node_vol, pscale, pdamp, inv_diag);
+                    {
+                        if (pc_simple) build_schur_diag(bsr, d.nnodes, schur_diag);
+                        build_block_jacobi(bsr, constrained, d.nnodes, node_vol, schur_diag, pscale, pdamp, inv_diag);
+                    }
                 if (check_jv && matrix_free && newton_it == 0 && stage == 0) {
                     compare_hessian_apply(d, *A_bsr, rho_use, mu, geom, constrained, r.data(), ndof);
                 }
