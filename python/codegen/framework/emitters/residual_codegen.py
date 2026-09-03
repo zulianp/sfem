@@ -4,7 +4,8 @@ import sympy as sp
 
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
-    ResidualCodegenDependencies,
+    assembled_matrix_dependencies,
+    jacobian_action_dependencies,
     residual_codegen_dependencies,
 )
 from codegen.framework.plans.generation import (
@@ -5056,20 +5057,7 @@ def _mixed_coo_triplet_matrix_assembly_source(
         "const geom_t *const *const SFEM_RESTRICT points",
     ]
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
-    state_dependencies = ResidualCodegenDependencies(
-        current=dependencies.current,
-        previous=dependencies.previous,
-        direction=False,
-        parameters=dependencies.parameters,
-        current_value=dependencies.current_value,
-        current_gradient=dependencies.current_gradient,
-        previous_value=dependencies.previous_value,
-        previous_gradient=dependencies.previous_gradient,
-        direction_value=False,
-        direction_gradient=False,
-        value_coefficients=dependencies.value_coefficients,
-        gradient_coefficients=dependencies.gradient_coefficients,
-    )
+    state_dependencies = assembled_matrix_dependencies(dependencies)
     params.extend(_mixed_mesh_dependency_params(layout, state_dependencies))
     params.extend(
         [
@@ -6546,20 +6534,7 @@ def _scalar_crs_matrix_assembly_source(
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    state_dependencies = ResidualCodegenDependencies(
-        current=dependencies.current,
-        previous=dependencies.previous,
-        direction=False,
-        parameters=dependencies.parameters,
-        current_value=dependencies.current_value,
-        current_gradient=dependencies.current_gradient,
-        previous_value=dependencies.previous_value,
-        previous_gradient=dependencies.previous_gradient,
-        direction_value=False,
-        direction_gradient=False,
-        value_coefficients=dependencies.value_coefficients,
-        gradient_coefficients=dependencies.gradient_coefficients,
-    )
+    state_dependencies = assembled_matrix_dependencies(dependencies)
     params.extend(
         _mesh_stream_parameters(state_dependencies, system.fields, output=False)
     )
@@ -7554,20 +7529,7 @@ def _scalar_coo_triplet_matrix_assembly_source(
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
-    state_dependencies = ResidualCodegenDependencies(
-        current=dependencies.current,
-        previous=dependencies.previous,
-        direction=False,
-        parameters=dependencies.parameters,
-        current_value=dependencies.current_value,
-        current_gradient=dependencies.current_gradient,
-        previous_value=dependencies.previous_value,
-        previous_gradient=dependencies.previous_gradient,
-        direction_value=False,
-        direction_gradient=False,
-        value_coefficients=dependencies.value_coefficients,
-        gradient_coefficients=dependencies.gradient_coefficients,
-    )
+    state_dependencies = assembled_matrix_dependencies(dependencies)
     params.extend(
         _mesh_stream_parameters(state_dependencies, system.fields, output=False)
     )
@@ -8629,27 +8591,10 @@ def _scalar_packed_jacobian_action_source(
         )
     params.append("const geom_t *const *const SFEM_RESTRICT points")
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
-    if dependencies.current:
-        params.append("const ptrdiff_t current_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s" % field.name
-            for field in system.fields
-        )
-    if dependencies.previous:
-        params.append("const ptrdiff_t previous_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-            for field in system.fields
-        )
-    params.append("const ptrdiff_t direction_stride")
     params.extend(
-        "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
-        for field in system.fields
-    )
-    params.append("const ptrdiff_t out_stride")
-    params.extend(
-        "scalar_t *const SFEM_RESTRICT %s_out" % field.name
-        for field in system.fields
+        _mesh_stream_parameters(
+            jacobian_action_dependencies(dependencies), system.fields
+        )
     )
     coordinate_element_lines, coordinate_element_array = (
         _coordinate_element_alias_lines(
@@ -9025,16 +8970,11 @@ def _scalar_packed_jacobian_action_source(
             )
         call_args.append("points")
         call_args.extend(map(str, dependencies.parameters))
-        if dependencies.current:
-            call_args.append("current_stride")
-            call_args.extend(field.name for field in system.fields)
-        if dependencies.previous:
-            call_args.append("previous_stride")
-            call_args.extend("%s_old" % field.name for field in system.fields)
-        call_args.append("direction_stride")
-        call_args.extend("%s_direction" % field.name for field in system.fields)
-        call_args.append("out_stride")
-        call_args.extend("%s_out" % field.name for field in system.fields)
+        call_args.extend(
+            _mesh_stream_arguments(
+                jacobian_action_dependencies(dependencies), system.fields
+            )
+        )
         lines.extend(
             [
                 ") {",
@@ -9725,27 +9665,10 @@ def _scalar_packed_affine_jacobian_action_source(
             "const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0"
         )
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
-    if dependencies.current:
-        params.append("const ptrdiff_t current_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s" % field.name
-            for field in system.fields
-        )
-    if dependencies.previous:
-        params.append("const ptrdiff_t previous_stride")
-        params.extend(
-            "const scalar_t *const SFEM_RESTRICT %s_old" % field.name
-            for field in system.fields
-        )
-    params.append("const ptrdiff_t direction_stride")
     params.extend(
-        "const scalar_t *const SFEM_RESTRICT %s_direction" % field.name
-        for field in system.fields
-    )
-    params.append("const ptrdiff_t out_stride")
-    params.extend(
-        "scalar_t *const SFEM_RESTRICT %s_out" % field.name
-        for field in system.fields
+        _mesh_stream_parameters(
+            jacobian_action_dependencies(dependencies), system.fields
+        )
     )
     field = system.fields[0]
     if (
@@ -10154,16 +10077,11 @@ def _scalar_packed_affine_jacobian_action_source(
         if not uses_cached_affine_metric:
             call_args.append("g_jacobian_determinant0")
         call_args.extend(map(str, dependencies.parameters))
-        if dependencies.current:
-            call_args.append("current_stride")
-            call_args.extend(field.name for field in system.fields)
-        if dependencies.previous:
-            call_args.append("previous_stride")
-            call_args.extend("%s_old" % field.name for field in system.fields)
-        call_args.append("direction_stride")
-        call_args.extend("%s_direction" % field.name for field in system.fields)
-        call_args.append("out_stride")
-        call_args.extend("%s_out" % field.name for field in system.fields)
+        call_args.extend(
+            _mesh_stream_arguments(
+                jacobian_action_dependencies(dependencies), system.fields
+            )
+        )
         lines.extend(
             [
                 ") {",

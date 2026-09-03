@@ -18,7 +18,7 @@ per-coefficient structural zeros, which is what the emitter needs to skip terms.
 planning layer builds from a lowered form collection.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import sympy as sp
 
@@ -110,3 +110,37 @@ def residual_codegen_dependencies(system, coefficients, dependencies):
             for coefficient in coefficients
         ),
     )
+
+
+def assembled_matrix_dependencies(dependencies):
+    """The dependency view an assembled matrix kernel sees.
+
+    A matrix is assembled, not applied, so there is no direction to apply it
+    to: the direction role and both of its access flags are dead regardless of
+    what the form's free symbols say.  Three assembly emitters were each
+    rebuilding the whole twelve-field record by hand to state that, in three
+    byte-identical copies.
+    """
+    return replace(
+        dependencies,
+        direction=False,
+        direction_value=False,
+        direction_gradient=False,
+    )
+
+
+def jacobian_action_dependencies(dependencies):
+    """The dependency view a Jacobian-action kernel sees.
+
+    The mirror of the assembled view.  An action is applied *to* a direction,
+    so the direction role is live at the kernel boundary whether or not the
+    form mentions it, and the emitters said so by appending the direction
+    stride and pointers unconditionally -- next to conditional chains for every
+    other role, which left the signature and the dependency set disagreeing
+    about the same kernel.
+
+    Only the role is forced.  ``direction_value`` and ``direction_gradient``
+    say what the body reads once the direction is in hand, which is the form's
+    decision and not the boundary's.
+    """
+    return replace(dependencies, direction=True)
