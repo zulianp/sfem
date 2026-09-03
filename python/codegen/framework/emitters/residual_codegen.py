@@ -67,6 +67,10 @@ from codegen.framework.plans.residual_structure import (
     residual_local_phase_plans,
     residual_mesh_phase_plans,
 )
+from codegen.framework.plans.geometry_quantities import (
+    local_geometry_quantities,
+    uses_geometry_values,
+)
 from codegen.framework.plans.streams import (
     STATE_FIELD_ROLES,
     live_field_roles,
@@ -2135,10 +2139,12 @@ def _mixed_local_function(
         "const ptrdiff_t geometry_stride",
         "const scalar_t *const SFEM_RESTRICT determinant",
     ]
-    if dependencies.uses_adjugate:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim)
-        )
+    params.extend(
+        "const scalar_t *const SFEM_RESTRICT %s[%d]"
+        % (quantity.name, quantity.components)
+        for quantity in local_geometry_quantities(dependencies, dim)
+        if quantity.is_indexed
+    )
     params.extend(_mixed_local_reference_params(rule, layout.n_reference_fields, dim, dependencies, basis_family))
     if dependencies.current:
         if stream_layout == "contiguous":
@@ -2230,12 +2236,10 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
         "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
         "            const scalar_t det = determinant[geometry_offset];",
     ]
-    if dependencies.uses_adjugate:
-        for i in range(dim * dim):
-            lines.append(
-                "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
-                % (i, i)
-            )
+    lines.extend(
+        "            const scalar_t adj%d = adjugate[%d][geometry_offset];" % (i, i)
+        for i in _adjugate_components(dependencies, dim)
+    )
     lines.extend(
         _mixed_local_field_evaluation_lines(
             system,
@@ -2296,8 +2300,12 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
 def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_layout="pointer"):
     dim = system.dim
     groups = _dependency_stream_groups(dependencies)
-    uses_determinant = any(dependencies.value_coefficients) or dependencies.uses_adjugate
-    uses_geometry_offset = uses_determinant or dependencies.uses_adjugate
+    # One predicate, not two.  uses_determinant already contains uses_adjugate,
+    # so "uses_determinant or uses_adjugate" restated it rather than widening
+    # it; the offset and the determinant are needed under exactly the same
+    # condition.  plans.geometry_quantities owns the derivation now, which is
+    # what made the redundancy visible.
+    uses_determinant = uses_geometry_offset = uses_geometry_values(dependencies)
 
     lines = [
         "    static constexpr int N_QP_1D = integer_root(N_QP, DIM);",
@@ -2423,12 +2431,10 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + lane;")
     if uses_determinant:
         lines.append("            const scalar_t det = determinant[geometry_offset];")
-    if dependencies.uses_adjugate:
-        for i in range(dim * dim):
-            lines.append(
-                "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
-                % (i, i)
-            )
+    lines.extend(
+        "            const scalar_t adj%d = adjugate[%d][geometry_offset];" % (i, i)
+        for i in _adjugate_components(dependencies, dim)
+    )
     for field_index, field in enumerate(system.fields):
         for group in groups:
             if group.uses_value:
@@ -2700,6 +2706,37 @@ def _affine_block_names(geometry_stream_indices, uses_cached_affine_metric, name
     if uses_cached_affine_metric:
         spelled["q_weight"] = "cached_affine_metric_q_weight"
     return spelled
+
+
+def _adjugate_components(dependencies, dim):
+    """The adjugate component indices this kernel reads, from the plan.
+
+    Empty when the form needs no adjugate, which is what the five
+    ``if dependencies.uses_adjugate:`` sites each decided for themselves.
+    Iterating the plan's quantities says the same thing once, and says it in
+    terms of a component count the plan owns rather than ``dim * dim`` spelled
+    at each site.
+    """
+    return [
+        index
+        for quantity in local_geometry_quantities(dependencies, dim)
+        if quantity.name == "adjugate"
+        for index in range(quantity.components)
+    ]
+
+
+def _geometry_buffer_arguments(dependencies, dim, names):
+    """The geometry buffers this kernel hands on, in the plan's order.
+
+    ``names`` maps a quantity to what this site calls it.  A quantity the plan
+    does not list contributes nothing, which is what the ``if
+    dependencies.uses_adjugate:`` guard around a single append was saying.
+    """
+    return [
+        names[quantity.name]
+        for quantity in local_geometry_quantities(dependencies, dim)
+        if quantity.name in names
+    ]
 
 
 def _stream_call_arguments(streams, spell):
@@ -2981,16 +3018,15 @@ def _simplex_local_body(
             "const scalar_t", "det", (), expr_ref("determinant[geometry_offset]")
         ),
     ]
-    if dependencies.uses_adjugate:
-        transform.extend(
-            BufferDeclNode(
-                "const scalar_t",
-                "adj%d" % i,
-                (),
-                expr_ref("adjugate[%d][geometry_offset]" % i),
-            )
-            for i in range(dim * dim)
+    transform.extend(
+        BufferDeclNode(
+            "const scalar_t",
+            "adj%d" % i,
+            (),
+            expr_ref("adjugate[%d][geometry_offset]" % i),
         )
+        for i in _adjugate_components(dependencies, dim)
+    )
     for field in system.fields:
         for group in groups:
             stem = field.name + group.symbol_suffix
@@ -3049,15 +3085,14 @@ def _simplex_local_body(
             "const scalar_t", "test_value", (), expr_ref("shape[q * N_SHAPE + test]")
         ),
     ]
-    if dependencies.uses_adjugate:
-        test_body.extend(
-            BufferDeclNode(
-                "const scalar_t",
-                "adj%d" % i,
-                (),
-                expr_ref("adjugate[%d][geometry_offset]" % i),
-            )
-            for i in range(dim * dim)
+    test_body.extend(
+        BufferDeclNode(
+            "const scalar_t",
+            "adj%d" % i,
+            (),
+            expr_ref("adjugate[%d][geometry_offset]" % i),
+        )
+        for i in _adjugate_components(dependencies, dim)
         )
     for d in range(dim):
         if not any(row[d] for row in dependencies.gradient_coefficients):
@@ -3170,16 +3205,15 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
             "const scalar_t", "det", (), expr_ref("determinant[geometry_offset]")
         ),
     ]
-    if dependencies.uses_adjugate:
-        body.extend(
-            BufferDeclNode(
-                "const scalar_t",
-                "adj%d" % i,
-                (),
-                expr_ref("adjugate[%d][geometry_offset]" % i),
-            )
-            for i in range(dim * dim)
+    body.extend(
+        BufferDeclNode(
+            "const scalar_t",
+            "adj%d" % i,
+            (),
+            expr_ref("adjugate[%d][geometry_offset]" % i),
         )
+        for i in _adjugate_components(dependencies, dim)
+    )
 
     for field_index, field in enumerate(system.fields):
         for group in groups:
@@ -3547,8 +3581,12 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
     """
     dim = system.dim
     n_fields = len(system.fields)
-    uses_determinant = any(dependencies.value_coefficients) or dependencies.uses_adjugate
-    uses_geometry_offset = uses_determinant or dependencies.uses_adjugate
+    # One predicate, not two.  uses_determinant already contains uses_adjugate,
+    # so "uses_determinant or uses_adjugate" restated it rather than widening
+    # it; the offset and the determinant are needed under exactly the same
+    # condition.  plans.geometry_quantities owns the derivation now, which is
+    # what made the redundancy visible.
+    uses_determinant = uses_geometry_offset = uses_geometry_values(dependencies)
     if not dependencies.uses_test_coefficients:
         return ()
 
@@ -3651,14 +3689,13 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
                 "const scalar_t", "det", (), expr_ref("determinant[geometry_offset]")
             )
         )
-    if dependencies.uses_adjugate:
-        lane_body.extend(
-            BufferDeclNode(
-                "const scalar_t", "adj%d" % i, (),
-                expr_ref("adjugate[%d][geometry_offset]" % i),
-            )
-            for i in range(dim * dim)
+    lane_body.extend(
+        BufferDeclNode(
+            "const scalar_t", "adj%d" % i, (),
+            expr_ref("adjugate[%d][geometry_offset]" % i),
         )
+        for i in _adjugate_components(dependencies, dim)
+    )
     lane_body.extend(_tensor_field_alias_nodes(system, dependencies))
     lane_body.extend(
         _coefficient_evaluation_nodes(system, coefficients, dependencies)
@@ -4103,11 +4140,12 @@ def _operator_source(
                 "const ptrdiff_t geometry_stride",
                 "const %s *const SFEM_RESTRICT determinant" % scalar_type,
             ]
-            if dependencies.uses_adjugate:
-                params.append(
-                    "const %s *const SFEM_RESTRICT adjugate[%d]"
-                    % (scalar_type, dim * dim)
-                )
+            params.extend(
+                "const %s *const SFEM_RESTRICT %s[%d]"
+                % (scalar_type, quantity.name, quantity.components)
+                for quantity in local_geometry_quantities(dependencies, dim)
+                if quantity.is_indexed
+            )
             if dependencies.current:
                 params.append(
                     "const %s *const SFEM_RESTRICT current[%d]"
@@ -4541,11 +4579,10 @@ def _mixed_affine_function(
         "const ptrdiff_t nnodes",
         "idx_t **const SFEM_RESTRICT elements",
     ]
-    if dependencies.uses_adjugate:
-        params.extend(
-            "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
-            for i in range(dim * dim)
-        )
+    params.extend(
+        "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
+        for i in _adjugate_components(dependencies, dim)
+    )
     params.append("const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0")
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
     params.extend(_mixed_mesh_dependency_params(layout, dependencies))
@@ -4638,27 +4675,26 @@ def _mixed_affine_function(
     if field_gather:
         lines.extend(["", *field_gather])
     lines.extend(["", *_zero_block_output_lines("block_output", layout.total_streams, "        ")])
-    affine_geometry_streams = (
-        (
-            tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
-            if dependencies.uses_adjugate
-            else ()
-        )
-        + ("jacobian_determinant0",)
-    )
+    affine_geometry_streams = tuple(
+        "jacobian_adjugate%d" % i
+        for i in _adjugate_components(dependencies, dim)
+    ) + ("jacobian_determinant0",)
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
     }
     lines.extend(_affine_geometry_stream_conversion_lines(affine_geometry_streams, "        "))
-    if dependencies.uses_adjugate:
-        lines.extend(
-            [
-                "        const scalar_t *block_adjugate[DIM * DIM];",
-                "        for (int component = 0; component < DIM * DIM; ++component) {",
-                "            block_adjugate[component] = block_affine_geometry_streams[component];",
-                "        }",
-            ]
+    lines.extend(
+        line
+        for _buffer in _geometry_buffer_arguments(
+            dependencies, dim, {"adjugate": "block_adjugate"}
         )
+        for line in (
+            "        const scalar_t *block_adjugate[DIM * DIM];",
+            "        for (int component = 0; component < DIM * DIM; ++component) {",
+            "            block_adjugate[component] = block_affine_geometry_streams[component];",
+            "        }",
+        )
+    )
     block_stream_lines, block_stream_args = _mixed_block_stream_pointer_lines(
         layout,
         dependencies,
@@ -4676,8 +4712,9 @@ def _mixed_affine_function(
         "block_affine_geometry_streams[%d]"
         % affine_geometry_stream_indices["jacobian_determinant0"],
     ]
-    if dependencies.uses_adjugate:
-        call_args.append("block_adjugate")
+    call_args.extend(
+        _geometry_buffer_arguments(dependencies, dim, {"adjugate": "block_adjugate"})
+    )
     call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
         block_stream_args[group.name]
@@ -4945,8 +4982,9 @@ def _mixed_isoparametric_function(
         "VECTOR_SIZE",
         "block_determinant",
     ]
-    if dependencies.uses_adjugate:
-        call_args.append("block_adjugate")
+    call_args.extend(
+        _geometry_buffer_arguments(dependencies, dim, {"adjugate": "block_adjugate"})
+    )
     call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
         block_stream_args[group.name]
@@ -5304,8 +5342,9 @@ def _mixed_coo_triplet_matrix_assembly_source(
         "0",
         "block_determinant",
     ]
-    if dependencies.uses_adjugate:
-        call_args.append("block_adjugate")
+    call_args.extend(
+        _geometry_buffer_arguments(dependencies, dim, {"adjugate": "block_adjugate"})
+    )
     call_args.extend(_mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family))
     call_args.extend(
         block_stream_args[group.name]
