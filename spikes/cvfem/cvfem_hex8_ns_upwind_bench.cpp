@@ -346,9 +346,15 @@ int main(int argc, char **argv) {
     // These are rejected rather than mapped onto the hand-written kernel. Mapping them is
     // what the atomic layout used to do, and it meant `--kernel sumfact --geom isoparam`
     // reported the hand-written kernel's throughput under the name `sumfact`.
-    if (geom_kind == GeomKind::Isoparam && kernel_kind != KernelKind::Current &&
-        kernel_kind != KernelKind::Sympy && kernel_kind != KernelKind::Fd &&
-        kernel_kind != KernelKind::Split) {
+    // Only for the operations that actually consult the kernel. The Jacobian action and
+    // the SpMV ignore --kernel entirely -- no apply_jacobian_action_* takes a KernelKind
+    // -- so rejecting them on the default kernel name would refuse a run that never uses
+    // it. That is exactly what happened: `--jac-action --geom isoparam` inherits the
+    // default `sumfact` and was refused for a kernel it does not call.
+    const bool kernel_is_consulted = !(jac_action || bsr_apply);
+    if (kernel_is_consulted && geom_kind == GeomKind::Isoparam &&
+        kernel_kind != KernelKind::Current && kernel_kind != KernelKind::Sympy &&
+        kernel_kind != KernelKind::Fd && kernel_kind != KernelKind::Split) {
         std::fprintf(stderr,
                      "--geom isoparam supports --kernel current|sympy|fd|split; '%s' has no "
                      "isoparametric form\n",
