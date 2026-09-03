@@ -193,9 +193,9 @@
   <p class="standfirst">The layer graph is clean and enforced, and the matrix-free apply path is now measured as well as described. The emission layer still holds 22,727 lines that should be a printer.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 27 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 30 commits from 060684ff</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
-    <span><b>Date</b> 2026-09-02</span>
+    <span><b>Date</b> 2026-09-03</span>
   </div>
 </header>
 
@@ -280,8 +280,8 @@
         <rect x="500" y="414" width="416" height="78" class="d-gapb" rx="2"/>
         <text x="516" y="438" class="d-name">ir/</text>
         <text x="516" y="458" class="d-sub">930 LOC · complete and well formed</text>
-        <text x="516" y="476" class="d-gapt">0 nodes built on the residual path</text>
-        <text x="902" y="438" class="d-gapt" text-anchor="end">BYPASSED</text>
+        <text x="516" y="476" class="d-gapt">2 kernel bodies on the residual path</text>
+        <text x="902" y="438" class="d-gapt" text-anchor="end">PARTIAL</text>
 
         <!-- L5 -->
         <text x="80" y="532" class="d-key" text-anchor="end">L5</text>
@@ -483,7 +483,7 @@
         <rect x="24" y="140" width="180" height="90" class="d-gapb" rx="2"/>
         <text x="38" y="162" class="d-name">ir/ (L4)</text>
         <text x="38" y="182" class="d-sub">KernelAST · 930 LOC</text>
-        <text x="38" y="202" class="d-gapt">0 nodes on this path</text>
+        <text x="38" y="202" class="d-gapt">2 kernel bodies on this path</text>
         <text x="38" y="220" class="d-dim">energy path uses 4 fragments</text>
 
         <text x="24" y="376" class="d-dim">The chain along the top is correct and enforced. Everything below it is the gap: one layer describing the kernel, another re-deriving it.</text>
@@ -500,7 +500,7 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Nine, ordered by what unblocks what. One is closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Nine, ordered by what unblocks what. One is closed and two are under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 0</div>
@@ -524,7 +524,7 @@
       <p>Measured effect: <b>the largest emitter contains zero free-symbol analysis</b>, down from six references, and its text-free helper count has fallen from 32 to 18. <code>residual_codegen.py</code> is 9,875 lines, from 10,074. The boundary emitter is down from eight symbol scans to two, both argument validation rather than planning.</p>
       <p><b>Done: kernel file naming.</b> Which files a kernel produces and what they are called — <code>LocalKernelPlan.name</code>/<code>.header</code> and <code>MeshKernelPlan.name</code>/<code>.source</code> were already the definition, and the emitters rebuilt both from format strings. The idempotence rule the emitter carried privately (a prefix already naming its element does not get a second one) moved into the plan factory with it. <b>This is the first move that changes the plan-consumption count: 13 unread, now 11.</b></p>
       <p><b>Remaining: the rest of the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, and geometry mode. These are the genuinely hard ones: unlike everything moved so far, they are not code that lifts out whole but structure that exists only as the shape of the emitter's control flow. The mesh phases, for instance, are spread across six large emission functions, each interleaving gather and scatter with buffer declarations that depend on the dependency set. They are what OP 2 and OP 4 wait on.</p>
-      <div class="op-facts"><span><i>emitters</i> 18,344 LOC in two modules</span><span><i>plans unread</i> 13 → 10</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP2, OP3, OP4</span></div>
+      <div class="op-facts"><span><i>emitters</i> 18,344 LOC in two modules</span><span><i>plans unread</i> 13 → 10</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed</span><span><i>still blocks</i> OP2, OP3 — OP4 started without it</span></div>
     </div>
   </div>
 
@@ -549,11 +549,11 @@
     </div>
   </div>
 
-  <div class="op blocked">
+  <div class="op ready">
     <div class="rail"></div><div class="num">OP 4</div>
     <div class="body">
-      <div class="op-title">Route the residual path through <code>KernelAST</code> <span class="chip c-gap">blocked by OP 1</span></div>
-      <p><code>ir/kernel_ast.py</code> is a complete, well-formed kernel IR: typed loops with vectorization and tabulation strategies, buffers, gather and scatter nodes, geometry nodes, plus <code>KernelASTPass</code> and <code>KernelASTPassPipeline</code>. The residual path builds <b>zero nodes</b>; the energy path uses four fragments; the pass pipeline is referenced only from tests.</p>
+      <div class="op-title">Route the residual path through <code>KernelAST</code> <span class="chip c-ok">under way — two kernels in</span></div>
+      <p><code>ir/kernel_ast.py</code> is a complete, well-formed kernel IR: typed loops with vectorization and tabulation strategies, buffers, gather and scatter nodes, geometry nodes, plus <code>KernelASTPass</code> and <code>KernelASTPassPipeline</code>. The residual path now builds nodes for <b>two kernel bodies</b> and for every statement helper feeding them, so the sympy-to-C bridge and the chain rule produce IR rather than text; the energy path still uses four fragments, and the pass pipeline is still referenced only from tests.</p>
       <p>Every optimization the PRD asks for — vectorization, unrolling, blocking, scratchpad packing, per-warp variants — is a pass over this IR. There is nowhere else for them to live, and today nothing to attach them to.</p>
       <div class="op-facts"><span><i>IR</i> 930 LOC, ready</span><span><i>residual nodes built</i> 0</span></div>
     </div>
