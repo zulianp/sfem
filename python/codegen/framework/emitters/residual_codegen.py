@@ -14,6 +14,7 @@ from codegen.framework.plans.generation import (
 )
 from codegen.framework.plans.matrix_formats import CRSAssemblyPlan
 from codegen.framework.ir.kernel_ast import (
+    AssignmentNode,
     BlockNode,
     BufferDeclNode,
     FunctionDefNode,
@@ -2757,144 +2758,200 @@ def _simplex_local_body(
 
     dim = system.dim
     groups = _dependency_stream_groups(dependencies)
-    lines = ["    for (int q = 0; q < N_QP; ++q) {"]
+
+    # Staging buffers, one per quantity accumulated across trial functions.
+    staging = []
     for field in system.fields:
         for group in groups:
+            stem = field.name + group.symbol_suffix
             if group.uses_value:
-                lines.append("        scalar_t %s%s_values[VECTOR_SIZE];" % (field.name, group.symbol_suffix))
+                staging.append(
+                    BufferDeclNode("scalar_t", "%s_values" % stem, ("VECTOR_SIZE",))
+                )
             if group.uses_gradient:
-                for d in range(dim):
-                    lines.append(
-                        "        scalar_t %s%s_grad_%d_ref_values[VECTOR_SIZE];"
-                        % (field.name, group.symbol_suffix, d)
+                staging.extend(
+                    BufferDeclNode(
+                        "scalar_t", "%s_grad_%d_ref_values" % (stem, d), ("VECTOR_SIZE",)
                     )
+                    for d in range(dim)
+                )
     for row, _field in enumerate(system.fields):
         if dependencies.value_coefficients[row]:
-            lines.append("        scalar_t value_coeff%d_values[VECTOR_SIZE];" % row)
-        for d in range(dim):
-            if dependencies.gradient_coefficients[row][d]:
-                lines.append("        scalar_t grad_coeff%d_%d_values[VECTOR_SIZE];" % (row, d))
+            staging.append(
+                BufferDeclNode("scalar_t", "value_coeff%d_values" % row, ("VECTOR_SIZE",))
+            )
+        staging.extend(
+            BufferDeclNode(
+                "scalar_t", "grad_coeff%d_%d_values" % (row, d), ("VECTOR_SIZE",)
+            )
+            for d in range(dim)
+            if dependencies.gradient_coefficients[row][d]
+        )
+
+    # Zero the staging buffers, then accumulate over trial functions.
+    gather = []
     for field_index, field in enumerate(system.fields):
         for group in groups:
+            stem = field.name + group.symbol_suffix
             if group.uses_value:
-                lines.extend(_work_item_loop_lines("        "))
-                lines.append("            %s%s_values[lane] = scalar_t(0);" % (field.name, group.symbol_suffix))
-                lines.append("        }")
-            if group.uses_gradient:
-                for d in range(dim):
-                    lines.extend(_work_item_loop_lines("        "))
-                    lines.append(
-                        "            %s%s_grad_%d_ref_values[lane] = scalar_t(0);"
-                        % (field.name, group.symbol_suffix, d)
+                gather.append(
+                    _work_item_loop_node(
+                        [
+                            AssignmentNode(
+                                expr_ref("%s_values[lane]" % stem),
+                                expr_ref("scalar_t(0)"),
+                            )
+                        ]
                     )
-                    lines.append("        }")
-            lines.append("        for (int trial = 0; trial < N_SHAPE; ++trial) {")
-            lines.extend(_work_item_loop_lines("            "))
-            lines.append(
-                "                const scalar_t coeff = %s[trial * N_FIELDS + %d][lane];"
-                % (group.name, field_index)
-            )
-            if group.uses_value:
-                lines.append(
-                    "                %s%s_values[lane] += coeff * shape[q * N_SHAPE + trial];"
-                    % (field.name, group.symbol_suffix)
                 )
             if group.uses_gradient:
-                for d in range(dim):
-                    lines.append(
-                        "                %s%s_grad_%d_ref_values[lane] += coeff * %s[q * N_SHAPE + trial];"
-                        % (
-                            field.name,
-                            group.symbol_suffix,
-                            d,
-                            sfem_simplex_grad_ref_name("grad_ref", d),
-                        )
+                gather.extend(
+                    _work_item_loop_node(
+                        [
+                            AssignmentNode(
+                                expr_ref("%s_grad_%d_ref_values[lane]" % (stem, d)),
+                                expr_ref("scalar_t(0)"),
+                            )
+                        ]
                     )
-            lines.append("            }")
-            lines.append("        }")
-    lines.extend(_work_item_loop_lines("        "))
-    lines.extend(
-        [
-            "            const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
-            "            const scalar_t det = determinant[geometry_offset];",
-        ]
-    )
-    if dependencies.uses_adjugate:
-        for i in range(dim * dim):
-            lines.append(
-                "            const scalar_t adj%d = adjugate[%d][geometry_offset];"
-                % (i, i)
+                    for d in range(dim)
+                )
+            trial_body = [
+                BufferDeclNode(
+                    "const scalar_t",
+                    "coeff",
+                    (),
+                    expr_ref(
+                        "%s[trial * N_FIELDS + %d][lane]" % (group.name, field_index)
+                    ),
+                )
+            ]
+            if group.uses_value:
+                trial_body.append(
+                    ScatterNode(
+                        expr_ref("%s_values[lane]" % stem),
+                        expr_ref("coeff * shape[q * N_SHAPE + trial]"),
+                        "+=",
+                    )
+                )
+            if group.uses_gradient:
+                trial_body.extend(
+                    ScatterNode(
+                        expr_ref("%s_grad_%d_ref_values[lane]" % (stem, d)),
+                        expr_ref(
+                            "coeff * %s[q * N_SHAPE + trial]"
+                            % sfem_simplex_grad_ref_name("grad_ref", d)
+                        ),
+                        "+=",
+                    )
+                    for d in range(dim)
+                )
+            gather.append(
+                _shape_loop_node("trial", [_work_item_loop_node(trial_body)])
             )
+
+    # Read the staged values back, evaluate the coefficients, stage them too.
+    evaluate = [
+        BufferDeclNode(
+            "const ptrdiff_t",
+            "geometry_offset",
+            (),
+            expr_ref("q * geometry_stride + lane"),
+        ),
+        BufferDeclNode(
+            "const scalar_t", "det", (), expr_ref("determinant[geometry_offset]")
+        ),
+    ]
+    if dependencies.uses_adjugate:
+        evaluate.extend(
+            BufferDeclNode(
+                "const scalar_t",
+                "adj%d" % i,
+                (),
+                expr_ref("adjugate[%d][geometry_offset]" % i),
+            )
+            for i in range(dim * dim)
+        )
     for field in system.fields:
         for group in groups:
+            stem = field.name + group.symbol_suffix
             if group.uses_value:
-                lines.append(
-                    "            const scalar_t %s%s = %s%s_values[lane];"
-                    % (field.name, group.symbol_suffix, field.name, group.symbol_suffix)
+                evaluate.append(
+                    BufferDeclNode(
+                        "const scalar_t", stem, (), expr_ref("%s_values[lane]" % stem)
+                    )
                 )
             if group.uses_gradient:
-                for d in range(dim):
-                    lines.append(
-                        "            const scalar_t %s%s_grad_%d_ref = %s%s_grad_%d_ref_values[lane];"
-                        % (
-                            field.name,
-                            group.symbol_suffix,
-                            d,
-                            field.name,
-                            group.symbol_suffix,
-                            d,
-                        )
+                evaluate.extend(
+                    BufferDeclNode(
+                        "const scalar_t",
+                        "%s_grad_%d_ref" % (stem, d),
+                        (),
+                        expr_ref("%s_grad_%d_ref_values[lane]" % (stem, d)),
                     )
-                lines.extend(
-                    _physical_gradient_lines(
-                        field.name + group.symbol_suffix, dim, "            "
-                    )
+                    for d in range(dim)
                 )
-    lines.extend(
-        _coefficient_evaluation_lines(
-            system,
-            coefficients,
-            "            ",
-            "q_weight[q]",
-            dependencies,
-        )
+                evaluate.extend(_physical_gradient_nodes(stem, dim))
+    evaluate.extend(
+        _coefficient_evaluation_nodes(system, coefficients, dependencies)
     )
     for row, _field in enumerate(system.fields):
         if dependencies.value_coefficients[row]:
-            lines.append("            value_coeff%d_values[lane] = value_coeff%d;" % (row, row))
-        for d in range(dim):
-            if dependencies.gradient_coefficients[row][d]:
-                lines.append(
-                    "            grad_coeff%d_%d_values[lane] = grad_coeff%d_%d;"
-                    % (row, d, row, d)
+            evaluate.append(
+                AssignmentNode(
+                    expr_ref("value_coeff%d_values[lane]" % row),
+                    expr_ref("value_coeff%d" % row),
                 )
-    lines.append("        }")
-    lines.extend(
-        [
-            "        for (int test = 0; test < N_SHAPE; ++test) {",
-            *_work_item_loop_lines("            "),
-            "                const ptrdiff_t geometry_offset = q * geometry_stride + lane;",
-            "                const scalar_t det = determinant[geometry_offset];",
-            "                const scalar_t test_value = shape[q * N_SHAPE + test];",
-        ]
-    )
-    if dependencies.uses_adjugate:
-        for i in range(dim * dim):
-            lines.append(
-                "                const scalar_t adj%d = adjugate[%d][geometry_offset];"
-                % (i, i)
             )
+        evaluate.extend(
+            AssignmentNode(
+                expr_ref("grad_coeff%d_%d_values[lane]" % (row, d)),
+                expr_ref("grad_coeff%d_%d" % (row, d)),
+            )
+            for d in range(dim)
+            if dependencies.gradient_coefficients[row][d]
+        )
+
+    # Contract the staged coefficients against each test function.
+    test_body = [
+        BufferDeclNode(
+            "const ptrdiff_t",
+            "geometry_offset",
+            (),
+            expr_ref("q * geometry_stride + lane"),
+        ),
+        BufferDeclNode(
+            "const scalar_t", "det", (), expr_ref("determinant[geometry_offset]")
+        ),
+        BufferDeclNode(
+            "const scalar_t", "test_value", (), expr_ref("shape[q * N_SHAPE + test]")
+        ),
+    ]
+    if dependencies.uses_adjugate:
+        test_body.extend(
+            BufferDeclNode(
+                "const scalar_t",
+                "adj%d" % i,
+                (),
+                expr_ref("adjugate[%d][geometry_offset]" % i),
+            )
+            for i in range(dim * dim)
+        )
     for d in range(dim):
         if not any(row[d] for row in dependencies.gradient_coefficients):
             continue
-        terms = [
+        terms = " + ".join(
             "%s[q * N_SHAPE + test] * adj%d"
             % (sfem_simplex_grad_ref_name("grad_ref", k), k * dim + d)
             for k in range(dim)
-        ]
-        lines.append(
-            "                const scalar_t test_grad%d = (%s) / det;"
-            % (d, " + ".join(terms))
+        )
+        test_body.append(
+            BufferDeclNode(
+                "const scalar_t",
+                "test_grad%d" % d,
+                (),
+                expr_ref("(%s) / det" % terms),
+            )
         )
     for row in range(len(system.fields)):
         terms = []
@@ -2906,12 +2963,27 @@ def _simplex_local_body(
             if dependencies.gradient_coefficients[row][d]
         )
         if terms:
-            lines.append(
-                "                output[test * N_FIELDS + %d][lane] += q_weight[q] * det * (%s);"
-                % (row, " + ".join(terms))
+            test_body.append(
+                ScatterNode(
+                    expr_ref("output[test * N_FIELDS + %d][lane]" % row),
+                    expr_ref("q_weight[q] * det * (%s)" % " + ".join(terms)),
+                    "+=",
+                )
             )
-    lines.extend(["            }", "        }", "    }"])
-    return (RawLinesNode(tuple(lines), reason="generic simplex body: hand-written loop nest, not yet IR"),)
+
+    quadrature = iterator("q", "int")
+    return (
+        LoopNode(
+            LoopKind.QUADRATURE,
+            quadrature,
+            iteration_range(0, expr_ref("N_QP", "quadrature_count")),
+            pre_increment(quadrature),
+            body=tuple(staging)
+            + tuple(gather)
+            + (_work_item_loop_node(evaluate),)
+            + (_shape_loop_node("test", [_work_item_loop_node(test_body)]),),
+        ),
+    )
 
 
 def _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
@@ -3058,6 +3130,40 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
     )
 
 
+def _work_item_loop_node(body):
+    """One work-item scope: a lane loop, or a bare block where the lane is a thread.
+
+    The quadrature helper builds exactly one of these; the generic simplex
+    body opens five, which is why it is a function rather than inlined.
+    """
+    target = _target()
+    policy = target.loop_lowering_policy()
+    if not policy.emits_lane_loop:
+        return BlockNode(body=tuple(body))
+    lane = iterator(policy.lane_index, policy.lane_index_type)
+    pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
+    return LoopNode(
+        LoopKind.SIMD,
+        lane,
+        iteration_range(0, expr_ref("nelems", "tile_extent")),
+        pre_increment(lane),
+        body=tuple(body),
+        vectorized=bool(pragma),
+    )
+
+
+def _shape_loop_node(name, body):
+    """A loop over shape functions -- ``trial`` or ``test``."""
+    index = iterator(name, "int")
+    return LoopNode(
+        LoopKind.SHAPE,
+        index,
+        iteration_range(0, expr_ref("N_SHAPE", "shape_count")),
+        pre_increment(index),
+        body=tuple(body),
+    )
+
+
 def _quadrature_lane_kernel_node(lane_body, name="quadrature_lane_body"):
     """The quadrature-over-lane loop nest as a node, ready to nest in a function.
 
@@ -3071,27 +3177,12 @@ def _quadrature_lane_kernel_node(lane_body, name="quadrature_lane_body"):
     caller can still treat every kernel body uniformly, and so the gap is
     counted rather than hidden.
     """
-    target = _target()
-    policy = target.loop_lowering_policy()
     quadrature = iterator("q", "int")
 
-    if policy.emits_lane_loop:
-        lane = iterator(policy.lane_index, policy.lane_index_type)
-        pragma = target.vectorize_pragma() if policy.vectorize_lane_loop else None
-        work_item = LoopNode(
-            LoopKind.SIMD,
-            lane,
-            iteration_range(0, expr_ref("nelems", "tile_extent")),
-            pre_increment(lane),
-            body=tuple(lane_body),
-            vectorized=bool(pragma),
-        )
-    else:
-        # The lane is a thread rather than an iteration, so the target opens a
-        # bare scope where a CPU target opens a loop.  Before BlockNode this
-        # was the one shape with no node, and the whole nest fell back to
-        # pre-rendered text on exactly the targets the IR exists to serve.
-        work_item = BlockNode(body=tuple(lane_body))
+    # The lane is a thread on some targets, an iteration on others; the scope
+    # helper answers that, and before BlockNode existed the thread case had no
+    # node at all and the whole nest fell back to text.
+    work_item = _work_item_loop_node(lane_body)
 
     return LoopNode(
         LoopKind.QUADRATURE,

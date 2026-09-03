@@ -167,9 +167,16 @@ class EveryLocalKernelIsATreeTest(unittest.TestCase):
 class RawLinesRatchetTest(unittest.TestCase):
     """How much of a kernel is still text.  Shrink-only.
 
-    Two body generators still hand back pre-rendered lines: the generic
-    simplex body and the tensor-product body, both hand-written loop nests.
-    Each is a place a ``KernelASTPass`` cannot reach.
+    One body generator still hands back pre-rendered lines: the
+    tensor-product body, whose interesting structure is calls into helper
+    templates rather than a loop nest, so migrating it is a ``CallNode`` job
+    rather than a loop one.  It is the last place a ``KernelASTPass`` cannot
+    reach.
+
+    The generic simplex body is gone from this list.  It was the largest of
+    the migrations and the one that needed shapes the earlier two did not:
+    five separate work-item scopes at quadrature level, two-level nesting for
+    the trial and test loops, and staging buffers with extents.
 
     A third is gone.  Targets whose lowering policy opens a bare work-item
     block instead of a lane loop had no node for that shape, so the entire
@@ -178,7 +185,7 @@ class RawLinesRatchetTest(unittest.TestCase):
     """
 
     #: Construction sites of RawLinesNode in the residual emitter.
-    BUDGET = 2
+    BUDGET = 1
 
     def _raw_lines_sites(self):
         import ast
