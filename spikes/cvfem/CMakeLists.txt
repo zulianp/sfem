@@ -141,6 +141,20 @@ target_include_directories(cvfem_hex8_ns_steady PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
 cvfem_subpar_target(cvfem_hex8_ns_steady)
 
+# The sfem::Op face of the same kernels, for the semi-structured GMG work. Kept as a
+# library so the Op compiles and is gated on its own before any driver depends on it.
+add_library(cvfem_ns_op STATIC cvfem_hex8_ns_op.cpp)
+target_link_libraries(cvfem_ns_op
+    PUBLIC
+        SFEM::sfem
+        $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+target_compile_options(cvfem_ns_op PRIVATE ${_cvfem_perf_opts})
+target_include_directories(cvfem_ns_op PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
+cvfem_subpar_target(cvfem_ns_op)
+
 # set_target_properties(cvfem_tet4_ns_upwind_bench PROPERTIES
 #     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
