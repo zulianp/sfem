@@ -4116,21 +4116,11 @@ def _operator_source(
                 for quantity in local_geometry_quantities(dependencies, dim)
                 if quantity.is_indexed
             )
-            if dependencies.current:
-                params.append(
-                    "const %s *const SFEM_RESTRICT current[%d]"
-                    % (scalar_type, n_fields * n_shape)
-                )
-            if dependencies.previous:
-                params.append(
-                    "const %s *const SFEM_RESTRICT previous[%d]"
-                    % (scalar_type, n_fields * n_shape)
-                )
-            if dependencies.direction:
-                params.append(
-                    "const %s *const SFEM_RESTRICT direction[%d]"
-                    % (scalar_type, n_fields * n_shape)
-                )
+            params.extend(
+                "const %s *const SFEM_RESTRICT %s[%d]"
+                % (scalar_type, role.name, n_fields * n_shape)
+                for role in live_field_roles(dependencies)
+            )
             params.extend(
                 "const %s %s" % (scalar_type, parameter)
                 for parameter in dependencies.parameters
@@ -6752,30 +6742,18 @@ def _scalar_crs_matrix_assembly_source(
         block_function = "%s_contiguous" % block
     else:
         state_stream_args = {}
-        if state_dependencies.current:
-            current_lines, current_arg = _block_stream_argument(
+        for role in live_field_roles(state_dependencies, roles=STATE_FIELD_ROLES):
+            role_lines, role_arg = _block_stream_argument(
                 "const scalar_t *",
-                "block_current_streams",
-                "block_current",
+                "block_%s_streams" % role.name,
+                "block_%s" % role.name,
                 n_streams,
                 field_stream_order,
                 "        ",
                 mutable=False,
             )
-            lines.extend(current_lines)
-            state_stream_args["current"] = current_arg
-        if state_dependencies.previous:
-            previous_lines, previous_arg = _block_stream_argument(
-                "const scalar_t *",
-                "block_previous_streams",
-                "block_previous",
-                n_streams,
-                field_stream_order,
-                "        ",
-                mutable=False,
-            )
-            lines.extend(previous_lines)
-            state_stream_args["previous"] = previous_arg
+            lines.extend(role_lines)
+            state_stream_args[role.name] = role_arg
         direction_lines, direction_arg = _block_stream_argument(
             "const scalar_t *",
             "block_direction_streams",
@@ -7145,37 +7123,27 @@ def _scalar_crs_matrix_assembly_source(
             lines.extend(_isoparametric_geometry_assignment_lines(dim, "                "))
             lines.extend(["            }"])
         if packed_field_element_lines:
-            if state_dependencies.current:
-                state_stream_args["current"] = "block_current"
-            if state_dependencies.previous:
-                state_stream_args["previous"] = "block_previous"
+            state_stream_args.update(
+                (role.name, "block_%s" % role.name)
+                for role in live_field_roles(
+                    state_dependencies, roles=STATE_FIELD_ROLES
+                )
+            )
             direction_arg = "block_direction"
             output_arg = "block_output"
         else:
-            if state_dependencies.current:
-                current_lines, current_arg = _block_stream_argument(
+            for role in live_field_roles(state_dependencies, roles=STATE_FIELD_ROLES):
+                role_lines, role_arg = _block_stream_argument(
                     "const scalar_t *",
-                    "block_current_streams",
-                    "block_current",
+                    "block_%s_streams" % role.name,
+                    "block_%s" % role.name,
                     n_streams,
                     field_stream_order,
                     "            ",
                     mutable=False,
                 )
-                lines.extend(current_lines)
-                state_stream_args["current"] = current_arg
-            if state_dependencies.previous:
-                previous_lines, previous_arg = _block_stream_argument(
-                    "const scalar_t *",
-                    "block_previous_streams",
-                    "block_previous",
-                    n_streams,
-                    field_stream_order,
-                    "            ",
-                    mutable=False,
-                )
-                lines.extend(previous_lines)
-                state_stream_args["previous"] = previous_arg
+                lines.extend(role_lines)
+                state_stream_args[role.name] = role_arg
             direction_lines, direction_arg = _block_stream_argument(
                 "const scalar_t *",
                 "block_direction_streams",
@@ -7699,30 +7667,18 @@ def _scalar_coo_triplet_matrix_assembly_source(
         block_function = "%s_contiguous" % block
     else:
         state_stream_args = {}
-        if state_dependencies.current:
-            current_lines, current_arg = _block_stream_argument(
+        for role in live_field_roles(state_dependencies, roles=STATE_FIELD_ROLES):
+            role_lines, role_arg = _block_stream_argument(
                 "const scalar_t *",
-                "block_current_streams",
-                "block_current",
+                "block_%s_streams" % role.name,
+                "block_%s" % role.name,
                 n_streams,
                 field_stream_order,
                 "        ",
                 mutable=False,
             )
-            lines.extend(current_lines)
-            state_stream_args["current"] = current_arg
-        if state_dependencies.previous:
-            previous_lines, previous_arg = _block_stream_argument(
-                "const scalar_t *",
-                "block_previous_streams",
-                "block_previous",
-                n_streams,
-                field_stream_order,
-                "        ",
-                mutable=False,
-            )
-            lines.extend(previous_lines)
-            state_stream_args["previous"] = previous_arg
+            lines.extend(role_lines)
+            state_stream_args[role.name] = role_arg
         direction_lines, direction_arg = _block_stream_argument(
             "const scalar_t *",
             "block_direction_streams",
