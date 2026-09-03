@@ -11,6 +11,8 @@ class KernelASTNodeKind(str, Enum):
     SCATTER = "scatter"
     GEOMETRY = "geometry"
     LOCAL_COMPUTATION = "local_computation"
+    FUNCTION_DEF = "function_def"
+    RAW_LINES = "raw_lines"
 
 
 class GeometryNodeKind(str, Enum):
@@ -423,6 +425,79 @@ class LocalComputationNode:
             "output_name": self.output_name,
             "statement_count": len(tuple(getattr(self.evaluation_plan, "statements", ()))),
             "cost": None if self.cost is None else _cost_to_dict(self.cost),
+        }
+
+
+@dataclass(frozen=True)
+class FunctionDefNode:
+    """A whole kernel: its signature and its body as one tree.
+
+    Until this node existed a kernel was half a tree -- the body could be IR
+    while the template line, qualifier and parameter list stayed string
+    concatenation in the emitter, which meant no pass could see or rewrite a
+    kernel as a unit.  The qualifier comes from the target at print time, so a
+    function printed for CUDA carries ``__host__ __device__`` without the
+    emitter deciding anything.
+
+    ``params`` are rendered strings rather than typed entities.  A parameter
+    IR is a separate subsystem, and carrying pre-rendered declarations is what
+    keeps this node small enough to introduce under a byte-identity gate.
+    """
+
+    name: str
+    params: tuple = ()
+    body: tuple = ()
+    return_type: str = "void"
+    qualifier: str = ""
+    template_params: tuple = ()
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.FUNCTION_DEF, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "params", tuple(self.params))
+        object.__setattr__(self, "body", tuple(self.body))
+        object.__setattr__(self, "template_params", tuple(self.template_params))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "name": self.name,
+            "return_type": self.return_type,
+            "qualifier": self.qualifier,
+            "template_params": list(self.template_params),
+            "params": list(self.params),
+            "body": [_entity_to_dict(node) for node in self.body],
+        }
+
+
+@dataclass(frozen=True)
+class RawLinesNode:
+    """Pre-rendered text that has not been migrated to the IR yet.
+
+    An explicit escape hatch, and deliberately an ugly one.  It lets a kernel
+    be a ``FunctionDefNode`` before its body is nodes, so the IR becomes the
+    spine of every kernel immediately rather than only of the few bodies that
+    have been converted -- and it marks exactly what is left, which a ratchet
+    counts and drives down.
+
+    Unlike every other node, it prints its lines **verbatim and ignores the
+    indent it is given**: the text it carries was written with its own
+    absolute indentation baked in, which is precisely the property that makes
+    it un-migrated.  ``reason`` says what it is waiting on, so the remaining
+    ones stay legible instead of becoming anonymous debt.
+    """
+
+    lines: tuple = ()
+    reason: str = ""
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.RAW_LINES, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "lines", tuple(self.lines))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "line_count": len(self.lines),
+            "reason": self.reason,
         }
 
 

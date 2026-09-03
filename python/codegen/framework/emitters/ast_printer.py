@@ -6,11 +6,13 @@ from codegen.framework.ir.kernel_ast import (
     BufferAccess,
     CallNode,
     ExpressionRef,
+    FunctionDefNode,
     GatherNode,
     Literal,
     LoopIncrementKind,
     KernelAST,
     LoopNode,
+    RawLinesNode,
     ScatterNode,
     SymbolRef,
 )
@@ -31,6 +33,27 @@ class CLikeKernelASTPrinter:
         return tuple(lines)
 
     def print_node(self, node, indent=""):
+        if isinstance(node, RawLinesNode):
+            # Verbatim, and the indent is ignored on purpose -- see the node.
+            return tuple(node.lines)
+        if isinstance(node, FunctionDefNode):
+            lines = []
+            if node.template_params:
+                lines.append(
+                    "%stemplate <%s>" % (indent, ", ".join(node.template_params))
+                )
+            opener = " ".join(part for part in (node.qualifier, node.return_type) if part)
+            lines.append("%s%s %s(" % (indent, opener, node.name))
+            last = len(node.params) - 1
+            for position, param in enumerate(node.params):
+                lines.append(
+                    "%s        %s%s" % (indent, param, "" if position == last else ",")
+                )
+            lines.append("%s) {" % indent)
+            for body_node in node.body:
+                lines.extend(self.print_node(body_node, indent + self.indent_unit))
+            lines.append("%s}" % indent)
+            return tuple(lines)
         if isinstance(node, LoopNode):
             lines = []
             if node.vectorized and self.vectorize_pragma:

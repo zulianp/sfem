@@ -28,7 +28,8 @@ unittest_status=0
     python.codegen.framework.tests.test_apply_variants_match_generation \
     python.codegen.framework.tests.test_residual_path_capabilities \
     python.codegen.framework.tests.test_kernel_ast_slice \
-    python.codegen.framework.tests.test_target_binding || unittest_status=$?
+    python.codegen.framework.tests.test_target_binding \
+    python.codegen.framework.tests.test_kernel_function_ir || unittest_status=$?
 
 if command -v mpic++ >/dev/null 2>&1 || command -v mpicxx >/dev/null 2>&1 || command -v c++ >/dev/null 2>&1; then
     echo "Generated OpenMP compile checks: covered by test_m9_regression and existing unittest gates"
