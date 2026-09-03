@@ -516,7 +516,7 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Ten, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Eleven, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 0</div>
@@ -635,6 +635,17 @@
       <p>Two facts shape the work. The check is <i>fused into the sparsity search</i> rather than sitting beside it — <code>ks[j]</code> is the search result and the branch validates it in the same pass — so removal keeps the search and drops the test, the flag and the I/O, rather than deleting a loop. And the CRS form carries the same pattern but is not currently emitted for any shipped material, so the real removal is smaller than the emitter source suggests.</p>
       <p>Note that the <code>reduction</code> clause plumbed through <code>parallel_for_pragma</code> in OP&nbsp;2 exists to reproduce this check byte-for-byte. That was the right transitional move under a byte-identity gate, and it is not settled design: if the check is hoisted, the clause and its target API go with it.</p>
       <div class="op-facts"><span><i>files carrying the flag</i> 36</span><span><i>per element</i> N_SHAPE² branches</span><span><i>hoisted cost</i> O(nnz), once</span><span><i>blocks</i> nothing</span></div>
+    </div>
+  </div>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 11</div>
+    <div class="body">
+      <div class="op-title">Generated kernels carry dead temporaries and aliases <span class="chip c-part">deferred — residuals must be reproduced first</span></div>
+      <p>Raised by Patrick, and still true of current generation rather than only the older generator. A scan of the 508 generated sources finds <b>358 declarations that are a pure alias</b> of another name — <code>const scalar_t material1 = weak_mat_tmp4;</code>, with <code>material1</code> and <code>material3</code> aliasing the same temporary — and <b>343 declarations never referenced again</b>.</p>
+      <p>Both have identifiable causes. <code>_physical_gradient_nodes</code> emits all <code>dim</code> physical components unconditionally, so a form using a subset gets dead ones: <code>u0_grad_1</code> and <code>u0_grad_2</code> are unread while <code>u0_grad_0</code> is live. The dependency set already records which components are needed as <code>dependencies.gradient_coefficients[row][d]</code>, so the emitter has the information and ignores it. The aliases are a material-slot to CSE-temporary mapping that could be substituted at the use sites instead of named.</p>
+      <p>This work is <b>deferred until the residuals have been reproduced</b>, and the reason is the verification posture rather than the difficulty. Every change on this branch has been proven by 520 generated files coming back byte-identical. Removing dead declarations changes that text by design, so byte-identity stops being the proof and becomes the thing that must break. The gate becomes the apply bench — parity across all nine variants and the answer digest, both of which must be <i>unchanged</i>, since deleting code nothing reads cannot move a number — and the snapshot is then re-recorded as a deliberate act. Doing that while results are being reproduced would make an output change and a reproduction run indistinguishable.</p>
+      <div class="op-facts"><span><i>pure aliases</i> 358</span><span><i>unread declarations</i> 343</span><span><i>files scanned</i> 508</span><span><i>gate changes to</i> parity + digest</span></div>
     </div>
   </div>
 </section>
