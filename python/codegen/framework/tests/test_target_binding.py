@@ -207,18 +207,36 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     """What still bypasses the target.  Shrink-only.
 
     A literal pragma in an emitter is a target decision made at L6 by writing
-    it down.  ``residual_codegen`` had 41 and now has 17 -- the twenty-four
-    with an exact accessor were converted.  ``energy_codegen``'s 25 are a
-    different shape: that module already receives target syntax through a
-    ``source_builder`` parameter, which is the pattern the residual path
-    lacks, so its literals should move to that object rather than to a
-    module-level accessor.
+    it down.  ``residual_codegen`` had 41 and now has 17: the twenty-four with
+    an exact accessor were converted.  ``energy_codegen`` had 25 and now has
+    14, its eleven leaf pragmas moved onto the ``source_builder`` it already
+    receives.
+
+    The fourteen that remain are not oversights, and three separate reasons
+    keep them:
+
+    ``#pragma omp parallel`` (4) and ``#pragma omp for schedule(static)`` (3)
+    come in pairs that open a parallel region with its own brace and put a
+    work-sharing construct inside it.  They are *structure*, not spelling.
+    An accessor returning nothing for CUDA would leave a bare block around a
+    serial loop -- code that compiles and is quietly wrong -- which hides the
+    portability gap instead of closing it.  Restructuring is the real fix.
+
+    Seven ``#pragma omp atomic update`` sit in the ``_sfem_soa_hessian_scatter_*``
+    matrix-format helpers, which take no ``source_builder``.  Those are leaves
+    and should be converted; it needs the builder threaded into seven
+    functions, which is mechanical and separable.
+
+    One ``#pragma omp parallel`` is in ``_sfem_packed_thread_scratch_header_source``,
+    which preallocates thread-local scratch.  That is OpenMP-specific
+    infrastructure rather than a pragma spelling, and porting it is a design
+    question about what per-thread scratch means on a GPU.
     """
 
     #: file -> literal pragmas remaining.  Lower these; never raise them.
     BUDGET = {
         "residual_codegen.py": 17,
-        "energy_codegen.py": 25,
+        "energy_codegen.py": 14,
     }
 
     def _literal_pragmas(self, name):
