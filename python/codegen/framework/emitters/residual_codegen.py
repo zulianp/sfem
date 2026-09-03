@@ -2614,6 +2614,20 @@ def _mixed_local_field_evaluation_lines(
     return lines
 
 
+def _stream_call_arguments(streams, spell):
+    """A local kernel's call arguments, in the plan's order.
+
+    The signature comes from ``local_kernel_stream_plans``; so does the call.
+    They used to be two branch chains testing the same conditions -- whether a
+    metric replaces the determinant, whether the adjugate is needed, which
+    field streams are live -- written out twice and free to drift.  The plan
+    decides what is passed and in what order; ``spell`` says what the caller
+    calls each one, which is the only part that differs between call sites and
+    the only part that is emission's job.
+    """
+    return [spell(stream) for stream in streams]
+
+
 def _declare_stream(stream):
     """Spell one ``DataStreamPlan`` as a C parameter declaration.
 
@@ -4071,53 +4085,32 @@ def _operator_source(
                     )
                 )
                 pre_call_lines.extend(["        }", "    }"])
-                call_args.append("geom_metric")
-            else:
-                call_args.append("determinant")
-            if dependencies.uses_adjugate and gradient_metric is None:
-                call_args.append("adjugate")
-            if tensor_product:
-                call_args.append(
-                    quadrature_reference_accessor(
-                        prefix, ISOPARAMETRIC_MODE, "shape_1d", scalar_type
+            # The plan already decided which streams this kernel takes and in
+            # what order, for the signature.  The call reads the same plan
+            # rather than re-deriving it, so the two cannot disagree.
+            def spell(stream):
+                if stream.role is DataStreamRole.REFERENCE:
+                    return quadrature_reference_accessor(
+                        prefix, ISOPARAMETRIC_MODE, stream.name, scalar_type
                     )
+                return stream.name
+
+            call_args.extend(
+                _stream_call_arguments(
+                    local_kernel_stream_plans(
+                        dependencies,
+                        dim=dim,
+                        n_fields=n_fields,
+                        tensor_product=tensor_product,
+                        uses_gradient_metric=gradient_metric is not None,
+                        metric_components=symmetric_metric_component_count(dim),
+                        grad_ref_name=lambda d: sfem_simplex_grad_ref_name(
+                            "grad_ref", d
+                        ),
+                    ),
+                    spell,
                 )
-                if dependencies.uses_reference_gradients:
-                    call_args.append(
-                        quadrature_reference_accessor(
-                            prefix, ISOPARAMETRIC_MODE, "grad_1d", scalar_type
-                        )
-                    )
-                call_args.append(
-                    quadrature_reference_accessor(
-                        prefix, ISOPARAMETRIC_MODE, "q_weight_1d", scalar_type
-                    )
-                )
-            else:
-                call_args.append(
-                    quadrature_reference_accessor(prefix, ISOPARAMETRIC_MODE, "shape", scalar_type)
-                )
-                if dependencies.uses_reference_gradients:
-                    call_args.extend(
-                        quadrature_reference_accessor(
-                            prefix,
-                            ISOPARAMETRIC_MODE,
-                            sfem_simplex_grad_ref_name("grad_ref", d),
-                            scalar_type,
-                        )
-                        for d in range(dim)
-                    )
-                call_args.append(
-                    quadrature_reference_accessor(prefix, ISOPARAMETRIC_MODE, "q_weight", scalar_type)
-                )
-            if dependencies.current:
-                call_args.append("current")
-            if dependencies.previous:
-                call_args.append("previous")
-            if dependencies.direction:
-                call_args.append("direction")
-            call_args.extend(map(str, dependencies.parameters))
-            call_args.append("output")
+            )
             lines.extend(
                 [
                     ") {",
