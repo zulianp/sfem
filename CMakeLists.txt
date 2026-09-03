@@ -134,6 +134,8 @@ list(APPEND SFEM_MODULES
     frontend/ops/generated/laplace/op
     frontend/ops/generated/linear_elasticity
     frontend/ops/generated/linear_elasticity/op
+    frontend/ops/generated/saint_venant_kirchhoff
+    frontend/ops/generated/saint_venant_kirchhoff/op
     frontend/ops/generated/neohookean_ogden
     frontend/ops/generated/neohookean_ogden/op
     frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark

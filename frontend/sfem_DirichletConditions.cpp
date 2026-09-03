@@ -164,6 +164,33 @@ namespace sfem {
 
     int DirichletConditions::n_conditions() const { return impl_->conditions.size(); }
 
+    int DirichletConditions::set_time(const real_t time, const real_t global_scale) {
+        for (auto &c : impl_->conditions) {
+            if (!c.profile_initialized) {
+                c.base_value = c.value;
+                if (c.values) {
+                    c.base_values = create_host_buffer<real_t>(static_cast<ptrdiff_t>(c.values->size()));
+                    if (!c.base_values) return SFEM_FAILURE;
+                    std::memcpy(c.base_values->data(), c.values->data(), c.values->size() * sizeof(real_t));
+                }
+                c.profile_initialized = true;
+            }
+
+            const real_t scale = global_scale * c.profile.value(time);
+            if (c.values) {
+                const ptrdiff_t n      = static_cast<ptrdiff_t>(c.values->size());
+                const real_t   *base   = c.base_values->data();
+                real_t         *values = c.values->data();
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n; ++i) values[i] = scale * base[i];
+            } else {
+                c.value = scale * c.base_value;
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
     DirichletConditions::DirichletConditions(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
         impl_->space = space;
     }
@@ -359,6 +386,8 @@ namespace sfem {
                         }
                     }
 
+                    conds[i].values = values;
+
                 } else {
                     conds[i].value = atof(pch);
                 }
@@ -433,15 +462,32 @@ namespace sfem {
                 }
             }
 
-            std::vector<int>    component;
-            std::vector<real_t> value;
-            auto                node_value     = c["value"];
-            auto                node_component = c["component"];
+            std::vector<int>     component;
+            std::vector<real_t>  value;
+            SharedBuffer<real_t> file_values;
+            auto                 node_value     = c["value"];
+            auto                 node_component = c["component"];
 
             assert(node_value.readable());
             assert(node_component.readable());
 
-            if (node_value.is_seq()) {
+            if (node_value.is_map()) {
+                if (!node_value.has_child("path")) {
+                    SFEM_ERROR("File-backed Dirichlet value requires path\n");
+                    return nullptr;
+                }
+
+                std::string value_path;
+                node_value["path"] >> value_path;
+                file_values = Buffer<real_t>::from_file(smesh::Path(value_path));
+                if (!file_values || file_values->size() != nodeset->size()) {
+                    SFEM_ERROR("Dirichlet value file %s has %td entries; expected %td\n",
+                               value_path.c_str(),
+                               file_values ? static_cast<ptrdiff_t>(file_values->size()) : ptrdiff_t(0),
+                               static_cast<ptrdiff_t>(nodeset->size()));
+                    return nullptr;
+                }
+            } else if (node_value.is_seq()) {
                 node_value >> value;
             } else {
                 value.resize(1);
@@ -455,16 +501,27 @@ namespace sfem {
                 node_component >> component[0];
             }
 
-            if (component.size() != value.size()) {
-                SFEM_ERROR("Inconsistent sizes for component (%d) and value (%d)\n", (int)component.size(), (int)value.size());
+            if (file_values && component.size() != 1) {
+                SFEM_ERROR("A file-backed Dirichlet value requires exactly one component\n");
+                return nullptr;
             }
+
+            if (!file_values && component.size() != value.size()) {
+                SFEM_ERROR("Inconsistent sizes for component (%d) and value (%d)\n", (int)component.size(), (int)value.size());
+                return nullptr;
+            }
+
+            LoadProfile profile;
+            if (c.has_child("profile") && LoadProfile::from_yaml(c["profile"], profile) != SFEM_SUCCESS) return nullptr;
 
             for (size_t i = 0; i < component.size(); i++) {
                 struct Condition cdc;
                 cdc.component = component[i];
-                cdc.value     = value[i];
+                cdc.value     = file_values ? 0 : value[i];
+                cdc.values    = file_values;
                 cdc.sidesets.push_back(sideset);
                 cdc.nodeset = nodeset;
+                cdc.profile = profile;
                 dc->impl_->conditions.push_back(cdc);
             }
         }
@@ -668,4 +725,3 @@ namespace sfem {
 #endif
 
 }  // namespace sfem
-

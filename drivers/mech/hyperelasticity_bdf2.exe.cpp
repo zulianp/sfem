@@ -14,6 +14,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_NeumannConditions.hpp"
 #include "sfem_Rotate.hpp"
+#include "sfem_StateField.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_env.hpp"
 
@@ -55,8 +56,12 @@ namespace {
         real_t      lsolve_atol;
         bool        use_preconditioner;
 
-        real_t load_scale;
-        real_t load_ramp_time;
+        real_t      load_scale;
+        real_t      load_ramp_time;
+        std::string initial_displacement;
+        std::string initial_displacement_components;
+        std::string initial_velocity;
+        std::string initial_velocity_components;
 
         std::string control_point_csv;
         geom_t      control_point_x;
@@ -105,8 +110,12 @@ namespace {
             ret.lsolve_atol        = smesh::Env::read("SFEM_LSOLVE_ATOL", 1e-12);
             ret.use_preconditioner = smesh::Env::read("SFEM_USE_PRECONDITIONER", false);
 
-            ret.load_scale     = smesh::Env::read("SFEM_LOAD_SCALE", 1.0);
-            ret.load_ramp_time = smesh::Env::read("SFEM_LOAD_RAMP_TIME", 0.0);
+            ret.load_scale                      = smesh::Env::read("SFEM_LOAD_SCALE", 1.0);
+            ret.load_ramp_time                  = smesh::Env::read("SFEM_LOAD_RAMP_TIME", 0.0);
+            ret.initial_displacement            = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT", "");
+            ret.initial_displacement_components = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT_COMPONENTS", "");
+            ret.initial_velocity                = smesh::Env::read_string("SFEM_INITIAL_VELOCITY", "");
+            ret.initial_velocity_components     = smesh::Env::read_string("SFEM_INITIAL_VELOCITY_COMPONENTS", "");
 
             ret.control_point_csv = smesh::Env::read_string("SFEM_CONTROL_POINT_CSV", "");
             ret.control_point_x   = (geom_t)smesh::Env::read("SFEM_CONTROL_POINT_X", 0.0);
@@ -200,6 +209,23 @@ namespace {
         return env.load_scale * ramp_value;
     }
 
+    int read_initial_state(const std::shared_ptr<sfem::Mesh> &mesh,
+                           const std::string                 &full_path,
+                           const std::string                 &component_paths,
+                           real_t *const                      state) {
+        if (!full_path.empty() && !component_paths.empty()) {
+            SFEM_ERROR("Specify either a full initial-state file or component files, not both\n");
+            return SFEM_FAILURE;
+        }
+        if (!full_path.empty()) {
+            return sfem::read_state_field(full_path, mesh->n_nodes() * mesh->spatial_dimension(), state);
+        }
+        if (!component_paths.empty()) {
+            return sfem::read_state_field_components(component_paths, mesh->n_nodes(), mesh->spatial_dimension(), state);
+        }
+        return SFEM_SUCCESS;
+    }
+
     std::shared_ptr<sfem::RotateYZ> create_rotate_conditions(const std::shared_ptr<sfem::FunctionSpace> &fs,
                                                              const EnvOptions                           &env) {
         if (env.rotate_sideset.empty()) {
@@ -218,19 +244,6 @@ namespace {
         ret->rcenter[2] = env.rotate_rcenter[2];
         ret->create_constraint();
         return ret;
-    }
-
-    void scale_neumann_values(const std::shared_ptr<sfem::NeumannConditions> &neumann,
-                              const std::vector<real_t>                      &base_values,
-                              const real_t                                    scale) {
-        if (!neumann) {
-            return;
-        }
-
-        auto &conditions = neumann->conditions();
-        for (size_t i = 0; i < conditions.size(); ++i) {
-            conditions[i].value = scale * base_values[i];
-        }
     }
 
     real_t dot_host(const ptrdiff_t n, const real_t *const a, const real_t *const b) {
@@ -418,8 +431,10 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     }
     f->add_operator(inertia_op);
 
+    std::shared_ptr<sfem::DirichletConditions> dirichlet_conditions;
     if (dirichlet_path.to_string() != "NONE") {
-        auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+        dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+        if (!dirichlet_conditions) return SFEM_FAILURE;
         f->add_constraint(dirichlet_conditions);
     }
 
@@ -429,13 +444,9 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     }
 
     std::shared_ptr<sfem::NeumannConditions> neumann_conditions;
-    std::vector<real_t>                      neumann_base_values;
     if (neumann_path.to_string() != "NONE") {
         neumann_conditions = sfem::NeumannConditions::create_from_file(fs, neumann_path);
-        neumann_base_values.reserve(neumann_conditions->conditions().size());
-        for (const auto &condition : neumann_conditions->conditions()) {
-            neumann_base_values.push_back(condition.value);
-        }
+        if (!neumann_conditions) return SFEM_FAILURE;
         f->add_operator(neumann_conditions);
     }
 
@@ -453,6 +464,21 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     auto incr  = sfem::create_host_buffer<real_t>(ndofs);
 
     auto u_hat = inertia_op->u_hat();
+    blas->zeros(ndofs, u_nm1->data());
+    blas->zeros(ndofs, u_n->data());
+    blas->zeros(ndofs, u->data());
+    blas->zeros(ndofs, v_nm1->data());
+    blas->zeros(ndofs, v_n->data());
+    blas->zeros(ndofs, v->data());
+    blas->zeros(ndofs, a->data());
+    if (read_initial_state(mesh, env.initial_displacement, env.initial_displacement_components, u_n->data()) != SFEM_SUCCESS)
+        return SFEM_FAILURE;
+    if (read_initial_state(mesh, env.initial_velocity, env.initial_velocity_components, v_n->data()) != SFEM_SUCCESS)
+        return SFEM_FAILURE;
+    blas->copy(ndofs, u_n->data(), u_nm1->data());
+    blas->copy(ndofs, u_n->data(), u->data());
+    blas->copy(ndofs, v_n->data(), v_nm1->data());
+    if (dirichlet_conditions && dirichlet_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
     f->apply_constraints(u_n->data());
     f->apply_constraints(u_nm1->data());
     f->apply_constraints(u->data());
@@ -524,7 +550,8 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             rotate_conds->update(step);
         }
 
-        scale_neumann_values(neumann_conditions, neumann_base_values, load_factor(env, t));
+        if (dirichlet_conditions && dirichlet_conditions->set_time(t) != SFEM_SUCCESS) return SFEM_FAILURE;
+        if (neumann_conditions && neumann_conditions->set_time(t, load_factor(env, t)) != SFEM_SUCCESS) return SFEM_FAILURE;
 
         if (step == 1) {
             inertia_op->set_alpha(1 / (env.dt * env.dt));

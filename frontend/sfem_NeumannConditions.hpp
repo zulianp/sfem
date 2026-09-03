@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "sfem_ForwardDeclarations.hpp"
+#include "sfem_LoadProfile.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
@@ -26,9 +27,13 @@ namespace sfem {
             std::vector<std::shared_ptr<Sideset>> sidesets;  /// Maybe empty in certain cases
             SharedBuffer<idx_t *>                 surface;
             SharedBuffer<real_t>                  values;
+            SharedBuffer<real_t>                  base_values;
             real_t                                value{0};
+            real_t                                base_value{0};
             int                                   component{0};
             bool                                  follower_pressure{false};
+            LoadProfile                           profile;
+            bool                                  profile_initialized{false};
         };
 
         static std::shared_ptr<NeumannConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
@@ -72,11 +77,12 @@ namespace sfem {
         int hessian_diag(const real_t *const x, real_t *const values) override;
         int hessian_block_diag_sym(const real_t *const, real_t *const) override { return SFEM_SUCCESS; }
 
-        inline bool is_linear() const override { return true; }
-        ptrdiff_t   n_dofs_domain() const override;
-        ptrdiff_t   n_dofs_image() const override;
+        bool      is_linear() const override;
+        ptrdiff_t n_dofs_domain() const override;
+        ptrdiff_t n_dofs_image() const override;
 
         int                            n_conditions() const;
+        int                            set_time(real_t time, real_t global_scale = 1);
         std::shared_ptr<FunctionSpace> space();
         std::vector<struct Condition> &conditions();
 

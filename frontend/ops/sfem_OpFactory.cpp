@@ -29,6 +29,11 @@
 #include "sfem_SpectralElementLaplacian.hpp"
 #include "sfem_VectorLaplacian.hpp"
 
+#ifdef SFEM_ENABLE_RYAML
+#include <c4/format.hpp>
+#include <ryml_std.hpp>
+#endif
+
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
 #endif
@@ -158,13 +163,28 @@ namespace sfem {
     std::string d_op_str(const std::string &name) { return "gpu:" + name; }
 
 #ifdef SFEM_ENABLE_RYAML
-    static std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
-                                                   const ryml::ConstNodeRef             &node,
-                                                   const ExecutionSpace                  es) {
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            const ryml::ConstNodeRef             &node,
+                                            const ExecutionSpace                  es) {
         std::string name;
         node["type"] >> name;
 
-        return create_op(space, name.c_str(), es);
+        auto prototype = create_op(space, name.c_str(), es);
+        if (!prototype) return nullptr;
+        return prototype->create_from_yaml(space, node);
+    }
+
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            std::string                           yaml,
+                                            const ExecutionSpace                  es) {
+        ryml::Tree tree = ryml::parse_in_place(ryml::to_substr(yaml));
+        auto       root = tree.rootref();
+        auto       node = root.has_child("operator") ? root["operator"] : root;
+        if (!node.has_child("type")) {
+            SFEM_ERROR("Operator YAML requires a type\n");
+            return nullptr;
+        }
+        return create_op_from_yaml(space, node, es);
     }
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem

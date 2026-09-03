@@ -8,6 +8,7 @@
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
+#include "sfem_StateField.hpp"
 #include "smesh_env.hpp"
 
 #include "sfem_ssgmg.hpp"
@@ -51,8 +52,11 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     auto fs = sfem::FunctionSpace::create(m, m->spatial_dimension());
     auto f  = sfem::Function::create(fs);
 
+    std::shared_ptr<sfem::DirichletConditions> dirichlet_conditions;
     if (dirichlet_path.to_string() != "NONE") {
-        auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+        dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+        if (!dirichlet_conditions) return SFEM_FAILURE;
+        if (dirichlet_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             f->add_constraint(sfem::to_device(dirichlet_conditions));
         } else {
@@ -60,8 +64,11 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
         }
     }
 
+    std::shared_ptr<sfem::NeumannConditions> neumann_conditions;
     if (neumann_path.to_string() != "NONE") {
-        auto neumann_conditions = sfem::NeumannConditions::create_from_file(fs, neumann_path);
+        neumann_conditions = sfem::NeumannConditions::create_from_file(fs, neumann_path);
+        if (!neumann_conditions) return SFEM_FAILURE;
+        if (neumann_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
         if (es == sfem::EXECUTION_SPACE_DEVICE) {
             f->add_operator(sfem::to_device(neumann_conditions));
         } else {
@@ -101,6 +108,39 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     blas->zeros(ndofs, increment->data());
     blas->zeros(ndofs, temp_vel->data());
     blas->zeros(ndofs, g->data());
+
+    const std::string initial_displacement            = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT", "");
+    const std::string initial_displacement_components = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT_COMPONENTS", "");
+    const std::string initial_velocity                = smesh::Env::read_string("SFEM_INITIAL_VELOCITY", "");
+    const std::string initial_velocity_components     = smesh::Env::read_string("SFEM_INITIAL_VELOCITY_COMPONENTS", "");
+
+    auto read_initial = [&](const std::string &full_path, const std::string &component_paths, auto &state) -> int {
+        if (full_path.empty() && component_paths.empty()) return SFEM_SUCCESS;
+        if (!full_path.empty() && !component_paths.empty()) {
+            SFEM_ERROR("Specify either a full initial-state file or component files, not both\n");
+            return SFEM_FAILURE;
+        }
+        auto      host   = sfem::create_host_buffer<real_t>(ndofs);
+        const int status = !full_path.empty() ? sfem::read_state_field(full_path, ndofs, host->data())
+                                              : sfem::read_state_field_components(
+                                                        component_paths, m->n_nodes(), m->spatial_dimension(), host->data());
+        if (status != SFEM_SUCCESS) return status;
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            state = smesh::to_device(host);
+            return SFEM_SUCCESS;
+        }
+#endif
+        blas->copy(ndofs, host->data(), state->data());
+        return SFEM_SUCCESS;
+    };
+
+    if (read_initial(initial_displacement, initial_displacement_components, displacement) != SFEM_SUCCESS ||
+        read_initial(initial_velocity, initial_velocity_components, velocity) != SFEM_SUCCESS)
+        return SFEM_FAILURE;
+    if (dirichlet_conditions && dirichlet_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
+    f->apply_constraints(displacement->data());
+    blas->copy(ndofs, displacement->data(), solution->data());
 
     // Time integration parameters
     real_t dt          = smesh::Env::read("SFEM_DT", 0.1);
@@ -185,6 +225,11 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
 
     // Time loop
     while (t < T) {
+        const real_t next_time = std::min<real_t>(t + dt, T);
+        if (es == sfem::EXECUTION_SPACE_HOST) {
+            if (dirichlet_conditions && dirichlet_conditions->set_time(next_time) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (neumann_conditions && neumann_conditions->set_time(next_time) != SFEM_SUCCESS) return SFEM_FAILURE;
+        }
         for (int k = 0; k < nliter; k++) {
             // Use increment as temp buffer
             blas->zeros(ndofs, increment->data());
