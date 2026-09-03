@@ -55,6 +55,8 @@ namespace {
                      "  SFEM_NL_MAX_IT SFEM_NL_RTOL SFEM_NL_ATOL\n"
                      "  SFEM_LSOLVE_RTOL SFEM_LSOLVE_ATOL SFEM_LSOLVE_MAX_IT\n"
                      "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
+                     "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default 0 = assembled BSR)\n"
+                     "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
                      "  SFEM_VERIFY_TOL      fail if velocity Linf exceeds this (default 1e-2)\n",
                      argv0);
     }
@@ -181,6 +183,14 @@ int main(int argc, char **argv) {
     const real_t      lin_atol   = smesh::Env::read<real_t>("SFEM_LSOLVE_ATOL", 1e-14);
     const int         lin_max_it = smesh::Env::read<int>("SFEM_LSOLVE_MAX_IT", 1000);
     const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
+    // 1: the Krylov method applies J(u)v through the operator's own kernels. 0: assemble
+    // a BSR once per Newton step and hand the Krylov method an SpMV. Which is faster is
+    // the question this driver exists to answer at each level -- see the timing
+    // breakdown printed at the end.
+    const int         matrix_free = smesh::Env::read<int>("SFEM_MATRIX_FREE", 0);
+    // Compares J_mf v against J_asm v once, on the first Jacobian. The two paths must
+    // agree before any timing comparison between them means anything.
+    const int         check_jv    = smesh::Env::read<int>("SFEM_CHECK_JV", 0);
     const real_t      verify_tol = smesh::Env::read<real_t>("SFEM_VERIFY_TOL", 1e-2);
 
     FlowCase flow;
@@ -331,6 +341,19 @@ int main(int argc, char **argv) {
     const real_t rho_re1 = mu / std::max(U * Ly, real_t(1e-30));
     const int    n_stages = (rho == real_t(0) || Re_phys <= real_t(1.5)) ? 1 : 2;
 
+    double t_op    = 0;  // building the Jacobian operator (assembly, or nothing)
+    double t_prec  = 0;  // building the block-Jacobi preconditioner
+    double t_solve = 0;  // the Krylov solve itself
+
+    // Matrix-free reads the state buffer on every apply, so one operator tracks Newton
+    // for the whole solve. The assembled one is a snapshot and has to be rebuilt.
+    std::shared_ptr<sfem::Operator<real_t>> mf_op;
+    if (matrix_free) {
+        const double t0 = smesh::time_seconds();
+        mf_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+        t_op += smesh::time_seconds() - t0;
+    }
+
     int  newton_it    = 0;
     int  lin_it_total = 0;
     bool converged    = false;
@@ -374,15 +397,47 @@ int main(int argc, char **argv) {
         for (ptrdiff_t i = 0; i < ndof; ++i) rhs[(size_t)i] = -r[(size_t)i];
         std::fill(dx.begin(), dx.end(), real_t(0));
 
-        // Rebuilt each step: the operator assembles at construction, so it would
-        // otherwise hold the Jacobian at the initial state for the whole solve.
-        auto linop  = sfem::create_linear_operator(sfem::op_type::BSR, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+        // The assembled operator is a snapshot of the Jacobian at construction, so it is
+        // rebuilt each step; the matrix-free one reads the live state and is not.
+        std::shared_ptr<sfem::Operator<real_t>> linop = mf_op;
+        {
+            const double t0 = smesh::time_seconds();
+            if (!matrix_free)
+                linop = sfem::create_linear_operator(sfem::op_type::BSR, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+            t_op += smesh::time_seconds() - t0;
+        }
+
+        if (check_jv) {
+            auto asm_op = sfem::create_linear_operator(sfem::op_type::BSR, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+            auto mf     = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, xbuf, sfem::EXECUTION_SPACE_HOST);
+            std::vector<real_t> v((size_t)ndof), ya((size_t)ndof, 0), ym((size_t)ndof, 0);
+            for (ptrdiff_t i = 0; i < ndof; ++i) v[(size_t)i] = std::sin(real_t(0.7) * real_t(i) + real_t(0.3));
+            asm_op->apply(v.data(), ya.data());
+            mf->apply(v.data(), ym.data());
+            real_t dmax = 0, amax = 0, uinf = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i)
+                for (int c = 0; c < 3; ++c) uinf = std::max(uinf, std::fabs(x[(size_t)i * 4 + c]));
+            for (ptrdiff_t i = 0; i < ndof; ++i) {
+                dmax = std::max(dmax, std::fabs(ya[(size_t)i] - ym[(size_t)i]));
+                amax = std::max(amax, std::fabs(ya[(size_t)i]));
+            }
+            std::printf("check_jv[newton %d]: rel=%.6e  |u|_inf=%.3e\n", newton_it, (amax > 0) ? dmax / amax : dmax, uinf);
+        }
+
         auto solver = sfem::create_bcgs<real_t>(linop, sfem::EXECUTION_SPACE_HOST);
         solver->set_max_it(lin_max_it);
         solver->set_rtol(lin_rtol);
         solver->set_atol(lin_atol);
-        solver->set_preconditioner_op(make_block_jacobi(*op, x, cmask.data(), nnodes));
-        solver->apply(rhs.data(), dx.data());
+        {
+            const double t0 = smesh::time_seconds();
+            solver->set_preconditioner_op(make_block_jacobi(*op, x, cmask.data(), nnodes));
+            t_prec += smesh::time_seconds() - t0;
+        }
+        {
+            const double t0 = smesh::time_seconds();
+            solver->apply(rhs.data(), dx.data());
+            t_solve += smesh::time_seconds() - t0;
+        }
         lin_it_total += solver->iterations();
 
         real_t dxinf = 0;
@@ -396,6 +451,12 @@ int main(int argc, char **argv) {
     }
 
     std::printf("newton_converged: %d  newton_it: %d  lin_it_total: %d\n", converged ? 1 : 0, newton_it, lin_it_total);
+    std::printf("matrix_free: %d  t_operator: %.4f s  t_precond: %.4f s  t_solve: %.4f s  us_per_lin_it: %.2f\n",
+                matrix_free,
+                t_op,
+                t_prec,
+                t_solve,
+                lin_it_total ? 1e6 * t_solve / lin_it_total : 0.0);
 
     // Verification against the analytic profile, on the free nodes only, matching what
     // the standalone driver reports.
