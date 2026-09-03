@@ -55,7 +55,7 @@ namespace {
                      "  SFEM_NL_MAX_IT SFEM_NL_RTOL SFEM_NL_ATOL\n"
                      "  SFEM_LSOLVE_RTOL SFEM_LSOLVE_ATOL SFEM_LSOLVE_MAX_IT\n"
                      "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
-                     "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default 0 = assembled BSR)\n"
+                     "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default); 0: assembled BSR\n"
                      "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
                      "  SFEM_VERIFY_TOL      fail if velocity Linf exceeds this (default 1e-2)\n",
                      argv0);
@@ -183,11 +183,13 @@ int main(int argc, char **argv) {
     const real_t      lin_atol   = smesh::Env::read<real_t>("SFEM_LSOLVE_ATOL", 1e-14);
     const int         lin_max_it = smesh::Env::read<int>("SFEM_LSOLVE_MAX_IT", 1000);
     const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
-    // 1: the Krylov method applies J(u)v through the operator's own kernels. 0: assemble
-    // a BSR once per Newton step and hand the Krylov method an SpMV. Which is faster is
-    // the question this driver exists to answer at each level -- see the timing
-    // breakdown printed at the end.
-    const int         matrix_free = smesh::Env::read<int>("SFEM_MATRIX_FREE", 0);
+    // Matrix-free by default. 0 assembles a BSR once per Newton step and hands the
+    // Krylov method an SpMV instead; that path stays fully supported and gated, and at
+    // p=1 it is still the faster of the two -- see the timing breakdown printed at the
+    // end. The default reflects where the work is going, not where it is today: the
+    // semi-structured hierarchy is what makes the matrix-free apply worth having, and
+    // an assembled BSR per level is exactly the memory the hierarchy exists to avoid.
+    const int         matrix_free = smesh::Env::read<int>("SFEM_MATRIX_FREE", 1);
     // Compares J_mf v against J_asm v once, on the first Jacobian. The two paths must
     // agree before any timing comparison between them means anything.
     const int         check_jv    = smesh::Env::read<int>("SFEM_CHECK_JV", 0);
