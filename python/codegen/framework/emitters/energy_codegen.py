@@ -967,6 +967,77 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     )
 
 
+class _BlockKernelInputs:
+    """What both element block kernels need before they diverge.
+
+    Computed once by the dispatcher and handed to whichever kernel the form
+    turns out to be, so the two do not each re-derive it.
+    """
+
+    __slots__ = (
+        "name",
+        "work_item",
+        "element_inputs",
+        "reference_inputs",
+        "use_tensor_product_reference",
+        "use_reference_gradient_vectors",
+        "stream_shape_order",
+        "uses_current",
+        "uses_direction",
+        "source_builder",
+    )
+
+    def __init__(self, **fields):
+        for field in self.__slots__:
+            setattr(self, field, fields[field])
+
+
+def _sfem_soa_block_signature_lines(name, params, source_builder):
+    """The template header, parameter list and asserts both kernels open with."""
+    lines = [
+        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
+        "static %s void %s(" % (_inline_qualifier(source_builder), name),
+    ]
+    for idx, param in enumerate(params):
+        comma = "," if idx + 1 < len(params) else ""
+        lines.append("        %s%s" % (param, comma))
+    lines.extend(
+        [
+            ") {",
+            '    static_assert(N_QP > 0, \"N_QP must be positive\");',
+            '    static_assert(VECTOR_SIZE > 0, \"VECTOR_SIZE must be positive\");',
+        ]
+    )
+    return lines
+
+
+def _sfem_soa_element_stream_params(shared):
+    """One parameter per stream of every element input."""
+    return [
+        "const %s *const SFEM_RESTRICT %s" % (array_input.scalar_type, stream)
+        for array_input in shared.element_inputs
+        for stream in _soa_array_stream_names(array_input)
+    ]
+
+
+def _sfem_soa_reference_basis_params(dim, shared, omit_reference_basis_inputs):
+    """The reference basis a block kernel is handed, in its four shapes."""
+    if omit_reference_basis_inputs:
+        return []
+    if shared.use_tensor_product_reference:
+        return [
+            "const scalar_t *const SFEM_RESTRICT shape_1d",
+            "const scalar_t *const SFEM_RESTRICT grad_1d",
+        ]
+    if shared.use_reference_gradient_vectors:
+        return list(_sfem_reference_gradient_vector_params(dim))
+    return [
+        "const %s *const SFEM_RESTRICT %s"
+        % (array_input.scalar_type, _sfem_soa_reference_param_name(array_input))
+        for array_input in shared.reference_inputs
+    ]
+
+
 def _sfem_soa_block_function(
     form,
     prefix,
@@ -980,101 +1051,122 @@ def _sfem_soa_block_function(
     function_name=None,
     constant_p1_gradient_expansion=False,
 ):
+    """Emit one element block kernel, of whichever kind this form is.
+
+    Two kernels have always lived behind this name and the form decides which.
+    A form carrying a lowered weak form becomes a quadrature kernel: it takes a
+    geometry stride and an array of quadrature weights, and its body comes from
+    the weak-form emitters.  A form without one becomes the older per-point
+    kernel: it takes a quadrature index and a single scalar weight, gathers its
+    inputs into local arrays, and evaluates an expression graph.  They share a
+    signature shape and little else -- they do not even return the same thing,
+    one a list of lines and the other a printed IR function.
+
+    ``form.weak_form is not None`` used to be asked thirteen times through a
+    single three-hundred-line body, which is what made the two hard to see.  It
+    is asked once, here.  Each kernel then knows which one it is, and the
+    conditions that followed collapse: the per-point kernel cannot have stream
+    arrays and cannot omit its reference basis, because both are weak-form-only,
+    and it no longer has to say so.
+    """
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
-    work_item = _work_item_index(source_builder)
-    name = function_name or "%s_%s_block" % (prefix, form.name)
-    element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     use_tensor_product_reference = _use_tensor_product_reference(
         quadrature_rule,
         reference_inputs,
         basis_family,
     )
-    use_reference_gradient_vectors = (
-        not use_tensor_product_reference
-        and len(reference_inputs) == 1
-        and reference_inputs[0].name == "grad_ref"
+    shared = _BlockKernelInputs(
+        name=function_name or "%s_%s_block" % (prefix, form.name),
+        work_item=_work_item_index(source_builder),
+        element_inputs=_sfem_soa_element_inputs(array_inputs),
+        reference_inputs=reference_inputs,
+        use_tensor_product_reference=use_tensor_product_reference,
+        use_reference_gradient_vectors=(
+            not use_tensor_product_reference
+            and len(reference_inputs) == 1
+            and reference_inputs[0].name == "grad_ref"
+        ),
+        stream_shape_order=(
+            _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
+            if use_tensor_product_reference
+            else tuple(range(n_nodes))
+        ),
+        uses_current=_form_uses_current(form, default=True),
+        uses_direction=_form_uses_direction(form, default=form.has_direction),
+        source_builder=source_builder,
     )
+    if form.weak_form is None:
+        return _sfem_soa_pointwise_block_function(
+            form,
+            dim,
+            n_nodes,
+            array_inputs,
+            quadrature_rule,
+            shared,
+        )
+    return _sfem_soa_weak_form_block_function(
+        form,
+        prefix,
+        dim,
+        n_nodes,
+        quadrature_rule,
+        shared,
+        use_shared_weak_local=use_shared_weak_local,
+        constant_p1_gradient_expansion=constant_p1_gradient_expansion,
+    )
+
+
+def _sfem_soa_weak_form_block_function(
+    form,
+    prefix,
+    dim,
+    n_nodes,
+    quadrature_rule,
+    shared,
+    use_shared_weak_local=False,
+    constant_p1_gradient_expansion=False,
+):
+    """The quadrature kernel: a form with a lowered weak form."""
+    source_builder = shared.source_builder
+    use_stream_arrays = use_shared_weak_local
     omit_reference_basis_inputs = (
-        constant_p1_gradient_expansion
-        and form.weak_form is not None
-        and not use_tensor_product_reference
+        constant_p1_gradient_expansion and not shared.use_tensor_product_reference
     )
-    use_stream_arrays = use_shared_weak_local and form.weak_form is not None
-    uses_current = _form_uses_current(form, default=True)
-    uses_direction = _form_uses_direction(form, default=form.has_direction)
-    stream_shape_order = (
-        _tensor_product_stream_shape_order(quadrature_rule, dim, n_nodes)
-        if use_tensor_product_reference
-        else tuple(range(n_nodes))
-    )
-    identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
-    params = ["const int nelems"]
-    if form.weak_form is not None:
-        params.append("const ptrdiff_t geometry_stride")
-    else:
-        params.append("const int q")
+
+    params = ["const int nelems", "const ptrdiff_t geometry_stride"]
+    params.extend(_sfem_soa_element_stream_params(shared))
     params.extend(
-        "const %s *const SFEM_RESTRICT %s" % (array_input.scalar_type, stream)
-        for array_input in element_inputs
-        for stream in _soa_array_stream_names(array_input)
+        _sfem_soa_reference_basis_params(dim, shared, omit_reference_basis_inputs)
     )
-    if omit_reference_basis_inputs:
-        pass
-    elif use_tensor_product_reference:
-        params.extend(
-            (
-                "const scalar_t *const SFEM_RESTRICT shape_1d",
-                "const scalar_t *const SFEM_RESTRICT grad_1d",
-            )
-        )
-    elif use_reference_gradient_vectors:
-        params.extend(_sfem_reference_gradient_vector_params(dim))
+    if shared.use_tensor_product_reference:
+        params.append("const scalar_t *const SFEM_RESTRICT q_weight_1d")
     else:
-        params.extend(
-            "const %s *const SFEM_RESTRICT %s"
-            % (array_input.scalar_type, _sfem_soa_reference_param_name(array_input))
-            for array_input in reference_inputs
-        )
-    if form.weak_form is not None:
-        if use_tensor_product_reference:
-            params.append("const scalar_t *const SFEM_RESTRICT q_weight_1d")
-        else:
-            params.append("const scalar_t *const SFEM_RESTRICT q_weight")
-    else:
-        params.append("const scalar_t qw")
+        params.append("const scalar_t *const SFEM_RESTRICT q_weight")
     params.extend(_form_material_parameter_declarations(form))
     if use_stream_arrays:
-        if uses_current:
-            params.extend(
-                (
-                    "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % dim,
-                )
+        if shared.uses_current:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % dim
             )
-        if uses_direction:
-            params.extend(
-                (
-                    "const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * %d]"
-                    % dim,
-                )
+        if shared.uses_direction:
+            params.append(
+                "const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * %d]" % dim
             )
         if form.name == "objective":
-            params.extend(("scalar_t *const SFEM_RESTRICT value",))
+            params.append("scalar_t *const SFEM_RESTRICT value")
         else:
-            params.extend(
-                (
-                    "scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * %d]"
-                    % dim,
-                )
+            params.append(
+                "scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * %d]" % dim
             )
     else:
-        if uses_current:
+        if shared.uses_current:
             params.extend(
                 "const scalar_t *const SFEM_RESTRICT %s" % name
                 for name in _field_stream_names("u", dim, n_nodes)
             )
-        if uses_direction:
+        if shared.uses_direction:
             params.extend(
                 "const scalar_t *const SFEM_RESTRICT %s" % name
                 for name in _field_stream_names("h", dim, n_nodes)
@@ -1084,26 +1176,13 @@ def _sfem_soa_block_function(
             for name in _output_stream_names(form, dim, n_nodes)
         )
 
-    lines = [
-        "template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>",
-        "static %s void %s(" % (_inline_qualifier(source_builder), name),
-    ]
-    for idx, param in enumerate(params):
-        comma = "," if idx + 1 < len(params) else ""
-        lines.append("        %s%s" % (param, comma))
-    lines.extend(
-        [
-            ") {",
-            "    static_assert(N_QP > 0, \"N_QP must be positive\");",
-            "    static_assert(VECTOR_SIZE > 0, \"VECTOR_SIZE must be positive\");",
-        ]
-    )
+    lines = _sfem_soa_block_signature_lines(shared.name, params, source_builder)
     if not use_stream_arrays:
         lines.append(
-            "    static_assert(N_SHAPE == %d, \"N_SHAPE does not match generated expression\");"
+            '    static_assert(N_SHAPE == %d, \"N_SHAPE does not match generated expression\");'
             % n_nodes
         )
-    if use_tensor_product_reference:
+    if shared.use_tensor_product_reference:
         if use_stream_arrays:
             lines.extend(
                 [
@@ -1111,9 +1190,9 @@ def _sfem_soa_block_function(
                     % quadrature_rule.dim,
                     "    static constexpr int N_SHAPE_1D = integer_root(N_SHAPE, %d);"
                     % quadrature_rule.dim,
-                    "    static_assert(ipow(N_QP_1D, %d) == N_QP, \"N_QP must be tensor-product compatible\");"
+                    '    static_assert(ipow(N_QP_1D, %d) == N_QP, \"N_QP must be tensor-product compatible\");'
                     % quadrature_rule.dim,
-                    "    static_assert(ipow(N_SHAPE_1D, %d) == N_SHAPE, \"N_SHAPE must be tensor-product compatible\");"
+                    '    static_assert(ipow(N_SHAPE_1D, %d) == N_SHAPE, \"N_SHAPE must be tensor-product compatible\");'
                     % quadrature_rule.dim,
                 ]
             )
@@ -1126,9 +1205,7 @@ def _sfem_soa_block_function(
                     % quadrature_rule.tensor_product_n_shape_1d,
                 ]
             )
-        if form.weak_form is None:
-            lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "    "))
-    if form.weak_form is not None and not use_stream_arrays and uses_current:
+    if not use_stream_arrays and shared.uses_current:
         lines.append(
             "    const scalar_t *const weak_u_streams[N_SHAPE * %d] = {%s};"
             % (
@@ -1137,12 +1214,12 @@ def _sfem_soa_block_function(
                     streams_in_shape_order(
                         _field_stream_names("u", dim, n_nodes),
                         dim,
-                        stream_shape_order,
+                        shared.stream_shape_order,
                     )
                 ),
             )
         )
-    if form.weak_form is not None and not use_stream_arrays and uses_direction:
+    if not use_stream_arrays and shared.uses_direction:
         lines.append(
             "    const scalar_t *const weak_h_streams[N_SHAPE * %d] = {%s};"
             % (
@@ -1151,12 +1228,12 @@ def _sfem_soa_block_function(
                     streams_in_shape_order(
                         _field_stream_names("h", dim, n_nodes),
                         dim,
-                        stream_shape_order,
+                        shared.stream_shape_order,
                     )
                 ),
             )
         )
-    if form.weak_form is not None and not use_stream_arrays and form.name != "objective":
+    if not use_stream_arrays and form.name != "objective":
         lines.append(
             "    scalar_t *const weak_out_streams[N_SHAPE * %d] = {%s};"
             % (
@@ -1165,12 +1242,12 @@ def _sfem_soa_block_function(
                     streams_in_shape_order(
                         _output_stream_names(form, dim, n_nodes),
                         dim,
-                        stream_shape_order,
+                        shared.stream_shape_order,
                     )
                 ),
             )
         )
-    if form.weak_form is not None and use_tensor_product_reference:
+    if shared.use_tensor_product_reference:
         _append_sfem_soa_tensor_weak_form_lines(
             lines,
             form,
@@ -1182,13 +1259,83 @@ def _sfem_soa_block_function(
         lines.append("}")
         return lines
 
-    if form.weak_form is None:
-        lines.extend(_work_item_loop_lines(source_builder, "    "))
-    if form.weak_form is None:
-        lines.append("        scalar_t u[N_SHAPE * %d];" % dim)
+    _append_sfem_soa_weak_form_lines(
+        lines,
+        form,
+        prefix,
+        dim,
+        n_nodes,
+        shared.reference_inputs,
+        shared.use_tensor_product_reference,
+        quadrature_rule,
+        use_stream_arrays,
+        source_builder,
+        constant_p1_gradient_expansion=constant_p1_gradient_expansion,
+    )
+    lines.append("}")
+    return lines
+
+
+def _sfem_soa_pointwise_block_function(
+    form,
+    dim,
+    n_nodes,
+    array_inputs,
+    quadrature_rule,
+    shared,
+):
+    """The per-point kernel: a form with no lowered weak form.
+
+    Takes one quadrature index and one weight, gathers every input into a local
+    array, and evaluates the expression graph.  Stream arrays and an omitted
+    reference basis are weak-form-only, so neither appears here.
+    """
+    source_builder = shared.source_builder
+    work_item = shared.work_item
+
+    params = ["const int nelems", "const int q"]
+    params.extend(_sfem_soa_element_stream_params(shared))
+    params.extend(
+        _sfem_soa_reference_basis_params(
+            dim, shared, omit_reference_basis_inputs=False
+        )
+    )
+    params.append("const scalar_t qw")
+    params.extend(_form_material_parameter_declarations(form))
+    if shared.uses_current:
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % name
+            for name in _field_stream_names("u", dim, n_nodes)
+        )
+    if shared.uses_direction:
+        params.extend(
+            "const scalar_t *const SFEM_RESTRICT %s" % name
+            for name in _field_stream_names("h", dim, n_nodes)
+        )
+    params.extend(
+        "scalar_t *const SFEM_RESTRICT %s" % name
+        for name in _output_stream_names(form, dim, n_nodes)
+    )
+
+    lines = _sfem_soa_block_signature_lines(shared.name, params, source_builder)
+    lines.append(
+        '    static_assert(N_SHAPE == %d, \"N_SHAPE does not match generated expression\");'
+        % n_nodes
+    )
+    if shared.use_tensor_product_reference:
+        lines.extend(
+            [
+                "    static constexpr int N_QP_1D = %d;"
+                % quadrature_rule.tensor_product_n_qp_1d,
+                "    static constexpr int N_SHAPE_1D = %d;"
+                % quadrature_rule.tensor_product_n_shape_1d,
+            ]
+        )
+        lines.extend(_tensor_product_q_index_lines(quadrature_rule.dim, "    "))
+
+    lines.extend(_work_item_loop_lines(source_builder, "    "))
+    lines.append("        scalar_t u[N_SHAPE * %d];" % dim)
     for array_input in array_inputs:
-        if form.weak_form is not None:
-            continue
         if array_input.is_reference_qp_shape:
             array_decl = "%s %s[N_SHAPE * %d];" % (
                 array_input.scalar_type,
@@ -1202,23 +1349,21 @@ def _sfem_soa_block_function(
                 array_input.local_size,
             )
         lines.append("        %s" % array_decl)
-    if form.has_direction and form.weak_form is None:
+    if form.has_direction:
         lines.append("        scalar_t du[N_SHAPE * %d];" % dim)
 
-    if form.weak_form is None:
-        for array_input in element_inputs:
-            for i, stream in enumerate(_soa_array_stream_names(array_input)):
-                lines.append("        %s[%d] = %s[%s];" % (array_input.name, i, stream, work_item))
-    if form.weak_form is not None:
-        pass
-    elif use_tensor_product_reference:
+    for array_input in shared.element_inputs:
+        for i, stream in enumerate(_soa_array_stream_names(array_input)):
+            lines.append("        %s[%d] = %s[%s];" % (array_input.name, i, stream, work_item))
+
+    if shared.use_tensor_product_reference:
         _append_tensor_product_reference_gradient_lines(
             lines,
-            reference_inputs[0].name,
+            shared.reference_inputs[0].name,
             quadrature_rule,
         )
-    elif use_reference_gradient_vectors:
-        array_input = reference_inputs[0]
+    elif shared.use_reference_gradient_vectors:
+        array_input = shared.reference_inputs[0]
         for shape in range(array_input.n_shape):
             for component in range(array_input.components):
                 local_idx = shape * array_input.components + component
@@ -1232,7 +1377,7 @@ def _sfem_soa_block_function(
                     )
                 )
     else:
-        for array_input in reference_inputs:
+        for array_input in shared.reference_inputs:
             source = _sfem_soa_reference_param_name(array_input)
             for shape in range(array_input.n_shape):
                 for component in range(array_input.components):
@@ -1249,45 +1394,13 @@ def _sfem_soa_block_function(
                         )
                     )
 
-    if form.weak_form is None:
-        if use_stream_arrays:
-            lines.extend(["        for (int shape = 0; shape < N_SHAPE; ++shape) {"])
-            for d in range(dim):
-                lines.append(
-                    "            u[shape * %d + %d] = u_streams[shape * %d + %d][%s];"
-                    % (dim, d, dim, d, work_item)
-                )
-                if form.has_direction:
-                    lines.append(
-                        "            du[shape * %d + %d] = h_streams[shape * %d + %d][%s];"
-                        % (dim, d, dim, d, work_item)
-                    )
-            lines.append("        }")
-        else:
-            for node in range(n_nodes):
-                for d in range(dim):
-                    idx = node * dim + d
-                    component = _component_name(d)
-                    lines.append("        u[%d] = u%s%d[%s];" % (idx, component, node, work_item))
-                    if form.has_direction:
-                        lines.append("        du[%d] = h%s%d[%s];" % (idx, component, node, work_item))
-
-    if form.weak_form is not None:
-        _append_sfem_soa_weak_form_lines(
-            lines,
-            form,
-            prefix,
-            dim,
-            n_nodes,
-            reference_inputs,
-            use_tensor_product_reference,
-            quadrature_rule,
-            use_stream_arrays,
-            source_builder,
-            constant_p1_gradient_expansion=constant_p1_gradient_expansion,
-        )
-        lines.append("}")
-        return lines
+    for node in range(n_nodes):
+        for d in range(dim):
+            idx = node * dim + d
+            component = _component_name(d)
+            lines.append("        u[%d] = u%s%d[%s];" % (idx, component, node, work_item))
+            if form.has_direction:
+                lines.append("        du[%d] = h%s%d[%s];" % (idx, component, node, work_item))
 
     output_count = len(form.expression_graph.evaluation_plan.outputs)
     lines.append("        scalar_t element_vector[%d];" % max(1, output_count))
@@ -1301,7 +1414,7 @@ def _sfem_soa_block_function(
     opening = lines.index(") {")
     return _print_energy_kernel(
         FunctionDefNode(
-            name,
+            shared.name,
             params=tuple(params),
             body=(
                 RawLinesNode(
