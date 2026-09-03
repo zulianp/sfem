@@ -59,8 +59,8 @@ int main(int argc, char **argv) {
     const auto macros = parse_list(smesh::Env::read_string("SFEM_BENCH_MACROS", "2,4,6,8"));
     const auto levels = parse_list(smesh::Env::read_string("SFEM_BENCH_LEVELS", "2,4,8"));
 
-    std::printf("%-4s %-10s %-12s %-12s %-12s %-12s %-12s %-9s %-12s %s\n",
-                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em_ns/d", "sp_best", "best_MDOF/s", "agree_rel");
+    std::printf("%-4s %-10s %-12s %-12s %-12s %-12s %-12s %-12s %-9s %-12s %s\n",
+                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "sp_best", "best_MDOF/s", "agree_rel");
 
     int failures = 0;
 
@@ -107,6 +107,8 @@ int main(int argc, char **argv) {
             std::vector<scalar_t> y_hoi((size_t)ndof, 0), y_em((size_t)ndof, 0);
             sscvfem_apply_macro_local_hoisted(d, rho, mu, dir.data(), y_hoi.data());
             sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
+            std::vector<scalar_t> y_emf((size_t)ndof, 0);
+            sscvfem_apply_macro_local_emfull(d, rho, mu, dir.data(), y_emf.data());
 
             double dmax = 0, amax = 0;
             for (ptrdiff_t i = 0; i < ndof; ++i) {
@@ -114,6 +116,7 @@ int main(int argc, char **argv) {
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_aff[(size_t)i]));
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_hoi[(size_t)i]));
                 dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_em[(size_t)i]));
+                dmax = std::max(dmax, std::fabs(y_naive[(size_t)i] - y_emf[(size_t)i]));
                 amax = std::max(amax, std::fabs(y_naive[(size_t)i]));
             }
             const double rel = (amax > 0) ? dmax / amax : dmax;
@@ -152,9 +155,13 @@ int main(int argc, char **argv) {
                 std::fill(y_em.begin(), y_em.end(), scalar_t(0));
                 sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
             });
-            const double t_best = std::min(std::min(t_macro, t_aff), std::min(t_hoi, t_em));
+            const double t_emf = time_it([&] {
+                std::fill(y_emf.begin(), y_emf.end(), scalar_t(0));
+                sscvfem_apply_macro_local_emfull(d, rho, mu, dir.data(), y_emf.data());
+            });
+            const double t_best = std::min(std::min(t_macro, t_aff), std::min(std::min(t_hoi, t_em), t_emf));
 
-            std::printf("%-4d %-10td %-12.3f %-12.3f %-12.3f %-12.3f %-12.3f %-9.2f %-12.1f %.3e%s\n",
+            std::printf("%-4d %-10td %-12.3f %-12.3f %-12.3f %-12.3f %-12.3f %-12.3f %-9.2f %-12.1f %.3e%s\n",
                         L,
                         ndof,
                         1e9 * t_naive / (double)ndof,
@@ -162,6 +169,7 @@ int main(int argc, char **argv) {
                         1e9 * t_aff / (double)ndof,
                         1e9 * t_hoi / (double)ndof,
                         1e9 * t_em / (double)ndof,
+                        1e9 * t_emf / (double)ndof,
                         t_naive / t_best,
                         1e-6 * (double)ndof / t_best,
                         rel,
