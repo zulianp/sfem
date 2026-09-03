@@ -141,9 +141,13 @@ namespace sfem {
     }
 
 #ifdef SFEM_ENABLE_RYAML
-    static std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
-                                                   const ryml::ConstNodeRef             &node,
-                                                   const ExecutionSpace                  es);
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            const ryml::ConstNodeRef             &node,
+                                            const ExecutionSpace                  es);
+
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            std::string                           yaml,
+                                            const ExecutionSpace                  es);
 #endif  // SFEM_ENABLE_RYAML
 
 }  // namespace sfem

@@ -2,6 +2,14 @@ schema_version: 1
 id: cylindrical_pressure_vessel
 name: Hyperelastic cylindrical pressure vessel
 kind: validation
+family: hyperelastic
+dimension: 2
+tier: medium
+operator: GeneratedModifiedMooneyRivlin
+element: QUAD4
+resolution:
+  radial_cells: 20
+  circumferential_cells: 20
 source:
   description: Published analytical radial and hoop Cauchy stress profiles
   tutorial: https://www.solids4foam.com/tutorials/more-tutorials/solid-mechanics/hyperelasticity/cylindricalPressureVessel.html
@@ -76,5 +84,6 @@ verification:
     hoop_stress_max_abs_mpa: 5.0
 
 oracle:
+  type: published_analytical_profile
   radial_stress: oracle/radial_stress.csv
   hoop_stress: oracle/hoop_stress.csv

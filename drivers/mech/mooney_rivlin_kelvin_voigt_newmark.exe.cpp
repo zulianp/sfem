@@ -12,6 +12,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_NeumannConditions.hpp"
 #include "sfem_NewmarkInertiaPotential.hpp"
+#include "sfem_StateField.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_env.hpp"
 
@@ -40,6 +41,10 @@ namespace {
         real_t load_pulse_time;
         real_t initial_disp_y;
         real_t initial_disp_z;
+        std::string initial_displacement;
+        std::string initial_displacement_components;
+        std::string initial_velocity;
+        std::string initial_velocity_components;
         bool   verbose;
 
         static EnvOptions read() {
@@ -66,6 +71,10 @@ namespace {
             ret.load_pulse_time = smesh::Env::read("SFEM_LOAD_PULSE_TIME", 0.0);
             ret.initial_disp_y  = smesh::Env::read("SFEM_INITIAL_DISP_Y", 0.0);
             ret.initial_disp_z  = smesh::Env::read("SFEM_INITIAL_DISP_Z", 0.0);
+            ret.initial_displacement = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT", "");
+            ret.initial_displacement_components = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT_COMPONENTS", "");
+            ret.initial_velocity            = smesh::Env::read_string("SFEM_INITIAL_VELOCITY", "");
+            ret.initial_velocity_components = smesh::Env::read_string("SFEM_INITIAL_VELOCITY_COMPONENTS", "");
             ret.verbose         = smesh::Env::read("SFEM_VERBOSE", false);
             return ret;
         }
@@ -92,19 +101,6 @@ namespace {
 
         const real_t ramp = env.load_ramp_time > 0 ? std::min<real_t>(t / env.load_ramp_time, 1) : 1;
         return env.load_scale * ramp;
-    }
-
-    void scale_neumann_values(const std::shared_ptr<sfem::NeumannConditions> &neumann_conditions,
-                              const std::vector<real_t>                     &base_values,
-                              const real_t                                   scale) {
-        if (!neumann_conditions) {
-            return;
-        }
-
-        auto &conditions = neumann_conditions->conditions();
-        for (size_t i = 0; i < conditions.size(); ++i) {
-            conditions[i].value = scale * base_values[i];
-        }
     }
 
     void initialize_cantilever_bend(const std::shared_ptr<sfem::Mesh> &mesh,
@@ -141,6 +137,23 @@ namespace {
                 u[dim * i + 2] = tip_z * shape;
             }
         }
+    }
+
+    int read_initial_state(const std::shared_ptr<sfem::Mesh> &mesh,
+                           const std::string                 &full_path,
+                           const std::string                 &component_paths,
+                           real_t *const                      state) {
+        if (!full_path.empty() && !component_paths.empty()) {
+            SFEM_ERROR("Specify either a full initial-state file or component files, not both\n");
+            return SFEM_FAILURE;
+        }
+        if (!full_path.empty()) {
+            return sfem::read_state_field(full_path, mesh->n_nodes() * mesh->spatial_dimension(), state);
+        }
+        if (!component_paths.empty()) {
+            return sfem::read_state_field_components(component_paths, mesh->n_nodes(), mesh->spatial_dimension(), state);
+        }
+        return SFEM_SUCCESS;
     }
 
     void newmark_predictor(const ptrdiff_t n,
@@ -212,8 +225,11 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     auto fs   = sfem::FunctionSpace::create(mesh, mesh->spatial_dimension());
     auto f    = sfem::Function::create(fs);
 
+    std::shared_ptr<sfem::DirichletConditions> dirichlet_conditions;
     if (dirichlet_path.to_string() != "NONE") {
-        f->add_constraint(sfem::DirichletConditions::create_from_file(fs, dirichlet_path));
+        dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
+        if (!dirichlet_conditions) return SFEM_FAILURE;
+        f->add_constraint(dirichlet_conditions);
     }
 
     auto material_op = sfem::create_op(fs, "GeneratedMooneyRivlinKelvinVoigtNewmark", sfem::EXECUTION_SPACE_HOST);
@@ -250,6 +266,11 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     blas->zeros(ndofs, rhs->data());
     blas->zeros(ndofs, incr->data());
     initialize_cantilever_bend(mesh, env.initial_disp_y, env.initial_disp_z, u_n->data());
+    if (read_initial_state(mesh, env.initial_displacement, env.initial_displacement_components, u_n->data()) != SFEM_SUCCESS)
+        return SFEM_FAILURE;
+    if (read_initial_state(mesh, env.initial_velocity, env.initial_velocity_components, v_n->data()) != SFEM_SUCCESS)
+        return SFEM_FAILURE;
+    if (dirichlet_conditions && dirichlet_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
     f->apply_constraints(u_n->data());
 
     auto inertia_op = std::make_shared<sfem::NewmarkInertiaPotential>(fs);
@@ -268,13 +289,9 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     f->add_operator(inertia_op);
 
     std::shared_ptr<sfem::NeumannConditions> neumann_conditions;
-    std::vector<real_t>                      neumann_base_values;
     if (neumann_path.to_string() != "NONE") {
         neumann_conditions = sfem::NeumannConditions::create_from_file(fs, neumann_path);
-        neumann_base_values.reserve(neumann_conditions->conditions().size());
-        for (const auto &condition : neumann_conditions->conditions()) {
-            neumann_base_values.push_back(condition.value);
-        }
+        if (!neumann_conditions) return SFEM_FAILURE;
         f->add_operator(neumann_conditions);
     }
 
@@ -316,7 +333,8 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
 
     for (int step = 1; step <= env.n_steps; ++step) {
         const real_t t = step * env.dt;
-        scale_neumann_values(neumann_conditions, neumann_base_values, load_factor(env, t));
+        if (dirichlet_conditions && dirichlet_conditions->set_time(t) != SFEM_SUCCESS) return SFEM_FAILURE;
+        if (neumann_conditions && neumann_conditions->set_time(t, load_factor(env, t)) != SFEM_SUCCESS) return SFEM_FAILURE;
 
         newmark_predictor(ndofs, env.dt, env.beta, u_n->data(), v_n->data(), a_n->data(), u_hat->data());
         newmark_velocity_shift(ndofs, env.dt, env.gamma, alpha_v, v_n->data(), a_n->data(), u_hat->data(), z->data());
