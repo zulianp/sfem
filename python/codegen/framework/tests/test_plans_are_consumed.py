@@ -93,6 +93,12 @@ UNCONSUMED_PLAN_TYPES = frozenset(
         # factory that produces it also moved out of pipeline/driver.py,
         # where emission could not have reached it even in principle.
         "BlockPlan",
+        # The order a local kernel's phases run in -- evaluate trial,
+        # transform reference, evaluate material, contract test -- is the
+        # plan's decision.  _assemble_local_phases walks it and the emitter
+        # supplies nodes per phase, where the order used to be implicit in
+        # which list things were appended to.
+        "LocalPhasePlan",
     }
 )
 
@@ -108,6 +114,7 @@ PLAN_FACTORIES = {
         "jacobian_block_plan",
     ),
     "DataStreamPlan": ("local_kernel_stream_plans",),
+    "LocalPhasePlan": ("residual_local_phase_plans",),
 }
 
 
@@ -181,7 +188,7 @@ class PlansAreConsumedTest(unittest.TestCase):
         )
         self.assertEqual(
             unconsumed,
-            6,
+            5,
             "the number of unread structural plans changed to %d; update this "
             "expectation deliberately, and say why in the commit" % unconsumed,
         )
