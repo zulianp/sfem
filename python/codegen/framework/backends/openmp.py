@@ -25,7 +25,7 @@ from codegen.framework.emitters.residual_codegen import (
     generate_mixed_residual_sfem_files,
 )
 from codegen.framework.emitters.matrix_formats import emit_matrix_format_metadata_files
-from codegen.framework.targets import OpenMPTarget, TargetLanguage
+from codegen.framework.targets import OpenMPTarget, TargetLanguage, use_target
 
 
 @dataclass(frozen=True)
@@ -74,8 +74,16 @@ class OpenMPSoABackend:
         if self.target.language is not TargetLanguage.CPP:
             raise ValueError("OpenMP SoA backend requires a C++ CPU target")
         unit.validate_for_context(context)
-        traversal = self._traversal(unit, context)
-        files = tuple(self._emit_traversal_files(traversal))
+        # The backend's target reaches the emitters here.  Before this binding
+        # existed it reached only the check above and the energy emitter: the
+        # residual emitters constructed their own OpenMPTarget, so this
+        # backend's target had no effect on them.  No output changes today,
+        # because AVX512Target and the ARM targets spell every qualifier and
+        # pragma exactly as OpenMPTarget does -- the wiring was dead rather
+        # than wrong.  It stops being dead the moment one of them differs.
+        with use_target(self.target):
+            traversal = self._traversal(unit, context)
+            files = tuple(self._emit_traversal_files(traversal))
         if traversal.local_name:
             self._validate_common_source_contract(files, traversal.local_prefix)
         else:

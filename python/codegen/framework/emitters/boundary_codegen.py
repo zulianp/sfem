@@ -18,7 +18,7 @@ from codegen.framework.fem.reference import (
     _sfem_unit_interval_gauss_rule,
     _tri6_reference_gradients,
 )
-from codegen.framework.targets import OpenMPTarget
+from codegen.framework.targets import current_target
 from codegen.framework.plans.boundary_usage import (
     boundary_coefficient_usage,
     coordinate_symbols as _coordinate_candidates,
@@ -27,7 +27,8 @@ from codegen.framework.plans.residual_model import residual_emission_model
 
 
 def _target():
-    return OpenMPTarget()
+    """The target this emission prints for -- bound by the backend, not chosen here."""
+    return current_target()
 
 
 def _function_qualifier():
