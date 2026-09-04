@@ -843,3 +843,42 @@ after the damping fix, and the differences are inside the noise quantified above
 The model's own stage 1b gate required a convergent smoother before reporting anything.
 The driver had no such gate until now, which is precisely how a divergent smoother survived
 several rounds of coarse-grid investigation.
+
+## P5 answered: a saddle-point smoother is not the fix
+
+SIMPLE is implemented (`SimpleSmoother`, `SFEM_SMOOTHER=simple`) on the 2x2 block split,
+which is what that split was built for. Following the rule the previous section learned the
+hard way, it was measured as a standalone smoother with no coarse space before being allowed
+anywhere near a cycle. Standalone rates at L=8 over sweeps 35-39:
+
+| smoother | omega | rate |
+|----------|-------|------|
+| block-Jacobi | 0.35 | 0.9669 |
+| SIMPLE       | 0.35 | 0.9667 |
+| SIMPLE       | 0.7  | 1.850  |
+| SIMPLE       | 1.0  | 3.059  |
+
+SIMPLE matches block-Jacobi to four digits and diverges sooner as damping is relaxed.
+Neither more inner sweeps nor rescaling the Schur diagonal changes it.
+
+The block-split gate under `SFEM_GMG_CHECK=1` explains why, and is the reason the null
+result is trustworthy rather than a suspected bug. The four blocks sum to the full Jacobian
+action to 1.4e-16, so the split is exact, and their norms are `uu` 0.284, `up` 2.231,
+`pu` 0.552, `pp` 23.748. The pressure-pressure block -- the Rhie-Chow stabilisation --
+is about eighty-five times the momentum block, and the divergence coupling `pu` that SIMPLE
+uses to build its pressure correction is a two percent perturbation on it. SIMPLE's Schur
+complement `S = Dpp - C Du^-1 B` is therefore `Dpp` to within a couple of percent, its
+pressure update reduces to block-Jacobi's, and its velocity correction is negligible.
+
+So this system is not coupling-limited and a saddle-point smoother has nothing to work with.
+That is a different diagnosis from the one P5 was written under: the difficulty is not that
+velocity and pressure are strongly coupled, it is that the stabilisation dominates the
+operator outright.
+
+It is also worth correcting an impression left by the previous section. An asymptotic
+smoother rate near 0.97 is not by itself a bad smoother -- a smoother's asymptotic rate is
+set by the smoothest mode, which is precisely what the coarse grid exists to remove, and
+good multigrid smoothers routinely look terrible measured this way. What is fatal is a rate
+above 1, which is what the old default damping produced. With that fixed the smoother is
+doing its job, and the remaining weakness is in the coarse correction, where the velocity and
+pressure rows still coarsen with different best-fit scales (0.63 against 0.12).

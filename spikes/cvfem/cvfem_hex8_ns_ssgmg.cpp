@@ -104,11 +104,172 @@ namespace {
         std::vector<real_t> inv_;
     };
 
+    // SIMPLE smoother.
+    //
+    // Block-Jacobi is not a smoother for this system: measured as the stationary iteration
+    // it becomes inside a cycle, its rate crosses 1 at the damping that looked best by
+    // iteration count, and even at its best damping it only reaches about 0.97 per sweep.
+    // That is the failure a saddle-point smoother exists to fix, and it is what the 2x2
+    // block split was built for -- SIMPLE needs the off-diagonal blocks on their own, and
+    // evaluating the whole operator to get one of them would discard most of the work.
+    //
+    // One application, given a residual r = (r_u, r_p):
+    //   du   = Du^-1 r_u                        velocity predictor, 3x3 solves per node
+    //   rp   = r_p - (C du)_p                   continuity defect of that predictor
+    //   dp   = solve(S dp = rp),  S = Dpp - C Du^-1 B, approximated by its diagonal
+    //   du  -= Du^-1 (B dp)_u                   make the predictor respect the new pressure
+    // With one inner sweep from dp = 0 the Schur apply drops out and the cost is two block
+    // applications, PU and UP, rather than two full ones.
+    //
+    // Accumulates into `out`, which is the Operator convention here and is what the
+    // stationary iteration relies on: it computes r = b - A x and then calls the
+    // preconditioner as x += M^-1 r.
+    class SimpleSmoother final : public sfem::Operator<real_t> {
+    public:
+        SimpleSmoother(sfem::CVFEMNavierStokes &op, const real_t *const state, const ptrdiff_t nnodes,
+                       std::vector<real_t> dinv_u, std::vector<real_t> dinv_p, std::vector<uint8_t> free_dof,
+                       const real_t omega, const int inner)
+            : op_(op), state_(state), nnodes_(nnodes), dinv_u_(std::move(dinv_u)), dinv_p_(std::move(dinv_p)),
+              free_(std::move(free_dof)), omega_(omega), inner_(inner) {}
+
+        int apply(const real_t *const r, real_t *const out) override {
+            const ptrdiff_t    nd = nnodes_ * 4;
+            std::vector<real_t> du((size_t)nd, 0), tmp((size_t)nd, 0), dp((size_t)nd, 0);
+
+            // velocity predictor
+            for (ptrdiff_t i = 0; i < nnodes_; ++i) {
+                const real_t *const m = dinv_u_.data() + (size_t)i * 9;
+                const real_t *const rr = r + (size_t)i * 4;
+                real_t *const       dd = du.data() + (size_t)i * 4;
+                for (int a = 0; a < 3; ++a)
+                    dd[a] = m[a * 3 + 0] * rr[0] + m[a * 3 + 1] * rr[1] + m[a * 3 + 2] * rr[2];
+            }
+
+            // continuity defect of the predictor
+            op_.apply_blocks(state_, du.data(), tmp.data(), sfem::CVFEM_BLOCK_PU);
+            std::vector<real_t> rp((size_t)nnodes_, 0);
+            for (ptrdiff_t i = 0; i < nnodes_; ++i)
+                rp[(size_t)i] = r[(size_t)i * 4 + 3] - tmp[(size_t)i * 4 + 3];
+
+            // pressure correction. The first sweep starts from dp = 0, so the Schur
+            // application is zero and is skipped rather than computed.
+            for (int it = 0; it < inner_; ++it) {
+                std::vector<real_t> s((size_t)nnodes_, 0);
+                if (it > 0) {
+                    std::fill(tmp.begin(), tmp.end(), real_t(0));
+                    std::vector<real_t> t2((size_t)nd, 0), w((size_t)nd, 0), t3((size_t)nd, 0);
+                    op_.apply_blocks(state_, dp.data(), tmp.data(), sfem::CVFEM_BLOCK_PP);
+                    op_.apply_blocks(state_, dp.data(), t2.data(), sfem::CVFEM_BLOCK_UP);
+                    for (ptrdiff_t i = 0; i < nnodes_; ++i) {
+                        const real_t *const m  = dinv_u_.data() + (size_t)i * 9;
+                        const real_t *const tt = t2.data() + (size_t)i * 4;
+                        real_t *const       ww = w.data() + (size_t)i * 4;
+                        for (int a = 0; a < 3; ++a)
+                            ww[a] = m[a * 3 + 0] * tt[0] + m[a * 3 + 1] * tt[1] + m[a * 3 + 2] * tt[2];
+                    }
+                    op_.apply_blocks(state_, w.data(), t3.data(), sfem::CVFEM_BLOCK_PU);
+                    for (ptrdiff_t i = 0; i < nnodes_; ++i)
+                        s[(size_t)i] = tmp[(size_t)i * 4 + 3] - t3[(size_t)i * 4 + 3];
+                }
+                for (ptrdiff_t i = 0; i < nnodes_; ++i)
+                    dp[(size_t)i * 4 + 3] += dinv_p_[(size_t)i] * (rp[(size_t)i] - s[(size_t)i]);
+            }
+
+            // velocity correction for the new pressure
+            std::fill(tmp.begin(), tmp.end(), real_t(0));
+            op_.apply_blocks(state_, dp.data(), tmp.data(), sfem::CVFEM_BLOCK_UP);
+
+            for (ptrdiff_t i = 0; i < nnodes_; ++i) {
+                const real_t *const m  = dinv_u_.data() + (size_t)i * 9;
+                const real_t *const tt = tmp.data() + (size_t)i * 4;
+                real_t              c[3];
+                for (int a = 0; a < 3; ++a)
+                    c[a] = m[a * 3 + 0] * tt[0] + m[a * 3 + 1] * tt[1] + m[a * 3 + 2] * tt[2];
+                for (int a = 0; a < 3; ++a) {
+                    const ptrdiff_t k = i * 4 + a;
+                    if (free_[(size_t)k]) out[k] += omega_ * (du[(size_t)k] - c[a]);
+                }
+                const ptrdiff_t kp = i * 4 + 3;
+                if (free_[(size_t)kp]) out[kp] += omega_ * dp[(size_t)kp];
+            }
+            return SFEM_SUCCESS;
+        }
+
+        ptrdiff_t rows() const override { return nnodes_ * 4; }
+        ptrdiff_t cols() const override { return nnodes_ * 4; }
+        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+    private:
+        sfem::CVFEMNavierStokes &op_;
+        const real_t *const      state_;
+        ptrdiff_t                nnodes_;
+        std::vector<real_t>      dinv_u_, dinv_p_;
+        std::vector<uint8_t>     free_;
+        real_t                   omega_;
+        int                      inner_;
+    };
+
     // `mask` marks the constrained dofs. It is needed because hessian_block_diag reports
     // the operator's own diagonal and knows nothing about boundary conditions, while the
     // matrix the Krylov method actually sees has identity rows there -- Function applies
     // the constraints to it after the operators. A preconditioner built from the
     // unconstrained diagonal scales those rows by something unrelated to 1.
+    // Builds the pieces SIMPLE needs from the operator's own 4x4 block diagonal: the 3x3
+    // velocity inverse per node, and a diagonal approximation of the Schur complement.
+    // `ds_scale` tunes the latter, which is the one genuinely approximate ingredient --
+    // S = Dpp - C Du^-1 B is not diagonal and its true diagonal is not available
+    // matrix-free, so the pressure block's own diagonal stands in for it.
+    std::shared_ptr<SimpleSmoother> make_simple(sfem::CVFEMNavierStokes &op,
+                                                const real_t *const      x,
+                                                const mask_t *const      mask,
+                                                const ptrdiff_t          nnodes,
+                                                const real_t             omega,
+                                                const int                inner,
+                                                const real_t             ds_scale) {
+        std::vector<real_t> bd((size_t)nnodes * 16, real_t(0));
+        op.hessian_block_diag(x, bd.data());
+
+        std::vector<real_t>  du((size_t)nnodes * 9, real_t(0));
+        std::vector<real_t>  dp((size_t)nnodes, real_t(0));
+        std::vector<uint8_t> freed((size_t)nnodes * 4, 1);
+
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const real_t *const b = bd.data() + (size_t)i * 16;
+            real_t              a[9];
+            for (int r = 0; r < 3; ++r)
+                for (int c = 0; c < 3; ++c) a[r * 3 + c] = b[r * 4 + c];
+
+            const real_t det = a[0] * (a[4] * a[8] - a[5] * a[7]) - a[1] * (a[3] * a[8] - a[5] * a[6]) +
+                               a[2] * (a[3] * a[7] - a[4] * a[6]);
+            real_t *const m = du.data() + (size_t)i * 9;
+            if (std::fabs(det) > real_t(1e-30)) {
+                const real_t id = real_t(1) / det;
+                m[0] = (a[4] * a[8] - a[5] * a[7]) * id;
+                m[1] = (a[2] * a[7] - a[1] * a[8]) * id;
+                m[2] = (a[1] * a[5] - a[2] * a[4]) * id;
+                m[3] = (a[5] * a[6] - a[3] * a[8]) * id;
+                m[4] = (a[0] * a[8] - a[2] * a[6]) * id;
+                m[5] = (a[2] * a[3] - a[0] * a[5]) * id;
+                m[6] = (a[3] * a[7] - a[4] * a[6]) * id;
+                m[7] = (a[1] * a[6] - a[0] * a[7]) * id;
+                m[8] = (a[0] * a[4] - a[1] * a[3]) * id;
+            } else {
+                m[0] = m[4] = m[8] = real_t(1);
+            }
+
+            const real_t pp = b[15];
+            dp[(size_t)i]   = (std::fabs(pp) > real_t(1e-30)) ? ds_scale / pp : real_t(0);
+
+            for (int c = 0; c < 4; ++c) {
+                const ptrdiff_t k = i * 4 + c;
+                if (mask_get(k, mask)) freed[(size_t)k] = 0;
+            }
+        }
+
+        return std::make_shared<SimpleSmoother>(op, x, nnodes, std::move(du), std::move(dp),
+                                                std::move(freed), omega, inner);
+    }
+
     std::shared_ptr<BlockJacobi> make_block_jacobi(sfem::CVFEMNavierStokes &op,
                                                    const real_t *const      x,
                                                    const mask_t *const      mask,
@@ -280,6 +441,42 @@ namespace {
             for (auto e : v) s += e * e;
             return std::sqrt(s);
         };
+
+        // Block-split gate: the four blocks must sum to the full Jacobian action, and
+        // each must be non-trivial. A smoother built on the block split is only as good as
+        // this, and a block application that silently produced nothing would make SIMPLE
+        // degenerate into block-Jacobi without saying so.
+        {
+            auto           &fop = *g.level_ops[0];
+            const ptrdiff_t nd  = g.data->functions[0]->space()->n_dofs();
+            std::vector<real_t> dir((size_t)nd), full((size_t)nd, 0), sum((size_t)nd, 0);
+            for (ptrdiff_t k = 0; k < nd; ++k) dir[(size_t)k] = std::sin(0.7 * (real_t)k) + 0.3;
+
+            fop.apply(g.states[0]->data(), dir.data(), full.data());
+
+            const int   sel[4] = {sfem::CVFEM_BLOCK_UU, sfem::CVFEM_BLOCK_UP,
+                                  sfem::CVFEM_BLOCK_PU, sfem::CVFEM_BLOCK_PP};
+            const char *bn[4]  = {"uu", "up", "pu", "pp"};
+            std::printf("block split:");
+            for (int b = 0; b < 4; ++b) {
+                std::vector<real_t> one((size_t)nd, 0);
+                fop.apply_blocks(g.states[0]->data(), dir.data(), one.data(), sel[b]);
+                real_t n = 0;
+                for (ptrdiff_t k = 0; k < nd; ++k) {
+                    n += one[(size_t)k] * one[(size_t)k];
+                    sum[(size_t)k] += one[(size_t)k];
+                }
+                std::printf("  |%s| %.4e", bn[b], std::sqrt(n));
+            }
+            real_t dn = 0, fn = 0;
+            for (ptrdiff_t k = 0; k < nd; ++k) {
+                const real_t d = sum[(size_t)k] - full[(size_t)k];
+                dn += d * d;
+                fn += full[(size_t)k] * full[(size_t)k];
+            }
+            std::printf("\n  sum vs full: rel %.4e  %s\n", (fn > 0) ? std::sqrt(dn / fn) : 0.0,
+                        (fn > 0 && std::sqrt(dn / fn) < 1e-10) ? "OK" : "MISMATCH");
+        }
 
         // Constraint census per level. A colocated Navier-Stokes system with velocity
         // Dirichlet data all round fixes pressure only up to a constant, so the pressure
@@ -887,8 +1084,16 @@ int main(int argc, char **argv) {
                 // divergent smoother makes the cycle diverge regardless of what the coarse
                 // levels do -- and no coarse-grid fix can repair that.
                 if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 3 && newton_it == 0) {
-                    const real_t om   = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
-                    auto         prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
+                    const real_t om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                    const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "bjacobi");
+                    std::shared_ptr<sfem::Operator<real_t>> prec;
+                    if (kind == "simple")
+                        prec = make_simple(*op, x, cmask.data(), nnodes, om,
+                                           smesh::Env::read<int>("SFEM_SIMPLE_INNER", 1),
+                                           smesh::Env::read<real_t>("SFEM_SIMPLE_DS", real_t(1)));
+                    else
+                        prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
+                    std::printf("smoother kind: %s\n", kind.c_str());
                     std::vector<real_t> xs((size_t)ndof, 0), r((size_t)ndof, 0), z((size_t)ndof, 0);
                     real_t prev = 0;
                     for (ptrdiff_t k = 0; k < ndof; ++k) prev += rhs[(size_t)k] * rhs[(size_t)k];

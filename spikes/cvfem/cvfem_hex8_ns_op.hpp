@@ -33,6 +33,16 @@ namespace sfem {
     // which geometry treatment it wants.
     enum class CVFEMGeometry { Affine, Isoparam };
 
+    // Selectors for apply_blocks. Named here so a driver can spell a block selection
+    // without including the semi-structured kernel header, which the operator otherwise
+    // keeps to itself.
+    enum CVFEMBlock : int {
+        CVFEM_BLOCK_UU = 1,  // momentum rows, velocity columns
+        CVFEM_BLOCK_UP = 2,  // momentum rows, pressure column
+        CVFEM_BLOCK_PU = 4,  // continuity row, velocity columns
+        CVFEM_BLOCK_PP = 8   // continuity row, pressure column
+    };
+
     class CVFEMNavierStokes final : public Op {
     public:
         explicit CVFEMNavierStokes(const std::shared_ptr<FunctionSpace> &space);
@@ -109,6 +119,20 @@ namespace sfem {
         // a Navier-Stokes block. This is what a block-Jacobi smoother wants. `values`
         // must hold n_nodes * 16 entries and is accumulated into.
         int hessian_block_diag(const real_t *const x, real_t *const values);
+
+        // Jacobian action restricted to a subset of the 2x2 (velocity, pressure) blocks.
+        //
+        // `blocks` is an OR of the block selectors: 1 = momentum rows / velocity columns,
+        // 2 = momentum rows / pressure column, 4 = continuity row / velocity columns,
+        // 8 = continuity row / pressure column. Rows outside the selection are left alone
+        // and columns outside it are treated as zero, so a selection costs a kernel with
+        // the terms it does not need removed rather than branched over.
+        //
+        // This is what a saddle-point smoother needs: SIMPLE builds its pressure
+        // correction from the off-diagonal blocks alone, and evaluating the full operator
+        // to obtain one of them would throw most of the work away. Semi-structured only;
+        // it refuses on the flat path, which has no block-split kernel.
+        int apply_blocks(const real_t *const x, const real_t *const h, real_t *const out, const int blocks);
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
 
