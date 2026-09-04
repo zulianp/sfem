@@ -194,3 +194,86 @@ def _direct_output_targets(output_targets):
         if not (isinstance(target, str) and target.startswith("output:"))
     )
     return direct_output_targets, len(direct_output_targets) != len(output_targets)
+
+
+def runtime_typed_entry_point(function_name, params, body, return_type="int"):
+    """A kernel body emitted once, behind one runtime-typed entry point.
+
+    ``params`` are spelled in terms of ``scalar_t`` and ``body`` is the block
+    that used to follow ``using scalar_t = double;`` -- the same text for every
+    precision, which is why it was being written out twice.  It becomes a
+    template, and the ``extern "C"`` symbol becomes the switch that selects an
+    instantiation, the shape ``cu_tet4_laplacian_apply`` uses in
+    ``operators/tet4/cuda/``.
+
+    The switch runs once per call, outside the element loop.  Nothing inside
+    the loop changes, which is what keeps this from costing throughput -- and
+    the gate that says so is laplace on TET4, which reaches these kernels.
+
+    See ARCHITECTURE.html OP 17.
+    """
+    from codegen.framework.plans.apply_variants import runtime_scalar_cases
+
+    implementation = "%s_tpl" % function_name
+    lines = ["template <typename scalar_t>", "static %s %s(" % (return_type, implementation)]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.append(") {")
+    lines.extend(body)
+    lines.extend(["}", ""])
+
+    lines.append('extern "C" %s %s(' % (return_type, function_name))
+    entry_params = [_runtime_typed_param(param) for param in params]
+    entry_params.insert(0, "const enum smesh::PrimitiveType real_type")
+    for index, param in enumerate(entry_params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(entry_params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    switch (real_type == smesh::SMESH_DEFAULT",
+            "                   ? smesh::TypeToEnum<real_t>::value()",
+            "                   : real_type) {",
+        ]
+    )
+    for enum_value, scalar_type in runtime_scalar_cases():
+        if enum_value.endswith("SMESH_DEFAULT"):
+            continue
+        arguments = ", ".join(
+            _runtime_typed_arg(param, scalar_type) for param in params
+        )
+        lines.extend(
+            [
+                "        case %s:" % enum_value,
+                "            return %s<%s>(%s);" % (implementation, scalar_type, arguments),
+            ]
+        )
+    lines.extend(
+        [
+            "        default:",
+            "            return SFEM_FAILURE;",
+            "    }",
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
+def _runtime_typed_param(param):
+    """One template parameter, as the runtime-typed entry point declares it."""
+    if "scalar_t" not in param:
+        return param
+    if "*" in param:
+        return param.replace("scalar_t", "void", 1)
+    return param.replace("scalar_t", "real_t", 1)
+
+
+def _runtime_typed_arg(param, scalar_type):
+    """The same parameter, cast back at the call into the template."""
+    name = param.split()[-1].strip("*&").split("[")[0]
+    if "scalar_t" not in param or "*" not in param:
+        return name
+    const = "const " if param.lstrip().startswith("const ") else ""
+    if param.rstrip().endswith("]"):
+        return "(%s%s *const *)%s" % (const, scalar_type, name)
+    return "(%s%s *)%s" % (const, scalar_type, name)

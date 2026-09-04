@@ -29,6 +29,7 @@ from codegen.framework.ir.kernel_ast import (
     iterator,
     pre_increment,
 )
+from codegen.framework.emitters.cprinter import runtime_typed_entry_point
 from codegen.framework.emitters.ast_printer import (
     CLikeKernelASTPrinter,
     render_kernel_ast_lines,
@@ -147,6 +148,17 @@ from codegen.framework.plans.scheduling import (
 #: would say so.
 AFFINE_MODE = GeometryMode.AFFINE.value
 ISOPARAMETRIC_MODE = GeometryMode.ISOPARAMETRIC.value
+
+
+def _template_scalar_axis():
+    """Stands where ``precision_axis()`` stood, for a body emitted once.
+
+    A body written in terms of ``scalar_t`` is the same text for every
+    precision, so it is emitted once as a template and the entry point selects
+    an instantiation.  The single entry keeps the surrounding loop intact while
+    it stops being a loop over precisions.
+    """
+    return (("scalar_t", ""),)
 
 
 def _assert_geometry_plans_agree(emission_plan):
@@ -635,7 +647,7 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
     output_name = "%s_out" % field.name
     scale = _sfem_ccode(gradient_metric.scale)
     lines = []
-    for scalar_type, suffix in precision_axis():
+    for scalar_type, suffix in _template_scalar_axis():
         params = [
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
@@ -664,16 +676,7 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
             "%s *const SFEM_RESTRICT %s_out" % (scalar_type, field.name)
             for field in system.fields
         )
-        lines.append('extern "C" int %s_aos%s(' % (function, suffix))
-        for index, param in enumerate(params):
-            lines.append(
-                "        %s%s"
-                % (param, "," if index + 1 < len(params) else "")
-            )
-        lines.extend(
-            [
-                ") {",
-                "    using scalar_t = %s;" % scalar_type,
+        body = [
                 "    static constexpr int DIM = %d;" % system.dim,
                 "    static constexpr int N_QP = %d;" % rule.n_qp,
                 "    static constexpr int N_SHAPE = %d;" % rule.n_shape,
@@ -739,9 +742,9 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
                 "        }",
                 "    }",
                 "    return SFEM_SUCCESS;",
-                "}",
-                "",
-            ]
+        ]
+        lines.extend(
+            runtime_typed_entry_point("%s_aos" % function, params, body)
         )
         if len(dependencies.parameters) == 1 and scale == str(dependencies.parameters[0]):
             unit_params = [
@@ -765,16 +768,7 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
                 "%s *const SFEM_RESTRICT %s_out" % (scalar_type, field.name)
                 for field in system.fields
             )
-            lines.append('extern "C" int %s_aos_unit%s(' % (function, suffix))
-            for index, param in enumerate(unit_params):
-                lines.append(
-                    "        %s%s"
-                    % (param, "," if index + 1 < len(unit_params) else "")
-                )
-            lines.extend(
-                [
-                    ") {",
-                    "    using scalar_t = %s;" % scalar_type,
+            unit_body = [
                     "    (void)nnodes;",
                     *_simplex_metric_scalar_affine_loop_lines(
                         system,
@@ -789,9 +783,11 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
                         metric_layout="aos",
                     ),
                     "    return SFEM_SUCCESS;",
-                    "}",
-                    "",
-                ]
+            ]
+            lines.extend(
+                runtime_typed_entry_point(
+                    "%s_aos_unit" % function, unit_params, unit_body
+                )
             )
     return lines
 
@@ -4034,6 +4030,11 @@ def _operator_source(
         '#include "geometry_kernels.hpp"',
         '#include "kernel_diagnostics.hpp"',
         '#include "packed_thread_scratch.hpp"',
+        "#if defined(__has_include)",
+        '#if __has_include("smesh_types.hpp")',
+        '#include "smesh_types.hpp"',
+        "#endif",
+        "#endif",
         "",
         "#ifndef SFEM_SUCCESS",
         "#define SFEM_SUCCESS 0",
