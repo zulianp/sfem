@@ -1,3 +1,4 @@
+import collections
 import json
 import os
 import re
@@ -76,7 +77,85 @@ def generate_op_files(material, elements, kernel_sources=None):
             c_abi_path,
             element_api_sources,
         )
+    _verify_generated_calls(files, abi_sources)
     return files
+
+
+def _call_argument_count(source, start):
+    """How many top-level arguments the call beginning at ``start`` passes.
+
+    ``start`` indexes the opening parenthesis.  Returns ``None`` if the call is
+    unterminated, which means this was not a call at all.
+    """
+    depth = 0
+    for index in range(start, len(source)):
+        char = source[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            if depth == 0:
+                return len(_split_c_parameters(source[start + 1 : index]))
+    return None
+
+
+def _verify_generated_calls(files, abi_sources):
+    """Every call the wrapper makes must match the kernel it calls.
+
+    The wrapper and the kernels are written by different layers that derive the
+    ABI separately, so a wrapper can be emitted that cannot possibly compile --
+    and for Stokes and poro-hyperelasticity, one was, on every generation, for
+    as long as those materials have existed.  Nothing noticed because nothing
+    in the framework compiles a generated wrapper: the byte-identity snapshot
+    and the reproducibility gate both operate on kernels, and the wrapper
+    syntax check in run_m9_regression.sh skips itself whenever ryml.hpp is
+    absent, which in a bare worktree is always.
+
+    Arity is a weaker statement than the compiler's, and it is available here,
+    now, with no build tree and no dependencies -- which is what makes it worth
+    having.  It is checked at generation rather than in a test because a
+    wrapper that cannot compile should not reach disk: the failure belongs
+    where the mistake is, not three steps downstream in somebody's build.
+
+    See ARCHITECTURE.html OP 16 for why the two layers disagree in the first
+    place and what would make the disagreement unrepresentable.
+    """
+    # Both views, because they cover different files.  The private view skips
+    # everything under `op/`, and the public entry points a wrapper actually
+    # calls are defined in the generated `_dispatch.cpp` sources, which live
+    # there -- so checking only the private view silently checks nothing for
+    # the mixed-order materials, which is how this check first passed while the
+    # defect it exists to catch was still present.
+    signatures = dict(_c_abi_signatures(abi_sources))
+    signatures.update(_c_abi_signatures(abi_sources, public_only=True))
+    if not signatures:
+        return
+    mismatches = []
+    for path, source in sorted(files.items()):
+        if not path.endswith(".cpp"):
+            continue
+        for name, signature in signatures.items():
+            expected = len(signature.parameters)
+            marker = "%s(" % name
+            index = source.find(marker)
+            while index >= 0:
+                before = source[index - 1] if index else " "
+                # Skip a longer name that merely ends with this one.
+                if before.isalnum() or before == "_":
+                    index = source.find(marker, index + len(marker))
+                    continue
+                actual = _call_argument_count(source, index + len(name))
+                if actual is not None and actual != expected:
+                    mismatches.append(
+                        "%s calls %s with %d argument(s); it takes %d"
+                        % (path, name, actual, expected)
+                    )
+                index = source.find(marker, index + len(marker))
+    if mismatches:
+        raise ValueError(
+            "generated wrapper does not match the kernels it calls:\n    %s"
+            % "\n    ".join(sorted(set(mismatches)))
+        )
 
 
 def _registration_entries_from_manifests(manifests):
@@ -4394,40 +4473,36 @@ def _residual_soa_view_declarations(fields, base, suffix, scalar_type):
     return lines
 
 
-_ARRAY_PARAMETER_CACHE = {}
-
-
 def _c_abi_declares_array_parameter(kernel_sources, name):
-    """Whether the emitted kernels declare ``name`` as an array parameter.
+    """Whether any generated entry point declares ``name`` with an array extent.
 
     Two conventions cross the wrapper/kernel boundary for a multi-component
     field.  Most kernels take one pointer per component -- ``u0, u1`` -- while
     the mixed-order (Taylor-Hood) ones take a single array-of-pointer,
-    ``const real_t *const u_data[2]``, because the field's components live on
-    different spaces and ``plans.streams`` groups them.  Only stokes and
+    ``const real_t *const u_data[3]``, because the field's components live on
+    different spaces and ``MixedFieldLayout`` groups them.  Only Stokes and
     poro_elasticity emit the second form, and even they emit both: it is a
     property of the individual kernel, not of the material or of the field.
 
-    So the wrapper cannot decide this from anything it holds; it has to read
-    what was actually emitted.  Looking the name up is exact rather than
-    positional because the array form is named for the field and suffix -- the
-    wrapper's own ``u_data`` -- while the component form is named ``u0``,
-    ``u1``, so a material using the component form declares no ``u_data`` at
-    all.
+    Looking the name up is exact rather than positional because the array form
+    is named for the field and suffix -- the wrapper's own ``u_data`` -- while
+    the component form is named ``u0``, ``u1``, so a material using the
+    component form declares no ``u_data`` at all.
 
-    This is a workaround for the layering defect it exposes, not a fix for it:
-    L7 is reconstructing a decision L3 already made instead of being handed it.
-    See ARCHITECTURE.html, OP 16.
+    Note what this cannot be keyed on.  The wrapper's two builders do not
+    correspond to the two conventions: Kelvin-Voigt's viscous residual comes
+    through ``_coupled_cases`` and takes components, Stokes's residual comes
+    through ``_residual_op`` and takes the array.  The wrapper's structure
+    follows the material's topology and the ABI follows the emitter's, so no
+    predicate over what L7 holds separates them -- see ARCHITECTURE.html OP 16.
     """
     if not kernel_sources:
         return False
-    key = (id(kernel_sources), name)
-    cached = _ARRAY_PARAMETER_CACHE.get(key)
-    if cached is None:
-        pattern = re.compile(r"SFEM_RESTRICT\s+" + re.escape(name) + r"\s*\[")
-        cached = any(pattern.search(source) for source in kernel_sources.values())
-        _ARRAY_PARAMETER_CACHE[key] = cached
-    return cached
+    return any(
+        parameter.name == name and parameter.extent is not None
+        for signature in _c_abi_signatures(kernel_sources).values()
+        for parameter in signature.parameters
+    )
 
 
 def _residual_soa_field_argument_names(fields, suffix, kernel_sources=None):
@@ -5293,6 +5368,124 @@ def _matrix_format_sources(kernel_sources):
     return tuple(entries)
 
 
+#: One parameter of a generated kernel's C entry point.
+#:
+#: ``extent`` is the array bound for a parameter declared as
+#: ``const real_t *const SFEM_RESTRICT u_data[3]`` and ``None`` for a plain
+#: pointer or scalar.  It is the fact that decides whether a caller passes the
+#: array or its elements, and it used to be discarded: parameter names were
+#: recovered as "the last identifier in the declaration", which reads `u_data`
+#: out of both forms and cannot tell them apart.  Stokes and
+#: poro-hyperelasticity were miscalled for exactly that reason.
+CParameter = collections.namedtuple("CParameter", "name extent text")
+
+#: One generated entry point: its name, its parameters in ABI order, and the
+#: declaration it was recovered from.
+CSignature = collections.namedtuple("CSignature", "name parameters declaration")
+
+
+def _split_c_parameters(text):
+    """Split a parameter list on top-level commas.
+
+    ``(void)`` is C for an empty parameter list, so it splits to nothing.  The
+    declaration parser and the call scanner both go through here, which is what
+    keeps them agreeing: counting ``void`` as a parameter on one side and not
+    the other made every diagnostics accessor look like a call with the wrong
+    arity.
+    """
+    if text.strip() == "void":
+        return []
+    # Only brackets nest.  Angle brackets must not be counted: a C linkage
+    # signature cannot carry a template argument, while the calls scanned
+    # through here are full of `packed->n_packs(...)`, whose `>` would open a
+    # depth that never closes and make the argument count meaningless.
+    parameters, depth, current = [], 0, []
+    for char in text:
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        if char == "," and depth == 0:
+            parameters.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    tail = "".join(current).strip()
+    if tail:
+        parameters.append(tail)
+    return [parameter.strip() for parameter in parameters if parameter.strip()]
+
+
+def _parse_c_parameter(text):
+    """One parameter declaration, as a name and an optional array extent."""
+    extent = None
+    match = re.search(r"\[\s*(\d+)\s*\]\s*$", text)
+    if match:
+        extent = int(match.group(1))
+        text_without_extent = text[: match.start()]
+    else:
+        text_without_extent = text
+    identifiers = re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", text_without_extent)
+    if not identifiers:
+        return None
+    return CParameter(name=identifiers[-1], extent=extent, text=text.strip())
+
+
+def _parse_c_declaration(declaration):
+    """A recovered ``extern "C"`` declaration, as a structured signature."""
+    name = _c_abi_function_name(declaration)
+    if not name:
+        return None
+    match = re.search(
+        r"\b%s\s*\((.*)\)\s*;" % re.escape(name), declaration, re.S
+    )
+    if not match:
+        return CSignature(name=name, parameters=(), declaration=declaration)
+    parsed = [
+        _parse_c_parameter(parameter)
+        for parameter in _split_c_parameters(match.group(1))
+    ]
+    return CSignature(
+        name=name,
+        parameters=tuple(parameter for parameter in parsed if parameter),
+        declaration=declaration,
+    )
+
+
+_SIGNATURE_CACHE = {}
+
+
+def _c_abi_signatures(kernel_sources, public_only=False):
+    """Every generated entry point this material publishes, by name.
+
+    This is the one place the emitted C++ is read.  It used to be eight
+    functions and twenty scattered regexes, each recovering the part of a
+    declaration it happened to need and each free to disagree with the others
+    about what a declaration says -- which is how a parameter's array extent
+    came to be visible to the header writer and invisible to the call writer.
+
+    Parsing the printed text at all is the layering defect described in
+    ARCHITECTURE.html OP 16; emission holds this in ``mesh_kernel_stream_plans``
+    and ``MixedFieldLayout`` and should publish it rather than have L7 recover
+    it.  Confining the recovery to one function is what makes that swap a
+    change of producer instead of a rewrite of every consumer.
+    """
+    if not kernel_sources:
+        return {}
+    key = (id(kernel_sources), bool(public_only))
+    cached = _SIGNATURE_CACHE.get(key)
+    if cached is None:
+        cached = {}
+        for declaration in _extract_c_abi_declarations(
+            kernel_sources, public_only=public_only
+        ):
+            signature = _parse_c_declaration(declaration)
+            if signature:
+                cached[signature.name] = signature
+        _SIGNATURE_CACHE[key] = cached
+    return cached
+
+
 def _extract_c_abi_declarations(kernel_sources, public_only=False):
     declarations = {}
     for path, source in sorted(kernel_sources.items()):
@@ -5332,12 +5525,7 @@ def _c_abi_function_name(declaration):
 
 
 def _c_abi_function_exists(kernel_sources, function_name, public_only=False):
-    if not kernel_sources:
-        return False
-    for declaration in _extract_c_abi_declarations(kernel_sources, public_only=public_only):
-        if _c_abi_function_name(declaration) == function_name:
-            return True
-    return False
+    return function_name in _c_abi_signatures(kernel_sources, public_only=public_only)
 
 
 def _c_abi_public_dispatch_case_elements(kernel_sources, function_name):
@@ -5372,31 +5560,19 @@ def _c_abi_public_dispatch_case_elements(kernel_sources, function_name):
 
 
 def _c_abi_function_declaration(kernel_sources, function_name, public_only=False):
-    if not kernel_sources:
-        return None
-    for declaration in _extract_c_abi_declarations(kernel_sources, public_only=public_only):
-        if _c_abi_function_name(declaration) == function_name:
-            return declaration
-    return None
+    signature = _c_abi_signatures(kernel_sources, public_only=public_only).get(
+        function_name
+    )
+    return signature.declaration if signature else None
 
 
 def _c_abi_parameter_names(kernel_sources, function_name, public_only=False):
-    declaration = _c_abi_function_declaration(
-        kernel_sources,
-        function_name,
-        public_only=public_only,
+    signature = _c_abi_signatures(kernel_sources, public_only=public_only).get(
+        function_name
     )
-    if not declaration:
+    if not signature:
         return ()
-    match = re.search(r"\b%s\s*\((.*)\)\s*;" % re.escape(function_name), declaration, re.S)
-    if not match:
-        return ()
-    names = []
-    for argument in match.group(1).split(","):
-        identifiers = re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", argument)
-        if identifiers:
-            names.append(identifiers[-1])
-    return tuple(names)
+    return tuple(parameter.name for parameter in signature.parameters)
 
 
 def _c_abi_ordered_domain_parameter_args(kernel_sources, function_name, dependencies):
@@ -6423,8 +6599,24 @@ def _residual_apply_dispatch_body(
                     ", ".join(
                         [
                             *common_args,
-                            *_affine_geometry_offsets(dim).split(", "),
-                            "determinant",
+                            # The geometry this entry point takes, not the one
+                            # its neighbours take.  A linear simplex Laplacian
+                            # contracts two reference gradients, so its kernel
+                            # asks for the symmetric gradient metric rather
+                            # than the adjugate and determinant -- exactly as
+                            # the packed branch above already works out for
+                            # itself.  This branch did not, and passed five
+                            # geometry arguments to a kernel taking three.
+                            #
+                            # It only shows when the metric form is the only
+                            # form: generate laplace for TRI3 or TET4 alone and
+                            # the wrapper does not compile.  Add any
+                            # tensor-product element and the shared entry point
+                            # becomes the adjugate form, so the unconditional
+                            # spelling is right again and the defect hides.
+                            *_affine_dispatch_geometry_args(
+                                kernel_sources, affine_soa, dim
+                            ),
                             *storage_args,
                             *field_args,
                         ]
@@ -7577,13 +7769,42 @@ def _affine_metric_offsets(dim):
     return ", ".join("geom_metric[%d]" % i for i in range(dim * (dim + 1) // 2))
 
 
+def _affine_dispatch_geometry_args(kernel_sources, function_name, dim):
+    """The geometry arguments one affine entry point takes, as a list."""
+    if _c_abi_function_uses_cached_metric(kernel_sources, function_name):
+        return _affine_metric_offsets(dim).split(", ")
+    return [*_affine_geometry_offsets(dim).split(", "), "determinant"]
+
+
 def _c_abi_function_uses_cached_metric(kernel_sources, function_name):
-    if not kernel_sources:
+    """Whether this kernel takes a cached gradient metric, not the adjugate.
+
+    A linear simplex Laplacian contracts two reference gradients, so the
+    geometry it needs is the symmetric metric -- three components in 2D, six in
+    3D -- rather than the adjugate and determinant.  The wrapper builds one
+    through ``smesh::FFF`` and caches it, and has to know which of the two the
+    kernel is asking for.
+
+    Both views, because they cover different files.  This used to read the
+    private view alone, which skips everything under `op/`, and the affine mesh
+    entry points are defined in the generated `_dispatch.cpp` sources, which
+    live there.  So it answered "no metric" for any build where the metric form
+    is the only form -- laplace generated for TRI3 or TET4 without a
+    tensor-product element alongside it -- and the wrapper passed the adjugate
+    and determinant to a kernel taking three metric components.  That wrapper
+    could not compile, and generating laplace for a single simplex element is
+    an ordinary thing to do.  With a tensor-product element also present the
+    shared entry point does take the adjugate, so the wrong answer was the
+    right one and the defect stayed hidden.
+    """
+    signatures = dict(_c_abi_signatures(kernel_sources))
+    signatures.update(_c_abi_signatures(kernel_sources, public_only=True))
+    signature = signatures.get(function_name)
+    if not signature:
         return False
-    for declaration in _extract_c_abi_declarations(kernel_sources):
-        if _c_abi_function_name(declaration) == function_name:
-            return "g_geom_metric0" in declaration
-    return False
+    return any(
+        parameter.name == "g_geom_metric0" for parameter in signature.parameters
+    )
 
 
 def _boundary_surface_name(element):
