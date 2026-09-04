@@ -231,6 +231,24 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int CVFEMNavierStokes::apply_blocks(const real_t *const x, const real_t *const h, real_t *const out,
+                                        const int blocks) {
+        SFEM_TRACE_SCOPE("CVFEMNavierStokes::apply_blocks");
+        if (!impl_->initialized) return SFEM_FAILURE;
+        if (!impl_->semi_structured) {
+            SFEM_ERROR("CVFEMNavierStokes::apply_blocks: semi-structured meshes only\n");
+            return SFEM_FAILURE;
+        }
+        impl_->ss.rhie_chow_scale = rhie_chow_scale;
+        sscvfem_unpack(impl_->ss, x);
+        if (!(impl_->cache_pgrad && impl_->pgrad_for == x)) {
+            sscvfem_nodal_p_grad(impl_->ss);
+            impl_->pgrad_for = x;
+        }
+        sscvfem_apply_blocks(impl_->ss, rho, mu, blocks, h, out);
+        return SFEM_SUCCESS;
+    }
+
     int CVFEMNavierStokes::value(const real_t * /*x*/, real_t *const /*out*/) {
         // Steady Navier-Stokes is not the stationary point of an energy, so there is no
         // value to contribute. Succeeding rather than erroring keeps Function::value
