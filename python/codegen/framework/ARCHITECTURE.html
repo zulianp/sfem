@@ -571,9 +571,29 @@
 
       <p>It also explains something OP 18 recorded without accounting for. <b>Laplace, the simplest and most performance-critical operator here, is written as a residual and therefore gets no sum factorisation</b>, which is the context for its 389 temporaries and for the hand-written low-order fast path someone wrote to compensate.</p>
 
-      <p><b>The direction reverses.</b> Contraction mode should become an explicit property the form layer carries, which either front end can set, rather than a consequence of which front end was used. Emission then branches on contraction mode &mdash; a form-layer fact, legitimately &mdash; instead of on <code>FormKind</code>, and a residual formulation like laplace becomes able to ask for the strong, sum-factorised path it cannot reach today. <code>tests/test_contraction_mode.py</code> pins the present state, including the assertion that mode still tracks kind exactly, so the day that stops being true is a test failure rather than a discovery.</p>
+      <p><b>And the strategy is not a mode to be chosen &mdash; it belongs to the element.</b> Three defaults govern it, all properties of the element rather than of the material or of how the material was written:</p>
 
-      <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>sum factorisation</i> energy only</span><span><i>laplace</i> residual, so none</span></div>
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>element family</th><th>evaluation</th></tr>
+        <tr><td>tensor-product</td><td>sum factorization, <b>always</b>. There is no decision to model.</td></tr>
+        <tr><td>simplex, lowest order</td><td>CSE expanded for a compact physical gradient, or for the basis functions directly, and <b>no quadrature-point information generated at all</b> &mdash; the basis gradients are constant over the element, so a quadrature loop and its per-point data are waste.</td></tr>
+        <tr><td>simplex, higher order</td><td>rules of its own, distinct from both.</td></tr>
+      </table>
+
+      <p>That removes the design question this entry was about to pose. The strategy is not a property either front end sets; it follows from the element, and the defect is that the framework currently derives it from the formulation instead. <code>tools/evaluation_strategy.py</code> measures the gap against those three rules, across the whole generated tree:</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>departure</th><th class="n">count</th></tr>
+        <tr><td>tensor-product elements without sum factorization</td><td class="n"><b>29</b></td></tr>
+        <tr><td>lowest-order simplices generating quadrature data</td><td class="n"><b>20</b></td></tr>
+        <tr><td>total</td><td class="n">49</td></tr>
+      </table>
+
+      <p>By material, sum factorization reaches every energy-formulated material and <b>none</b> of the residual-formulated ones &mdash; laplace, stokes, two-phase flow, the Neumann conditions. And every material generates quadrature loops on lowest-order simplices where the rule says none are needed: 48 apiece for the hyperelastic materials, 28 for two-phase flow, 4 for laplace.</p>
+
+      <p>So OP 18's finding was a symptom of this one. <b>Laplace gets neither default</b>: no sum factorization on its tensor-product elements because it is written as a residual, and quadrature loops on its lowest-order simplices where the compact expanded form needs none. The hand-written fast path in the emitter is what someone wrote instead of fixing the rule. <code>tests/test_contraction_mode.py</code> pins the present coupling &mdash; including the assertion that strategy still tracks formulation exactly &mdash; so the day that stops being true is a test failure rather than a rediscovery.</p>
+
+      <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>strategy departures</i> 49</span><span><i>sum factorisation</i> energy only</span><span><i>laplace</i> residual, so none</span></div>
     </div>
   </div>
 
