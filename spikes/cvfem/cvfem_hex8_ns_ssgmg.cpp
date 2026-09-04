@@ -12,6 +12,7 @@
 // driver states the problem and the operator stays opaque.
 
 #include "cvfem_hex8_ns_op.hpp"
+#include "cvfem_fgmres.hpp"
 #include "cvfem_ns_channel_case.hpp"
 
 #include "sfem_API.hpp"
@@ -1143,8 +1144,32 @@ namespace {
             }
 
             if (i + 1 < nlevels) {
-                auto sm = sfem::create_stationary<real_t>(lop, prec, sfem::EXECUTION_SPACE_HOST);
-                sm->set_max_it(g.smoothing_steps);
+                // SFEM_GMG_KSMOOTH > 0 replaces the stationary smoother with that many
+                // BiCGStab iterations, preconditioned by the same block-Jacobi.
+                //
+                // The Galerkin coarse operators approximate the fine operator far better
+                // than the rediscretised ones and are far worse to smooth -- denser, and
+                // without the diagonal dominance a stationary iteration needs, so they
+                // diverge under block-Jacobi at every damping. A Krylov method does not
+                // require that: it adapts to the operator it is given. The price is that
+                // the resulting cycle is no longer a fixed linear operator, which is why
+                // this must be paired with a flexible outer solver.
+                const int ksmooth = smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0);
+                std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> sm;
+                if (ksmooth > 0) {
+                    auto ks = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
+                    ks->set_max_it(ksmooth);
+                    ks->set_rtol(1e-12);
+                    ks->set_atol(1e-30);
+                    ks->verbose = false;
+                    ks->set_preconditioner_op(prec);
+                    sm = ks;
+                } else {
+                    auto st = sfem::create_stationary<real_t>(lop, prec, sfem::EXECUTION_SPACE_HOST);
+                    st->set_max_it(g.smoothing_steps);
+                    sm = st;
+                }
+                auto sm_unused = sm;
                 level_op_below = lop;
                 g.mg->add_level(lop, sm, i == 0 ? nullptr : wrap_p(i), g.data->restrictions[i]);
             } else {
@@ -1491,10 +1516,42 @@ int main(int argc, char **argv) {
             std::printf("check_jv[newton %d]: rel=%.6e  |u|_inf=%.3e\n", newton_it, (amax > 0) ? dmax / amax : dmax, uinf);
         }
 
-        auto solver = sfem::create_bcgs<real_t>(linop, sfem::EXECUTION_SPACE_HOST);
-        solver->set_max_it(lin_max_it);
-        solver->set_rtol(lin_rtol);
-        solver->set_atol(lin_atol);
+        // A Krylov smoother makes the cycle vary between applications, and BiCGStab
+        // assumes its preconditioner does not. It does not fail loudly when that is
+        // violated -- it stagnates -- so the outer solver switches to FGMRES whenever the
+        // preconditioner is not a fixed operator.
+        const int  ksmooth_outer = smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0);
+        const bool use_fgmres =
+                smesh::Env::read<int>("SFEM_FGMRES", (gmg && ksmooth_outer > 0) ? 1 : 0) != 0;
+
+        std::shared_ptr<sfem::FGMRES<real_t>>    fsolver;
+        std::shared_ptr<sfem::BiCGStab<real_t>>  bsolver;
+        std::function<void(const std::shared_ptr<sfem::Operator<real_t>> &)> set_prec;
+        std::function<int()>                                                 get_its;
+        std::function<void(const real_t *, real_t *)>                        do_solve;
+
+        if (use_fgmres) {
+            fsolver = std::make_shared<sfem::FGMRES<real_t>>(linop);
+            fsolver->set_max_it(lin_max_it);
+            fsolver->set_rtol(lin_rtol);
+            fsolver->set_atol(lin_atol);
+            fsolver->set_restart(smesh::Env::read<int>("SFEM_FGMRES_RESTART", 30));
+            set_prec = [fsolver](const std::shared_ptr<sfem::Operator<real_t>> &p) {
+                fsolver->set_preconditioner_op(p);
+            };
+            get_its  = [fsolver]() { return fsolver->iterations(); };
+            do_solve = [fsolver](const real_t *b, real_t *x) { fsolver->apply(b, x); };
+        } else {
+            bsolver = sfem::create_bcgs<real_t>(linop, sfem::EXECUTION_SPACE_HOST);
+            bsolver->set_max_it(lin_max_it);
+            bsolver->set_rtol(lin_rtol);
+            bsolver->set_atol(lin_atol);
+            set_prec = [bsolver](const std::shared_ptr<sfem::Operator<real_t>> &p) {
+                bsolver->set_preconditioner_op(p);
+            };
+            get_its  = [bsolver]() { return bsolver->iterations(); };
+            do_solve = [bsolver](const real_t *b, real_t *x) { bsolver->apply(b, x); };
+        }
         {
             const double t0 = smesh::time_seconds();
             if (gmg) {
@@ -1580,7 +1637,7 @@ int main(int argc, char **argv) {
                         std::printf("  %s  %.4e -> %.4e   x%.3e\n", nm[c], std::sqrt(n0[c]),
                                     std::sqrt(n1[c]), (n0[c] > 0) ? std::sqrt(n1[c] / n0[c]) : 0.0);
                 }
-                solver->set_preconditioner_op(gmg->mg);
+                set_prec(gmg->mg);
             } else if (use_gmg == 2) {
                 // Cost-matched control for the V-cycle. The same damped block-Jacobi, run
                 // as a stationary iteration on the fine level for the same number of
@@ -1596,25 +1653,25 @@ int main(int argc, char **argv) {
                 auto prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
                 auto sm   = sfem::create_stationary<real_t>(linop, prec, sfem::EXECUTION_SPACE_HOST);
                 sm->set_max_it(2 * gmg_smooth);
-                solver->set_preconditioner_op(sm);
+                set_prec(sm);
             } else {
-                solver->set_preconditioner_op(make_block_jacobi(*op, x, cmask.data(), nnodes));
+                set_prec(make_block_jacobi(*op, x, cmask.data(), nnodes));
             }
             t_prec += smesh::time_seconds() - t0;
         }
         {
             const double t0 = smesh::time_seconds();
-            solver->apply(rhs.data(), dx.data());
+            do_solve(rhs.data(), dx.data());
             t_solve += smesh::time_seconds() - t0;
         }
-        lin_it_total += solver->iterations();
+        lin_it_total += get_its();
 
         real_t dxinf = 0;
         for (ptrdiff_t i = 0; i < ndof; ++i) {
             x[(size_t)i] += dx[(size_t)i];
             dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
         }
-        std::printf("  lin_it: %d  |dx|_inf: %.6e\n", solver->iterations(), dxinf);
+        std::printf("  lin_it: %d  |dx|_inf: %.6e\n", get_its(), dxinf);
     }
     if (!converged) break;
     }
