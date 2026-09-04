@@ -103,3 +103,36 @@ def element_evaluation_plan(element_type):
         family=family,
         strategy=STRATEGY_BY_FAMILY[family],
     )
+
+
+#: The C scope a kernel body opens, per strategy.  A table rather than a
+#: conditional, and in the plan rather than in the emitter: emission printing
+#: `if strategy is EXPANDED` would be emission deciding, which is the thing the
+#: printer discipline is there to stop.  ``%(indent)s`` is filled by the caller.
+QUADRATURE_SCOPE_LINES = {
+    EvaluationStrategy.EXPANDED: (
+        "%(indent)s{",
+        "%(indent)s    const int q = 0;  // %(element)s evaluates in closed form",
+    ),
+    EvaluationStrategy.SUM_FACTORIZED: (
+        "%(indent)sfor (int q = 0; q < N_QP; ++q) {",
+    ),
+    EvaluationStrategy.QUADRATURE: (
+        "%(indent)sfor (int q = 0; q < N_QP; ++q) {",
+    ),
+}
+
+
+def quadrature_scope_lines(element_type, indent=""):
+    """The scope a kernel body opens over quadrature, for this element.
+
+    A lowest-order simplex has one quadrature point and constant basis
+    gradients, so the loop has one trip and collapses to the point itself.
+    ``const int q = 0`` rather than substituting zero throughout: the bodies
+    index reference tables as ``[q * N_SHAPE + shape]`` at a dozen sites, and
+    the compiler folds that where rewriting each site would not be worth the
+    churn.  What leaves the emitted source is the loop.
+    """
+    strategy = evaluation_strategy(element_type)
+    substitution = {"indent": indent, "element": str(element_type).upper()}
+    return [line % substitution for line in QUADRATURE_SCOPE_LINES[strategy]]

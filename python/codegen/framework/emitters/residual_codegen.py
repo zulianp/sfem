@@ -110,6 +110,9 @@ from codegen.framework.emitters.quadrature_codegen import (
 )
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
+from codegen.framework.plans.evaluation_strategy import (
+    quadrature_scope_lines,
+)
 from codegen.framework.plans.affine_element_kernel import (
     p1_simplex_metric_apply_plan,
 )
@@ -8219,7 +8222,7 @@ def _isoparametric_mesh_operator_source(
                     "block_adjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
-                "        for (int q = 0; q < N_QP; ++q) {",
+                *quadrature_scope_lines(rule.element_type, "        "),
                 *_work_item_loop_lines("            "),
             ]
         )
@@ -8247,7 +8250,7 @@ def _isoparametric_mesh_operator_source(
         lines.extend(
             [
                 "",
-                "        for (int q = 0; q < N_QP; ++q) {",
+                *quadrature_scope_lines(rule.element_type, "        "),
                 *_work_item_loop_lines("            "),
                 "                const ptrdiff_t geometry_offset = q * VECTOR_SIZE + lane;",
             ]
