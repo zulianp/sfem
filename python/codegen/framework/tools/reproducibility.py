@@ -970,6 +970,7 @@ def main(argv=None):
     recorded = baseline.get(bucket, {})
 
     measured, measured_rates, skipped_all, failures = {}, {}, {}, []
+    owner = {}
     with tempfile.TemporaryDirectory(prefix="sfem_reproducibility_") as workdir:
         generated = os.path.join(workdir, "generated")
         os.makedirs(generated)
@@ -992,6 +993,15 @@ def main(argv=None):
                 failures.append("%s: %s" % (material, error))
                 continue
             measured.update(digests)
+            # Which material a kernel belongs to is known exactly here and
+            # nowhere else.  It used to be re-derived downstream as
+            # `name.startswith(material)`, which is a guess that poro-elasticity
+            # falsifies: its material is "poro_elasticity" and its kernels are
+            # prefixed "poro_hyperelasticity_", so none of its 28 digests ever
+            # matched their own material.  They were reported as new on every
+            # single run, and `--record` never pruned them, so a renamed or
+            # deleted poro kernel would have sat in the baseline forever.
+            owner.update(dict.fromkeys(digests, material))
             measured_rates.update(rates)
             skipped_all[material] = skipped
             print(
@@ -1012,7 +1022,7 @@ def main(argv=None):
 
     key_scope = set()
     for material in materials:
-        key_scope.update(name for name in measured if name.startswith(material))
+        key_scope.update(name for name, m in owner.items() if m == material)
 
     if measured_rates:
         print("\nthroughput, MDOF/s (same-machine comparison only):")
@@ -1041,8 +1051,13 @@ def main(argv=None):
 
     if args.record:
         merged = dict(recorded)
+        # Drop this run's materials wholesale before re-adding what was
+        # measured, so a kernel that no longer exists leaves the baseline.  An
+        # entry is this run's if it was measured now, or if it was recorded
+        # under a kernel prefix one of these materials owns.
+        prefixes = {name.rsplit("_", 1)[0] for name in measured} or set()
         for name in list(merged):
-            if any(name.startswith(m) for m in materials):
+            if name in measured or any(name.startswith(p) for p in prefixes):
                 del merged[name]
         merged.update(measured)
         baseline[bucket] = merged
@@ -1053,9 +1068,7 @@ def main(argv=None):
         return 0
 
     scoped = {
-        name: digest
-        for name, digest in recorded.items()
-        if any(name.startswith(m) for m in materials)
+        name: digest for name, digest in recorded.items() if name in key_scope
     }
     moved, appeared, missing = _compare(scoped, measured)
 
