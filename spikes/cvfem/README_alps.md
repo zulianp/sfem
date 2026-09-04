@@ -318,6 +318,48 @@ worth about 1%, not the large win expected. I then predicted the gather dominate
 the M1 flatly contradicted at a 15% floor, and Grace then confirmed at 35%. The
 measurement was right both times and the reasoning was not.
 
+### Measured and rejected: hoisting the boundary term
+
+`boundary_scs_add_jacobian_action` runs on every micro-element and tests six faces before
+finding, in the interior, that it has nothing to do. A macro-element with no node on a
+domain plane contains no micro-element with a face on one, so the call can be skipped
+outright -- exactly, not approximately. It looked like the obvious next optimisation and
+it is worth **nothing**.
+
+Interleaved A/B in a single binary, one Grace socket, 4343300 dofs, apply in ns/dof:
+
+| | trial 1 | trial 2 | trial 3 |
+|---|---|---|---|
+| L=4 hoist on | 1.188 | 1.191 | 1.185 |
+| L=4 hoist off | 1.189 | 1.191 | 1.185 |
+| L=8 hoist on | 1.162 | 1.174 | 1.161 |
+| L=8 hoist off | 1.162 | 1.166 | 1.173 |
+
+Identical to within 0.1%. The reason is visible once looked at rather than assumed: for
+an interior micro-element the boundary kernel does six plane tests and returns, so there
+was never much to skip. It was reverted rather than kept behind a flag, because the cheap
+version of the test reads the eight macro corners and that is only valid for a box --
+a latent trap for the curved macro-elements the hierarchy will eventually want, bought for
+no measured gain.
+
+Three things about how this was measured are worth keeping, since two earlier readings of
+the same change were wrong.
+
+**Across builds is not an A/B.** The first comparison put the hoisted kernel at 1.133
+against a 1.095 recorded before it, and concluded a 4% regression. That 1.095 predated the
+block split and the upwind specialisation as well, so it measured three changes at once.
+A runtime switch inside one binary is what settled it.
+
+**Interleave the arms.** Alternating hoist-on and hoist-off across trials, rather than
+running each arm back to back, is the same discipline `bench_hex8_alps.sbatch` already
+applies -- on a busy node the colored layout once looked 30% slower than packed measured
+back to back and 60% faster interleaved.
+
+**Check a control column.** `bd_nv` never touches the guard and held at 11.45-11.49
+throughout the Grace job, which is what makes the 0.1% agreement believable. On the M1 the
+same control swung 24 to 31, so its apparent 7% gain carries no weight -- the machine was
+not quiet enough to measure a 7% effect.
+
 ### Where the remaining headroom is
 
 Specialise the gather. Every block currently loads all fourteen arrays and scatters all
@@ -325,11 +367,8 @@ four components regardless of what it needs; C needs the coordinates and the pre
 direction, and little else. On Grace that is the only change with room left in it, since
 the floor is most of what C costs.
 
-Then the boundary term. `boundary_scs_add_jacobian_action` runs on every micro-element and
-tests six faces before finding it has nothing to do, and the input-masked path adds a
-32-entry zero-and-copy on top. A macro-element in the interior cannot have a domain face
-on any of its micro-elements, so a per-macro flag skips it outright -- and it would help
-the full operator as much as the blocks.
+The boundary term was the other candidate and it has since been tried and rejected; see
+above. That leaves the gather as the only identified headroom on Grace.
 
 ### Correctness
 
