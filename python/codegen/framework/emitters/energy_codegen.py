@@ -3379,7 +3379,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 )
             )
         else:
-            lines.extend(["", "                for (int q = 0; q < N_QP; ++q) {"])
+            lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "                ")])
             geometry_lines = _sfem_soa_isoparametric_geometry_lines(
                 dim,
                 n_nodes,
@@ -3861,7 +3861,7 @@ def _sfem_soa_mesh_operator_function(
                 )
 
     if form.weak_form is None:
-        lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
+        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
         if use_tensor_product_reference:
             lines.extend(_tensor_product_q_index_lines(dim, "            "))
             lines.append(
@@ -3899,7 +3899,7 @@ def _sfem_soa_mesh_operator_function(
             )
         )
     elif geometry_mode == "isoparametric" and form.weak_form is not None:
-        lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
+        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
         if use_tensor_product_geometry:
             lines.extend(_tensor_product_q_index_lines(dim, "            "))
         lines.extend(
@@ -4521,7 +4521,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                     )
                 )
             else:
-                lines.extend(["", "                for (int q = 0; q < N_QP; ++q) {"])
+                lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "                ")])
                 geometry_lines = _sfem_soa_isoparametric_geometry_lines(
                     dim,
                     n_nodes,
@@ -5008,7 +5008,7 @@ def _sfem_soa_mesh_objective_steps_function(
             )
         )
     elif geometry_mode == "isoparametric":
-        lines.extend(["", "        for (int q = 0; q < N_QP; ++q) {"])
+        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
         if use_tensor_product_geometry:
             lines.extend(_tensor_product_q_index_lines(dim, "            "))
         lines.extend(
