@@ -534,13 +534,17 @@ def _simplex_metric_scalar_affine_fast_path_body(
     if dependencies.previous or dependencies.current == dependencies.direction:
         return None
 
-    stream_group_name = "current" if dependencies.current else "direction"
-    if gradient_metric.stream_group_name != stream_group_name:
+    # Exactly one input role is live here: the guard above rejects a form with
+    # a previous state, or with current and direction either both set or both
+    # clear.  So the role is the one the plan reports, and its name, suffix and
+    # stride are the three things these lines were deriving by hand.
+    (role,) = live_field_roles(dependencies)
+    if gradient_metric.stream_group_name != role.name:
         return None
 
     field = system.fields[0]
-    input_name = field.name if dependencies.current else "%s_direction" % field.name
-    input_stride = "current_stride" if dependencies.current else "direction_stride"
+    input_name = "%s%s" % (field.name, role.suffix)
+    input_stride = role.stride
     output_name = "%s_out" % field.name
     scale = _sfem_ccode(gradient_metric.scale)
     lines = []
@@ -649,9 +653,9 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
     gradient_metric,
 ):
     field = system.fields[0]
-    input_kind = "current" if dependencies.current else "direction"
-    input_name = field.name if dependencies.current else "%s_direction" % field.name
-    input_stride = "%s_stride" % input_kind
+    (role,) = live_field_roles(dependencies)
+    input_name = "%s%s" % (field.name, role.suffix)
+    input_stride = role.stride
     output_name = "%s_out" % field.name
     scale = _sfem_ccode(gradient_metric.scale)
     lines = []
@@ -666,17 +670,15 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
             "const %s %s" % (scalar_type, parameter)
             for parameter in dependencies.parameters
         )
-        if dependencies.current:
-            params.append("const ptrdiff_t current_stride")
+        # One pass over the live roles rather than a branch each.  The names
+        # the branches spelled are the role's own: `current` carries an empty
+        # suffix and `direction` carries "_direction", which is what
+        # `live_field_roles` already reports, and the sequence is in ABI order.
+        for role in live_field_roles(dependencies):
+            params.append("const ptrdiff_t %s" % role.stride)
             params.extend(
-                "const %s *const SFEM_RESTRICT %s" % (scalar_type, field.name)
-                for field in system.fields
-            )
-        if dependencies.direction:
-            params.append("const ptrdiff_t direction_stride")
-            params.extend(
-                "const %s *const SFEM_RESTRICT %s_direction"
-                % (scalar_type, field.name)
+                "const %s *const SFEM_RESTRICT %s%s"
+                % (scalar_type, field.name, role.suffix)
                 for field in system.fields
             )
         params.append("const ptrdiff_t out_stride")
@@ -761,15 +763,10 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
                 "idx_t **const SFEM_RESTRICT elements",
                 "const geom_t *const SFEM_RESTRICT g_geom_metric",
             ]
-            if dependencies.current:
+            for role in live_field_roles(dependencies):
                 unit_params.extend(
-                    "const %s *const SFEM_RESTRICT %s" % (scalar_type, field.name)
-                    for field in system.fields
-                )
-            if dependencies.direction:
-                unit_params.extend(
-                    "const %s *const SFEM_RESTRICT %s_direction"
-                    % (scalar_type, field.name)
+                    "const %s *const SFEM_RESTRICT %s%s"
+                    % (scalar_type, field.name, role.suffix)
                     for field in system.fields
                 )
             unit_params.extend(
@@ -980,15 +977,14 @@ def _field_gather_lines(system, dependencies, indent, element_array="elements"):
         return lines
 
     assignment_lines = []
-    for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
+    # Every live role, not the state pair with direction written out after it.
+    # The two produced the same line -- `live_field_roles` gives direction the
+    # name and stride the hand-written branch spelled -- and the full sequence
+    # is already in ABI order, so direction still lands last.
+    for role in live_field_roles(dependencies):
         assignment_lines.append(
             "%s            block_%s[stream][lane] = %s_components[field][node * %s];"
             % (indent, role.name, role.name, role.stride)
-        )
-    if dependencies.direction:
-        assignment_lines.append(
-            "%s            block_direction[stream][lane] = direction_components[field][node * direction_stride];"
-            % indent
         )
     lines.extend(
         [
