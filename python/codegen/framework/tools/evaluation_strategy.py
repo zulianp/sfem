@@ -11,13 +11,15 @@ the element rather than of the material or of how the material was written:
                         per-point data are pure waste.
   simplex, higher order rules of its own, distinct from both.
 
-The framework does not work this way yet.  It decides evaluation by
-formulation: the energy front end lowers a strong form and contracts it later
-through the sum-factorised `tensor_test`, while the residual front end lowers a
-weak form that is already contracted and has nothing left to factorise.  So the
-strategy a material gets follows from which `add_*` call was used, and Laplace
--- written as a residual, and the most performance-critical operator here --
-gets sum factorization on no element at all.
+Both front ends reach sum factorization on tensor-product elements, through
+different template families: the energy path defers a flux and contracts it with
+TensorProductWeakOps (`tensor_test`), the residual path evaluates and integrates
+with TensorProductResidualOps (`tensor_evaluate` / `tensor_integrate`).  So rule
+one is largely met already, by two separate implementations of it.
+
+Rule two is not.  Lowest-order simplices still generate quadrature loops and
+per-point data across every material, and the compact expanded form exists only
+as hand-written C transcribed into the emitter for the Laplacian.
 
 This reports the gap against the three rules, so closing it is measurable
 rather than asserted.  It reads a generated tree:
@@ -59,12 +61,23 @@ def survey(generated):
         material = os.path.basename(material_dir)
         # Sum factorization is reached through the material's tensor-product
         # local header, so it is a per-material fact, not a per-element one.
+        # Two sum-factorised template families, not one.  The energy front end
+        # contracts a deferred flux through TensorProductWeakOps (`tensor_test`);
+        # the residual front end evaluates and integrates through
+        # TensorProductResidualOps (`tensor_evaluate` / `tensor_integrate`).
+        # Both are sum factorization.  An earlier version of this tool looked
+        # only for `tensor_test` and therefore reported every residual material
+        # as unfactorised, which was wrong -- and wrong in the direction that
+        # invents work, since it made rule 1 look unmet where it is met.
+        markers = ("tensor_test<", "tensor_evaluate<", "tensor_evaluate_value<",
+                   "tensor_integrate<", "tensor_integrate_value<")
         factorised = any(
-            "tensor_test<" in open(path, errors="ignore").read()
+            any(marker in open(path, errors="ignore").read() for marker in markers)
             for path in glob.glob(os.path.join(material_dir, "**", "*.hpp"), recursive=True)
             if "tensor_product_kernels" not in path
         )
         by_element = {}
+        volume = {}
         for path in glob.glob(os.path.join(material_dir, "d*", "*", "*")):
             if os.path.isdir(path):
                 continue
@@ -72,6 +85,15 @@ def survey(generated):
             source = open(path, errors="ignore").read()
             by_element.setdefault(element, 0)
             by_element[element] += len(re.findall(r"for \(int q = 0", source))
+            # The rules govern volume kernels.  A material whose only kernels
+            # are surface integrals -- the Neumann conditions emit nothing but
+            # `*_boundary_operator.cpp` -- is not a tensor-product volume
+            # element missing sum factorization; it is a different kind of
+            # integral, and counting it as a departure was a category error
+            # that put sixteen phantom entries in this report.
+            volume.setdefault(element, False)
+            if "_boundary_operator" not in os.path.basename(path):
+                volume[element] = True
         for element, quadrature_loops in sorted(by_element.items()):
             rows.append(
                 {
@@ -80,6 +102,7 @@ def survey(generated):
                     "family": element_family(element),
                     "sum_factorised": factorised,
                     "quadrature_loops": quadrature_loops,
+                    "has_volume_kernels": volume.get(element, False),
                 }
             )
     return rows
@@ -89,7 +112,11 @@ def violations(rows):
     """Where the generated tree departs from the three defaults."""
     found = []
     for row in rows:
-        if row["family"] == "tensor-product" and not row["sum_factorised"]:
+        if (
+            row["family"] == "tensor-product"
+            and row.get("has_volume_kernels", True)
+            and not row["sum_factorised"]
+        ):
             found.append(
                 (
                     "tensor-product without sum factorization",
