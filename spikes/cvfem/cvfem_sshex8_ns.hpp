@@ -846,18 +846,23 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
         const scalar_t ax = g.A[dd][0], ay = g.A[dd][1], az = g.A[dd][2];
         const scalar_t c  = g.coeff[s];
 
-        // The upwind direction is a property of the state, so it is needed by every block
-        // that carries a convective contribution -- it cannot be specialised away.
-        const scalar_t corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
-                                               half * (pgy[i] + pgy[j]) * g.dvec[s][1] +
-                                               half * (pgz[i] + pgz[j]) * g.dvec[s][2]);
-        const scalar_t mdot = rho * (half * (ux[i] + ux[j]) * ax + half * (uy[i] + uy[j]) * ay +
-                                     half * (uz[i] + uz[j]) * az) - c * corr;
-        const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
-        const scalar_t mpos  = half * (mdot + sgn * mdot);
-        const scalar_t mneg  = half * (mdot - sgn * mdot);
-        const scalar_t d_pos = half * (one + sgn);
-        const scalar_t d_neg = half * (one - sgn);
+        // The upwind weights are needed only by the momentum rows. The continuity row is
+        // dmdot_v + dmdot_q with no sgn in it, so for a pressure-row evaluation the whole
+        // upwind computation -- the Rhie-Chow correction, the mass flux, the sign and the
+        // four weights -- is dead. That is most of what makes C cheap to ask for.
+        scalar_t mpos = 0, mneg = 0, d_pos = 0, d_neg = 0;
+        if constexpr (mom) {
+            const scalar_t corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
+                                                   half * (pgy[i] + pgy[j]) * g.dvec[s][1] +
+                                                   half * (pgz[i] + pgz[j]) * g.dvec[s][2]);
+            const scalar_t mdot = rho * (half * (ux[i] + ux[j]) * ax + half * (uy[i] + uy[j]) * ay +
+                                         half * (uz[i] + uz[j]) * az) - c * corr;
+            const scalar_t sgn  = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
+            mpos  = half * (mdot + sgn * mdot);
+            mneg  = half * (mdot - sgn * mdot);
+            d_pos = half * (one + sgn);
+            d_neg = half * (one - sgn);
+        }
 
         // The two halves of the mass-flux derivative, kept apart so the blocks can be.
         const scalar_t dmdot_v = (uu || pu) ? rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay +
@@ -1065,6 +1070,10 @@ inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar
                                  const scalar_t *const SFEM_RESTRICT dir,
                                  scalar_t *const SFEM_RESTRICT       jv) {
     switch (blocks & SSBLOCK_ALL) {
+        // 0 selects no block at all: the sweep gathers the macro-element, computes
+        // nothing, and scatters zeros. That is the floor any block specialisation can
+        // reach, and it is worth being able to measure rather than infer.
+        case 0:           sscvfem_apply_blocks_impl<0>(d, rho, mu, dir, jv);           break;
         case SSBLOCK_UU:  sscvfem_apply_blocks_impl<SSBLOCK_UU>(d, rho, mu, dir, jv);  break;
         case SSBLOCK_UP:  sscvfem_apply_blocks_impl<SSBLOCK_UP>(d, rho, mu, dir, jv);  break;
         case SSBLOCK_PU:  sscvfem_apply_blocks_impl<SSBLOCK_PU>(d, rho, mu, dir, jv);  break;
