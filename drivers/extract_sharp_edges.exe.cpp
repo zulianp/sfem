@@ -11,8 +11,10 @@
 
 #include "sortreduce.hpp"
 
+#include "smesh_edgeset.hpp"
 #include "smesh_extractions.hpp"
 #include "smesh_glob.hpp"
+#include "smesh_nodeset.hpp"
 
 #include "sfem_API.hpp"
 
@@ -46,15 +48,29 @@ int extract_sharp_edges_driver(const std::shared_ptr<sfem::Communicator> &comm, 
         return EXIT_FAILURE;
     }
 
-    auto sharp_edges             = smesh::extract_sharp_edges(*mesh, angle_threshold);
-    auto disconnected_elements   = smesh::extract_disconnected_faces(*mesh, sharp_edges);
-    auto corners                 = smesh::extract_sharp_corners(n_nodes, sharp_edges, true);
+    auto sharp_edges = smesh::extract_sharp_edges(*mesh, angle_threshold);
+    if (!sharp_edges) {
+        fprintf(stderr, "%s failed to extract sharp edges\n", argv[0]);
+        return EXIT_FAILURE;
+    }
 
-    const ptrdiff_t n_sharp_edges           = sharp_edges->extent(1);
-    const ptrdiff_t n_disconnected_elements = disconnected_elements->size();
-    const ptrdiff_t n_corners               = corners->size();
-    auto              e0                    = sharp_edges->data()[0];
-    auto              e1                    = sharp_edges->data()[1];
+    auto disconnected_elements = smesh::extract_disconnected_faces(*mesh, *sharp_edges);
+    auto corners               = smesh::extract_sharp_corners(*mesh, sharp_edges, true);
+    if (!corners || !corners->nodes()) {
+        fprintf(stderr, "%s failed to extract sharp corners\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    auto edge_nodes = smesh::create_edges_from_edgeset(mesh, sharp_edges).second;
+    if (!edge_nodes) {
+        fprintf(stderr, "%s failed to expand sharp edges to node pairs\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    const ptrdiff_t n_sharp_edges           = sharp_edges->size();
+    const ptrdiff_t n_disconnected_elements = disconnected_elements ? disconnected_elements->size() : 0;
+    auto            e0                      = edge_nodes->data()[0];
+    auto            e1                      = edge_nodes->data()[1];
 
     {
         char path[1024 * 10];
@@ -69,13 +85,13 @@ int extract_sharp_edges_driver(const std::shared_ptr<sfem::Communicator> &comm, 
         smesh::create_directory(path);
 
         snprintf(path, sizeof(path), "%s/corners/i0.raw", output_folder);
-        corners->to_file(smesh::Path(path));
+        corners->nodes()->to_file(smesh::Path(path));
 
-        snprintf(path, sizeof(path), "%s/e." dtype_ELEMENT_IDX_T ".raw", output_folder);
-        disconnected_elements->to_file(smesh::Path(path));
+        if (disconnected_elements) {
+            snprintf(path, sizeof(path), "%s/e." dtype_ELEMENT_IDX_T ".raw", output_folder);
+            disconnected_elements->to_file(smesh::Path(path));
 
-        {
-            const int nxe = elem_num_nodes(mesh->element_type(0));
+            const int nxe    = elem_num_nodes(mesh->element_type(0));
             auto      delems = sfem::create_host_buffer<idx_t>(nxe, n_disconnected_elements);
             auto      src    = mesh->elements(0)->data();
 
@@ -88,7 +104,8 @@ int extract_sharp_edges_driver(const std::shared_ptr<sfem::Communicator> &comm, 
             snprintf(path, sizeof(path), "%s/disconnected", output_folder);
             smesh::create_directory(path);
 
-            delems->to_files(smesh::Path(std::string(output_folder) + "/disconnected/i%d." + std::string(smesh::TypeToString<idx_t>::value())));
+            delems->to_files(smesh::Path(std::string(output_folder) + "/disconnected/i%d." +
+                                         std::string(smesh::TypeToString<idx_t>::value())));
         }
     }
 
@@ -113,3 +130,4 @@ int main(int argc, char *argv[]) {
     auto ctx = sfem::initialize(argc, argv);
     return extract_sharp_edges_driver(ctx->communicator(), argc, argv);
 }
+
