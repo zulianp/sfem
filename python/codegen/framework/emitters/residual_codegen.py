@@ -110,6 +110,9 @@ from codegen.framework.emitters.quadrature_codegen import (
 )
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
+from codegen.framework.plans.reference_data import (
+    mixed_reference_streams,
+)
 from codegen.framework.plans.evaluation_strategy import (
     quadrature_scope_lines,
 )
@@ -1231,25 +1234,17 @@ def _field_stream_initializer(layout, field_index, array_name):
 
 
 def _mixed_local_reference_params(cell_rule, n_fields, dim, dependencies, basis_family=None):
-    if _is_tensor_product_family(cell_rule, basis_family):
-        params = [
-            "const scalar_t *const SFEM_RESTRICT field_shape_1d[%d]" % n_fields
-        ]
-        if dependencies.uses_reference_gradients:
-            params.append(
-                "const scalar_t *const SFEM_RESTRICT field_grad_1d[%d]" % n_fields
-            )
-        params.append("const scalar_t *const SFEM_RESTRICT q_weight_1d")
-        return params
-
-    params = ["const scalar_t *const SFEM_RESTRICT field_shape[%d]" % n_fields]
-    if dependencies.uses_reference_gradients:
-        params.append(
-            "const scalar_t *const SFEM_RESTRICT field_grad_ref[%d]"
-            % (n_fields * dim)
+    """The reference buffers this kernel declares, spelled from the plan."""
+    return [
+        "const scalar_t *const SFEM_RESTRICT %s%s"
+        % (stream.name, "[%d]" % stream.extent if stream.extent else "")
+        for stream in mixed_reference_streams(
+            dependencies,
+            _is_tensor_product_family(cell_rule, basis_family),
+            n_fields,
+            dim,
         )
-    params.append("const scalar_t *const SFEM_RESTRICT q_weight")
-    return params
+    ]
 
 
 def _mixed_reference_pointer_lines(
@@ -1342,18 +1337,23 @@ def _mixed_reference_pointer_lines(
 
 
 def _mixed_reference_call_args(cell_rule, dependencies, reference_data, basis_family=None):
-    if _is_tensor_product_family(cell_rule, basis_family):
-        args = ["field_shape_1d"]
-        if dependencies.uses_reference_gradients:
-            args.append("field_grad_1d")
-        args.append("sfem::codegen::%s::q_weight_1d()" % reference_data)
-        return args
+    """The matching call arguments -- same plan, so they cannot disagree.
 
-    args = ["field_shape"]
-    if dependencies.uses_reference_gradients:
-        args.append("field_grad_ref")
-    args.append("sfem::codegen::%s::q_weight()" % reference_data)
-    return args
+    The buffers a caller passes through by name, and the quadrature weights it
+    reaches through the generated reference-data struct, are the same sequence
+    the signature declares.
+    """
+    return [
+        "sfem::codegen::%s::%s()" % (reference_data, stream.name)
+        if stream.from_reference_data
+        else stream.name
+        for stream in mixed_reference_streams(
+            dependencies,
+            _is_tensor_product_family(cell_rule, basis_family),
+            n_fields=0,
+            dim=0,
+        )
+    ]
 
 
 def _mesh_reference_name(geometry_mode, name):

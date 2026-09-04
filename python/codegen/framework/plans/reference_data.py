@@ -419,3 +419,43 @@ def _field_element_type_map(field_element_types):
         str(getattr(field, "name", field)): str(element).upper()
         for field, element in field_element_types
     }
+
+
+@dataclass(frozen=True)
+class MixedReferenceStream:
+    """One reference-basis buffer a mixed local kernel is handed.
+
+    ``extent`` is the array bound, or zero for a scalar.  ``from_reference_data``
+    marks the ones a caller reaches through the generated reference-data struct
+    rather than passing straight through.
+    """
+
+    name: str
+    extent: int = 0
+    from_reference_data: bool = False
+
+
+def mixed_reference_streams(dependencies, tensor_product, n_fields, dim):
+    """The reference buffers a mixed local kernel takes, in ABI order.
+
+    Shape, then the reference gradients when the form needs them, then the
+    quadrature weights.  Whether the gradients are there is the only variable,
+    and it was asked six times in the residual emitter -- once each in the
+    parameter list, the pointer setup and the call arguments, and twice over
+    because the tensor-product and simplex spellings were written out
+    separately.  A signature and its call that both come from here cannot
+    disagree about which buffers exist.
+    """
+    if tensor_product:
+        streams = [MixedReferenceStream("field_shape_1d", n_fields)]
+        if dependencies.uses_reference_gradients:
+            streams.append(MixedReferenceStream("field_grad_1d", n_fields))
+        streams.append(
+            MixedReferenceStream("q_weight_1d", from_reference_data=True)
+        )
+        return tuple(streams)
+    streams = [MixedReferenceStream("field_shape", n_fields)]
+    if dependencies.uses_reference_gradients:
+        streams.append(MixedReferenceStream("field_grad_ref", n_fields * dim))
+    streams.append(MixedReferenceStream("q_weight", from_reference_data=True))
+    return tuple(streams)
