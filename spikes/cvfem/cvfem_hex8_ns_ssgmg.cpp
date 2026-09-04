@@ -1006,18 +1006,31 @@ namespace {
         const ptrdiff_t     ndc = nn * N_FIELDS;
         std::vector<real_t> v((size_t)ndc), y((size_t)ndc), t1((size_t)n_fine), t2((size_t)n_fine);
 
+        // With null transfers this assembles A itself rather than R A P, which is how the
+        // fine level gets a matrix. Worth having for its own sake: a matrix-free apply
+        // accumulates with atomics, so its summation order changes with the thread count and
+        // the solve is not reproducible; a BSR apply accumulates each row in one thread and
+        // is deterministic however many threads are used.
+        auto composite = [&](const real_t *const xc, real_t *const yc) {
+            if (P && R) {
+                std::fill(t1.begin(), t1.end(), real_t(0));
+                std::fill(t2.begin(), t2.end(), real_t(0));
+                P->apply(xc, t1.data());
+                A_above->apply(t1.data(), t2.data());
+                R->apply(t2.data(), yc);
+            } else {
+                A_above->apply(xc, yc);
+            }
+        };
+
         for (int c = 0; c < ncolors; ++c) {
             for (int b = 0; b < N_FIELDS; ++b) {
                 std::fill(v.begin(), v.end(), real_t(0));
                 for (ptrdiff_t j = 0; j < nn; ++j)
                     if (color[(size_t)j] == c) v[(size_t)j * N_FIELDS + b] = real_t(1);
 
-                std::fill(t1.begin(), t1.end(), real_t(0));
-                std::fill(t2.begin(), t2.end(), real_t(0));
                 std::fill(y.begin(), y.end(), real_t(0));
-                P->apply(v.data(), t1.data());
-                A_above->apply(t1.data(), t2.data());
-                R->apply(t2.data(), y.data());
+                composite(v.data(), y.data());
 
                 for (ptrdiff_t i = 0; i < nn; ++i)
                     for (count_t a = rp[i]; a < rp[i + 1]; ++a)
@@ -1070,11 +1083,7 @@ namespace {
             f_coarse->apply_zero_constraints(v.data());
 
             assembled->apply(v.data(), ya.data());
-            std::fill(t1.begin(), t1.end(), real_t(0));
-            std::fill(t2.begin(), t2.end(), real_t(0));
-            P->apply(v.data(), t1.data());
-            A_above->apply(t1.data(), t2.data());
-            R->apply(t2.data(), yb.data());
+            composite(v.data(), yb.data());
 
             real_t dn = 0, rnv = 0;
             for (ptrdiff_t k = 0; k < ndc; ++k) {
@@ -1085,7 +1094,7 @@ namespace {
             const real_t rel = (rnv > 0) ? std::sqrt(dn / rnv) : 0.0;
             gate_ok          = rel < 1e-10;
             if (gate_ok || attempt == 2)
-                std::printf("galerkin assembly gate: |assembled - RAP| / |RAP| = %.4e  %s\n", rel,
+                std::printf("assembly gate [%s]: rel = %.4e  %s\n", (P && R) ? "RAP" : "A", rel,
                             gate_ok ? "OK" : "MISMATCH");
         }
 
@@ -1668,6 +1677,18 @@ int main(int argc, char **argv) {
         std::function<int()>                                                 get_its;
         std::function<void(const real_t *, real_t *)>                        do_solve;
 
+        // SFEM_ASSEMBLE_FINE=1 replaces the matrix-free fine operator with an assembled
+        // BSR one, probed the same way the Galerkin levels are. The point is determinism:
+        // the matrix-free apply accumulates through atomics, so its summation order follows
+        // the thread schedule and neither solver is reproducible; a BSR apply is.
+        if (smesh::Env::read<int>("SFEM_ASSEMBLE_FINE", 0)) {
+            const double t0  = smesh::time_seconds();
+            auto         src = gmg ? gmg->ops[0] : linop;
+            auto         fine_bsr = assemble_galerkin(f, src, nullptr, nullptr,
+                                                      f->space()->n_dofs(), nullptr);
+            phase_add("fine_assembly", smesh::time_seconds() - t0);
+            linop = fine_bsr;
+        }
         auto linop_timed = timed("outer_op", linop);
         if (use_fgmres) {
             fsolver = std::make_shared<sfem::FGMRES<real_t>>(linop_timed);
