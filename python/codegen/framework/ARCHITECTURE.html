@@ -518,7 +518,46 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Seventeen, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Eighteen, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 18</div>
+    <div class="body">
+      <div class="op-title">Low-order Laplacian and elasticity want CSE expanded, and one of them already has it &mdash; as frozen text <span class="chip c-part">analysed; the plan is the work</span></div>
+
+      <p>The requirement is that the simplest and most important kernels &mdash; Laplacian and linear elasticity on low-order elements &mdash; expand their common subexpressions rather than sharing them, so the emitted code is small and the register footprint minimal. A shared subexpression is a value live in a register from its definition to its last use; for a low-order element the expression it names is tiny and cheap to recompute, so naming it buys almost no arithmetic and lengthens live ranges across a loop the compiler is trying to vectorise. This is the register-pressure mechanism OP 15 measured, pointing the other way.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>kernel</th><th class="n">scalar temporaries</th><th class="n">lines</th></tr>
+        <tr><td>laplace &middot; TET4</td><td class="n"><b>389</b></td><td class="n">2,093</td></tr>
+        <tr><td>laplace &middot; TRI3</td><td class="n">214</td><td class="n">1,729</td></tr>
+        <tr><td>laplace &middot; HEX8</td><td class="n">0</td><td class="n">850</td></tr>
+        <tr><td>linear_elasticity &middot; TET4</td><td class="n"><b>284</b></td><td class="n">7,322</td></tr>
+        <tr><td>linear_elasticity &middot; TRI3</td><td class="n">96</td><td class="n">5,681</td></tr>
+        <tr><td>linear_elasticity &middot; HEX8</td><td class="n">0</td><td class="n">2,505</td></tr>
+        <tr><td><i>neohookean_ogden &middot; TET4, for contrast</i></td><td class="n">186</td><td class="n">7,141</td></tr>
+      </table>
+
+      <p>Read the last row against the first. <b>The Laplacian on TET4 carries more than twice the temporaries of a hyperelastic material on the same element</b> &mdash; 389 against 186 &mdash; which is the wrong way round for the simplest operator in the framework, and is the measurement that makes the case.</p>
+
+      <p><b>The low-order Laplacian already has the kernel this asks for.</b> There is a fast path that computes a TET4 element with <b>six</b> temporaries and four outputs, and a TRI3 element with three, straight from the metric components:</p>
+
+      <pre style="margin:8px 0 12px;padding:10px;overflow-x:auto;background:#00000008;border-radius:4px"><code>const scalar_t x0 = fff0 + fff1 + fff2;
+const scalar_t x3 = fff1 * u0;
+const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;
+const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</code></pre>
+
+      <p><b>It is hand-written C, as literal strings inside the emitter</b> &mdash; 28 such lines across <code>emitters/</code> &mdash; selected by a six-condition structural test that is also in the emitter: cached affine metric, one field, one quadrature point, <code>n_shape == dim + 1</code>, no previous state, and a matching stream group. Every one of those conditions is a property of the lowered form, which is to say a planning decision sitting in emission; and the kernel it selects is not derived from the form at all, it is transcribed.</p>
+
+      <p><b>Linear elasticity gets none of it.</b> The gate tests for a Laplacian-shaped form, so elasticity falls through to the general path and its 284 temporaries. The technique is frozen exactly where someone wrote it out, which is the cost of holding it as text rather than as a policy.</p>
+
+      <p><b>So the work is to make it a plan.</b> Expansion becomes a per-kernel decision the plan layer states &mdash; the structural test moves there, where it belongs, and gains the element-order and material conditions elasticity needs. Emission then generates the expanded body from the symbolic expressions with sharing suppressed, rather than reproducing transcribed arithmetic. Two things fall out: the Laplacian path stops being frozen text and starts being derived from the form it claims to implement, and elasticity gets the same treatment without anyone hand-writing it.</p>
+
+      <p><b>This is measurable now, which it was not an hour ago.</b> The reproducibility harness reaches TET4 and drives ten laplace kernels including the metric family, with a recorded baseline and throughput saturating by refine=24. Whether expansion pays, and where it stops paying as the element order rises, is a measurement rather than an argument &mdash; and OP 15 is the standing warning that the intuition can be wrong in either direction.</p>
+
+      <div class="op-facts"><span><i>laplace TET4</i> 389 temps</span><span><i>vs neohookean TET4</i> 186</span><span><i>hand-written kernel lines</i> 28</span><span><i>gate conditions in emission</i> 6</span><span><i>elasticity low-order</i> no fast path</span><span><i>gate</i> TET4, 10 kernels</span></div>
+    </div>
+  </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 17</div>
