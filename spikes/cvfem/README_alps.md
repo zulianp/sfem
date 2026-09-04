@@ -1572,3 +1572,57 @@ over iteration counts. `SFEM_ASSEMBLE_FINE=1` gives a deterministic operator for
 where the memory is affordable. It would be worth adding a determinism check to the test
 suite -- one checksum at one thread against the same at N -- so that a regression in any of
 this is caught rather than rediscovered.
+
+## Reproducibility, verified end to end
+
+With the smesh coordinate patch built in, all three measures are live and the chain is
+closed. Everything below is measured, not projected.
+
+**Mesh coordinates.** N=3 on 8 threads, three runs: 16562.000023022294 every time with
+`SMESH_DETERMINISTIC_COORDS=1`, against 16562.000030174851, 16562.000029459596,
+16562.000029459596 with it off. The deterministic value is exactly what a single-threaded
+run produced before the patch, which is what the ownership rule promised -- the lowest
+element was already winning there.
+
+**Operator.** Bit-identical at 1, 2, 4 and 8 threads: the Jacobian action checksums
+0.08034669538290462 at every one, as do the residual (-0.63166661236032529) and the initial
+state (206.55554994212321). Thread-count independent, not merely run-to-run stable.
+
+**Solve.** N=3, L=8, across thread counts:
+
+| | 1 | 2 | 4 | 8 |
+|---|---|---|---|---|
+| `SFEM_DETERMINISTIC_BLAS=0` | 2000 (cap) | 2000 (cap) | 1688 | 1223 |
+| `SFEM_DETERMINISTIC_BLAS=1` | 1030 | 1030 | 1030 | 1030 |
+
+Identical iteration counts and identical u_linf (2.982674e-03) at every thread count. The
+~20% iteration noise that made every comparison in this document unreliable is gone.
+
+### One thing worth noticing
+
+The deterministic run is not merely reproducible, it is better: 1030 iterations against 1223
+at best and two outright failures to converge. That is not luck. The fixed 256-chunk sum is
+partially pairwise, so it is *more accurate* than the serial accumulation a single thread
+performs -- which is why the deterministic single-threaded run converges where the
+non-deterministic single-threaded run stagnates at its cap. Determinism here costs nothing
+and buys accuracy.
+
+It also explains a result reported earlier in this document and never satisfactorily
+accounted for: the baseline that "failed to converge single-threaded and succeeded on eight".
+That was never about thread count. It was a solver sitting close enough to stagnation that
+the accumulated error in a long serial sum decided the outcome, and the thread count only
+changed how that sum was grouped.
+
+### The three measures
+
+| measure | where | default |
+|---------|-------|---------|
+| `SMESH_DETERMINISTIC_COORDS` | smesh, `sshex8_fill_points*` | on |
+| `SFEM_SS_SCATTER` | this spike, five sshex8 kernels | on |
+| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_openmp_blas.hpp` | **off** |
+
+The first two are on by default because they are strictly better -- deterministic, and
+faster or equal. The third is off because it changes results in the last bits relative to
+every number produced before it, and turning it on should be a deliberate act. On the
+evidence above it should probably become the default, but that is a decision for the
+codebase rather than for this spike.
