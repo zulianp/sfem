@@ -518,7 +518,41 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Nineteen, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Twenty, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 20</div>
+    <div class="body">
+      <div class="op-title">Energy and residual must lower to one form algebra <span class="chip c-part">phase 0 done &mdash; the evidence</span></div>
+
+      <p><b>The requirement.</b> Both formulations lower to the same three objects &mdash; 0-form (energy, or a residual-based merit), 1-form (gradient, or the negated residual), 2-form (Hessian, or the Jacobian) &mdash; and nothing below the form layer distinguishes them.</p>
+
+      <p><b>The algebra already exists and stops at emission.</b> <code>symbolic/forms.py</code> has <code>FormOrder</code>, <code>StandardFormName</code>, and <code>FormCollection.form(order)</code> / <code>blocks_for(order)</code>. <code>FormOrder</code> is used 33 times in <code>symbolic</code>, 23 in <code>plans</code>, 18 in <code>package</code>, 20 in <code>pipeline</code> &mdash; and <b>0 times in <code>emitters</code></b>. The split below the form layer is not a flag the emitters test; it is the module boundary itself.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>emitter</th><th class="n">lines</th><th class="n">functions</th><th class="n">decisions in emission</th></tr>
+        <tr><td><code>energy_codegen.py</code></td><td class="n">8,989</td><td class="n">149</td><td class="n">110</td></tr>
+        <tr><td><code>residual_codegen.py</code></td><td class="n">9,865</td><td class="n">145</td><td class="n">126</td></tr>
+      </table>
+
+      <p><b>Only seven function names are shared between them</b>, and stripping the formulation word from the names adds none. They are parallel implementations of the same concepts rather than copies, which is why every capability is built twice and can diverge &mdash; and between them they hold <b>231 of the 233</b> decisions left in emission. The fork is one branch, in <code>pipeline/driver.py</code>, choosing an energy or a residual codegen unit on <code>FormKind</code>.</p>
+
+      <p><b>Phase 0 measured which representation is actually load-bearing, and it is not the forms.</b> The parallel residual state &mdash; <code>residual_fields</code>, <code>residual_expressions</code>, <code>jacobian_action_blocks</code> &mdash; has <b>49 consumers across eight files</b>. The form-order accessors have <b>19 across five</b>. So re-keying is not a rename: it is making the form blocks become the representation everything reads, in place of the one they read now.</p>
+
+      <p><b>And the mismatch is sharper than the code comment says.</b> Probing every material at the form layer:</p>
+
+      <ul style="margin:6px 0 12px 18px">
+        <li><b>Residual formulations key blocks by assembled field while their lowered fields are per component.</b> Stokes lowers 1-form blocks <code>u</code>, <code>p</code> against fields <code>u0</code>, <code>u1</code>, <code>u2</code>, <code>p</code>. That is the documented mismatch, and it is why the parallel state exists.</li>
+        <li><b>Energy formulations populate no block metadata at all.</b> Linear elasticity and neohookean report empty blocks at every order, while their form <em>expressions</em> are present and non-trivial. So the energy path does not merely key blocks differently; it does not use them.</li>
+      </ul>
+
+      <p><b>One correction to the plan this phase was written from.</b> It said the residual 0-form does not exist, on the strength of <code>FormMetadata(FormOrder.ZERO)</code> being appended with no blocks. The <em>metadata</em> has no blocks, but the <em>form</em> does have an expression: laplace's 0-form is <code>&kappa;&sup2;(&nabla;u&middot;&nabla;v)&sup2;/2</code>, which is already the shape of a merit. What is missing is the block metadata and a consumer, not the mathematics &mdash; so phase 2 is smaller than planned. Worth noting that this expression is the square of the weak-form integrand, test function included, rather than of the assembled residual vector; whether that is the intended merit is a question for whoever specifies it.</p>
+
+      <p><b>What phase 0 leaves behind.</b> <code>tests/test_form_keying_baseline.py</code> records, for every material and dimension, which orders exist, what each order's blocks are keyed by, and what the lowered fields are called. Phase 1 then arrives as a diff against that file rather than as an assertion that nothing broke. It deliberately does not assert that the 1-form is the derivative of the 0-form: on the residual path the 0-form is a merit and the 1-form is the negated residual, and the two are not related that way.</p>
+
+      <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>energy block metadata</i> empty</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 19</div>
