@@ -1649,3 +1649,53 @@ One practical note, learned three times over in this document: the spike compile
 until `build64` is rebuilt and installed, and the symptom is a measurement that silently
 matches the old behaviour. Check a changed default against its own opt-out before believing
 it took effect.
+
+## The GMG comparison, rerun with everything deterministic
+
+Every earlier comparison in this document carried about twenty percent of iteration-count
+noise and should be read as indicative at best. With the mesh, the operator and the
+reductions all deterministic, iteration counts now repeat exactly -- 526/526, 40/40,
+1834/1834, 104/104 on repeated runs -- so these numbers mean what they say.
+
+Two Newton steps, 8 threads, baseline is block-Jacobi + BiCGStab, V-cycle is assembled
+Galerkin with `SFEM_GMG_KSMOOTH=16` and the default fine smoothing of 2.
+
+| case | dofs | baseline | V-cycle | verdict |
+|------|------|----------|---------|---------|
+| N=1, L=8  |  10,692 |  526 its, 0.76 s |  40 its, 0.37 s | **2.1x faster** |
+| N=1, L=16 |  75,140 | 1834 its, 7.51 s | 104 its, 4.96 s | **1.5x faster** |
+| N=2, L=8  |  75,140 | 1061 its, 2.89 s | 230 its, 10.35 s | 3.6x slower |
+| N=3, L=8  | 242,500 | 1178 its, 6.99 s | 430 its, 51.6 s | 7.4x slower |
+| N=2, L=16 | 561,924 | 1369 its, 25.7 s | 2000 capped, wrong answer | fails |
+
+Tuning recovers a good deal of that -- at N=3, L=8, three levels with the coarse solve capped
+at 30 iterations and `KSMOOTH=8` gives 120 iterations in 8.5 s against 430 in 51.6 s, and at
+N=2, L=16 it turns a wrong answer into 307 iterations and a correct one in 48.2 s -- but in
+neither case does it overtake the baseline.
+
+### The result is about lattice depth, not problem size
+
+The third and second rows are the same problem size, 75,140 unknowns, decomposed differently:
+one macro-element with a level-16 lattice against eight macro-elements with a level-8 one.
+The V-cycle is 1.5x faster on the first and 3.6x slower on the second. Size is not the
+variable; how much of the mesh is lattice rather than macro-elements is.
+
+The reason is structural. `create_gmg_data` derefines the lattice and stops at the macro
+mesh, which it never coarsens. At N=1 the coarsest level is 20 nodes and free. At N=3 it is
+208 nodes whose Galerkin operator needs the dense fallback -- 43,264 blocks, 832 probe
+applications -- and the coarse solve alone is 21% of the run at 26.7 ms per application,
+with the two smoothed levels above it taking another 59%. The hierarchy runs out of levels
+while the problem is still big.
+
+That also explains why the baseline moves in the opposite direction: it takes 1834 iterations
+on the deep lattice and 1061 on the shallow one at equal size. A deep lattice is the hard
+case for a pointwise preconditioner, and it is exactly where the V-cycle pays off.
+
+So the honest summary is narrower and better supported than any earlier one here: **the
+V-cycle wins where the mesh is mostly lattice, and loses where it is mostly macro-elements**,
+and it wins by more the deeper the lattice. For the semi-structured meshes this work exists
+to exploit -- few macro-elements, deep lattices -- that is the favourable regime.
+
+The next step is not more tuning. It is to keep coarsening below the macro mesh, so the
+hierarchy does not terminate on a problem that is still large and dense; that is a change in
+`create_gmg_data` rather than in this spike.
