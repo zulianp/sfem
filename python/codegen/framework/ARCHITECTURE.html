@@ -190,7 +190,7 @@
 <header class="masthead">
   <div class="eyebrow"><b>Prescriptive</b> — what the layers must own &nbsp;·&nbsp; <i>Descriptive</i> — what is built today &nbsp;·&nbsp; Open points</div>
   <h1>SFEM Codegen Architecture</h1>
-  <p class="standfirst">The layer graph is clean and enforced, and the matrix-free apply path is now measured as well as described. The emission layer still holds 23,515 lines that should be a printer — up from 22,727, because node construction is longer than string appends, which is why it is now measured by the decisions it makes rather than by its size.</p>
+  <p class="standfirst">The layer graph is clean and enforced, and the matrix-free apply path is now measured as well as described. The emission layer still holds 23,409 lines that should be a printer — up from 22,727, because node construction is longer than string appends, which is why it is now measured by the decisions it makes rather than by its size.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
     <span><b>Branch</b> codegen-layering, 42 commits from 060684ff</span>
@@ -267,8 +267,8 @@
         <text x="106" y="390" class="d-sub">streams · phases · layouts · cost · SymPy ends</text>
         <rect x="500" y="328" width="416" height="78" class="d-partb" rx="2"/>
         <text x="516" y="352" class="d-name">plans/</text>
-        <text x="516" y="372" class="d-sub">5,481 LOC · 17 modules · scheduler landed</text>
-        <text x="516" y="390" class="d-gapt">10 of 13 structural plans still unread</text>
+        <text x="516" y="372" class="d-sub">5,996 LOC · 19 modules · scheduler landed</text>
+        <text x="516" y="390" class="d-okt">every structural plan has a reader</text>
         <text x="902" y="352" class="d-keyd" text-anchor="end">PARTIAL</text>
 
         <!-- L4 -->
@@ -279,7 +279,7 @@
         <text x="106" y="476" class="d-sub">AST passes · loop structure fixed here</text>
         <rect x="500" y="414" width="416" height="78" class="d-gapb" rx="2"/>
         <text x="516" y="438" class="d-name">ir/</text>
-        <text x="516" y="458" class="d-sub">930 LOC · complete and well formed</text>
+        <text x="516" y="458" class="d-sub">1,211 LOC · one pass wired, an analysis</text>
         <text x="516" y="476" class="d-gapt">every residual kernel is a tree</text>
         <text x="902" y="438" class="d-gapt" text-anchor="end">PARTIAL</text>
 
@@ -291,8 +291,8 @@
         <text x="106" y="562" class="d-sub">atomics · widths · spaces · target ends here</text>
         <rect x="500" y="500" width="416" height="78" class="d-partb" rx="2"/>
         <text x="516" y="524" class="d-name">targets/</text>
-        <text x="516" y="544" class="d-sub">445 LOC · own layer since the split</text>
-        <text x="516" y="562" class="d-gapt">dialect only; _target() still hardcoded</text>
+        <text x="516" y="544" class="d-sub">513 LOC · own layer since the split</text>
+        <text x="516" y="562" class="d-gapt">bound, not threaded; 28 literal pragmas</text>
         <text x="902" y="524" class="d-keyd" text-anchor="end">PARTIAL</text>
 
         <!-- L6 -->
@@ -303,8 +303,8 @@
         <text x="106" y="648" class="d-sub">mechanical · no policy · no decisions</text>
         <rect x="500" y="586" width="416" height="78" class="d-gapb" rx="2"/>
         <text x="516" y="610" class="d-name">emitters/</text>
-        <text x="516" y="630" class="d-sub">22,727 LOC · 13 modules</text>
-        <text x="516" y="648" class="d-gapt">no symbol analysis left; still shapes the loops</text>
+        <text x="516" y="630" class="d-sub">23,409 LOC · 13 modules</text>
+        <text x="516" y="648" class="d-gapt">239 decisions left, from 428 measured</text>
         <text x="902" y="610" class="d-gapt" text-anchor="end">DOES NOT CONFORM</text>
 
         <!-- L7 -->
@@ -503,9 +503,11 @@
     <tr><td>IR node kinds</td><td class="n">8</td><td class="n">34</td><td>function, block, loop header, return, conditional — each added for a shape real generated code already had</td></tr>
     <tr><td>Residual kernels as trees</td><td class="n">0</td><td class="n">all</td><td>signature included; zero un-migrated bodies</td></tr>
     <tr><td>Pragmas bypassing the target</td><td class="n">66</td><td class="n">28</td><td>the rest are structure or deprioritised formats</td></tr>
-    <tr><td><b>emitters/ lines</b></td><td class="n">22,727</td><td class="n">23,515</td><td><b>grew.</b> Node construction is longer than string appends; the layer that should be a printer got bigger</td></tr>
+    <tr><td><b>emitters/ lines</b></td><td class="n">22,727</td><td class="n">23,409</td><td><b>grew.</b> Node construction is longer than string appends; the layer that should be a printer got bigger</td></tr>
     <tr><td><b>Structural plans unread</b></td><td class="n">10 of 13</td><td class="n">0 of 13</td><td><b>closed.</b> Every structural and assembly plan has a reader; connecting the last four found two of them describing streams their kernels do not have — OP 13</td></tr>
-    <tr><td><b>Passes over the IR</b></td><td class="n">0</td><td class="n">1</td><td><b>opened.</b> VectorizationContractPass runs in the printer's default pipeline — an analysis, not a transform, so the layer is reachable but still holds no optimization</td></tr>
+    <tr><td><b>Decisions in emission</b></td><td class="n">428</td><td class="n">239</td><td><b>the headline measure.</b> Branches whose test reads planning-layer input, ratcheted shrink-only. Not headed for zero by design: a branch on how C spells a declaration is emission's own business</td></tr>
+      <tr><td><b>Answer-level coverage</b></td><td class="n">0</td><td class="n">148</td><td><b>new.</b> Kernels driven and digested across all 8 materials at two mesh sizes — the gate that replaces byte-identity once output changes on purpose</td></tr>
+      <tr><td><b>Passes over the IR</b></td><td class="n">0</td><td class="n">1</td><td><b>opened.</b> VectorizationContractPass runs in the printer's default pipeline — an analysis, not a transform, so the layer is reachable but still holds no optimization</td></tr>
   </table>
   </div>
   <p><b>The shape is right; the direction of data flow is not.</b> L3 computes the structure, L4 can now represent it, L6 prints it — and L6 still originates it. That is the same defect found and fixed twice in narrow places this session: the scheduler computed <code>hoist_scope</code> and the emitters re-derived the loop nest by hand; the driver selected a target and the emitters constructed their own. Both are closed. The general case is not.</p>
@@ -639,7 +641,7 @@
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 10</div>
     <div class="body">
-      <div class="op-title">Kernels validate the matrix graph per element <span class="chip c-part">BSR done — four formats left</span></div>
+      <div class="op-title">Kernels validate the matrix graph per element <span class="chip c-part">removed from every kernel — not yet re-established</span></div>
       <p>Raised by Patrick, not found by this analysis. The generated Hessian assembly checks that the sparsity pattern contains every entry it needs <i>while assembling</i>. Each element's <code>_scatter_bsr</code> walks <code>N_SHAPE&nbsp;&times;&nbsp;N_SHAPE</code> candidate entries and tests each one with a three-condition branch, keeps a <code>valid_block_graph</code> flag, and calls <code>std::fprintf(stderr, …)</code> from inside an OpenMP parallel region on failure. The caller folds the status per element into <code>invalid_matrix_graph</code> and reduces it across threads with <code>reduction(|:invalid_matrix_graph)</code>.</p>
       <p>Graph validity is a property of the mesh and the sparsity pattern together — invariant across every element and across the whole assembly call. Establishing it once costs <b>O(nnz)</b>; re-testing it inside the loop costs <b>O(elements &times; N_SHAPE²)</b>, which is 100 branches per element for TET10 and far more for the higher-order hexes. Kernels must be correct, but preconditions belong to the caller: a kernel should be lean, and the priority inside an element loop is throughput.</p>
       <p>Two facts shape the work. The check is <i>fused into the sparsity search</i> rather than sitting beside it — <code>ks[j]</code> is the search result and the branch validates it in the same pass — so removal keeps the search and drops the test, the flag and the I/O, rather than deleting a loop. And the CRS form carries the same pattern but is not currently emitted for any shipped material, so the real removal is smaller than the emitter source suggests.</p>
@@ -647,7 +649,9 @@
             <p><b>Done for BSR</b>, the format vector problems assemble into. The scatter no longer declares <code>valid_block_graph</code>, no longer tests each of the N_SHAPE&nbsp;×&nbsp;N_SHAPE candidates with a three-condition branch, and no longer calls <code>std::fprintf</code> from inside the caller's parallel region. What is left is the locate loop, which was never validation: <code>ks[j]</code> is the search result the scatter needs either way, and the check had been fused into the search rather than sitting beside it. The function can no longer fail, so it returns <code>void</code> and its caller folds no status — the arrangement <code>_scatter_block_diag_sym</code> always had.</p>
       <p><b>The proof is an answer, not an argument.</b> This is the first change on the branch where byte-identity breaks on purpose: 36 generated files change, exactly the count this entry predicted, with no file added or removed. The reproducibility gate carries it instead — and carrying it meant extending that gate first, because it refused <code>rowptr</code> and <code>colidx</code> and so did not cover assembly at all. It now builds the mesh's own node adjacency graph, which is the sparsity pattern these kernels expect and precisely the precondition they had been re-establishing per element. Recording digests from the validating emitter and re-running against the stripped one leaves all 18 kernels unchanged, the two BSR assembly kernels among them.</p>
       <p><b>Four formats still validate</b> — CRS, DIA, COO and patch — and the <code>invalid_matrix_graph</code> flag with its <code>reduction(|:…)</code> clause stays until they follow. That clause is the one OP 2 plumbed through <code>parallel_for_pragma</code> to reproduce this check byte-for-byte; it goes when the last of them does, and the target API that carries it goes with it.</p>
-      <div class="op-facts"><span><i>files changed</i> 36</span><span><i>BSR</i> done</span><span><i>left</i> CRS · DIA · COO · patch</span><span><i>proof</i> digests unchanged</span><span><i>gate gained</i> BSR assembly coverage</span></div>
+            <p><b>All five formats now.</b> BSR, CRS, DIA, COO and patch have lost the flag, the per-candidate branch and the <code>std::fprintf</code>; all five return <code>void</code>, no caller folds a status, and <code>invalid_matrix_graph</code> together with its <code>reduction(|:…)</code> clause is gone from the generated code. What survives under that name's old clothes is <code>unsupported_matrix_format</code>, which is a different thing: <code>FORMAT</code> is a compile-time constant, so for any supported format the branch is discarded by <code>if constexpr</code> and costs nothing.</p>
+      <p><b>The other half is not done, and that is the open part.</b> Patrick's instruction was that the check belongs "way before, for instance during <code>Op::initialize</code>, then assumed". Written, then reverted: there are <i>four</i> <code>initialize</code> templates and the first attempt patched one the laplace path does not use, and more decisively <code>ryml.hpp</code> is absent from this tree, so the generated wrapper cannot be compiled here at all — the repo's own wrapper syntax gate reports itself skipped. Putting uncompiled C++ into four templates, and thereby into every generated operator, is not a thing to do unverified. So the precondition is currently assumed by the kernels and established nowhere.</p>
+      <div class="op-facts"><span><i>files changed</i> 36</span><span><i>formats done</i> 5 of 5</span><span><i>proof</i> 148 digests unchanged</span><span><i>gate gained</i> BSR assembly coverage</span><span><i>still open</i> establish it at setup</span><span><i>blocked by</i> no wrapper compile here</span></div>
     </div>
   </div>
 
@@ -741,7 +745,7 @@
       <tr><td>Emitter input</td><td class="m">a symbolic system</td><td class="m">an 8-member model</td><td><span class="chip c-ok">severed</span></td></tr>
       <tr><td>Driver and packaging</td><td class="m">outside the framework</td><td class="m">pipeline/ · package/</td><td><span class="chip c-ok">inside</span></td></tr>
       <tr><td>Residual paths: shared functions</td><td class="n">26</td><td class="n">48</td><td><span class="chip c-part">upper bound</span></td></tr>
-      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">23,515</td><td><span class="chip c-gap">grew — see below</span></td></tr>
+      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">23,409</td><td><span class="chip c-gap">grew — see below</span></td></tr>
     </tbody>
   </table>
   </div>
