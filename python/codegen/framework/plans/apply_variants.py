@@ -111,6 +111,42 @@ PACKED_ISOPARAMETRIC_VARIANTS = (
 PRECISIONS = (Precision.SCALAR, Precision.FLOAT)
 
 
+#: The scalar types a single entry point can be asked for at run time, and the
+#: ``smesh::PrimitiveType`` value that names each one.
+#:
+#: This is the same axis as ``PRECISIONS``, read for the opposite purpose.  As
+#: ``PRECISIONS`` it multiplies symbols: every kernel touching scalar data is
+#: emitted once per entry, the second copy differing only in ``using scalar_t =
+#: float`` and its parameter types.  As runtime cases it multiplies nothing --
+#: one entry point takes ``void *`` buffers and a ``const enum
+#: smesh::PrimitiveType``, switches, casts, and calls a template.
+#:
+#: The form and the values are SFEM's, not new: ``cu_tet4_laplacian_apply`` in
+#: ``operators/tet4/cuda/`` switches over exactly these three and falls through
+#: to ``SFEM_ERROR``.  ``SMESH_DEFAULT`` is first because it is the default a
+#: caller gets -- ``GPULaplacian`` declares ``real_type{smesh::SMESH_DEFAULT}``
+#: and carries it through ``clone()`` -- so it is the common path, not a
+#: fallback, and it resolves to ``real_t`` rather than to a fixed width.
+#:
+#: See ARCHITECTURE.html OP 17.
+RUNTIME_SCALAR_CASES = (
+    ("smesh::SMESH_DEFAULT", "real_t"),
+    ("smesh::SMESH_FLOAT32", "float"),
+    ("smesh::SMESH_FLOAT64", "double"),
+)
+
+#: The parameter a runtime-typed entry point carries, spelled as SFEM spells it.
+RUNTIME_SCALAR_TYPE_PARAMETER = "const enum smesh::PrimitiveType real_type"
+
+#: What the entry point names that parameter.
+RUNTIME_SCALAR_TYPE_ARGUMENT = "real_type"
+
+
+def runtime_scalar_cases():
+    """``(enum_value, c_type)`` for each case a runtime-typed kernel accepts."""
+    return RUNTIME_SCALAR_CASES
+
+
 @dataclass(frozen=True)
 class ApplyVariant:
     """One matrix-free apply kernel."""

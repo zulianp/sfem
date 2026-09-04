@@ -548,9 +548,23 @@
 
       <p><b>Two things this must not break, and one gate that does not yet exist.</b> Byte-identity breaks by design here &mdash; this is precisely the case OP 14 built <code>tools/reproducibility.py</code> for, and the 148 kernel digests are the correctness statement that has to survive unchanged. The second is performance, and it is the real risk: the standing rule in this codebase is that nothing trades measured CPU throughput for cleanliness. Moving a kernel body behind a template and a runtime switch should be free &mdash; the switch runs once per call, outside the element loop, exactly where SFEM's CUDA operators put it &mdash; but "should be" is not a measurement, and inlining and vectorisation of these bodies are sensitive. <b>A throughput gate before and after, on the same machine, is a precondition for this change rather than a follow-up to it.</b></p>
 
+      <p><b>The Op class mirrors <code>GPULaplacian</code>.</b> It declares <code>enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};</code> as a public member, carries it through <code>clone()</code>, and hands it to every kernel call alongside the buffers &mdash; whose interface types do not change, because the base <code>Op</code> methods take <code>real_t *</code> and a <code>real_t *</code> converts to <code>void *</code> at the call. That is exactly what <code>gpu_laplacian_block_vector</code> does. The generated Op has no <code>clone()</code> and keeps its state behind a pimpl, so the member is the one visible addition.</p>
+
+      <p><b>The work splits in two, and the half that was asked for is the safe half.</b> Classifying every <code>_float</code> definition by whether its body actually contains a kernel &mdash; a loop, a <code>#pragma</code>, a <code>using scalar_t</code> &mdash; rather than by size:</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>_float definitions</th><th class="n">forwarding only</th><th class="n">contains a kernel body</th></tr>
+        <tr><td>all generated</td><td class="n">1,854</td><td class="n">478</td></tr>
+        <tr><td><b>public ABI entry points</b></td><td class="n"><b>434</b></td><td class="n"><b>0</b></td></tr>
+      </table>
+
+      <p><b>Every one of the 434 public entry points is pure forwarding</b> &mdash; an element-type switch, or a single <code>return sfem::codegen::IMPL&lt;scalar_t, geom_t&gt;(&hellip;)</code> over a template that already exists. So collapsing the entire public ABI compiles no kernel body differently from today: the same template instantiations are called, from one symbol instead of two. <b>Throughput cannot move</b>, and the factor of two lands in full. That is stage one, and it carries no performance risk to gate.</p>
+
+      <p>Stage two is the 478 definitions that do carry a body, holding 7.6 MB of the 8.7 MB. Those bodies open with <code>using scalar_t = float;</code> and are written out in full, so collapsing them means turning each into a <code>template &lt;typename scalar_t&gt;</code> and letting the compiler instantiate it. That is where the source saving is and where the inlining and vectorisation risk is, and it is the part the throughput gate exists for.</p>
+
       <p><b>Open, and worth deciding before building.</b> <code>SMESH_DEFAULT</code> maps to <code>real_t</code>, which in most builds is <code>double</code>, so mirroring SFEM gives three instantiations where there are two today &mdash; object size grows even as the ABI halves, unless <code>DEFAULT</code> is folded into the matching concrete case. And the material scalar moving to <code>real_t</code> is a small semantic change: a caller running in single precision currently hands these kernels a <code>float</code> parameter and would hand them a <code>real_t</code>.</p>
 
-      <div class="op-facts"><span><i>ABI</i> 1,124 &rarr; 690</span><span><i>on scalar-carrying symbols</i> exactly 2&times;</span><span><i>source</i> &minus;8.7 MB of 31.8</span><span><i>bodies collapsed</i> 2,332</span><span><i>form</i> cu_tet4_laplacian.cu</span><span><i>needs</i> a throughput gate</span></div>
+      <div class="op-facts"><span><i>ABI</i> 1,124 &rarr; 690</span><span><i>on scalar-carrying symbols</i> exactly 2&times;</span><span><i>source</i> &minus;8.7 MB of 31.8</span><span><i>bodies collapsed</i> 2,332</span><span><i>form</i> cu_tet4_laplacian.cu</span><span><i>stage 1</i> 434 forwarders, no perf risk</span><span><i>stage 2</i> 478 bodies, needs a gate</span></div>
     </div>
   </div>
 
