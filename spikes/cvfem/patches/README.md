@@ -45,6 +45,11 @@ counts.
 `sshex8_build_node_owner` builds that table with a minimum, which is order independent, so
 the table is itself deterministic. Each fill then skips nodes it does not own.
 
+**Switch.** `SMESH_DETERMINISTIC_COORDS=0` restores the previous behaviour exactly: no
+ownership table is built and every element writes every node it contains, races included.
+Default is on. The switch exists so results produced before this change can still be
+reproduced, and so the two can be compared without rebuilding.
+
 Three properties worth noting:
 
 - A single-threaded run produces exactly what it produced before, since the lowest element
@@ -55,8 +60,9 @@ Three properties worth noting:
 - The extra cost is one pass over (elements x nodes-per-element) and one `ptrdiff_t` per
   node, paid once at mesh construction.
 
-**Checked:** `c++ -fsyntax-only` on `smesh_sshex8_mesh.cpp`, which explicitly instantiates
-both fills for every (idx, geom, ref) combination the library uses.
+**Checked:** `-fsyntax-only` on `smesh_sshex8_mesh.cpp`, which explicitly instantiates both
+fills for every (idx, geom, ref) combination the library uses -- in this tree, and again with
+`mpicxx` in the checkout at `~/Desktop/code/smesh`, where the patch has been applied.
 
 **Not checked:** the runtime effect, because that needs smesh rebuilt. The determinism
 probe is `SFEM_GMG_CHECK=1` in `cvfem_hex8_ns_ssgmg`, which prints `mesh coords checksum`;
