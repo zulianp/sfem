@@ -165,6 +165,11 @@ def _include_flags(root, generated_dir):
     dirs = [
         generated_dir,
         os.path.join(root, "base"),
+        # The simplex CPU kernels reach into SFEM proper: tet4_inline_cpu.hpp
+        # includes sortreduce.hpp, which lives here.  Without it the harness
+        # cannot drive TET4 at all, which is how a whole kernel family came to
+        # be outside every gate -- see ARCHITECTURE.html OP 17.
+        os.path.join(root, "algebra"),
         os.path.join(root, "build"),
         os.path.join(root, "build", "external", "smesh"),
         os.path.join(root, "external", "smesh", "src"),
@@ -327,6 +332,11 @@ def _bind(params, element, components, block_values=None):
             args.append("mesh.adjugate[%d].data()" % index)
         elif name == "g_jacobian_determinant0":
             args.append("mesh.determinant.data()")
+        elif re.fullmatch(r"g_geom_metric(\d+)", name or ""):
+            index = int(re.fullmatch(r"g_geom_metric(\d+)", name).group(1))
+            args.append("mesh.metric[%d].data()" % index)
+        elif name == "g_geom_metric":
+            args.append("mesh.metric_aos.data()")
         elif "PrimitiveType" in ctype:
             args.append(RUNTIME_TYPE_VALUE)
         elif name.endswith("_stride") and ctype == "const ptrdiff_t":
@@ -389,6 +399,7 @@ DRIVER_HEAD = r"""
 #include "sfem_base.hpp"
 #include "smesh_elem_type.hpp"
 #include "smesh_types.hpp"
+#include "tet4_inline_cpu.hpp"
 
 // The grid, its affine geometry, and the deterministic fills are shared with
 // codegen.framework.tools.apply_bench: a Cartesian grid of hexahedra whose map
@@ -402,6 +413,13 @@ struct Mesh {
     std::vector<const geom_t *> point_ptrs;
     std::vector<std::vector<geom_t>> adjugate;
     std::vector<geom_t> determinant;
+    // The symmetric gradient metric SFEM calls fff, in both layouts the
+    // generated kernels ask for: six separate component arrays, and one
+    // interleaved array indexed [element * 6 + component].  Filled by calling
+    // SFEM's own tet4_fff rather than by reimplementing it here, so the
+    // convention is theirs and cannot drift from the kernels being checked.
+    std::vector<std::vector<geom_t>> metric;
+    std::vector<geom_t> metric_aos;
 };
 
 static Mesh build_grid(int n) {
@@ -562,6 +580,22 @@ static Mesh build_grid_tet4(int n) {
                     m.adjugate[8][e] = (geom_t)(J[0] * J[4] - J[1] * J[3]);
                     m.determinant[e] = (geom_t)det;
                 }
+    m.metric.assign(6, std::vector<geom_t>(m.nelements, (geom_t)0));
+    m.metric_aos.assign((size_t)m.nelements * 6, (geom_t)0);
+    for (ptrdiff_t e = 0; e < m.nelements; ++e) {
+        geom_t fff[6];
+        tet4_fff(m.points[0][m.elements[0][e]], m.points[0][m.elements[1][e]],
+                 m.points[0][m.elements[2][e]], m.points[0][m.elements[3][e]],
+                 m.points[1][m.elements[0][e]], m.points[1][m.elements[1][e]],
+                 m.points[1][m.elements[2][e]], m.points[1][m.elements[3][e]],
+                 m.points[2][m.elements[0][e]], m.points[2][m.elements[1][e]],
+                 m.points[2][m.elements[2][e]], m.points[2][m.elements[3][e]],
+                 fff);
+        for (int k = 0; k < 6; ++k) {
+            m.metric[k][e] = fff[k];
+            m.metric_aos[(size_t)e * 6 + k] = fff[k];
+        }
+    }
     for (auto &row : m.elements) m.element_ptrs.push_back(row.data());
     for (auto &row : m.points) m.point_ptrs.push_back(row.data());
     return m;
