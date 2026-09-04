@@ -525,3 +525,93 @@ and the benchmark fails on either.
 CVFEM_CPUS=72 cvfem_run ./run_block_assess.sh          # the sweep above
 SFEM_BENCH_VERBOSE_BLOCKS=1 ./build/cvfem_sshex8_bench # one size
 ```
+
+## Semi-structured geometric multigrid: a running V-cycle, and why it is not yet a win
+
+`create_gmg_data` is wired up and a V-cycle runs, preconditioning BiCGStab inside the
+Newton loop (`SFEM_GMG=1` in `cvfem_hex8_ns_ssgmg`). Getting it to run at all turned on one
+parameter, and the result it produces says the smoother is the wrong one.
+
+### The wiring
+
+`Function` owns the coarse `Function`s that `create_gmg_data` derefines but does not hand
+their operators back, and every level here needs two things a linear problem would not
+need: the state to linearise about, and its own block diagonal. So `CVFEMNavierStokes`
+records the operator it produced in `derefine_op` and exposes it as `coarser()`, and the
+driver walks that chain from the finest level. Per level it holds a state buffer, restricted
+from the fine state with the averaging restriction; a matrix-free operator bound to that
+buffer; and a 4x4 block-Jacobi smoother built from `hessian_block_diag`. The coarse level is
+solved with BiCGStab. `build_gmg` runs once, `refresh_gmg` per Newton step -- rebuilding the
+whole hierarchy per step instead made the first run appear to hang.
+
+Three pieces of the default GMG path are deliberately not used. `create_gmg_operators`
+passes `nullptr` as the state, which is fatal for a nonlinear operator.
+`create_gmg_default_smoothers_and_solver` computes `sym_block_size = (block_size == 3 ? 6 :
+3)`, silently yielding 3 for block size 4, and reaches for `hessian_block_diag_sym`, whose
+packing assumes a symmetry a Navier-Stokes block does not have. Its CG coarse solver wants
+an SPD system.
+
+### Damping is what made it converge
+
+Undamped, the V-cycle was not merely ineffective but actively harmful: BiCGStab sat on its
+1000-iteration cap on every Newton step. Newton still crawled forward on the truncated
+steps, which is what made this slow to spot -- the residual fell 2.6e-2 -> 6.4e-6 and only
+the iteration counts showed anything wrong.
+
+The cause is that block-Jacobi is being asked to do a different job than elsewhere in this
+driver. As a Krylov preconditioner it is applied once and undamped is fine; as a smoother it
+is a stationary iteration, and undamped on this saddle-point system it does not converge.
+SFEM's own multigrid damps its block-Jacobi by `1/block_size` for exactly this reason.
+Measured (N=1, L=4, first four Newton steps):
+
+| omega | lin_it per Newton step |
+|-------|------------------------|
+| 1.0   | 1000, 1000 (capped)    |
+| 0.8   | 1000, 785, 334, 710    |
+| 0.7   | 391, 131, 122, 352     |
+| 0.6   | 164, 24, 548, 119      |
+| 0.5   | 31, 16, 154, 31        |
+| 0.4   | 41, 23, 143, 19        |
+| 0.25  | 50, 29, 376            |
+
+`SFEM_GMG_OMEGA` defaults to 0.5. The damping applies to the smoothers only; the coarse
+solve and the flat block-Jacobi preconditioner are left undamped.
+
+### It is not level-independent, which is the result that matters
+
+Total linear iterations over four Newton steps, V-cycle against the flat block-Jacobi
+preconditioner:
+
+| level | V-cycle | block-Jacobi |
+|-------|---------|--------------|
+| 2     | 48      | 123          |
+| 4     | 247     | 303          |
+| 8     | 2140    | 1082         |
+
+A working V-cycle holds iteration counts roughly flat as the lattice deepens. These grow
+faster than the flat preconditioner's and overtake it by L=8, where the V-cycle is *worse*
+than the smoother it is built from.
+
+The cause is the smoother rather than the coarse operator or the transfers. Increasing
+smoothing steps at L=8 reduces iterations monotonically and steeply -- 3113, 2140, 1402, 480
+for 1, 3, 6 and 12 steps. A wrong coarse-grid correction or a wrong transfer would not
+respond that way; it is the smoother failing to damp the high-frequency error the coarse
+level cannot see. This is the case the original plan flagged as P5, a Vanka or SIMPLE-type
+smoother, "only if P4's convergence degrades". It has degraded, so P5 is now the next step
+rather than a contingency.
+
+### The cost bar a V-cycle has to clear
+
+A V-cycle with three pre- and three post-smoothing steps costs roughly sixteen operator
+applies; the flat preconditioner costs one. So the V-cycle has to cut iteration counts by
+more than about 16x merely to break even on wall time, not the 2-3x it currently manages.
+That is not out of reach -- at L=8 block-Jacobi needs 1082 iterations and an effective
+V-cycle would need well under 50, comfortably past the bar -- but it does mean an
+almost-working smoother is worth nothing, and the smoother has to be most of the way to
+level-independent before the machinery pays for itself.
+
+Wall-clock numbers are not quoted here as a comparison. These runs are at N=1, far below
+saturation, where per-apply overhead dominates and the measured 2.1 ms for a 425-node apply
+is overhead rather than work. The iteration counts and their growth with level are the
+meaningful signal at this size; a wall-clock claim needs a saturated problem and will be
+worth making once the smoother is fixed.

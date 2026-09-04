@@ -47,6 +47,9 @@ namespace sfem {
         // above is left unused. Chosen at initialize() from the space, not configured.
         bool       semi_structured{false};
         SSMeshData ss;
+
+        // See coarser(): the operator derefine_op() built for the next level down.
+        std::shared_ptr<CVFEMNavierStokes> coarser;
     };
 
     CVFEMNavierStokes::CVFEMNavierStokes(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
@@ -64,6 +67,8 @@ namespace sfem {
     }
 
     bool CVFEMNavierStokes::is_semi_structured() const { return impl_->semi_structured; }
+
+    std::shared_ptr<CVFEMNavierStokes> CVFEMNavierStokes::coarser() const { return impl_->coarser; }
 
     ptrdiff_t CVFEMNavierStokes::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t CVFEMNavierStokes::n_dofs_image() const { return impl_->space->n_dofs(); }
@@ -319,6 +324,7 @@ namespace sfem {
         // the fine-grid stabilisation and be inconsistent.
         auto ret = std::static_pointer_cast<CVFEMNavierStokes>(clone_onto(space));
         ret->initialize();
+        impl_->coarser = ret;
         return ret;
     }
 

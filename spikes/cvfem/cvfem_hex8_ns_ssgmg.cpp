@@ -16,6 +16,8 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_GeometricMultigrid.hpp"
+#include "sfem_Multigrid.hpp"
 #include "sfem_context.hpp"
 #include "sfem_mask.hpp"
 
@@ -58,6 +60,8 @@ namespace {
                      "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
                      "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default); 0: assembled BSR\n"
                      "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
+                     "  SFEM_GMG             1: V-cycle preconditioner (needs a refine level > 1)\n"
+                     "  SFEM_GMG_SMOOTH      block-Jacobi smoothing steps (default 3)\n"
                      "  SFEM_ELEMENT_REFINE_LEVEL  >1: semi-structured macro-elements at that\n"
                      "                       internal level (default 1 = flat)\n"
                      "  SFEM_PGRAD_CACHE     1: reuse the nodal pressure gradient across a\n"
@@ -107,7 +111,8 @@ namespace {
     std::shared_ptr<BlockJacobi> make_block_jacobi(sfem::CVFEMNavierStokes &op,
                                                    const real_t *const      x,
                                                    const mask_t *const      mask,
-                                                   const ptrdiff_t          nnodes) {
+                                                   const ptrdiff_t          nnodes,
+                                                   const real_t             omega = real_t(1)) {
         std::vector<real_t> blocks((size_t)nnodes * 16, 0);
         op.hessian_block_diag(x, blocks.data());
 
@@ -143,6 +148,13 @@ namespace {
             const real_t pp = b[15];
             m[15]           = (std::fabs(pp) > real_t(1e-30)) ? real_t(1) / pp : real_t(1);
 
+            // Damping. Undamped block-Jacobi is fine as a Krylov preconditioner, where it
+            // is applied once, and is not a smoother: as a stationary iteration on this
+            // saddle-point system it does not converge. SFEM's own multigrid damps its
+            // block-Jacobi by 1/block_size for the same reason.
+            if (omega != real_t(1))
+                for (int k = 0; k < 16; ++k) m[k] *= omega;
+
             // Constrained rows are identity in the assembled matrix, so they must be
             // identity here too.
             for (int c = 0; c < 4; ++c) {
@@ -152,6 +164,117 @@ namespace {
             }
         }
         return std::make_shared<BlockJacobi>(nnodes, std::move(inv));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Semi-structured geometric multigrid, as a preconditioner for the Jacobian solve.
+    //
+    // sfem::create_gmg_data builds the hierarchy: it derefines the Function level by level,
+    // which calls derefine_op on the CVFEM operator, which reassembles itself on the coarse
+    // space. That is rediscretisation rather than Galerkin coarsening, and it has to be --
+    // the Rhie-Chow coefficient carries h^2/(2 mu), so the coarse pressure operator differs
+    // from the fine one by about 8x per level in 3D and P^T A P would inherit the wrong one.
+    //
+    // Two things here are not create_gmg_operators and create_gmg_default_smoothers_and_solver,
+    // and neither could be:
+    //
+    //   * create_gmg_operators builds each level with a null state. That is fine for a
+    //     linear operator and fatal for this one, whose Jacobian depends on where it is
+    //     linearised. Each level gets the fine state restricted onto it instead. The
+    //     restriction divides by the node incidence count before accumulating, so it
+    //     averages rather than sums and is the right transfer for a state.
+    //
+    //   * the default smoothers compute sym_block_size as (block_size == 3 ? 6 : 3), which
+    //     silently yields 3 for a block size of 4 where a symmetric 4x4 needs 10; they then
+    //     call hessian_block_diag_sym, which assumes a symmetry Navier-Stokes does not have;
+    //     and the coarse solver is CG, which needs an SPD operator. All three are wrong here,
+    //     so the smoother is the operator's own 4x4 block diagonal and the coarse solver is
+    //     BiCGStab.
+    struct GmgLevels {
+        std::shared_ptr<sfem::MultigridData>                   data;
+        std::vector<sfem::SharedBuffer<real_t>>                states;   // kept alive for the operators
+        std::vector<std::shared_ptr<sfem::Operator<real_t>>>   ops;
+        std::vector<std::shared_ptr<sfem::CVFEMNavierStokes>>  level_ops;
+        std::shared_ptr<sfem::Multigrid<real_t>>               mg;
+        int                                                    smoothing_steps{3};
+    };
+
+    std::shared_ptr<GmgLevels> build_gmg(const std::shared_ptr<sfem::Function>       &f,
+                                         const std::shared_ptr<sfem::CVFEMNavierStokes> &fine_op,
+                                         const sfem::SharedBuffer<real_t>            &x_fine,
+                                         const int smoothing_steps) {
+        auto data = sfem::create_gmg_data(f);
+        if (!data) return nullptr;
+        const int nlevels = (int)data->functions.size();
+        if (nlevels < 2) return nullptr;
+
+        auto out             = std::make_shared<GmgLevels>();
+        out->data            = data;
+        out->smoothing_steps = smoothing_steps;
+
+        // Level states. The matrix-free operators read these buffers live, so the buffers
+        // are allocated once and refilled per Newton step rather than reallocated -- which
+        // is also what lets the operators below be built once.
+        out->states.resize(nlevels);
+        out->states[0] = x_fine;
+        for (int i = 1; i < nlevels; ++i)
+            out->states[i] = smesh::create_host_buffer<real_t>((size_t)data->functions[i]->space()->n_dofs());
+
+        // The operator chain, so each level's block diagonal is reachable.
+        out->level_ops.resize(nlevels);
+        out->level_ops[0] = fine_op;
+        for (int i = 1; i < nlevels; ++i) {
+            out->level_ops[i] = out->level_ops[i - 1] ? out->level_ops[i - 1]->coarser() : nullptr;
+            if (!out->level_ops[i]) return nullptr;
+        }
+
+        for (int i = 0; i < nlevels; ++i)
+            out->ops.push_back(sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, data->functions[i],
+                                                            out->states[i], sfem::EXECUTION_SPACE_HOST));
+        return out;
+    }
+
+    // Per Newton step: push the new state down the levels and rebuild the smoothers around
+    // it. The hierarchy, its transfer operators and the level operators are all reused --
+    // only the linearisation moved. Rebuilding the whole hierarchy here instead was the
+    // first attempt and it dominated the solve, since create_gmg_data derefines every
+    // Function again.
+    void refresh_gmg(GmgLevels &g) {
+        const int nlevels = (int)g.ops.size();
+        for (int i = 1; i < nlevels; ++i) {
+            g.data->restrictions[i - 1]->apply(g.states[i - 1]->data(), g.states[i]->data());
+            g.data->functions[i]->apply_constraints(g.states[i]->data());
+        }
+
+        g.mg          = sfem::h_mg<real_t>();
+        g.mg->verbose = false;
+        for (int i = 0; i < nlevels; ++i) {
+            auto            fi = g.data->functions[i];
+            const ptrdiff_t nn = fi->space()->n_dofs() / N_FIELDS;
+            std::vector<mask_t> mask(mask_count(fi->space()->n_dofs()), 0);
+            fi->constraints_mask(mask.data());
+            const real_t omega = (i + 1 < nlevels)
+                                         ? smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.5))
+                                         : real_t(1);
+            auto prec = make_block_jacobi(*g.level_ops[i], g.states[i]->data(), mask.data(), nn, omega);
+
+            if (i + 1 < nlevels) {
+                auto sm = sfem::create_stationary<real_t>(g.ops[i], prec, sfem::EXECUTION_SPACE_HOST);
+                sm->set_max_it(g.smoothing_steps);
+                g.mg->add_level(g.ops[i], sm, i == 0 ? nullptr : g.data->prolongations[i],
+                                g.data->restrictions[i]);
+            } else {
+                // Coarse solve. BiCGStab, not CG: the operator is not symmetric.
+                auto cs = sfem::create_bcgs<real_t>(g.ops[i], sfem::EXECUTION_SPACE_HOST);
+                cs->set_max_it(smesh::Env::read<int>("SFEM_GMG_COARSE_MAX_IT", 200));
+                cs->set_rtol(1e-8);
+                cs->set_atol(1e-14);
+                cs->verbose = false;
+                cs->set_preconditioner_op(prec);
+                g.mg->add_level(g.ops[i], cs, g.data->prolongations[i], nullptr);
+            }
+        }
+        g.mg->set_max_it(1);  // one V-cycle per preconditioner application
     }
 
 }  // namespace
@@ -195,6 +318,11 @@ int main(int argc, char **argv) {
     // semi-structured hierarchy is what makes the matrix-free apply worth having, and
     // an assembled BSR per level is exactly the memory the hierarchy exists to avoid.
     const int         matrix_free = smesh::Env::read<int>("SFEM_MATRIX_FREE", 1);
+    // 1: precondition the Jacobian solve with a semi-structured multigrid V-cycle instead
+    // of point block-Jacobi. Needs a semi-structured mesh with more than one level, so it
+    // is ignored on a flat one.
+    const int         use_gmg     = smesh::Env::read<int>("SFEM_GMG", 0);
+    const int         gmg_smooth  = smesh::Env::read<int>("SFEM_GMG_SMOOTH", 3);
     // Compares J_mf v against J_asm v once, on the first Jacobian. The two paths must
     // agree before any timing comparison between them means anything.
     const int         check_jv    = smesh::Env::read<int>("SFEM_CHECK_JV", 0);
@@ -381,6 +509,19 @@ int main(int argc, char **argv) {
         t_op += smesh::time_seconds() - t0;
     }
 
+    // Built once: the hierarchy and its transfer operators depend on the mesh, not the
+    // state. The level states are refreshed per Newton step below, since they do.
+    std::shared_ptr<GmgLevels> gmg;
+    if (use_gmg) {
+        gmg = build_gmg(f, op, xbuf, gmg_smooth);
+        if (!gmg) {
+            std::fprintf(stderr, "SFEM_GMG=1 but the hierarchy could not be built "
+                                 "(needs a semi-structured mesh with more than one level)\n");
+            return EXIT_FAILURE;
+        }
+        std::printf("gmg: %zu levels, %d smoothing steps\n", gmg->ops.size(), gmg_smooth);
+    }
+
     int  newton_it    = 0;
     int  lin_it_total = 0;
     bool converged    = false;
@@ -457,7 +598,13 @@ int main(int argc, char **argv) {
         solver->set_atol(lin_atol);
         {
             const double t0 = smesh::time_seconds();
-            solver->set_preconditioner_op(make_block_jacobi(*op, x, cmask.data(), nnodes));
+            if (gmg) {
+                // The hierarchy is fixed but the linearisation is not.
+                refresh_gmg(*gmg);
+                solver->set_preconditioner_op(gmg->mg);
+            } else {
+                solver->set_preconditioner_op(make_block_jacobi(*op, x, cmask.data(), nnodes));
+            }
             t_prec += smesh::time_seconds() - t0;
         }
         {
