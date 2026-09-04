@@ -1390,3 +1390,49 @@ This does not rescue the Grace numbers, and the large-case conclusion stands: at
 unknowns the V-cycle is still far slower there. But it does mean the laptop comparisons were
 measuring the wrong thing, and that the correct single-threaded comparison at 75k unknowns
 favours the V-cycle by more than the earlier multithreaded one suggested.
+
+## With an assembled fine operator: the baseline's stagnation was an artefact
+
+`SFEM_ASSEMBLE_FINE=1` replaces the matrix-free fine operator with a BSR one, probed by the
+same coloured probing the Galerkin levels use (null transfers assemble A rather than R A P).
+The motivation is determinism: a matrix-free apply accumulates through atomics, so its
+summation order follows the thread schedule, while a BSR apply accumulates each row in one
+thread.
+
+It does what it should, and it corrects the previous section.
+
+**The operator becomes thread-independent.** The assembly gate is identical at 1 and 8
+threads (1.7650e-16, 2.3080e-16), and at L=8 the V-cycle takes exactly 36 iterations at both
+thread counts where matrix-free gave 36 and 37.
+
+**The solver does not.** At L=16 the assembled baseline gives 1862 and 2000 iterations on
+two runs at 8 threads. Removing the operator's non-determinism leaves the Krylov method's
+own: the dot products are OpenMP reductions and their order still follows the schedule. A
+deterministic operator is necessary for a reproducible parallel solve and not sufficient.
+
+**And the baseline's single-threaded stagnation was specific to the matrix-free operator.**
+The previous section reported that the baseline fails to converge on one thread -- 2000
+iterations, capped, u_linf 6.28e-03 against the correct 4.29e-03 -- and concluded that the
+V-cycle wins by 2.6x once the comparison is made deterministically. With the assembled
+operator the baseline converges on one thread in 1873 iterations to u_linf 4.292937e-03. The
+stagnation was an accident of the matrix-free operator's rounding, not a property of
+BiCGStab on this problem, and the conclusion drawn from it is withdrawn.
+
+The honest comparison at L=16, N=1, with a deterministic operator on both sides:
+
+| arm | threads | iterations | t_solve | u_linf |
+|-----|---------|-----------|---------|--------|
+| baseline | 1 | 1873 | 5.05 s | 4.292937e-03 |
+| V-cycle | 1 | 112 | 7.78 s | 4.291494e-03 |
+| baseline | 8 | 1210 | 3.48 s | 4.223545e-03 |
+| V-cycle | 8 | 86 | 4.55 s | 4.291483e-03 |
+
+The V-cycle uses seventeen times fewer iterations and is about 1.4x slower, at both thread
+counts, and the ranking no longer depends on how many threads are used or on which operator
+the baseline happens to get. That is the first comparison in this document that is stable
+under both, and it says the V-cycle is not yet competitive at this size -- by a much smaller
+margin than the multithreaded matrix-free numbers suggested, and in the opposite direction
+from the single-threaded ones.
+
+Assembling the fine operator costs 1.85 s single-threaded and 0.90 s on eight, which is
+already counted in the timings above.
