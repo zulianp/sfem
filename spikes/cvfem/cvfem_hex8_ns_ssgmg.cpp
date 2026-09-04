@@ -1269,9 +1269,20 @@ namespace {
                 // cheap; when the fine level dominates it is not, and the same setting that
                 // wins at one macro-element loses by an order of magnitude at twenty-seven.
                 // Default is to follow SFEM_GMG_KSMOOTH, i.e. smooth every level the same.
-                const int ksmooth = (i > 0) ? smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0)
-                                            : smesh::Env::read<int>("SFEM_GMG_KSMOOTH_FINE",
-                                                                    smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0));
+                // The fine level gets far less smoothing than the coarse ones, and the
+                // reason is pure arithmetic. The fine smoother is itself BiCGStab
+                // preconditioned by block-Jacobi -- the same solver this whole cycle is
+                // competing against -- so at k iterations a cycle spends 4k fine operator
+                // applications on smoothing alone, against the two that solver spends per
+                // iteration. At k = 16 that is 32 times the work per outer iteration, which
+                // the eleven-fold drop in iteration count cannot pay for. At k = 2 it is
+                // four times the work for a comparable drop, and that is the configuration
+                // that finally beats the baseline. Coarse levels keep the strong smoother:
+                // they need it, and they are cheap.
+                const int kdefault = smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0);
+                const int ksmooth  = (i > 0) ? kdefault
+                                             : smesh::Env::read<int>("SFEM_GMG_KSMOOTH_FINE",
+                                                                     kdefault > 0 ? 2 : 0);
                 std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> sm;
                 if (ksmooth > 0) {
                     auto ks = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
