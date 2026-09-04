@@ -1,5 +1,9 @@
 import sympy as sp
 
+from codegen.framework.plans.evaluation_strategy import (
+    quadrature_scope_lines,
+)
+
 from codegen.framework.ir.kernel_ast import (
     AssignmentNode,
     BufferDeclNode,
@@ -1725,7 +1729,12 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         scalar_temporaries=True,
     )
 
-    lines.append("        for (int q = 0; q < N_QP; ++q) {")
+    # Only reached for a constant-P1 simplex: the caller gates on
+    # `constant_p1_simplex_reference_gradients`, so N_QP is one and this
+    # loop has a single trip.  No strategy test is wanted here -- a
+    # higher-order simplex never arrives, so a branch would describe a
+    # case that cannot happen.
+    lines.append("        { const int q = 0;  // constant-P1 simplex")
     lines.append("            const scalar_t qw = q_weight[q];")
     lines.extend(_work_item_loop_lines(source_builder, "            "))
     lines.append("            const ptrdiff_t geometry_offset = q * geometry_stride + %s;" % work_item)
@@ -8568,12 +8577,17 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
     return lines
 
 
-def _sfem_soa_element_api_geometry_tile_lines(dim):
+def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
     lines = []
     for component in range(dim * dim):
         lines.append("        scalar_t block_jacobian_adjugate%d[N_QP * VECTOR_SIZE];" % component)
     lines.append("        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];")
-    lines.append("        for (int q = 0; q < N_QP; ++q) {")
+    # The element API tiles are per element, so the scope the
+    # element calls for can be printed here without the shared
+    # local header disagreeing with itself about it.
+    lines.extend(
+        quadrature_scope_lines(quadrature_rule.element_type, "        ")
+    )
     lines.append("            #pragma omp simd")
     lines.append("            for (int lane = 0; lane < nelems; ++lane) {")
     for component in range(dim * dim):
@@ -8649,7 +8663,12 @@ def _sfem_soa_element_api_coords_tile_lines(
             "        const scalar_t *const grad_ref = %s;"
             % quadrature_reference_accessor(prefix, "isoparametric", "grad_ref")
         )
-    lines.append("        for (int q = 0; q < N_QP; ++q) {")
+    # The element API tiles are per element, so the scope the
+    # element calls for can be printed here without the shared
+    # local header disagreeing with itself about it.
+    lines.extend(
+        quadrature_scope_lines(quadrature_rule.element_type, "        ")
+    )
     lines.extend(
         _sfem_soa_isoparametric_geometry_lines(
             dim,
@@ -8725,7 +8744,7 @@ def _sfem_soa_element_api_operation_lines(
                 )
             )
         else:
-            lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim))
+            lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule))
         lines.append(
             "        %s"
             % _sfem_soa_element_api_block_call(
@@ -8803,7 +8822,7 @@ def _sfem_soa_element_api_hessian_lines(
                 )
             )
         else:
-            lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim))
+            lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule))
         lines.extend(
             [
                 "        scalar_t block_h_data[NDOFS][VECTOR_SIZE];",
