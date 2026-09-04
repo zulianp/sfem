@@ -141,18 +141,35 @@ namespace {
                 sfem::EXECUTION_SPACE_HOST);
     }
 
+    // Some phases contain others: precond_total wraps the whole V-cycle, so the smoothers,
+    // transfers and coarse solve are inside it. Summing every row therefore double counts,
+    // and shares taken against that sum understate everything -- which is exactly how an
+    // earlier reading of this table came to report fine-level smoothing at 42% when it is
+    // 79% of wall time. Containers are excluded from the denominator and printed apart.
+    bool is_container(const std::string &k) { return k == "precond_total"; }
+
     void phase_report() {
         if (g_phases.empty()) return;
         double total = 0;
-        for (auto &kv : g_phases) total += kv.second.t;
+        for (auto &kv : g_phases)
+            if (!is_container(kv.first)) total += kv.second.t;
         std::vector<std::pair<std::string, Phase>> v(g_phases.begin(), g_phases.end());
         std::sort(v.begin(), v.end(), [](const auto &a, const auto &b) { return a.second.t > b.second.t; });
-        std::printf("\nphase breakdown (%.3f s accounted)\n", total);
+        std::printf("\nphase breakdown (%.3f s in top-level phases; shares are of that)\n", total);
         std::printf("  %-22s %10s %10s %12s %7s\n", "phase", "seconds", "calls", "us/call", "share");
-        for (auto &kv : v)
+        for (auto &kv : v) {
+            if (is_container(kv.first)) continue;
             std::printf("  %-22s %10.3f %10ld %12.1f %6.1f%%\n", kv.first.c_str(), kv.second.t, kv.second.n,
                         1e6 * kv.second.t / (double)std::max(1L, kv.second.n),
                         100.0 * kv.second.t / std::max(1e-30, total));
+        }
+        for (auto &kv : v)
+            if (is_container(kv.first))
+                std::printf("  %-22s %10.3f %10ld %12.1f %6.1f%%  (container: the rows above it\n"
+                            "  %-22s %10s %10s %12s %7s   marked op/smooth/transfer/coarse are inside)\n",
+                            kv.first.c_str(), kv.second.t, kv.second.n,
+                            1e6 * kv.second.t / (double)std::max(1L, kv.second.n),
+                            100.0 * kv.second.t / std::max(1e-30, total), "", "", "", "", "");
     }
 
     class BlockJacobi final : public sfem::Operator<real_t> {
@@ -426,7 +443,9 @@ namespace {
                                                    const real_t             omega = real_t(1),
                                                    const real_t             prow  = real_t(1)) {
         std::vector<real_t> blocks((size_t)nnodes * 16, 0);
+        const double        t0 = smesh::time_seconds();
         op.hessian_block_diag(x, blocks.data());
+        phase_add("hessian_block_diag", smesh::time_seconds() - t0);
         return make_block_jacobi_from_diag(std::move(blocks), mask, nnodes, omega, prow);
     }
 
@@ -1570,7 +1589,9 @@ int main(int argc, char **argv) {
     converged = false;
     for (newton_it = 0; newton_it <= max_newton; ++newton_it) {
         std::fill(r.begin(), r.end(), real_t(0));
-        f->gradient(x, r.data());
+        { const double t0 = smesh::time_seconds();
+          f->gradient(x, r.data());
+          phase_add("newton_residual", smesh::time_seconds() - t0); }
         // Measure the residual on the free dofs only. Function::gradient leaves the
         // boundary-condition residual (x - value) in the constrained rows, which is a
         // different quantity from the equation residual and never decays to zero the way
