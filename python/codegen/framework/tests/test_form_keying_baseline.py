@@ -11,11 +11,16 @@ actually in use, and the form blocks the one that is nearly not.
 So the re-keying has to arrive as a reviewable diff rather than as a claim.
 This records, for every material and dimension: which form orders exist, what
 each order's blocks are keyed by, and what the lowered residual fields are
-called.  Today those two disagree wherever a field has more than one
-component -- Stokes lowers blocks keyed ``u`` and ``p`` while its fields are
-``u0``, ``u1``, ``u2``, ``p`` -- and agree trivially wherever fields are
+called.  Today those two differ wherever a field has more than one
+component -- Stokes lowers blocks keyed ``u`` and ``p`` while its lowered
+fields are ``u0``, ``u1``, ``u2``, ``p`` -- and coincide wherever fields are
 scalar.  Both cases are pinned, because Phase 1 has to move the first without
 disturbing the second.
+
+The difference is not a loss.  The lowered fields are built with
+``field_name``, ``component`` and ``components``, so ``u0`` knows it is
+component 0 of ``u``; both keyings are projections of one object, and phase 1
+carries the expansion into the blocks rather than choosing between them.
 
 Note what this file does *not* assert.  The 0-form of a residual formulation
 is a merit function and the 1-form is the negated residual; the second is not
@@ -140,12 +145,15 @@ class FormKeyingBaselineTest(unittest.TestCase):
         self.assertEqual(scoped, measured)
 
     def test_energy_formulations_populate_no_block_metadata(self):
-        """The other half of the split, pinned so its removal is visible.
+        """Energy declares its structure at the API, not in block metadata.
 
-        A residual formulation keys blocks differently from its fields; an
-        energy formulation has no blocks at all, at any order, while its form
-        expressions are present.  Phase 1 has to fix both, and this is the one
-        that the code comment about keying does not mention.
+        `system.add_energy("", energy, fields=(u,), variables=(F,))` supplies
+        the field and the variable group the energy differentiates through, and
+        one variable group per field is validated at that boundary.  So empty
+        blocks here are not missing information -- they are information that
+        arrived somewhere else -- and this pins the fact rather than calling it
+        a defect.  When phase 1 derives blocks from those declared fields and
+        variables, this is what changes.
         """
         snapshot = collect(("linear_elasticity",))
         for dim, equations in snapshot["linear_elasticity"].items():
