@@ -140,7 +140,10 @@ goes (roughly 800 linear iterations per Newton step, against one assembly).
 |---|---|---|---|---|
 | Apple M-series | 10 cores | 74 | 13.5 | 0.17x |
 | Grace | 72 cores | 424 | 2.36 | 1.0x |
-| Hopper GH200 | 1 GPU | 10417 | 0.096 | 24.6x |
+| Hopper GH200 | 1 GPU | 10417 | 0.096 | 24.6x* |
+
+\* The Hopper figure is a kernel *without* the Rhie-Chow term, which every host figure
+includes; see the Hopper section below. Corrected for it the ratio is nearer 18x.
 
 Saturation was swept, not assumed: Grace reaches it near 1.85M dofs, Hopper by
 1.1M. Below that both mislead badly -- Grace reads 20 MDOF/s at 10k dofs, a
@@ -346,8 +349,39 @@ and it ignores `SFEM_GEOM` for the same reason. And it refuses `hessian_bsr`, be
 assembled matrix per level is the memory a hierarchy exists to avoid; refusing beats
 returning a zero matrix.
 
-**4. Hopper.** Nothing semi-structured has run on a GPU, and layout conclusions have already
-inverted once between Grace and Hopper: packing is worth 10% on CPU and loses by 42% there.
+**4. Hopper.** Measured, and it says do not port the gather. Two things came out of it.
+
+*Every device figure previously in this file was for a kernel without the Rhie-Chow term.*
+None of the `cvfem_cuda_time_*` entry points takes `rc_scale`; `cvfem_cuda_residual_rc`
+existed but was only ever verified, never timed, and the timing path attached neither the
+coordinates nor the nodal gradient that it needs. Every host figure includes the term. The
+comparison was therefore between a device kernel missing a term and host kernels that have
+it -- the third comparability error of this work, after the pressure gradient and the
+cross-build boundary A/B, and the same shape each time: two sides doing different work with
+nothing in the harness to notice. `cvfem_cuda_time_residual_rc` now exists.
+
+| Hopper, packed residual, n=128 | MDOF/s |
+|---|---|
+| without Rhie-Chow | 7872 |
+| with Rhie-Chow | **5899** |
+
+The term costs 1.33x, so it is a quarter of the device kernel -- close to its share on the
+host, where hoisting its coefficients was worth 1.28x. Applying that factor to the apply
+figure puts Hopper nearer **18x Grace than the 24.6x** reported before; that scaling is an
+inference from the residual, since there is no timed apply with the term.
+
+*The macro-local gather is already on the GPU, as packing, and it loses.* The packed
+kernel is block-per-pack with shared-memory staging, which is the same transformation, and
+the plain global layout beats it by 1.41x for the Jacobian action -- 10420 against 7297
+MDOF/s -- confirmed twice in separate builds.
+
+So a semi-structured CUDA port would buy nothing from the half that wins on CPU and
+everything from the half the GPU lacks: the device takes `adj` and `det` as precomputed
+inputs, so geometry is already hoisted there, but `mdot_coeff` still runs per
+sub-control-surface per element. Hoisting those coefficients needs elements sharing a
+Jacobian, which packs cannot give and macro-elements can. The ceiling on that is the 25%
+above, and realistically less, since the Rhie-Chow term is more than its coefficients.
+Worth doing only if a quarter of the device kernel is worth a port.
 
 **5. Retire the pack machinery.** Semi-structured meshes give node contiguity by
 construction, which is what `PackedMesh` renumbering manufactures -- and that renumbering

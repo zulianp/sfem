@@ -103,6 +103,11 @@ int cvfem_cuda_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu,
 double cvfem_cuda_time_jacobian_action(cvfem_cuda_ctx *ctx, double rho, double mu,
                                        int flush_mode, int block_size, int repeat);
 
+// With the Rhie-Chow term. Every other cvfem_cuda_time_* entry point runs without it,
+// which made the device throughput figures incomparable with the host ones.
+double cvfem_cuda_time_residual_rc(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                   double rc_scale, int flush_mode, int block_size, int repeat);
+
 // ---- assembled BSR Jacobian ------------------------------------------------
 //
 // Assembly is element-parallel with global atomicAdd, NOT block-per-pack. A single

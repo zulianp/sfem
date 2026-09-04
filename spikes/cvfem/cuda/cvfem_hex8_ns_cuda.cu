@@ -2582,6 +2582,28 @@ extern "C" int cvfem_cuda_synchronize(void) {
     return 0;
 }
 
+// Times the Rhie-Chow residual. Its absence is why every device throughput number in
+// README_alps.md was for a kernel without the Rhie-Chow term while every host number
+// included it: cvfem_cuda_residual_rc existed but was only ever verified, never timed,
+// and none of the other cvfem_cuda_time_* entry points take rc_scale.
+extern "C" double cvfem_cuda_time_residual_rc(cvfem_cuda_ctx *ctx, double rho, double mu,
+                                              double rc_scale, int flush_mode, int block_size,
+                                              int repeat) {
+    cudaEvent_t a, b;
+    if (cudaEventCreate(&a) != cudaSuccess || cudaEventCreate(&b) != cudaSuccess) return -1.0;
+    if (cvfem_cuda_residual_rc(ctx, rho, mu, rc_scale, flush_mode, block_size, nullptr) != 0) return -1.0;
+    if (cudaDeviceSynchronize() != cudaSuccess) return -1.0;
+    cudaEventRecord(a);
+    for (int i = 0; i < repeat; ++i)
+        if (cvfem_cuda_residual_rc(ctx, rho, mu, rc_scale, flush_mode, block_size, nullptr) != 0) return -1.0;
+    cudaEventRecord(b);
+    if (cudaEventSynchronize(b) != cudaSuccess) return -1.0;
+    float ms = 0.f;
+    cudaEventElapsedTime(&ms, a, b);
+    cudaEventDestroy(a); cudaEventDestroy(b);
+    return (double)ms / 1000.0 / (repeat > 0 ? repeat : 1);
+}
+
 extern "C" double cvfem_cuda_time_residual(cvfem_cuda_ctx *ctx, double rho, double mu,
                                            int flush_mode, int block_size, int repeat) {
     cudaEvent_t a, b;

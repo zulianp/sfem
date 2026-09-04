@@ -270,6 +270,18 @@ int main(int argc, char **argv) {
             std::printf("skipping assembled rows: the matrix would be %.1f GiB\n", bsr_gib);
         }
 
+        // cvfem_cuda_residual_rc needs the coordinates and the nodal pressure gradient on
+        // the device. The timing path attached neither, which is why the Rhie-Chow kernel
+        // had never been timed here.
+        {
+            std::vector<double> cx((size_t)d.nnodes), cy((size_t)d.nnodes), cz((size_t)d.nnodes);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                cx[i] = d.points[0][i]; cy[i] = d.points[1][i]; cz[i] = d.points[2][i];
+            }
+            cvfem_cuda_attach_coords(ctx, cx.data(), cy.data(), cz.data());
+            cvfem_cuda_nodal_p_grad(ctx, block_size, nullptr);
+        }
+
         const double dofs = (double)(d.nnodes * 4);
         auto row = [&](const char *what, double t) {
             std::printf("TIMING %-28s n=%-4d dofs=%-12td %10.4e s %10.1f MDOF/s\n",
@@ -279,6 +291,14 @@ int main(int argc, char **argv) {
         row("residual standard", cvfem_cuda_time_residual_global(ctx, rho, mu, 0, block_size, repeat));
         row("jac_action packed", cvfem_cuda_time_jacobian_action(ctx, rho, mu, CVFEM_CUDA_FLUSH_ATOMIC, block_size, repeat));
         row("jac_action standard", cvfem_cuda_time_jacobian_action_global(ctx, rho, mu, 0, block_size, repeat));
+        // With Rhie-Chow, which every row above omits. The host kernels always include it,
+        // so this is the row to compare against them.
+        {
+            const double t_rc = cvfem_cuda_time_residual_rc(ctx, rho, mu, 1.0, CVFEM_CUDA_FLUSH_ATOMIC,
+                                                            block_size, repeat);
+            if (t_rc > 0) row("residual packed +rc", t_rc);
+            else std::printf("residual packed +rc: unavailable on this configuration\n");
+        }
         if (with_bsr) {
             row("assemble sympy", cvfem_cuda_time_assemble(ctx, rho, mu, CVFEM_CUDA_JAC_SYMPY, block_size, repeat));
             row("assemble diag",  cvfem_cuda_time_assemble_diag(ctx, rho, mu, block_size, repeat));
