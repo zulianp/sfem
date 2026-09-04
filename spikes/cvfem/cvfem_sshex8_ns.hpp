@@ -921,6 +921,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
     constexpr bool up = (Blocks & SSBLOCK_UP) != 0;
     constexpr bool pu = (Blocks & SSBLOCK_PU) != 0;
     constexpr bool pp = (Blocks & SSBLOCK_PP) != 0;
+    constexpr bool mom = uu || up;
 
     const int L   = d.level;
     const int nxe = d.nxe;
@@ -938,6 +939,20 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+            // Gather only what this block reads. On Grace the gather and scatter alone are
+            // 35% of the full operator, so a block that still loads all fourteen arrays
+            // cannot get far below that however little arithmetic it does -- C was 46%
+            // against a 35% floor.
+            //
+            // Coordinates and the state velocity are always needed: the first by the macro
+            // geometry, the second by the boundary term, which takes ux, uy, uz whatever
+            // is being masked. The state pressure and its gradient are read only by the
+            // upwind switch, which lives in the momentum rows. The direction velocity is
+            // read by A_uu and B; the direction pressure by B^T and C.
+            constexpr bool need_state_p = mom;              // upwind correction
+            constexpr bool need_dir_v   = uu || pu;
+            constexpr bool need_dir_q   = up || pp;
+
             for (int a = 0; a < nxe; ++a) {
                 const smesh::idx_t g = d.elems[a][e];
                 lg[(size_t)a]        = g;
@@ -947,15 +962,33 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                 lux[(size_t)a]       = d.ux[(size_t)g];
                 luy[(size_t)a]       = d.uy[(size_t)g];
                 luz[(size_t)a]       = d.uz[(size_t)g];
-                lp[(size_t)a]        = d.p[(size_t)g];
-                lvx[(size_t)a]       = dir[(size_t)g * 4 + 0];
-                lvy[(size_t)a]       = dir[(size_t)g * 4 + 1];
-                lvz[(size_t)a]       = dir[(size_t)g * 4 + 2];
-                lq[(size_t)a]        = dir[(size_t)g * 4 + 3];
-                lpgx[(size_t)a]      = d.pgx[(size_t)g];
-                lpgy[(size_t)a]      = d.pgy[(size_t)g];
-                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+                if constexpr (need_state_p) {
+                    lp[(size_t)a]   = d.p[(size_t)g];
+                    lpgx[(size_t)a] = d.pgx[(size_t)g];
+                    lpgy[(size_t)a] = d.pgy[(size_t)g];
+                    lpgz[(size_t)a] = d.pgz[(size_t)g];
+                }
+                if constexpr (need_dir_v) {
+                    lvx[(size_t)a] = dir[(size_t)g * 4 + 0];
+                    lvy[(size_t)a] = dir[(size_t)g * 4 + 1];
+                    lvz[(size_t)a] = dir[(size_t)g * 4 + 2];
+                }
+                if constexpr (need_dir_q) lq[(size_t)a] = dir[(size_t)g * 4 + 3];
             }
+            // Anything not gathered must still read as zero, since the element kernels and
+            // the boundary term take all of them regardless.
+            if constexpr (!need_state_p) {
+                std::fill(lp.begin(), lp.end(), scalar_t(0));
+                std::fill(lpgx.begin(), lpgx.end(), scalar_t(0));
+                std::fill(lpgy.begin(), lpgy.end(), scalar_t(0));
+                std::fill(lpgz.begin(), lpgz.end(), scalar_t(0));
+            }
+            if constexpr (!need_dir_v) {
+                std::fill(lvx.begin(), lvx.end(), scalar_t(0));
+                std::fill(lvy.begin(), lvy.end(), scalar_t(0));
+                std::fill(lvz.begin(), lvz.end(), scalar_t(0));
+            }
+            if constexpr (!need_dir_q) std::fill(lq.begin(), lq.end(), scalar_t(0));
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
             SSMacroGeom mg;
@@ -1055,10 +1088,15 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                 }
             }
 
+            // Scatter only the rows written: a continuity-row block touches one component
+            // of four, and the atomics are the expensive half of the scatter.
             for (int a = 0; a < nxe; ++a) {
                 const smesh::idx_t g = lg[(size_t)a];
-                for (int c = 0; c < N_FIELDS; ++c)
-                    atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                if constexpr (uu || up)
+                    for (int c = 0; c < 3; ++c)
+                        atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                if constexpr (pu || pp)
+                    atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, lout[(size_t)a * N_FIELDS + 3]);
             }
         }
     }

@@ -305,9 +305,21 @@ rather than a failure. The operator caches per state pointer, so pointing it at 
 vector is safe; changing the contents behind the same pointer is not, and that is why it
 is not the default. The gate checks the cached and uncached paths agree, at 3.5e-16.
 
-**2. Specialise the gather.** On Grace the gather-and-scatter floor is 35% of the operator
-and C costs 46%, so eleven points is all that is left for the pressure block without
-touching it. Every block currently loads all fourteen arrays regardless of need.
+**2. Specialise the gather.** Done. Each block now gathers only the arrays it reads and
+scatters only the rows it writes, and on Grace the blocks a Schur scheme wants got about a
+quarter cheaper:
+
+| | before | after |
+|---|---|---|
+| floor | 35.3% | 12.2% |
+| `pp` (C) | 46.4% | **36.1%** |
+| `pu` (B) | 53.0% | **43.2%** |
+| `con` rows | 54.9% | **45.5%** |
+
+`uu` and `mom` barely moved, 2 points, which is right: they read almost everything anyway.
+Two constraints cap what C can save. The boundary term takes the state velocity whatever
+is masked, and the macro geometry needs the coordinates, so C still gathers seven of the
+fourteen arrays rather than the three its own arithmetic uses.
 
 **3. Wire the semi-structured kernels into the Op and the driver.** Everything measured so
 far is kernel-level. The end-to-end claim, and the multigrid work behind it, needs this.
@@ -348,15 +360,19 @@ specialisation can reach rather than leaving it to be inferred.
 
 ### Cost as a share of the full operator
 
-| block | Grace L=4 | L=8 | L=16 | M1 L=8 | what wants it |
-|---|---|---|---|---|---|
-| **gather only (floor)** | 34.5% | **35.3%** | 33.4% | **14.9%** | -- |
-| `pp` (C) | 48.6% | **46.4%** | 46.5% | 38.1% | pressure preconditioner, Schur |
-| `pu` (B) | 54.2% | 53.0% | 53.2% | 52.4% | `B A^-1 B^T` |
-| `con` rows | 54.9% | 54.9% | 54.9% | 53.9% | segregated pressure solve |
-| `up` (B^T) | 68.3% | 66.9% | 67.1% | 73.2% | `B A^-1 B^T` |
-| `uu` (A) | 89.1% | 88.9% | 88.8% | 98.2% | momentum solve |
-| `mom` rows | 98.7% | 98.2% | 98.3% | 104.5% | -- |
+| block | Grace L=4 | L=8 | L=16 | what wants it |
+|---|---|---|---|---|
+| gather only (floor) | 13.0% | **12.2%** | 12.2% | -- |
+| `pp` (C) | 38.0% | **36.1%** | 34.1% | pressure preconditioner, Schur |
+| `pu` (B) | 44.8% | 43.2% | 40.5% | `B A^-1 B^T` |
+| `con` rows | 46.4% | 45.5% | 43.6% | segregated pressure solve |
+| `up` (B^T) | 66.3% | 64.6% | 65.1% | `B A^-1 B^T` |
+| `uu` (A) | 87.7% | 86.8% | 87.0% | momentum solve |
+| `mom` rows | 95.7% | 95.9% | 96.0% | -- |
+
+Shares are against the full operator measured through the same block kernel in the same
+run. `SSBLOCK_ALL` sets every flag, so it gathers everything and the denominator is
+unaffected by the specialisation below.
 
 Grace is stable to within a point across L=4..16. L=2 is worse across the board -- the
 floor alone is 45% there -- because `(L+1)^3 / L^3` is 3.375, so a macro-element gathers
@@ -371,12 +387,14 @@ viscous and convective terms it keeps are most of the cost.
 **Asking for the momentum rows is not worth it.** At 98% of J it is within noise of just
 evaluating the operator, and on the M1 it is slower. Use the full apply for that.
 
-**The floor is the gather, and how much that matters depends on the machine.** On Grace it
-is 35% of the operator, so C at 46% sits only eleven points above it and there is little
-left to win without specialising the gather itself. On the M1 the floor is 15%, because
-its kernels are roughly ten times slower per dof so the same fixed cost is a much smaller
-share. The two machines disagree about where the remaining headroom is, and Grace is the
-one to believe.
+**The floor was the gather, and specialising it was worth a quarter on the pressure
+blocks.** Before, on Grace, the gather and scatter were 35% of the operator and C cost 46%,
+leaving eleven points; the M1 put the same floor at 15%, because its kernels are about ten
+times slower per dof so the same fixed cost is a smaller share of them. Grace was the one
+to believe, and gathering only what each block reads took C to 36% and B to 43%. Note that
+the floor figure is now block-dependent by construction -- a `Blocks = 0` sweep gathers
+only the coordinates and the state velocity -- so 12% is the floor for a block that reads
+nothing, not a bound shared by all of them.
 
 **Two hypotheses of mine were wrong, in opposite directions.** I had written into the
 kernel that the upwind switch "cannot be specialised away". It can -- the continuity row
