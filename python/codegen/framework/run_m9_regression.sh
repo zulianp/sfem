@@ -61,7 +61,7 @@ fi
 
 if [[ "${SFEM_REPRODUCIBILITY:-0}" == "1" ]]; then
     echo "Input-output reproducibility gate: every kernel's answers against the baseline"
-    "$PYTHON_BIN" -m codegen.framework.tools.reproducibility --all
+    "$PYTHON_BIN" -m codegen.framework.tools.reproducibility --all --refine 3
 else
     echo "Input-output reproducibility gate: skipped; set SFEM_REPRODUCIBILITY=1 to run it (needs a C++ compiler)"
 fi
