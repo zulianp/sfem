@@ -1300,3 +1300,45 @@ The two fixes compound: clamping the coarse levels' thread count made coarse smo
 enough that spending on it is affordable, which is what makes a weak fine smoother viable.
 Measured before the clamp, cheap fine smoothing looked worse, and that reading is what
 delayed this by a round.
+
+## The 2x speedup does not survive to a large problem
+
+The configuration that beat the baseline at L=16, N=1 on a laptop fails at N=3 on Grace.
+Measured at 1,853,572 unknowns, 72 threads, two Newton steps:
+
+| arm | iterations | t_solve | u_linf |
+|-----|-----------|---------|--------|
+| baseline BiCGStab + block-Jacobi | 1702 | 12.42 s | 1.30e-03 |
+| baseline, repeat | 1888 | 13.78 s | 5.80e-03 |
+| V-cycle, fine smoothing 2 | 2000 (cap) | 382.6 s | 1.99e-01 |
+| V-cycle, fine smoothing 16 | 518 | 201.7 s | 1.49e-03 |
+
+Weak fine smoothing does not merely lose here, it fails: the linear solve exhausts its
+iteration cap and returns an answer two orders of magnitude off. Strong fine smoothing
+converges to the right answer and takes fifteen times as long as the baseline. There is no
+setting at this size that is both correct and competitive.
+
+The pattern across every measurement in this document is now consistent: the smoothing
+strength this cycle needs grows with the problem, and the cost of that smoothing is what
+sinks it. It needed 8 iterations per level at four levels and 16 at five; it works at 2 on
+the fine level at 75k unknowns and fails at 2 at 1.85M. Each time the requirement rises the
+per-cycle cost rises with it, and the iteration count does not fall fast enough to pay.
+
+So the honest state is that the V-cycle is faster than block-Jacobi on one problem size on
+one machine, and slower or wrong everywhere else that has been measured. The earlier
+sections reporting the 2x win should be read with this one attached.
+
+### Two implementation notes attached to the same runs
+
+The thread clamp is off by default. Resizing the OpenMP team per operator application costs
+more than it saves once the team is large: at 72 threads it made the coarse smoothers slower
+than leaving them alone (33.3 ms against 14.0 ms per call on level 1), having made them
+faster at eight threads. The underlying problem -- coarse levels cannot use 72 threads -- is
+real and unsolved; the clamp moved the cost rather than removing it.
+
+An attempt to fix that by giving small levels a hand-written serial apply was reverted. It
+was slower (30.5 s against 3.0 s at L=16, N=1) and, more seriously, it changed the iteration
+count from 60 to 220 consistently, which is the signature of a wrong operator rather than a
+slow one -- most likely a block-layout mismatch, since the assembly gate only ever validated
+the values against `h_bsr_spmv` and not against a second reader of the same array. Any
+future serial path needs its own gate against the parallel one before it is trusted.
