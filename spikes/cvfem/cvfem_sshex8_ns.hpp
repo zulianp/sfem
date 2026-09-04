@@ -711,6 +711,372 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
 // matrix stays in L1 across the whole macro-element. The benchmark decides.
 
 // ---------------------------------------------------------------------------
+// The 2x2 field-block split: (velocity, pressure) x (velocity, pressure).
+//
+//        | A_uu  B^T |   momentum rows
+//   J =  |           |
+//        | B     C   |   continuity rows
+//
+// Solution schemes want these separately. A Schur approximation needs B and B^T to form
+// B A^-1 B^T; a segregated or projection scheme solves the momentum rows alone; the
+// pressure preconditioner investigated in the standalone driver needs C by itself; and a
+// Vanka or block smoother wants to address them independently. Evaluating the whole
+// operator and discarding three quarters of it is the thing to avoid.
+//
+// Where each term lands, which is not one-to-one with the code's own structure:
+//
+//   viscous                     -> A_uu
+//   qmid * A                    -> B^T
+//   convective mpos/mneg on v   -> A_uu
+//   continuity dmdot            -> split, see below
+//
+// The convective flux contributes to BOTH A_uu and B^T, because the mass-flux derivative
+// carries a velocity part and a pressure part:
+//
+//   dmdot = rho/2 (v_i + v_j).A   +   c (q_i - q_j)
+//           \_____ velocity _____/     \___ pressure ___/
+//
+// so d_pos * dmdot * u_i splits along the same line, and the continuity row splits into
+// B (the velocity half) and C (the Rhie-Chow half). Getting that wrong would put the
+// Rhie-Chow coupling in A_uu, where it would quietly break any Schur approximation built
+// on these blocks.
+
+enum SSBlock : int {
+    SSBLOCK_UU  = 1 << 0,  // momentum rows, velocity columns
+    SSBLOCK_UP  = 1 << 1,  // momentum rows, pressure column   (B^T)
+    SSBLOCK_PU  = 1 << 2,  // continuity row, velocity columns (B)
+    SSBLOCK_PP  = 1 << 3,  // continuity row, pressure column  (C)
+    SSBLOCK_MOM = SSBLOCK_UU | SSBLOCK_UP,
+    SSBLOCK_CON = SSBLOCK_PU | SSBLOCK_PP,
+    SSBLOCK_ALL = SSBLOCK_MOM | SSBLOCK_CON
+};
+
+// Reference: correct by construction, and slow.
+//
+// A block is selected by zeroing the input components outside its columns and the output
+// rows outside its rows, around the unmodified full operator. That cannot disagree with
+// the operator, which is what makes it the right thing to check the fast path against --
+// the fast path restates the arithmetic and could drift.
+inline void sscvfem_apply_blocks_ref(SSMeshData &d, const scalar_t rho, const scalar_t mu, const int blocks,
+                                     const scalar_t *const SFEM_RESTRICT dir,
+                                     scalar_t *const SFEM_RESTRICT       jv) {
+    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    std::vector<scalar_t> v((size_t)ndof), y((size_t)ndof);
+
+    const bool want_ucol = (blocks & (SSBLOCK_UU | SSBLOCK_PU)) != 0;
+    const bool want_pcol = (blocks & (SSBLOCK_UP | SSBLOCK_PP)) != 0;
+
+    for (ptrdiff_t i = 0; i < ndof; ++i) jv[i] = scalar_t(0);
+
+    for (int pass = 0; pass < 2; ++pass) {
+        const bool ucol = (pass == 0);
+        if (ucol && !want_ucol) continue;
+        if (!ucol && !want_pcol) continue;
+
+        for (ptrdiff_t n = 0; n < d.nnodes; ++n) {
+            for (int c = 0; c < 3; ++c) v[(size_t)n * 4 + c] = ucol ? dir[(size_t)n * 4 + c] : scalar_t(0);
+            v[(size_t)n * 4 + 3] = ucol ? scalar_t(0) : dir[(size_t)n * 4 + 3];
+        }
+        std::fill(y.begin(), y.end(), scalar_t(0));
+        // The default apply, named directly rather than through sscvfem_apply, which
+        // is declared below this point.
+        sscvfem_apply_macro_local_hoisted(d, rho, mu, v.data(), y.data());
+
+        const int mom_bit = ucol ? SSBLOCK_UU : SSBLOCK_UP;
+        const int con_bit = ucol ? SSBLOCK_PU : SSBLOCK_PP;
+        for (ptrdiff_t n = 0; n < d.nnodes; ++n) {
+            if (blocks & mom_bit)
+                for (int c = 0; c < 3; ++c) jv[(size_t)n * 4 + c] += y[(size_t)n * 4 + c];
+            if (blocks & con_bit) jv[(size_t)n * 4 + 3] += y[(size_t)n * 4 + 3];
+        }
+    }
+}
+
+// Fast path: the hoisted action with the unwanted terms compiled out.
+template <int Blocks>
+static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t mu, const SSMacroGeom &g,
+                                              const scalar_t *const SFEM_RESTRICT ux,
+                                              const scalar_t *const SFEM_RESTRICT uy,
+                                              const scalar_t *const SFEM_RESTRICT uz,
+                                              const scalar_t *const SFEM_RESTRICT vx,
+                                              const scalar_t *const SFEM_RESTRICT vy,
+                                              const scalar_t *const SFEM_RESTRICT vz,
+                                              const scalar_t *const SFEM_RESTRICT q,
+                                              const scalar_t *const SFEM_RESTRICT p,
+                                              const scalar_t *const SFEM_RESTRICT pgx,
+                                              const scalar_t *const SFEM_RESTRICT pgy,
+                                              const scalar_t *const SFEM_RESTRICT pgz,
+                                              scalar_t *const SFEM_RESTRICT       r) {
+    constexpr bool uu = (Blocks & SSBLOCK_UU) != 0;
+    constexpr bool up = (Blocks & SSBLOCK_UP) != 0;
+    constexpr bool pu = (Blocks & SSBLOCK_PU) != 0;
+    constexpr bool pp = (Blocks & SSBLOCK_PP) != 0;
+    constexpr bool mom = uu || up;
+
+    for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+
+    // Viscous: A_uu only. Skipped entirely for a pressure-block evaluation, which is most
+    // of what makes C cheap to get on its own.
+    if constexpr (uu) {
+        scalar_t dgrad[9];
+        cvfem_hex8_grad_sumfact(g.adj, g.det, vx, vy, vz, dgrad);
+        for (int d2 = 0; d2 < 3; ++d2) {
+            scalar_t tx, ty, tz;
+            cvfem_hex8_traction(mu, dgrad[0], dgrad[1], dgrad[2], dgrad[3], dgrad[4], dgrad[5], dgrad[6],
+                                dgrad[7], dgrad[8], g.A[d2][0], g.A[d2][1], g.A[d2][2], tx, ty, tz);
+            for (int e = 0; e < 4; ++e) {
+                const int i = CVFEM_HEX8_DIR_EDGES[d2][e][0];
+                const int j = CVFEM_HEX8_DIR_EDGES[d2][e][1];
+                r[i * 4 + 0] -= tx;
+                r[i * 4 + 1] -= ty;
+                r[i * 4 + 2] -= tz;
+                r[j * 4 + 0] += tx;
+                r[j * 4 + 1] += ty;
+                r[j * 4 + 2] += tz;
+            }
+        }
+    }
+
+    const scalar_t half = scalar_t(0.5);
+    const scalar_t one  = scalar_t(1);
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        const int      i  = CVFEM_HEX8_SCS[s].i;
+        const int      j  = CVFEM_HEX8_SCS[s].j;
+        const int      dd = s >> 2;
+        const scalar_t ax = g.A[dd][0], ay = g.A[dd][1], az = g.A[dd][2];
+        const scalar_t c  = g.coeff[s];
+
+        // The upwind direction is a property of the state, so it is needed by every block
+        // that carries a convective contribution -- it cannot be specialised away.
+        const scalar_t corr = (p[j] - p[i]) - (half * (pgx[i] + pgx[j]) * g.dvec[s][0] +
+                                               half * (pgy[i] + pgy[j]) * g.dvec[s][1] +
+                                               half * (pgz[i] + pgz[j]) * g.dvec[s][2]);
+        const scalar_t mdot = rho * (half * (ux[i] + ux[j]) * ax + half * (uy[i] + uy[j]) * ay +
+                                     half * (uz[i] + uz[j]) * az) - c * corr;
+        const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
+        const scalar_t mpos  = half * (mdot + sgn * mdot);
+        const scalar_t mneg  = half * (mdot - sgn * mdot);
+        const scalar_t d_pos = half * (one + sgn);
+        const scalar_t d_neg = half * (one - sgn);
+
+        // The two halves of the mass-flux derivative, kept apart so the blocks can be.
+        const scalar_t dmdot_v = (uu || pu) ? rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay +
+                                                            (vz[i] + vz[j]) * az)
+                                            : scalar_t(0);
+        const scalar_t dmdot_q = (up || pp) ? c * (q[i] - q[j]) : scalar_t(0);
+
+        if constexpr (mom) {
+            scalar_t fx = 0, fy = 0, fz = 0;
+            if constexpr (uu) {
+                const scalar_t apos = d_pos * dmdot_v;
+                const scalar_t aneg = d_neg * dmdot_v;
+                fx += apos * ux[i] + mpos * vx[i] + aneg * ux[j] + mneg * vx[j];
+                fy += apos * uy[i] + mpos * vy[i] + aneg * uy[j] + mneg * vy[j];
+                fz += apos * uz[i] + mpos * vz[i] + aneg * uz[j] + mneg * vz[j];
+            }
+            if constexpr (up) {
+                const scalar_t apos = d_pos * dmdot_q;
+                const scalar_t aneg = d_neg * dmdot_q;
+                const scalar_t qmid = half * (q[i] + q[j]);
+                fx += apos * ux[i] + aneg * ux[j] + qmid * ax;
+                fy += apos * uy[i] + aneg * uy[j] + qmid * ay;
+                fz += apos * uz[i] + aneg * uz[j] + qmid * az;
+            }
+            r[i * 4 + 0] += fx;
+            r[i * 4 + 1] += fy;
+            r[i * 4 + 2] += fz;
+            r[j * 4 + 0] -= fx;
+            r[j * 4 + 1] -= fy;
+            r[j * 4 + 2] -= fz;
+        }
+
+        if constexpr (pu || pp) {
+            scalar_t dm = 0;
+            if constexpr (pu) dm += dmdot_v;
+            if constexpr (pp) dm += dmdot_q;
+            r[i * 4 + 3] += dm;
+            r[j * 4 + 3] -= dm;
+        }
+    }
+}
+
+// Macro-local sweep for a chosen set of blocks.
+//
+// The boundary sub-control-surface term is handled by input masking rather than by
+// specialising it: it is a shared kernel that writes all four blocks, and restating it
+// here to split it would be a second copy of arithmetic that already exists. Zeroing the
+// direction components outside the wanted columns, and dropping the rows outside the
+// wanted rows, gives its contribution to those blocks exactly. It is a boundary term, so
+// it runs on a vanishing fraction of the elements and its cost does not drive this.
+template <int Blocks>
+inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                                    const scalar_t *const SFEM_RESTRICT dir,
+                                                    scalar_t *const SFEM_RESTRICT       jv) {
+    constexpr bool uu = (Blocks & SSBLOCK_UU) != 0;
+    constexpr bool up = (Blocks & SSBLOCK_UP) != 0;
+    constexpr bool pu = (Blocks & SSBLOCK_PU) != 0;
+    constexpr bool pp = (Blocks & SSBLOCK_PP) != 0;
+
+    const int L   = d.level;
+    const int nxe = d.nxe;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+#pragma omp parallel
+    {
+        std::vector<smesh::idx_t> lg((size_t)nxe);
+        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
+        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
+        std::vector<scalar_t>     lvx((size_t)nxe), lvy((size_t)nxe), lvz((size_t)nxe), lq((size_t)nxe);
+        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
+        std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                lg[(size_t)a]        = g;
+                lx[(size_t)a]        = (scalar_t)d.points[0][g];
+                ly[(size_t)a]        = (scalar_t)d.points[1][g];
+                lz[(size_t)a]        = (scalar_t)d.points[2][g];
+                lux[(size_t)a]       = d.ux[(size_t)g];
+                luy[(size_t)a]       = d.uy[(size_t)g];
+                luz[(size_t)a]       = d.uz[(size_t)g];
+                lp[(size_t)a]        = d.p[(size_t)g];
+                lvx[(size_t)a]       = dir[(size_t)g * 4 + 0];
+                lvy[(size_t)a]       = dir[(size_t)g * 4 + 1];
+                lvz[(size_t)a]       = dir[(size_t)g * 4 + 2];
+                lq[(size_t)a]        = dir[(size_t)g * 4 + 3];
+                lpgx[(size_t)a]      = d.pgx[(size_t)g];
+                lpgy[(size_t)a]      = d.pgy[(size_t)g];
+                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+            }
+            std::fill(lout.begin(), lout.end(), scalar_t(0));
+
+            SSMacroGeom mg;
+            {
+                scalar_t ex[8], ey[8], ez[8];
+                for (int a = 0; a < 8; ++a) {
+                    const int l = off[a];
+                    ex[a]       = lx[(size_t)l];
+                    ey[a]       = ly[(size_t)l];
+                    ez[a]       = lz[(size_t)l];
+                }
+                sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+            }
+
+            for (int zi = 0; zi < L; ++zi) {
+                for (int yi = 0; yi < L; ++yi) {
+                    for (int xi = 0; xi < L; ++xi) {
+                        const int base = sscvfem_lidx(L, xi, yi, zi);
+
+                        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+                        scalar_t vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
+                        scalar_t r[CVFEM_HEX8_N_DOF];
+                        for (int a = 0; a < 8; ++a) {
+                            const int l = base + off[a];
+                            x[a]        = lx[(size_t)l];
+                            y[a]        = ly[(size_t)l];
+                            z[a]        = lz[(size_t)l];
+                            ux[a]       = lux[(size_t)l];
+                            uy[a]       = luy[(size_t)l];
+                            uz[a]       = luz[(size_t)l];
+                            p[a]        = lp[(size_t)l];
+                            vx[a]       = lvx[(size_t)l];
+                            vy[a]       = lvy[(size_t)l];
+                            vz[a]       = lvz[(size_t)l];
+                            q[a]        = lq[(size_t)l];
+                            pgx[a]      = lpgx[(size_t)l];
+                            pgy[a]      = lpgy[(size_t)l];
+                            pgz[a]      = lpgz[(size_t)l];
+                        }
+
+                        sscvfem_action_blocks<Blocks>(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz, r);
+
+                        // Boundary term, by input masking. Two passes only when both
+                        // column groups are wanted, which for the full operator is the
+                        // single unmasked pass below.
+                        // A row group that wants every column needs no input masking at
+                        // all: run the boundary term once as it stands and keep the rows.
+                        // Without this, asking for the momentum rows costs more than the
+                        // whole operator, because the two masked passes outweigh the terms
+                        // the specialisation removes.
+                        constexpr bool all_cols_mom = uu && up;
+                        constexpr bool all_cols_con = pu && pp;
+                        constexpr bool no_masking =
+                                (Blocks == SSBLOCK_ALL) ||
+                                (all_cols_mom && !pu && !pp) || (all_cols_con && !uu && !up);
+
+                        if constexpr (no_masking) {
+                            scalar_t rb[CVFEM_HEX8_N_DOF];
+                            for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
+                            boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                             ux, uy, uz, vx, vy, vz, q, rb);
+                            for (int a = 0; a < 8; ++a) {
+                                if constexpr (uu || up)
+                                    for (int cc = 0; cc < 3; ++cc) r[a * 4 + cc] += rb[a * 4 + cc];
+                                if constexpr (pu || pp) r[a * 4 + 3] += rb[a * 4 + 3];
+                            }
+                        } else {
+                            scalar_t zero8[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+                            scalar_t rb[CVFEM_HEX8_N_DOF];
+                            if constexpr (uu || pu) {
+                                for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
+                                boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                                 ux, uy, uz, vx, vy, vz, zero8, rb);
+                                for (int a = 0; a < 8; ++a) {
+                                    if constexpr (uu)
+                                        for (int cc = 0; cc < 3; ++cc) r[a * 4 + cc] += rb[a * 4 + cc];
+                                    if constexpr (pu) r[a * 4 + 3] += rb[a * 4 + 3];
+                                }
+                            }
+                            if constexpr (up || pp) {
+                                for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
+                                boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                                 ux, uy, uz, zero8, zero8, zero8, q, rb);
+                                for (int a = 0; a < 8; ++a) {
+                                    if constexpr (up)
+                                        for (int cc = 0; cc < 3; ++cc) r[a * 4 + cc] += rb[a * 4 + cc];
+                                    if constexpr (pp) r[a * 4 + 3] += rb[a * 4 + 3];
+                                }
+                            }
+                        }
+
+                        for (int a = 0; a < 8; ++a) {
+                            const int l = base + off[a];
+                            for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
+                        }
+                    }
+                }
+            }
+
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = lg[(size_t)a];
+                for (int c = 0; c < N_FIELDS; ++c)
+                    atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+            }
+        }
+    }
+}
+
+// Runtime entry. The mask is a compile-time parameter inside, so each combination gets a
+// kernel with the terms it does not need removed rather than branched over.
+inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar_t mu, const int blocks,
+                                 const scalar_t *const SFEM_RESTRICT dir,
+                                 scalar_t *const SFEM_RESTRICT       jv) {
+    switch (blocks & SSBLOCK_ALL) {
+        case SSBLOCK_UU:  sscvfem_apply_blocks_impl<SSBLOCK_UU>(d, rho, mu, dir, jv);  break;
+        case SSBLOCK_UP:  sscvfem_apply_blocks_impl<SSBLOCK_UP>(d, rho, mu, dir, jv);  break;
+        case SSBLOCK_PU:  sscvfem_apply_blocks_impl<SSBLOCK_PU>(d, rho, mu, dir, jv);  break;
+        case SSBLOCK_PP:  sscvfem_apply_blocks_impl<SSBLOCK_PP>(d, rho, mu, dir, jv);  break;
+        case SSBLOCK_MOM: sscvfem_apply_blocks_impl<SSBLOCK_MOM>(d, rho, mu, dir, jv); break;
+        case SSBLOCK_CON: sscvfem_apply_blocks_impl<SSBLOCK_CON>(d, rho, mu, dir, jv); break;
+        case SSBLOCK_ALL: sscvfem_apply_blocks_impl<SSBLOCK_ALL>(d, rho, mu, dir, jv); break;
+        default:          sscvfem_apply_blocks_ref(d, rho, mu, blocks, dir, jv);       break;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Block diagonal: the 4x4 block per node, which is what a block-Jacobi smoother inverts.
 //
 // The multigrid path needs one of these at every level, so it is not the once-per-Newton

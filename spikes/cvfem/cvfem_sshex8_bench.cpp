@@ -62,12 +62,13 @@ int main(int argc, char **argv) {
     // Macro-element counts in y, and the internal level of each.
     // ndof applies is only affordable on a small mesh, so the probe check is opt-in and
     // self-limiting.
-    const int  probe_diag = smesh::Env::read<int>("SFEM_BENCH_PROBE_DIAG", 0);
+    const int  probe_diag     = smesh::Env::read<int>("SFEM_BENCH_PROBE_DIAG", 0);
+    const int  verbose_blocks = smesh::Env::read<int>("SFEM_BENCH_VERBOSE_BLOCKS", 0);
     const auto macros = parse_list(smesh::Env::read_string("SFEM_BENCH_MACROS", "2,4,6,8"));
     const auto levels = parse_list(smesh::Env::read_string("SFEM_BENCH_LEVELS", "2,4,8"));
 
-    std::printf("%-4s %-10s %-11s %-11s %-11s %-11s %-11s %-11s %-9s %-9s %-9s %-10s %-10s %s\n",
-                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "bd_nv", "bd_mac", "pgrad", "hoist+pg", "agree", "bd_agree");
+    std::printf("%-4s %-10s %-11s %-11s %-11s %-11s %-11s %-11s %-9s %-9s %-9s %-10s %-10s %-10s %s\n",
+                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "bd_nv", "bd_mac", "pgrad", "hoist+pg", "agree", "bd_agree", "blk_agree");
 
     int failures = 0;
 
@@ -226,13 +227,72 @@ int main(int argc, char **argv) {
             const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d, rho, mu, bd_naive); });
             const double t_bdm = time_it([&] { sscvfem_block_diag(d, rho, mu, bd_macro); });
 
+            // The 2x2 field blocks. Each specialised kernel is checked against the
+            // reference built by masking the inputs around the unmodified operator, and
+            // the four of them must also sum back to the full operator -- a term landing
+            // in the wrong block would pass the first check and fail the second.
+            double blk_rel = 0, blk_sum_rel = 0;
+            {
+                const int    masks[4] = {SSBLOCK_UU, SSBLOCK_UP, SSBLOCK_PU, SSBLOCK_PP};
+                const char  *names[4] = {"uu", "up", "pu", "pp"};
+                std::vector<scalar_t> yb((size_t)ndof), yr((size_t)ndof), acc((size_t)ndof, 0), yfull((size_t)ndof, 0);
+                sscvfem_apply(d, rho, mu, dir.data(), yfull.data());
+
+                double fmax = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i) fmax = std::max(fmax, std::fabs((double)yfull[(size_t)i]));
+
+                for (int b = 0; b < 4; ++b) {
+                    std::fill(yb.begin(), yb.end(), scalar_t(0));
+                    std::fill(yr.begin(), yr.end(), scalar_t(0));
+                    sscvfem_apply_blocks(d, rho, mu, masks[b], dir.data(), yb.data());
+                    sscvfem_apply_blocks_ref(d, rho, mu, masks[b], dir.data(), yr.data());
+                    double m = 0;
+                    for (ptrdiff_t i = 0; i < ndof; ++i) {
+                        m = std::max(m, std::fabs((double)(yb[(size_t)i] - yr[(size_t)i])));
+                        acc[(size_t)i] += yb[(size_t)i];
+                    }
+                    const double rl = (fmax > 0) ? m / fmax : m;
+                    blk_rel = std::max(blk_rel, rl);
+                    if (verbose_blocks) std::printf("    block %s vs reference: %.3e\n", names[b], rl);
+                }
+                double sm = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i)
+                    sm = std::max(sm, std::fabs((double)(acc[(size_t)i] - yfull[(size_t)i])));
+                blk_sum_rel = (fmax > 0) ? sm / fmax : sm;
+                if (verbose_blocks) {
+                    std::printf("    uu+up+pu+pp vs full operator: %.3e\n", blk_sum_rel);
+                    // What a scheme actually saves by asking for one block instead of J.
+                    const int   tm[7]  = {SSBLOCK_UU, SSBLOCK_UP, SSBLOCK_PU, SSBLOCK_PP,
+                                          SSBLOCK_MOM, SSBLOCK_CON, SSBLOCK_ALL};
+                    const char *tn[7]  = {"uu (A)", "up (B^T)", "pu (B)", "pp (C)",
+                                          "mom rows", "con rows", "all (J)"};
+                    double      tall   = 0;
+                    for (int b = 0; b < 7; ++b) {
+                        const double tb = time_it([&] {
+                            std::fill(yb.begin(), yb.end(), scalar_t(0));
+                            sscvfem_apply_blocks(d, rho, mu, tm[b], dir.data(), yb.data());
+                        });
+                        if (tm[b] == SSBLOCK_ALL) tall = tb;
+                        std::printf("    %-10s %8.3f ns/dof%s\n", tn[b], 1e9 * tb / (double)ndof,
+                                    (tall > 0 && tm[b] != SSBLOCK_ALL) ? "" : "");
+                    }
+                    for (int b = 0; b < 6; ++b) {
+                        const double tb = time_it([&] {
+                            std::fill(yb.begin(), yb.end(), scalar_t(0));
+                            sscvfem_apply_blocks(d, rho, mu, tm[b], dir.data(), yb.data());
+                        });
+                        std::printf("    %-10s %5.2f%% of the full operator\n", tn[b], 100.0 * tb / tall);
+                    }
+                }
+            }
+
             // The nodal pressure gradient, timed separately because the flat operator
             // recomputes it inside every apply while this benchmark hoists it out of the
             // timed region. Any comparison against the flat kernel has to add it back, or
             // it is not measuring the same work.
             const double t_pg = time_it([&] { sscvfem_nodal_p_grad(d); });
 
-            std::printf("%-4d %-10td %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-9.3f %-9.3f %-9.3f %-10.3f %-10.2e %.2e%s\n",
+            std::printf("%-4d %-10td %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-9.3f %-9.3f %-9.3f %-10.3f %-10.2e %-10.2e %.2e%s\n",
                         L,
                         ndof,
                         1e9 * t_naive / (double)ndof,
@@ -247,8 +307,9 @@ int main(int argc, char **argv) {
                         1e9 * (t_hoi + t_pg) / (double)ndof,
                         rel,
                         std::max(bd_rel, bd_probe_rel),
+                        std::max(blk_rel, blk_sum_rel),
                         (rel < tol) ? "" : "  <-- MISMATCH");
-            if (rel >= tol || bd_rel >= tol || bd_probe_rel >= tol) ++failures;
+            if (rel >= tol || bd_rel >= tol || bd_probe_rel >= tol || blk_rel >= tol || blk_sum_rel >= tol) ++failures;
         }
     }
 
