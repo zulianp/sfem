@@ -1,10 +1,11 @@
 --- a/src/mesh/semistructured/smesh_sshex8_mesh.impl.hpp
 +++ b/src/mesh/semistructured/smesh_sshex8_mesh.impl.hpp
-@@ -5,8 +5,56 @@
+@@ -5,8 +5,69 @@
  #include "smesh_sshex8_mesh.hpp"
  #include "smesh_ssquad4.hpp"
  
 +#include <algorithm>
++#include <cstdlib>
 +#include <vector>
 +
  namespace smesh {
@@ -31,6 +32,18 @@
 +// and a single-threaded run produces exactly what it produced before, since element 0 was
 +// already the first to write. It is also less work: a shared node is now interpolated
 +// once instead of once per incident element.
++//
++// SMESH_DETERMINISTIC_COORDS=0 restores the previous behaviour exactly -- no ownership
++// table, every element writing every node it contains -- for comparing against results
++// produced before this change.
++inline bool sshex8_deterministic_coords() {
++  static const bool on = [] {
++    const char *e = std::getenv("SMESH_DETERMINISTIC_COORDS");
++    return !e || std::atoi(e) != 0;
++  }();
++  return on;
++}
++
 +template <typename idx_t>
 +static void sshex8_build_node_owner(
 +    const int level, const ptrdiff_t nelements,
@@ -57,22 +70,25 @@
  template <typename T>
  SMESH_INLINE void
  hex8_eval_f(const T x, const T y, const T z, T *const SMESH_RESTRICT f0,
-@@ -105,6 +153,9 @@
+@@ -105,6 +166,12 @@
    // Nodes
    const geom_t h = geom_t(1) / geom_t(level);
  
++  const bool             deterministic = sshex8_deterministic_coords();
 +  std::vector<ptrdiff_t> owner;
-+  sshex8_build_node_owner<idx_t>(level, nelements, elements, owner);
++  if (deterministic) {
++    sshex8_build_node_owner<idx_t>(level, nelements, elements, owner);
++  }
 +
  #pragma omp parallel for collapse(4)
    for (int zi = 0; zi < level + 1; zi++) {
      for (int yi = 0; yi < level + 1; yi++) {
-@@ -117,6 +168,12 @@
+@@ -117,6 +184,12 @@
            int lidx = sshex8_lidx(level, xi, yi, zi);
  
            for (ptrdiff_t e = 0; e < nelements; e++) {
 +            const ptrdiff_t g = (ptrdiff_t)elements[lidx][e];
-+            if (owner[(size_t)g] != e) {
++            if (deterministic && owner[(size_t)g] != e) {
 +              // Another element owns this node and will write it.
 +              continue;
 +            }
@@ -80,7 +96,7 @@
              geom_t acc = 0;
  
              for (int lnode = 0; lnode < 8; lnode++) {
-@@ -125,7 +182,7 @@
+@@ -125,7 +198,7 @@
                acc += p * f[lnode];
              }
  
@@ -89,22 +105,25 @@
            }
          }
        }
-@@ -152,6 +209,9 @@
+@@ -152,6 +225,12 @@
        sshex8_lidx(level, level, level, level),
        sshex8_lidx(level, 0, level, level)};
  
++  const bool             deterministic = sshex8_deterministic_coords();
 +  std::vector<ptrdiff_t> owner;
-+  sshex8_build_node_owner<idx_t>(level, nelements, elements, owner);
++  if (deterministic) {
++    sshex8_build_node_owner<idx_t>(level, nelements, elements, owner);
++  }
 +
  #pragma omp parallel for collapse(4)
    for (int zi = 0; zi < level + 1; zi++) {
      for (int yi = 0; yi < level + 1; yi++) {
-@@ -163,6 +223,12 @@
+@@ -163,6 +242,12 @@
            int lidx = sshex8_lidx(level, xi, yi, zi);
  
            for (ptrdiff_t e = 0; e < nelements; e++) {
 +            const ptrdiff_t g = (ptrdiff_t)elements[lidx][e];
-+            if (owner[(size_t)g] != e) {
++            if (deterministic && owner[(size_t)g] != e) {
 +              // Another element owns this node and will write it.
 +              continue;
 +            }
@@ -112,7 +131,7 @@
              geom_t acc = 0;
  
              for (int lnode = 0; lnode < 8; lnode++) {
-@@ -171,7 +237,7 @@
+@@ -171,7 +256,7 @@
                acc += p * f[lnode];
              }
  
