@@ -592,13 +592,14 @@ A working V-cycle holds iteration counts roughly flat as the lattice deepens. Th
 faster than the flat preconditioner's and overtake it by L=8, where the V-cycle is *worse*
 than the smoother it is built from.
 
-The cause is the smoother rather than the coarse operator or the transfers. Increasing
-smoothing steps at L=8 reduces iterations monotonically and steeply -- 3113, 2140, 1402, 480
-for 1, 3, 6 and 12 steps. A wrong coarse-grid correction or a wrong transfer would not
-respond that way; it is the smoother failing to damp the high-frequency error the coarse
-level cannot see. This is the case the original plan flagged as P5, a Vanka or SIMPLE-type
-smoother, "only if P4's convergence degrades". It has degraded, so P5 is now the next step
-rather than a contingency.
+That first reading -- that the smoother was at fault -- was wrong, and the reasoning behind
+it was wrong in a way worth recording. It rested on smoothing steps at L=8 reducing
+iterations monotonically (3113, 2140, 1402, 480 for 1, 3, 6 and 12), read as evidence that
+the coarse-grid correction was sound and only the smoother was weak. But a damped smoother
+is a convergent iteration by itself, so a cycle whose coarse correction contributed nothing
+whatever would improve with smoothing count in exactly the same way. Counted in operator
+applies rather than iterations the same numbers say the opposite: 7114, 14671, 19223, 13162
+against block-Jacobi's 1082. More smoothing was buying less, not more.
 
 ### The cost bar a V-cycle has to clear
 
@@ -614,4 +615,107 @@ Wall-clock numbers are not quoted here as a comparison. These runs are at N=1, f
 saturation, where per-apply overhead dominates and the measured 2.1 ms for a 425-node apply
 is overhead rather than work. The iteration counts and their growth with level are the
 meaningful signal at this size; a wall-clock claim needs a saturated problem and will be
-worth making once the smoother is fixed.
+worth making once the cycle is fixed.
+
+
+## What is actually wrong with the V-cycle
+
+Chasing the above produced a diagnosis, one real bug fixed, and a clear statement of what
+still blocks the cycle. The instruments are in the driver behind `SFEM_GMG_CHECK`.
+
+### A control arm that never ran
+
+`SFEM_GMG=2` runs the same damped block-Jacobi as a stationary iteration on the fine level
+for the same number of sweeps a V-cycle spends smoothing, with no hierarchy under it. It
+exists because iteration counts cannot otherwise distinguish a weak smoother from a broken
+coarse correction.
+
+Its first results showed V-cycle and control agreeing to the digit -- 48 against 48, 470
+against 470 -- which was not a finding but a bug: the hierarchy was built under `if
+(use_gmg)`, so `SFEM_GMG=2` took the `if (gmg)` branch and ran the V-cycle. The control was
+unreachable. It now builds only for `SFEM_GMG == 1`.
+
+### The bug: the state was restricted with the residual's operator
+
+Every coarse operator is linearised about a state restricted from the level above, and that
+restriction was `create_hierarchical_restriction`. The adjoint test in `check_transfers`
+shows that operator is exactly the transpose of the prolongation -- ratio 1.000000 on every
+level, once the probe vectors respect the constraints that both transfers impose on their
+output. (Probing with unconstrained noise reports a spurious mismatch; the first version of
+this test did exactly that and produced ratios of 0.41 and 1.12, which read convincingly as
+a broken transfer and were nothing of the kind.)
+
+Being the adjoint is precisely right for the residual and precisely wrong for a state. `P^T`
+sums where a state transfer must average, inflating each coarse state by the number of fine
+nodes feeding a coarse node -- a measured factor of about 3.8 per level. Every coarse
+operator was therefore linearised about a field several times too large. Normalising by `R`
+applied to the constant 1 recovers the partition-of-unity average. The effect on the cycle's
+own convergence rate at L=8 was the difference between diverging and converging:
+
+| cycle | before | after |
+|-------|--------|-------|
+| 1     | 5.83   | 0.185 |
+| 2     | 1.17   | 0.626 |
+
+### What still blocks it: Rhie-Chow does not survive coarsening
+
+The cycle still turns divergent after the second cycle, settling at about 1.34 per cycle at
+L=8, and the V-cycle remains the worst of the three preconditioners:
+
+| level | V-cycle | fine smoother, no hierarchy | block-Jacobi |
+|-------|---------|-----------------------------|--------------|
+| 2     | 48      | 42                          | 123          |
+| 4     | 470     | 84                          | 304          |
+| 8     | 2407    | 574                         | 918          |
+
+The coarse-operator consistency check applies `A_c` and `R A_f P` to the same smooth coarse
+vector and compares them per component. The rediscretised coarse operator disagrees with
+the Galerkin operator the transfers imply by a factor of about six, and the disagreement is
+almost entirely in the pressure rows:
+
+| level pair | ux   | uy   | uz   | p    |
+|------------|------|------|------|------|
+| 0->1       | 0.79 | 0.72 | 0.76 | 6.59 |
+| 1->2       | 1.59 | 1.30 | 2.42 | 5.24 |
+| 2->3       | 0.00 | 0.00 | 0.00 | 6.01 |
+
+That localises it to the stabilisation. `Df = rc_scale * h^2 / (2 mu)` is the one term that
+depends on the lattice spacing outright, so each level stabilises a different equation, and
+rediscretisation hands the cycle a coarse pressure operator that is not a coarse version of
+the fine one. Holding `Df` at the fine level's value (`SFEM_GMG_RC_DECAY=0.25`) confirms the
+mechanism -- the pressure inconsistency falls from about 6 to between 0.6 and 1.2.
+
+The awkward part is that the same change makes the cycle *worse*, taking the L=8 rates to
+0.41, 1.30, 1.52. A coarse operator stabilised for the fine level's `h` is closer to the
+Galerkin operator and simultaneously under-stabilised on its own mesh, where it is near
+enough singular that solving it amplifies what it returns. The two requirements point in
+opposite directions, which is the real obstacle: consistency with the fine operator and
+stability on the coarse mesh cannot both come from rediscretising with an h-dependent
+stabilisation.
+
+Nor is it a scalar. `SFEM_GMG_CGC` scales the prolonged correction; swept over 0.125 to 8 at
+L=8, every value diverges eventually -- values below 1 delay it, values above accelerate it
+sharply (4 gives 4.7 per cycle, 8 gives 17). A single factor per level cannot repair a
+coarse operator that differs in what it does rather than by how much.
+
+### Ruled out
+
+Recorded so they are not re-investigated: the transfer pair (exact adjoints, ratio
+1.000000); the pressure null space (every level carries exactly one pressure pin, and
+filtering the constant pressure mode out of each prolonged correction with
+`SFEM_GMG_PFILTER=1` changes the rates in the fourth decimal); hierarchy depth (capping at
+two levels with `SFEM_GMG_MAX_LEVELS`, so the coarse level is the well-resolved L=4 mesh,
+diverges at the same 1.33); the nodal pressure-gradient cache (`SFEM_PGRAD_CACHE=0`
+reproduces the rates bit for bit); and smoother damping (swept; 0.5 is best and is the
+default).
+
+### Where this leaves the preconditioner
+
+Block-Jacobi is still the one to beat, and in work rather than iterations it is not close.
+At L=8 it spends about 918 operator applies against roughly 3400 for the no-hierarchy
+smoother arm and some 19000 for the V-cycle. The fine-level stationary smoother wins on
+iteration count at every level and loses on work at every level.
+
+The next step is not a better smoother -- the evidence points away from that. It is the
+coarse pressure operator: either a stabilisation that coarsens consistently, or a coarse
+level built as a genuine Galerkin product for the pressure block instead of rediscretised.
