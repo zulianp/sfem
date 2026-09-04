@@ -1342,3 +1342,51 @@ count from 60 to 220 consistently, which is the signature of a wrong operator ra
 slow one -- most likely a block-layout mismatch, since the assembly gate only ever validated
 the values against `h_bsr_spmv` and not against a second reader of the same array. Any
 future serial path needs its own gate against the parallel one before it is trusted.
+
+## There is no threading bug, but threading has been flattering the baseline
+
+Running one thread against many, on a small case, settles several things at once.
+
+**No race.** Every deterministic check is bit-identical at 1, 2, 4 and 8 threads: the
+Galerkin assembly gates (2.3509e-16, 1.7047e-16, 1.3501e-16), the block-split norms and
+their sum against the full operator, and the transfer adjointness. Where both solvers
+converge they agree to seven digits (u_linf 7.167056e-03 against 7.167062e-03). The
+operators, transfers and assembly are thread-independent.
+
+**Single-threaded runs are exactly reproducible and multithreaded ones are not.** At L=16,
+N=1 the V-cycle gives 102, 102, 102 iterations on one thread and 70, 56, 75 on eight; the
+baseline gives 2000, 2000 and 1125, 1625. That is reduction order in the Krylov dot
+products, not a defect, but it is worth knowing that every multithreaded iteration count in
+this document carries roughly twenty percent of noise.
+
+**And the noise helps the baseline, which invalidates the comparisons above.** On one thread
+at L=16, N=1:
+
+| arm | iterations | t_solve | u_linf | p_linf |
+|-----|-----------|---------|--------|--------|
+| baseline BiCGStab + block-Jacobi | 2000 (cap) | 18.98 s | 6.275e-03 | 1.605e-02 |
+| V-cycle | 102 | 7.35 s | 4.291e-03 | 2.257e-03 |
+
+The baseline does not converge single-threaded. It stagnates and exhausts its cap, and the
+answer it returns is wrong -- 4.29e-03 is the value every converged run in this document
+produces, and its pressure error is seven times worse. On eight threads the same solver
+converges in 1125 to 1625 iterations. Rounding noise from threaded reductions is perturbing
+a stagnating BiCGStab enough to break it out, which is a known behaviour and is pure luck.
+
+So the baseline this method has been measured against was being helped by an accident of
+parallel reduction order, and every multithreaded comparison reported above is a V-cycle
+against a baseline that is quietly getting a free restart. Single-threaded, where both
+solvers are deterministic and the comparison is honest, the V-cycle takes 102 iterations and
+7.35 seconds and is correct, while the baseline takes 2000, nineteen seconds, and is wrong.
+
+**What remains true is the parallel efficiency gap.** From one to eight threads, t_solve goes
+19.08, 6.50, 6.79, 7.08 for the baseline and 7.44, 8.41, 3.08, 3.42 for the V-cycle. Neither
+scales past two to four threads on this machine -- the problem is memory bound -- and much of
+the baseline's apparent gain is its iteration count falling rather than its work speeding up.
+The V-cycle scales worse in the sense that matters, because its coarse levels cannot use the
+threads at all, and at 72 threads on Grace that is the difference between the two results.
+
+This does not rescue the Grace numbers, and the large-case conclusion stands: at 1.85M
+unknowns the V-cycle is still far slower there. But it does mean the laptop comparisons were
+measuring the wrong thing, and that the correct single-threaded comparison at 75k unknowns
+favours the V-cycle by more than the earlier multithreaded one suggested.
