@@ -36,20 +36,16 @@ import os
 import re
 import sys
 
-TENSOR_PRODUCT = ("hex8", "hex27", "hex64", "hex125", "quad4")
-SIMPLEX_LOWEST = ("tet4", "tri3")
-SIMPLEX_HIGHER = ("tet10", "tri6")
-
+from codegen.framework.fem.element_family import element_family as _element_family
 
 def element_family(element):
-    base = element[len("proteus_"):] if element.startswith("proteus_") else element
-    if base in TENSOR_PRODUCT:
-        return "tensor-product"
-    if base in SIMPLEX_LOWEST:
-        return "simplex-lowest"
-    if base in SIMPLEX_HIGHER:
-        return "simplex-higher"
-    return "mixed"
+    """The element's family, from the taxonomy the generator uses.
+
+    This was three literal tuples here.  A measurement and a generator that
+    disagree about what TET4 is would report conformance the generator does not
+    have, so both now read `fem.element_family`.
+    """
+    return _element_family(element).value
 
 
 def survey(generated):
