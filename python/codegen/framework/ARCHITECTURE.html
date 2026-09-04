@@ -518,12 +518,12 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Seventeen, ordered by what unblocks what. Two are closed and one is under way since this document was written. OP 16 was found by building the generated code for the first time. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Seventeen, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 17</div>
     <div class="body">
-      <div class="op-title">The precision axis multiplies the ABI, and should be a parameter <span class="chip c-part">designed, measured, not yet built</span></div>
+      <div class="op-title">The precision axis multiplies the ABI, and should be a parameter <span class="chip c-part">stage 1 built; stage 2 open</span></div>
 
       <p><b>Every kernel that touches scalar data is emitted twice.</b> <code>precision_axis()</code> returns <code>(double, "")</code> and <code>(float, "_float")</code>, and each emitter loops over it, so the generated tree carries a full second copy of every kernel that differs from the first in one line &mdash; <code>using scalar_t = float;</code> &mdash; and in the types of its field parameters. They are not two instantiations of a template; they are two written-out bodies.</p>
 
@@ -562,9 +562,13 @@
 
       <p>Stage two is the 478 definitions that do carry a body, holding 7.6 MB of the 8.7 MB. Those bodies open with <code>using scalar_t = float;</code> and are written out in full, so collapsing them means turning each into a <code>template &lt;typename scalar_t&gt;</code> and letting the compiler instantiate it. That is where the source saving is and where the inlining and vectorisation risk is, and it is the part the throughput gate exists for.</p>
 
-      <p><b>Open, and worth deciding before building.</b> <code>SMESH_DEFAULT</code> maps to <code>real_t</code>, which in most builds is <code>double</code>, so mirroring SFEM gives three instantiations where there are two today &mdash; object size grows even as the ABI halves, unless <code>DEFAULT</code> is folded into the matching concrete case. And the material scalar moving to <code>real_t</code> is a small semantic change: a caller running in single precision currently hands these kernels a <code>float</code> parameter and would hand them a <code>real_t</code>.</p>
+      <p><b>Stage one is built.</b> The public ABI is <b>1,124 &rarr; 690</b>, exactly the predicted 1.63&times; overall and 2&times; on every symbol that carries scalar data. All 291 translation units compile, all eleven materials. The 74 surviving kernel digests reproduce the recorded baseline exactly, and the gate reports the 74 that no longer generate &mdash; the <code>_float</code> twins &mdash; rather than passing silently over them. Throughput on the benchmarked laplace kernels is unchanged: six comparable kernels within &plusmn;1%, two of them bit-identical, against a &plusmn;2% noise floor. Generated source is 0.2 MB <em>larger</em>, which is the expected shape of this stage: it adds the switches without yet removing a single kernel body.</p>
 
-      <div class="op-facts"><span><i>ABI</i> 1,124 &rarr; 690</span><span><i>on scalar-carrying symbols</i> exactly 2&times;</span><span><i>source</i> &minus;8.7 MB of 31.8</span><span><i>bodies collapsed</i> 2,332</span><span><i>form</i> cu_tet4_laplacian.cu</span><span><i>stage 1</i> 434 forwarders, no perf risk</span><span><i>stage 2</i> 478 bodies, needs a gate</span></div>
+      <p>Three things had to be repaired along the way, and one of them was mine. The mixed-order materials pass a vector field as an array of pointers, and an array does not convert its element type implicitly the way a pointer does, so both the parameter and the argument need the cast spelled out. The reproducibility harness could not bind the new ABI at all &mdash; it matched concrete C types, and <code>void</code> matched none of them &mdash; so the correctness gate was briefly blind to the very change it existed to check; it now binds runtime-typed entry points at <code>SMESH_FLOAT64</code>, which is what makes the digests comparable with the baseline. And the gate had a second blindness that <b>this branch introduced</b> when kernel-to-material scoping was fixed earlier: scoping by what was measured this run made a kernel that stops generating invisible, so 74 could vanish with the gate still green. Baseline entries now carry their owning material.</p>
+
+      <p><b>Open, and worth deciding before building stage two.</b> <code>SMESH_DEFAULT</code> maps to <code>real_t</code>, which in most builds is <code>double</code>, so mirroring SFEM gives three instantiations where there are two today &mdash; object size grows even as the ABI halves, unless <code>DEFAULT</code> is folded into the matching concrete case. And the material scalar moving to <code>real_t</code> is a small semantic change: a caller running in single precision currently hands these kernels a <code>float</code> parameter and would hand them a <code>real_t</code>.</p>
+
+      <div class="op-facts"><span><i>ABI</i> 1,124 &rarr; 690</span><span><i>on scalar-carrying symbols</i> exactly 2&times;</span><span><i>source</i> &minus;8.7 MB of 31.8</span><span><i>bodies collapsed</i> 2,332</span><span><i>form</i> cu_tet4_laplacian.cu</span><span><i>stage 1</i> built, 1,124 &rarr; 690</span><span><i>stage 2</i> 478 bodies, needs a gate</span></div>
     </div>
   </div>
 

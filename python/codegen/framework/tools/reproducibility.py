@@ -239,15 +239,45 @@ IN_FIELDS = (
     "const double *const SFEM_RESTRICT",
     "const float *const SFEM_RESTRICT",
     "const real_t *const SFEM_RESTRICT",
+    # A runtime-typed entry point takes its buffers as void and is told their
+    # type by a separate parameter.  The harness drives those at
+    # SMESH_FLOAT64, so the buffer it allocates is a double one and the digest
+    # is directly comparable with the baseline recorded before the ABI carried
+    # its type at run time.  See ARCHITECTURE.html OP 17.
+    "const void *const SFEM_RESTRICT",
 )
 OUT_FIELDS = (
     "double *const SFEM_RESTRICT",
     "float *const SFEM_RESTRICT",
     "real_t *const SFEM_RESTRICT",
+    "void *const SFEM_RESTRICT",
 )
+
+#: What the harness asks a runtime-typed entry point for.
+RUNTIME_TYPE_CTYPE = "const enum smesh::PrimitiveType"
+RUNTIME_TYPE_VALUE = "smesh::SMESH_FLOAT64"
+
+
+def _field_argument(buffer, ctype, extent, const):
+    """How the harness hands one field buffer to the kernel.
+
+    An array-of-pointer parameter takes the array; everything else takes
+    ``.data()``.  A void parameter additionally needs the cast the type system
+    no longer does implicitly for an array of pointers.
+    """
+    value = buffer if extent else "%s.data()" % buffer
+    if "void" not in ctype:
+        return value
+    qualifier = "const " if const else ""
+    if extent:
+        return "(%svoid *const *)%s" % (qualifier, value)
+    return "(%svoid *)%s" % (qualifier, value)
 
 
 def _scalar_type(ctype):
+    if "void" in ctype:
+        # Driven at SMESH_FLOAT64, so the buffer behind the void is a double.
+        return "double"
     for name in ("double", "float", "real_t"):
         if name in ctype:
             return name
@@ -290,6 +320,8 @@ def _bind(params, element, components, block_values=None):
             args.append("mesh.adjugate[%d].data()" % index)
         elif name == "g_jacobian_determinant0":
             args.append("mesh.determinant.data()")
+        elif "PrimitiveType" in ctype:
+            args.append(RUNTIME_TYPE_VALUE)
         elif name.endswith("_stride") and ctype == "const ptrdiff_t":
             args.append("1")
         elif ctype in SCALARS:
@@ -316,12 +348,16 @@ def _bind(params, element, components, block_values=None):
             scalar = _scalar_type(ctype)
             buffer = "out_%s_%s" % (scalar, name)
             outputs.append((buffer, scalar, name, components, extent, None))
-            args.append(buffer if extent else "%s.data()" % buffer)
+            args.append(
+                _field_argument(buffer, ctype, extent, const=False)
+            )
         elif ctype in IN_FIELDS:
             scalar = _scalar_type(ctype)
             buffer = "in_%s_%s" % (scalar, name)
             inputs.append((buffer, scalar, name, components, extent, None))
-            args.append(buffer if extent else "%s.data()" % buffer)
+            args.append(
+                _field_argument(buffer, ctype, extent, const=True)
+            )
         else:
             raise Unbindable("%s %s" % (ctype, name))
     if not outputs:
@@ -345,6 +381,7 @@ DRIVER_HEAD = r"""
 
 #include "sfem_base.hpp"
 #include "smesh_elem_type.hpp"
+#include "smesh_types.hpp"
 
 // The grid, its affine geometry, and the deterministic fills are shared with
 // codegen.framework.tools.apply_bench: a Cartesian grid of hexahedra whose map
@@ -812,7 +849,7 @@ def run_material(root, generated, material, refine, compiler, verbose=False, rep
         blocks.append(_call_block(entry["name"], args, inputs, outputs, repeats))
 
     if not blocks:
-        return {}, skipped
+        return {}, {}, skipped
 
     workdir = os.path.join(generated, "_driver_%s" % material)
     os.makedirs(workdir, exist_ok=True)
@@ -1023,6 +1060,23 @@ def main(argv=None):
     key_scope = set()
     for material in materials:
         key_scope.update(name for name, m in owner.items() if m == material)
+    # A baseline entry for one of this run's materials belongs in scope even
+    # when nothing measured it, because that is exactly the case worth
+    # reporting: the kernel used to exist and does not any more.  Scoping only
+    # by what was measured this run made a vanished kernel invisible -- 74 of
+    # them went missing when the precision suffixes were collapsed and the gate
+    # stayed green, which is the failure it exists to prevent.  The owner
+    # recorded alongside the digest answers this; entries from a baseline
+    # written before owners were recorded fall back to the kernel prefixes seen
+    # this run.
+    prefixes = {name.rsplit("_", 1)[0] for name in owner}
+    for name, digest in recorded.items():
+        recorded_owner = digest.get("material") if isinstance(digest, dict) else None
+        if recorded_owner is not None:
+            if recorded_owner in materials:
+                key_scope.add(name)
+        elif name in owner or any(name.startswith(prefix) for prefix in prefixes):
+            key_scope.add(name)
 
     if measured_rates:
         print("\nthroughput, MDOF/s (same-machine comparison only):")
@@ -1059,7 +1113,14 @@ def main(argv=None):
         for name in list(merged):
             if name in measured or any(name.startswith(p) for p in prefixes):
                 del merged[name]
-        merged.update(measured)
+        merged.update(
+            {
+                name: dict(digest, material=owner[name])
+                if isinstance(digest, dict) and name in owner
+                else digest
+                for name, digest in measured.items()
+            }
+        )
         baseline[bucket] = merged
         with open(BASELINE_PATH, "w", encoding="utf-8") as handle:
             json.dump(baseline, handle, indent=2, sort_keys=True)

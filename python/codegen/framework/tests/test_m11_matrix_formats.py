@@ -620,7 +620,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 (Path(out_dir) / "op/sfem_GeneratedStokes_manifest.json").read_text()
             )
             coo_triplet_variants = _manifest_runtime_variants(manifest, "hessian_coo_triplet")
-            self.assertEqual(len(coo_triplet_variants), 8)
+            self.assertEqual(len(coo_triplet_variants), 4)
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedStokes_c_abi.hpp").read_text()
             self.assertIn("stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa", c_abi_header)
@@ -671,7 +671,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                 (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow_manifest.json").read_text()
             )
             coo_triplet_variants = _manifest_runtime_variants(manifest, "hessian_coo_triplet")
-            self.assertEqual(len(coo_triplet_variants), 10)
+            self.assertEqual(len(coo_triplet_variants), 5)
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp").read_text()
             self.assertIn(
@@ -725,8 +725,8 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             manifest = json.loads(
                 (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow_manifest.json").read_text()
             )
-            self.assertEqual(len(_manifest_runtime_variants(manifest, "hessian_crs")), 10)
-            self.assertEqual(len(_manifest_runtime_variants(manifest, "hessian_bsr")), 10)
+            self.assertEqual(len(_manifest_runtime_variants(manifest, "hessian_crs")), 5)
+            self.assertEqual(len(_manifest_runtime_variants(manifest, "hessian_bsr")), 5)
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp").read_text()
             self.assertIn(
@@ -1201,7 +1201,7 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                     self.assertTrue(_manifest_runtime_variants(manifest, "hessian_coo_triplet"))
                 if name == "two_phase_flow":
                     self.assertEqual(
-                        10,
+                        5,
                         len(_manifest_runtime_variants(manifest, "hessian_coo_triplet")),
                     )
 
