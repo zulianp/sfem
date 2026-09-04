@@ -5561,8 +5561,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
     lines.extend(
         [
             "",
-            "    int invalid_matrix_graph = 0;",
-            *source_builder.parallel_for_lines(reduction="|:invalid_matrix_graph"),
+            "    int unsupported_matrix_format = 0;",
+            *source_builder.parallel_for_lines(reduction="|:unsupported_matrix_format"),
             "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
             "        idx_t ev[N_SHAPE];",
             "        scalar_t element_matrix[NDOFS * NDOFS];",
@@ -5747,7 +5747,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         [
             "    }",
             "",
-            "    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;",
+            "    return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;",
             "}",
             "",
         ]
@@ -5813,8 +5813,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 "    (void)nnodes;",
                 "    (void)max_nodes_per_pack;",
                 "    (void)n_shared_nodes;",
-                "    int invalid_matrix_graph = 0;",
-                *source_builder.parallel_for_lines(reduction="|:invalid_matrix_graph"),
+                "    int unsupported_matrix_format = 0;",
+                *source_builder.parallel_for_lines(reduction="|:unsupported_matrix_format"),
                 "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
                 "        const ptrdiff_t e_start = pack * n_elements_per_pack;",
                 "        const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
@@ -5824,10 +5824,10 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 "                ev[shape] = %s_packed_global_node(elements[shape][element], pack, owned_nodes_ptr, ghost_ptr, ghost_idx);" % function_base,
                 "            }",
                 "            count_t *const entries = &packed_element_entries[element * (DIM * N_SHAPE) * (DIM * N_SHAPE)];",
-                "            invalid_matrix_graph |= (%s_discover_packed_crs_entries<scalar_t>(ev, rowptr, colidx, entries) != SFEM_SUCCESS);" % function_base,
+                "            %s_discover_packed_crs_entries<scalar_t>(ev, rowptr, colidx, entries);" % function_base,
                 "        }",
                 "    }",
-                "    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;",
+                "    return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;",
                 "}",
                 "",
                 "template <typename scalar_t, typename geometry_t>",
@@ -6177,6 +6177,21 @@ def _packed_crs_passes(matrix_format_plan):
 
 
 def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
+    """Call the scatter for the format this kernel was instantiated with.
+
+    None of the scatters can fail any more.  They used to: each re-established
+    per element that the sparsity pattern contained the entries it was about to
+    write, which is a property of the mesh and the pattern together and cannot
+    change between elements or between calls.  That check belongs where the
+    graph is built -- the operator's setup -- and the kernels now assume it.
+
+    What survives is ``unsupported_matrix_format``, and it is a different thing
+    wearing the old name's clothes: ``FORMAT`` is a compile-time constant, so
+    for any format actually supported this branch is discarded by
+    ``if constexpr`` and costs nothing at run time.  It catches a kernel
+    instantiated for a format it has no scatter for, which is a programming
+    error rather than a data one.
+    """
     cases = (
         (
             "bsr",
@@ -6187,19 +6202,19 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
         (
             "crs",
             0,
-            "invalid_matrix_graph |= (%s_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);"
+            "%s_scatter_crs(ev, element_matrix, rowptr, colidx, values);"
             % function_base,
         ),
         (
             "dia",
             2,
-            "invalid_matrix_graph |= (%s_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values) != SFEM_SUCCESS);"
+            "%s_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values);"
             % function_base,
         ),
         (
             "coo",
             3,
-            "invalid_matrix_graph |= (%s_scatter_coo(ev, element_matrix, coo_nnz, coo_rows, coo_cols, values) != SFEM_SUCCESS);"
+            "%s_scatter_coo(ev, element_matrix, coo_nnz, coo_rows, coo_cols, values);"
             % function_base,
         ),
         (
@@ -6211,7 +6226,7 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
         (
             "patch",
             4,
-            "invalid_matrix_graph |= (%s_scatter_patch(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);"
+            "%s_scatter_patch(ev, element_matrix, rowptr, colidx, values);"
             % function_base,
         ),
         (
@@ -6231,12 +6246,12 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
         lines.append("%s    %s" % (indent, statement))
         first = False
     if first:
-        lines.append("%sinvalid_matrix_graph |= 1;" % indent)
+        lines.append("%sunsupported_matrix_format |= 1;" % indent)
         return lines
     lines.extend(
         [
             "%s} else {" % indent,
-            "%s    invalid_matrix_graph |= 1;" % indent,
+            "%s    unsupported_matrix_format |= 1;" % indent,
             "%s}" % indent,
         ]
     )
@@ -6563,7 +6578,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
 def _sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes):
     return [
         "template <typename scalar_t>",
-        "static SFEM_INLINE int %s_scatter_crs(" % function_base,
+        "static SFEM_INLINE void %s_scatter_crs(" % function_base,
         "        const idx_t *const SFEM_RESTRICT ev,",
         "        const scalar_t *const SFEM_RESTRICT element_matrix,",
         "        const count_t *const SFEM_RESTRICT rowptr,",
@@ -6575,26 +6590,15 @@ def _sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes):
         "    int lenrow[N_SHAPE];",
         "    int local_col[N_SHAPE * N_SHAPE];",
         "    idx_t ks[N_SHAPE];",
-        "    bool valid_graph = true;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        row_begin[i] = rowptr[ev[i]];",
         "        lenrow[i] = (int)(rowptr[ev[i] + 1] - row_begin[i]);",
         "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin[i]];",
         "        %s_find_cols(ev, cols, lenrow[i], ks);" % function_base,
         "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            if (ks[j] < 0 || ks[j] >= lenrow[i] || cols[ks[j]] != ev[j]) {",
-        "                if (valid_graph) {",
-        "                    std::fprintf(stderr, \"%s_scatter_crs missing graph entry (%%ld, %%ld)\\n\", (long)ev[i], (long)ev[j]);"
-        % function_base,
-        "                }",
-        "                local_col[i * N_SHAPE + j] = 0;",
-        "                valid_graph = false;",
-        "            } else {",
-        "                local_col[i * N_SHAPE + j] = (int)ks[j];",
-        "            }",
+        "            local_col[i * N_SHAPE + j] = (int)ks[j];",
         "        }",
         "    }",
-        "    if (!valid_graph) return SFEM_FAILURE;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        const count_t rb = row_begin[i];",
         "        const int lr = lenrow[i];",
@@ -6611,7 +6615,6 @@ def _sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes):
         "            }",
         "        }",
         "    }",
-        "    return SFEM_SUCCESS;",
         "}",
         "",
     ]
@@ -6630,7 +6633,7 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes):
         "}",
         "",
         "template <typename scalar_t>",
-        "static SFEM_INLINE int %s_discover_packed_crs_entries(" % function_base,
+        "static SFEM_INLINE void %s_discover_packed_crs_entries(" % function_base,
         "        const idx_t *const SFEM_RESTRICT ev,",
         "        const count_t *const SFEM_RESTRICT rowptr,",
         "        const idx_t *const SFEM_RESTRICT colidx,",
@@ -6639,40 +6642,23 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes):
         "    static constexpr int N_SHAPE = %d;" % n_nodes,
         "    static constexpr int NDOFS = DIM * N_SHAPE;",
         "    idx_t ks[N_SHAPE];",
-        "    bool valid_graph = true;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        const count_t row_begin = rowptr[ev[i]];",
         "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
         "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
         "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
         "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {",
-        "                if (valid_graph) {",
-        "                    std::fprintf(stderr, \"%s_discover_packed_crs_entries missing graph entry (%%ld, %%ld)\\n\", (long)ev[i], (long)ev[j]);"
-        % function_base,
-        "                }",
-        "                for (int bi = 0; bi < DIM; ++bi) {",
-        "                    for (int bj = 0; bj < DIM; ++bj) {",
-        "                        const int row = bi * N_SHAPE + i;",
-        "                        const int col = bj * N_SHAPE + j;",
-        "                        entries[row * NDOFS + col] = row_begin;",
-        "                    }",
-        "                }",
-        "                valid_graph = false;",
-        "            } else {",
-        "                const int local_col = (int)ks[j];",
-        "                for (int bi = 0; bi < DIM; ++bi) {",
-        "                    const count_t row_value_offset = row_begin * DIM * DIM + bi * lenrow * DIM;",
-        "                    for (int bj = 0; bj < DIM; ++bj) {",
-        "                        const int row = bi * N_SHAPE + i;",
-        "                        const int col = bj * N_SHAPE + j;",
-        "                        entries[row * NDOFS + col] = row_value_offset + local_col * DIM + bj;",
-        "                    }",
+        "            const int local_col = (int)ks[j];",
+        "            for (int bi = 0; bi < DIM; ++bi) {",
+        "                const count_t row_value_offset = row_begin * DIM * DIM + bi * lenrow * DIM;",
+        "                for (int bj = 0; bj < DIM; ++bj) {",
+        "                    const int row = bi * N_SHAPE + i;",
+        "                    const int col = bj * N_SHAPE + j;",
+        "                    entries[row * NDOFS + col] = row_value_offset + local_col * DIM + bj;",
         "                }",
         "            }",
         "        }",
         "    }",
-        "    return valid_graph ? SFEM_SUCCESS : SFEM_FAILURE;",
         "}",
         "",
         "template <typename scalar_t>",
@@ -6711,7 +6697,7 @@ def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes, assembly=No
     _assembly_reduction_is_atomic(assembly.reduction_policy, "DIA")
     return [
         "template <typename scalar_t>",
-        "static SFEM_INLINE int %s_scatter_dia(" % function_base,
+        "static SFEM_INLINE void %s_scatter_dia(" % function_base,
         "        const idx_t *const SFEM_RESTRICT ev,",
         "        const scalar_t *const SFEM_RESTRICT element_matrix,",
         "        const ptrdiff_t nnodes,",
@@ -6721,25 +6707,14 @@ def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes, assembly=No
         "    static constexpr int DIM = %d;" % dim,
         "    static constexpr int N_SHAPE = %d;" % n_nodes,
         "    ptrdiff_t diagonals[N_SHAPE * N_SHAPE];",
-        "    bool valid_diagonal_offsets = true;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        for (int j = 0; j < N_SHAPE; ++j) {",
         "            const int offset = (int)(ev[j] - ev[i]);",
         "            ptrdiff_t diagonal = 0;",
         "            while (diagonal < ndiag && %s[diagonal] != offset) ++diagonal;" % offsets,
-        "            if (diagonal == ndiag) {",
-        "                if (valid_diagonal_offsets) {",
-        "                    std::fprintf(stderr, \"%s_scatter_dia missing diagonal offset %%d\\n\", offset);"
-        % function_base,
-        "                }",
-        "                diagonals[i * N_SHAPE + j] = 0;",
-        "                valid_diagonal_offsets = false;",
-        "            } else {",
-        "                diagonals[i * N_SHAPE + j] = diagonal;",
-        "            }",
+        "            diagonals[i * N_SHAPE + j] = diagonal;",
         "        }",
         "    }",
-        "    if (!valid_diagonal_offsets) return SFEM_FAILURE;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        for (int j = 0; j < N_SHAPE; ++j) {",
         "            const ptrdiff_t diagonal = diagonals[i * N_SHAPE + j];",
@@ -6754,7 +6729,6 @@ def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes, assembly=No
         "            }",
         "        }",
         "    }",
-        "    return SFEM_SUCCESS;",
         "}",
         "",
     ]
@@ -6782,7 +6756,7 @@ def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, assembly=No
     # asserting a policy that would be the wrong one for this kernel.
     return [
         "template <typename scalar_t>",
-        "static SFEM_INLINE int %s_scatter_coo(" % function_base,
+        "static SFEM_INLINE void %s_scatter_coo(" % function_base,
         "        const idx_t *const SFEM_RESTRICT ev,",
         "        const scalar_t *const SFEM_RESTRICT element_matrix,",
         "        const ptrdiff_t nnz,",
@@ -6792,7 +6766,6 @@ def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, assembly=No
         "    static constexpr int DIM = %d;" % dim,
         "    static constexpr int N_SHAPE = %d;" % n_nodes,
         "    ptrdiff_t entries[N_SHAPE * N_SHAPE];",
-        "    bool valid_coo_entries = true;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        for (int j = 0; j < N_SHAPE; ++j) {",
         "            ptrdiff_t lo = 0;",
@@ -6803,19 +6776,9 @@ def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, assembly=No
         % (rows, rows, cols),
         "                else hi = mid;",
         "            }",
-        "            if (lo == nnz || %s[lo] != ev[i] || %s[lo] != ev[j]) {" % (rows, cols),
-        "                if (valid_coo_entries) {",
-        "                    std::fprintf(stderr, \"%s_scatter_coo missing graph entry (%%ld, %%ld)\\n\", (long)ev[i], (long)ev[j]);"
-        % function_base,
-        "                }",
-        "                entries[i * N_SHAPE + j] = 0;",
-        "                valid_coo_entries = false;",
-        "            } else {",
-        "                entries[i * N_SHAPE + j] = lo;",
-        "            }",
+        "            entries[i * N_SHAPE + j] = lo;",
         "        }",
         "    }",
-        "    if (!valid_coo_entries) return SFEM_FAILURE;",
         "    for (int i = 0; i < N_SHAPE; ++i) {",
         "        for (int j = 0; j < N_SHAPE; ++j) {",
         "            scalar_t *const block = &%s[entries[i * N_SHAPE + j] * DIM * DIM];" % value_stream,
@@ -6829,7 +6792,6 @@ def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, assembly=No
         "            }",
         "        }",
         "    }",
-        "    return SFEM_SUCCESS;",
         "}",
         "",
     ]
@@ -7011,7 +6973,6 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=
                 )
             ],
         ),
-        ReturnNode(expr_ref("SFEM_SUCCESS")),
     ]
     return _print_scatter_function(
         FunctionDefNode(
@@ -7024,7 +6985,6 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=
                 "scalar_t *const SFEM_RESTRICT %s" % value_stream,
             ),
             body=tuple(body),
-            return_type="int",
             qualifier="static SFEM_INLINE",
             template_params=("typename scalar_t",),
         )
