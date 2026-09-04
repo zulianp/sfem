@@ -1000,3 +1000,51 @@ tolerates an operator that block-Jacobi cannot smooth. That carries a consequenc
 stating before it is measured -- a Krylov smoother makes the preconditioner vary between
 applications, which BiCGStab does not admit, so the outer solver would have to become
 flexible (FGMRES) at the same time.
+
+## Krylov smoothing and a flexible outer solver: the V-cycle finally works
+
+Two changes that had to land together. `SFEM_GMG_KSMOOTH=n` replaces the stationary smoother
+with n BiCGStab iterations per level, which does not need the diagonal dominance the
+Galerkin operators lack. That makes the cycle vary between applications, and BiCGStab
+assumes its preconditioner does not -- it does not fail loudly when that is violated, it
+stagnates -- so `cvfem_fgmres.hpp` adds flexible GMRES, selected automatically whenever the
+smoother is Krylov. SFEM had no GMRES of any kind.
+
+FGMRES was gated before use: with a fixed block-Jacobi preconditioner it reaches the same
+solution as BiCGStab (u_linf 1.6569e-03 against 1.6558e-03). It needs more iterations there,
+which is expected -- restarted GMRES discards information at each restart and BiCGStab
+performs two operator applications per iteration -- and is beside the point, since it exists
+for the case BiCGStab cannot handle at all.
+
+### Total linear iterations over four Newton steps
+
+| refine level | dofs   | block-Jacobi | Galerkin + Krylov smoothing + FGMRES |
+|--------------|--------|--------------|--------------------------------------|
+| 2            | 324    | 123          | 20                                   |
+| 4            | 1700   | 305          | 29                                   |
+| 8            | 10692  | 959          | 59   (ksmooth 8)                     |
+| 16           | 75140  | 2954         | 82   (ksmooth 16)                    |
+
+Block-Jacobi grows by about a factor of three per refinement; this grows by about half that.
+At the largest size measured it is a factor of thirty-six fewer iterations, and unlike the
+rediscretised V-cycle it is stable run to run -- 89 and 102 on repeats, against 3084 and
+1485 for the arm that was being read as signal earlier.
+
+This is the first configuration in which the V-cycle does what it was built for.
+
+### What it costs, and what is not yet shown
+
+Wall time, L=16, two repeats: block-Jacobi 9.8 and 13.2 seconds, this 25.5 and 29.3. Thirty-six
+times fewer iterations and still about twice the time, because each iteration now carries a
+cycle whose levels each run sixteen preconditioned BiCGStab iterations, plus the per-Newton
+assembly. Smoothing strength is near optimal at that setting: at L=16, ksmooth 10, 12, 16 and
+24 give 77.1, 72.9, 23.5 and 27.1 seconds.
+
+Two honest limits. First, smoothing strength has to grow with depth -- eight iterations
+suffice at four levels and give 1194 iterations at five, where sixteen give 99. That the
+cycle needs more smoothing as it deepens says the smoother is still the weak component, and
+it eats into the iteration gain because the cost per cycle rises with it. Second, the
+crossover in wall time was not demonstrated: the iteration counts diverge fast enough that
+one should exist, but L=32 exceeded the time available here, so that remains a projection
+rather than a measurement, and projections of exactly this kind have been wrong twice
+already in this document.
