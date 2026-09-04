@@ -103,7 +103,14 @@ ELEMENT_BY_MATERIAL = {
 }
 
 
+#: Set from --element, when a run is checking a family the default grid for a
+#: material cannot reach.
+ELEMENT_OVERRIDE = None
+
+
 def _elements_for(material):
+    if ELEMENT_OVERRIDE:
+        return ELEMENT_OVERRIDE, ()
     element, aliases = ELEMENT_BY_MATERIAL.get(material, (ELEMENT, ALIAS_TARGETS))
     return element, aliases
 
@@ -971,6 +978,12 @@ def main(argv=None):
     parser.add_argument("--material", action="append", default=None)
     parser.add_argument("--all", action="store_true", help="every maintained material")
     parser.add_argument("--refine", type=int, default=6, help="cells per side")
+    parser.add_argument(
+        "--element",
+        help="drive this element instead of the material's default, so a "
+             "kernel family the default grid cannot reach can still be "
+             "checked and timed",
+    )
     parser.add_argument("--record", action="store_true", help="rewrite the baseline")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument(
@@ -986,6 +999,8 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
+    if args.element:
+        globals()["ELEMENT_OVERRIDE"] = args.element
     materials = args.material or (list(MATERIALS) if args.all else ["laplace"])
 
     compiler = _compiler()
