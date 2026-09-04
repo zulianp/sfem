@@ -1619,10 +1619,33 @@ changed how that sum was grouped.
 |---------|-------|---------|
 | `SMESH_DETERMINISTIC_COORDS` | smesh, `sshex8_fill_points*` | on |
 | `SFEM_SS_SCATTER` | this spike, five sshex8 kernels | on |
-| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_openmp_blas.hpp` | **off** |
+| `SFEM_DETERMINISTIC_BLAS` | `algebra/openmp/sfem_openmp_blas.hpp` | on |
 
-The first two are on by default because they are strictly better -- deterministic, and
-faster or equal. The third is off because it changes results in the last bits relative to
-every number produced before it, and turning it on should be a deliberate act. On the
-evidence above it should probably become the default, but that is a decision for the
-codebase rather than for this spike.
+All three are on by default, each opting out with `=0`.
+
+The reduction was switched on after measuring what it costs, which is nothing: per-iteration
+time went from 8509 to 7672 microseconds at N=3 and 1880 to 1811 at N=1. The `reduction`
+clause privatises and combines per thread; a flat chunk array summed once is cheaper. So it
+is reproducible, more accurate and faster, and there was no trade to weigh.
+
+The chunk count is a function of the length alone -- serial below 4096 elements, and above
+that growing so a chunk stays near 8192. Depending only on the length is what keeps the
+result identical across thread counts. A fixed 256 was wrong at both ends: it spawned 256
+chunks over almost no work for short vectors, which is the same thread-team overhead that
+made small multigrid levels slower on more cores, and for long ones it left each chunk a
+serial sum whose error grew with the problem.
+
+Verified with nothing set, N=3, L=8:
+
+| threads | 1 | 2 | 4 | 8 |
+|---------|---|---|---|---|
+| iterations | 1178 | 1178 | 1178 | 1178 |
+| u_linf | 2.985426e-03 | 2.985426e-03 | 2.985426e-03 | 2.985426e-03 |
+
+`cvfem_ns_op_gate` passes.
+
+One practical note, learned three times over in this document: the spike compiles the
+*installed* SFEM headers, not the ones in this tree. Editing `algebra/` here changes nothing
+until `build64` is rebuilt and installed, and the symptom is a measurement that silently
+matches the old behaviour. Check a changed default against its own opt-out before believing
+it took effect.
