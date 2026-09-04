@@ -518,7 +518,41 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Sixteen, ordered by what unblocks what. Two are closed and one is under way since this document was written. OP 16 was found by building the generated code for the first time. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Seventeen, ordered by what unblocks what. Two are closed and one is under way since this document was written. OP 16 was found by building the generated code for the first time. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 17</div>
+    <div class="body">
+      <div class="op-title">The precision axis multiplies the ABI, and should be a parameter <span class="chip c-part">designed, measured, not yet built</span></div>
+
+      <p><b>Every kernel that touches scalar data is emitted twice.</b> <code>precision_axis()</code> returns <code>(double, "")</code> and <code>(float, "_float")</code>, and each emitter loops over it, so the generated tree carries a full second copy of every kernel that differs from the first in one line &mdash; <code>using scalar_t = float;</code> &mdash; and in the types of its field parameters. They are not two instantiations of a template; they are two written-out bodies.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>surface</th><th class="n">today</th><th class="n">after</th><th class="n">change</th></tr>
+        <tr><td>public C ABI entry points</td><td class="n">1,124</td><td class="n">690</td><td class="n"><b>&minus;39%</b></td></tr>
+        <tr><td>&hellip; of which precision-paired</td><td class="n">868 (77%)</td><td class="n">434</td><td class="n"><b>exactly 2&times;</b></td></tr>
+        <tr><td>&hellip; carrying no scalar data</td><td class="n">256</td><td class="n">256</td><td class="n">unchanged</td></tr>
+        <tr><td>generated <code>.cpp</code></td><td class="n">31.8 MB</td><td class="n">~23.1 MB</td><td class="n"><b>&minus;27%</b></td></tr>
+        <tr><td>duplicated definitions</td><td class="n">2,332</td><td class="n">0</td><td class="n">&mdash;</td></tr>
+      </table>
+
+      <p>All 434 <code>_float</code> symbols have a twin &mdash; none is orphaned &mdash; and the 256 that do not pair are the matrix-format metadata and diagnostics accessors, which carry no scalar buffers and correctly sit off the axis. So the factor of two holds exactly wherever scalar data crosses the boundary, and the overall figure is 1.63&times; only because a fifth of the surface is metadata.</p>
+
+      <p><b>The form to adopt is SFEM's own, not a new one.</b> <code>operators/tet4/cuda/cu_tet4_laplacian.cu</code> already routes exactly this problem: one <code>extern "C"</code> symbol, scalar buffers declared <code>void *</code>, and a <code>const enum smesh::PrimitiveType</code> naming their type at run time. The body switches over <code>SMESH_DEFAULT</code>, <code>SMESH_FLOAT32</code> and <code>SMESH_FLOAT64</code>, casts, and calls a template that holds the specialised code; anything else raises <code>SFEM_ERROR</code>. Two details are load-bearing and both are already settled by that code. <b>One enum governs a group</b> of buffers that share a type &mdash; the parameter is <code>real_type_xy</code> because it covers <code>x</code> and <code>y</code> together, not one enum per pointer. And <b>geometry is not on the axis</b>: <code>fff</code> crosses as <code>void *</code> but is cast unconditionally to a fixed <code>cu_jacobian_t</code>, because its precision is a build-time property.</p>
+
+      <p>That last point is already true of the generated kernels, which is what makes the change tractable: diffing a precision pair, the <code>geom_t</code> geometry parameters are <b>identical</b> in both, and only the field buffers and the material scalar differ. <code>cu_linear_elasticity_apply</code> settles the material scalar too &mdash; <code>mu</code> and <code>lambda</code> cross as <code>const real_t</code>, a build-time type, not as part of the runtime axis.</p>
+
+      <p><b>So the target signature is a mechanical rewrite of the pair</b>, taking <code>laplace_tri3_jacobian_action_affine_mesh_soa_aos</code> as the worked case: geometry stays <code>const geom_t *</code>, <code>kappa</code> becomes <code>const real_t</code>, the two field pointers become <code>const void *</code> and <code>void *</code>, and one <code>const enum smesh::PrimitiveType real_type</code> is inserted ahead of them. The body that exists twice becomes one <code>template &lt;typename scalar_t&gt;</code> function, and the entry point becomes the switch that selects it.</p>
+
+      <p><b>Where the decision lives.</b> <code>precision_axis()</code> stops being an axis that multiplies symbols and becomes the list of runtime cases the switch spells &mdash; the same plan, read by emission for a different purpose, which is the shape OP 0 established for this axis when it was made plan-driven. The wrapper loses an axis outright: <code>package/op_wrappers.py</code> currently selects a symbol by precision and would instead pass a value.</p>
+
+      <p><b>Two things this must not break, and one gate that does not yet exist.</b> Byte-identity breaks by design here &mdash; this is precisely the case OP 14 built <code>tools/reproducibility.py</code> for, and the 148 kernel digests are the correctness statement that has to survive unchanged. The second is performance, and it is the real risk: the standing rule in this codebase is that nothing trades measured CPU throughput for cleanliness. Moving a kernel body behind a template and a runtime switch should be free &mdash; the switch runs once per call, outside the element loop, exactly where SFEM's CUDA operators put it &mdash; but "should be" is not a measurement, and inlining and vectorisation of these bodies are sensitive. <b>A throughput gate before and after, on the same machine, is a precondition for this change rather than a follow-up to it.</b></p>
+
+      <p><b>Open, and worth deciding before building.</b> <code>SMESH_DEFAULT</code> maps to <code>real_t</code>, which in most builds is <code>double</code>, so mirroring SFEM gives three instantiations where there are two today &mdash; object size grows even as the ABI halves, unless <code>DEFAULT</code> is folded into the matching concrete case. And the material scalar moving to <code>real_t</code> is a small semantic change: a caller running in single precision currently hands these kernels a <code>float</code> parameter and would hand them a <code>real_t</code>.</p>
+
+      <div class="op-facts"><span><i>ABI</i> 1,124 &rarr; 690</span><span><i>on scalar-carrying symbols</i> exactly 2&times;</span><span><i>source</i> &minus;8.7 MB of 31.8</span><span><i>bodies collapsed</i> 2,332</span><span><i>form</i> cu_tet4_laplacian.cu</span><span><i>needs</i> a throughput gate</span></div>
+    </div>
+  </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 16</div>
