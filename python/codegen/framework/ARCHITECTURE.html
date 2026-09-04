@@ -523,7 +523,7 @@
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 20</div>
     <div class="body">
-      <div class="op-title">Energy and residual must lower to one form algebra <span class="chip c-part">phase 1a done &mdash; residual side re-exposed</span></div>
+      <div class="op-title">Energy and residual must lower to one form algebra <span class="chip c-part">1a done; 1b stopped &mdash; the split is contraction mode</span></div>
 
       <p><b>The requirement.</b> Both formulations lower to the same three objects &mdash; 0-form (energy, or a residual-based merit), 1-form (gradient, or the negated residual), 2-form (Hessian, or the Jacobian) &mdash; and nothing below the form layer distinguishes them.</p>
 
@@ -557,9 +557,23 @@
 
       <p>One thing the attempt got wrong first, worth keeping. The blocks were re-wrapped as <code>FormBlock</code> to make the return type uniform &mdash; which renames them, because <code>FormBlock.name</code> is derived as <code>form_2_&lt;row&gt;_&lt;column&gt;</code> while the lowering's blocks carry a name that already appears in generated kernels. The accessor hands back the lowering's own objects instead. Re-exposing is the job; renaming is not, and a phase that must be byte-identical cannot afford it.</p>
 
-      <p><b>The second half is the energy side</b>, which has nothing to re-expose: it declares <code>fields=(u,)</code> and <code>variables=(F,)</code> at the API and never lowers a per-component expansion. Its 1-form is <code>dE/dF</code>, a nine-vector in the differentiation variables rather than in the field's components, so deriving per-component blocks means carrying <code>dF/du</code> &mdash; real work rather than re-exposure, and the reason this phase splits in two.</p>
+      <p><b>Phase 1b stopped, and the reason changes the plan.</b> The energy side has nothing to re-expose, so the work was to derive per-component blocks from the declared fields and variables. Following <code>dF/du</code> to see what that costs turned up something better: the two paths do not carry the same object at all.</p>
 
-      <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>energy block metadata</i> empty</span></div>
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>1-form</th><th>free symbols</th><th>contraction</th><th class="n">sum-factorised</th></tr>
+        <tr><td>residual &mdash; laplace, stokes</td><td>include <code>u_test_grad_0..2</code></td><td>already done, symbolically</td><td class="n"><b>no</b></td></tr>
+        <tr><td>energy &mdash; elasticity, neohookean</td><td><code>F[0..8]</code>, no test function</td><td>later, numerically</td><td class="n"><b>yes</b></td></tr>
+      </table>
+
+      <p>A residual 1-form is a weak form: it names its test function and the contraction is finished before emission sees it. An energy 1-form is <code>dE/dF</code>, a strong quantity, contracted against the test functions afterwards by <code>_append_transformed_loperand_lines</code> and <code>tensor_test</code> &mdash; and <b>that contraction is sum-factorised</b>, working through one-dimensional <code>shape_1d</code> and <code>grad_1d</code> operators with <code>integer_root(N_QP)</code> per dimension. Counting it in the generated tree: the two energy materials reach <code>tensor_test</code>, the two residual materials reach it <b>zero</b> times.</p>
+
+      <p><b>So the split is not energy against residual. It is strong-contracted against weak-contracted</b>, and the front end a material happens to be written in silently decides which it gets. Making the energy path produce weak forms &mdash; the obvious way to unify &mdash; would take sum factorisation away from the only materials that have it, on exactly the tensor-product elements it exists for. That is the trade this codebase does not make.</p>
+
+      <p>It also explains something OP 18 recorded without accounting for. <b>Laplace, the simplest and most performance-critical operator here, is written as a residual and therefore gets no sum factorisation</b>, which is the context for its 389 temporaries and for the hand-written low-order fast path someone wrote to compensate.</p>
+
+      <p><b>The direction reverses.</b> Contraction mode should become an explicit property the form layer carries, which either front end can set, rather than a consequence of which front end was used. Emission then branches on contraction mode &mdash; a form-layer fact, legitimately &mdash; instead of on <code>FormKind</code>, and a residual formulation like laplace becomes able to ask for the strong, sum-factorised path it cannot reach today. <code>tests/test_contraction_mode.py</code> pins the present state, including the assertion that mode still tracks kind exactly, so the day that stops being true is a test failure rather than a discovery.</p>
+
+      <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>sum factorisation</i> energy only</span><span><i>laplace</i> residual, so none</span></div>
     </div>
   </div>
 
