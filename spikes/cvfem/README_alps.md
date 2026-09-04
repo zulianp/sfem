@@ -1482,3 +1482,39 @@ fixed-order reduction in the BLAS layer.
 
 Still atomic, and worth the same treatment: the residual, the block diagonal, and the
 2x2 block-split kernels, none of which are on the path measured above.
+
+### The remaining kernels
+
+The residual, the block diagonal and the 2x2 block-split applies now use the same two-pass
+scatter. The helpers are templated on the number of values per node, since the block diagonal
+carries sixteen rather than four, and the tables are shared across all of them.
+
+One thing changed rather than being preserved. The block-split scatter previously wrote only
+the components its block selection touches -- "a continuity-row block touches one component
+of four, and the atomics are the expensive half of the scatter". That saving existed because
+atomics were expensive; with a plain write it is worth nothing, and the untouched components
+are zero in the element buffer anyway, so the two-pass path moves all four.
+
+Determinism, N=3 L=4 on 8 threads, repeat-diff within a run:
+
+| kernel | atomic | two-pass |
+|--------|--------|----------|
+| residual | 8.674e-19 | 0.000e+00 |
+| block diagonal | 5.551e-17 | 0.000e+00 |
+| block split | 1.735e-18 | 0.000e+00 |
+
+And they are faster, in line with the Jacobian action's 11%: the residual goes from 3918 to
+3528 us per call and the block diagonal from 7524 to 6952, about 10% and 8%.
+
+Correctness is unchanged -- `cvfem_ns_op_gate` passes with the scatter on and off, at the
+same tolerances (grad 1.5e-15, bsr 1.2e-16, apply 4.3e-16, blockdiag 5.9e-16, diag 2.4e-17,
+asm_vs_mf 1.7e-14). `cvfem_sshex8_bench` reports three disagreeing configurations both with
+and without these changes, and with the kernel edits stashed, so that failure is pre-existing
+and not caused here. It is worth chasing separately.
+
+What is left is not in these kernels. With the scatter on, the residual output tracks the
+input state exactly: two runs sharing a state checksum of 206.55554942713621 both give
+-0.6316666704417313, and the run that produced 206.55554979906918 is the only one that
+differs. The state itself still varies between runs at 8 threads and is stable at one, so the
+remaining non-determinism is in the setup that builds the initial field, not in the operator.
+That and the Krylov reductions are what stand between this and a reproducible parallel solve.
