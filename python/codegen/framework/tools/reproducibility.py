@@ -439,6 +439,78 @@ static Mesh build_grid_hex27(int n) {
     return m;
 }
 
+// A tetrahedral grid: the same cube lattice, each cell split into six
+// tetrahedra by the Freudenthal subdivision about the main diagonal.  Unlike
+// the hexahedral grids the cells are not all alike, so the adjugate and
+// determinant are computed per element from its own vertices rather than being
+// the same constant everywhere -- which makes this a stronger check of the
+// geometry paths, not a weaker one.
+static Mesh build_grid_tet4(int n) {
+    Mesh m;
+    const int nn = n + 1;
+    m.h = 1.0 / (double)n;
+    m.nnodes = (ptrdiff_t)nn * nn * nn;
+    m.nelements = (ptrdiff_t)n * n * n * 6;
+    m.elements.assign(4, std::vector<idx_t>(m.nelements));
+    m.points.assign(3, std::vector<geom_t>(m.nnodes));
+    auto nid = [&](int i, int j, int k) { return (idx_t)((k * nn + j) * nn + i); };
+    for (int k = 0; k < nn; ++k)
+        for (int j = 0; j < nn; ++j)
+            for (int i = 0; i < nn; ++i) {
+                const idx_t id = nid(i, j, k);
+                m.points[0][id] = (geom_t)(i * m.h);
+                m.points[1][id] = (geom_t)(j * m.h);
+                m.points[2][id] = (geom_t)(k * m.h);
+            }
+    // The six tetrahedra of a cube, as corner bit patterns (bit0=x, 1=y, 2=z).
+    static const int tets[6][4] = {
+        {0, 1, 3, 7}, {0, 1, 5, 7}, {0, 4, 5, 7},
+        {0, 4, 6, 7}, {0, 2, 6, 7}, {0, 2, 3, 7},
+    };
+    m.adjugate.assign(9, std::vector<geom_t>(m.nelements, (geom_t)0));
+    m.determinant.assign(m.nelements, (geom_t)0);
+    ptrdiff_t e = 0;
+    for (int k = 0; k < n; ++k)
+        for (int j = 0; j < n; ++j)
+            for (int i = 0; i < n; ++i)
+                for (int t = 0; t < 6; ++t, ++e) {
+                    idx_t v[4];
+                    for (int c = 0; c < 4; ++c) {
+                        const int bits = tets[t][c];
+                        v[c] = nid(i + (bits & 1), j + ((bits >> 1) & 1), k + ((bits >> 2) & 1));
+                    }
+                    double J[9];
+                    for (int c = 0; c < 3; ++c)
+                        for (int d = 0; d < 3; ++d)
+                            J[d * 3 + c] = (double)m.points[d][v[c + 1]] - (double)m.points[d][v[0]];
+                    double det = J[0] * (J[4] * J[8] - J[5] * J[7])
+                               - J[1] * (J[3] * J[8] - J[5] * J[6])
+                               + J[2] * (J[3] * J[7] - J[4] * J[6]);
+                    if (det < 0.0) {           // keep every element positively oriented
+                        const idx_t swap = v[1]; v[1] = v[2]; v[2] = swap;
+                        for (int c = 0; c < 3; ++c)
+                            for (int d = 0; d < 3; ++d)
+                                J[d * 3 + c] = (double)m.points[d][v[c + 1]] - (double)m.points[d][v[0]];
+                        det = -det;
+                    }
+                    for (int c = 0; c < 4; ++c) m.elements[c][e] = v[c];
+                    // adj(J) = det(J) * J^-1, written row-major.
+                    m.adjugate[0][e] = (geom_t)(J[4] * J[8] - J[5] * J[7]);
+                    m.adjugate[1][e] = (geom_t)(J[2] * J[7] - J[1] * J[8]);
+                    m.adjugate[2][e] = (geom_t)(J[1] * J[5] - J[2] * J[4]);
+                    m.adjugate[3][e] = (geom_t)(J[5] * J[6] - J[3] * J[8]);
+                    m.adjugate[4][e] = (geom_t)(J[0] * J[8] - J[2] * J[6]);
+                    m.adjugate[5][e] = (geom_t)(J[2] * J[3] - J[0] * J[5]);
+                    m.adjugate[6][e] = (geom_t)(J[3] * J[7] - J[4] * J[6]);
+                    m.adjugate[7][e] = (geom_t)(J[1] * J[6] - J[0] * J[7]);
+                    m.adjugate[8][e] = (geom_t)(J[0] * J[4] - J[1] * J[3]);
+                    m.determinant[e] = (geom_t)det;
+                }
+    for (auto &row : m.elements) m.element_ptrs.push_back(row.data());
+    for (auto &row : m.points) m.point_ptrs.push_back(row.data());
+    return m;
+}
+
 // A stable hash of the parameter name, so every field is filled differently and
 // the same way on every machine.  Two kernels reading the same named field read
 // the same numbers, which is what lets their digests be compared.
@@ -639,7 +711,11 @@ def run_material(root, generated, material, refine, compiler, verbose=False, rep
     element, _aliases = _elements_for(material)
     # A Taylor-Hood pair names its velocity element; the grid is that element's.
     grid_element = element.split("_")[0] if "_" in element else element
-    builder = "build_grid_hex27" if grid_element == "HEX27" else "build_grid"
+    builder = {
+        "HEX27": "build_grid_hex27",
+        "TET4": "build_grid_tet4",
+        "TET10": "build_grid_tet4",
+    }.get(grid_element, "build_grid")
 
     # How many fields the system carries, read off the structure-of-arrays
     # kernels: those take one output pointer per field.  The interleaved
