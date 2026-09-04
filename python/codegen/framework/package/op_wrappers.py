@@ -99,6 +99,39 @@ def _call_argument_count(source, start):
     return None
 
 
+def _verify_declaration_matches_recovery(declared_signatures, recovered):
+    """The extraction, checked against signatures whose shape is known.
+
+    Not the whole parser: see the note at the call site for what this does and
+    does not establish.
+    """
+    disagreements = []
+    for name, declared in sorted((declared_signatures or {}).items()):
+        parsed = recovered.get(name)
+        if parsed is None or parsed.declaration is None:
+            continue
+        declared_names = [parameter.name for parameter in declared.parameters]
+        parsed_names = [parameter.name for parameter in parsed.parameters]
+        if declared_names != parsed_names:
+            disagreements.append(
+                "%s: declared %s, recovered %s"
+                % (name, declared_names, parsed_names)
+            )
+            continue
+        declared_extents = [parameter.extent for parameter in declared.parameters]
+        parsed_extents = [parameter.extent for parameter in parsed.parameters]
+        if declared_extents != parsed_extents:
+            disagreements.append(
+                "%s: array extents declared %s, recovered %s"
+                % (name, declared_extents, parsed_extents)
+            )
+    if disagreements:
+        raise ValueError(
+            "the C ABI recovery disagrees with what was declared:\n    %s"
+            % "\n    ".join(disagreements)
+        )
+
+
 def _verify_generated_calls(files, abi_sources, declared_signatures=None):
     """Every call the wrapper makes must match the kernel it calls.
 
@@ -128,10 +161,20 @@ def _verify_generated_calls(files, abi_sources, declared_signatures=None):
     # defect it exists to catch was still present.
     signatures = dict(_c_abi_signatures(abi_sources))
     signatures.update(_c_abi_signatures(abi_sources, public_only=True))
-    # What L7 declared outranks what L7 parsed back.  These are the same
-    # functions either way; taking the declaration means the check compares the
-    # wrapper's calls against the signatures the dispatch sources were written
-    # with, rather than against a recovery of them.
+    # Where both exist they must agree.  The dispatch entry points are authored
+    # here from `group["params"]` and also recovered from the text they were
+    # printed as, so this compares the recovery against a known answer, on
+    # fifty to a hundred signatures per material, every generation.
+    #
+    # What it covers is the extraction: locating a declaration in the emitted
+    # source and splitting its parameter list back out.  Verified by injection
+    # -- dropping a parameter during extraction is caught.  What it does not
+    # cover is `_parse_c_parameter`, because both sides go through it, so a
+    # defect there moves declared and recovered together and cancels; dropping
+    # every array extent is not caught.  That half is only covered by the
+    # arity check downstream and by the compile spike.
+    _verify_declaration_matches_recovery(declared_signatures, signatures)
+    # What was declared then outranks what was parsed back.
     signatures.update(declared_signatures or {})
     if not signatures:
         return
@@ -5464,7 +5507,17 @@ def _parse_c_parameter(text):
 
 
 def _parse_c_declaration(declaration):
-    """A recovered ``extern "C"`` declaration, as a structured signature."""
+    """A recovered ``extern "C"`` declaration, as a structured signature.
+
+    The parse is required to be total.  It used to drop any parameter it could
+    not read a name out of, which is the shape of failure that has to be
+    excluded here rather than merely made unlikely: a signature short one
+    parameter is not obviously wrong, it is a signature, and the consumer
+    checking arity against it would then be checking against a number the
+    parse invented.  The whole reason this layer parses at all is that the ABI
+    reaches it as text (ARCHITECTURE.html OP 16); while that is true, the parse
+    has to fail loudly rather than quietly return something plausible.
+    """
     name = _c_abi_function_name(declaration)
     if not name:
         return None
@@ -5473,13 +5526,19 @@ def _parse_c_declaration(declaration):
     )
     if not match:
         return CSignature(name=name, parameters=(), declaration=declaration)
-    parsed = [
-        _parse_c_parameter(parameter)
-        for parameter in _split_c_parameters(match.group(1))
+    texts = _split_c_parameters(match.group(1))
+    parsed = [_parse_c_parameter(parameter) for parameter in texts]
+    unreadable = [
+        text for text, parameter in zip(texts, parsed) if parameter is None
     ]
+    if unreadable:
+        raise ValueError(
+            "cannot read the parameters of generated entry point '%s': %s"
+            % (name, "; ".join(unreadable))
+        )
     return CSignature(
         name=name,
-        parameters=tuple(parameter for parameter in parsed if parameter),
+        parameters=tuple(parsed),
         declaration=declaration,
     )
 
