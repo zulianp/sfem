@@ -6181,7 +6181,7 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
         (
             "bsr",
             1,
-            "invalid_matrix_graph |= (%s_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);"
+            "%s_scatter_bsr(ev, element_matrix, rowptr, colidx, values);"
             % function_base,
         ),
         (
@@ -6431,13 +6431,27 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     reaches this scatter's parameters and not the callers that pass the
     buffers in, which still name them as literals.
 
-    The format vector problems use, so the one worth having in the IR.  It
-    still carries the per-element graph validation OP 10 is about removing:
-    the locate loop tests every candidate entry and reports the first failure
-    through ``std::fprintf`` from inside whatever parallel region the caller
-    opened.  Represented faithfully here rather than quietly dropped -- when
-    the check goes, what disappears is the IfNode below and the flag it sets,
-    and the locate loop simply keeps its result.
+    The format vector problems use, so the one worth having in the IR.
+
+    It no longer validates the matrix graph.  It used to: the locate loop tested
+    each of the N_SHAPE x N_SHAPE candidate entries with a three-condition
+    branch, kept a ``valid_block_graph`` flag, and reported the first failure
+    through ``std::fprintf`` from inside whatever parallel region the caller had
+    opened.  Whether the sparsity pattern contains this mesh's entries is a
+    property of the mesh and the pattern together -- invariant across every
+    element and across the whole call -- so re-deciding it per element cost
+    O(elements x N_SHAPE^2) to learn something that was already true or already
+    false before the loop began.  It is the caller that builds the graph, and
+    the caller that can establish it once.
+
+    What is left is the locate loop itself, which is not validation: ``ks[j]``
+    is the search result the scatter needs either way.  The check was fused into
+    the search rather than sitting beside it, so removing it keeps the search
+    and drops the test, the flag and the I/O.
+
+    The function can no longer fail, so it returns void and its caller does not
+    fold a status -- which is the arrangement ``_scatter_block_diag_sym`` has
+    always had.
     """
     assembly = BSRAssemblyPlan() if assembly is None else assembly
     row_pointer = assembly.row_pointer
@@ -6445,36 +6459,14 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     value_stream = assembly.value_stream
     atomic = _assembly_reduction_is_atomic(assembly.reduction_policy, "BSR")
 
-    missing = expr_ref("ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]")
-    report = CallNode(
-        "std::fprintf",
-        (
-            "stderr",
-            '"%s_scatter_bsr missing block graph entry (%%ld, %%ld)\\n"' % function_base,
-            "(long)ev[i]",
-            "(long)ev[j]",
-        ),
-    )
     locate = _counting_loop(
         "j",
         0,
         expr_ref("N_SHAPE"),
         [
-            IfNode(
-                missing,
-                body=(
-                    IfNode(expr_ref("valid_block_graph"), body=(report,)),
-                    AssignmentNode(
-                        expr_ref("entries[i * N_SHAPE + j]"), expr_ref("row_begin")
-                    ),
-                    AssignmentNode(expr_ref("valid_block_graph"), expr_ref("false")),
-                ),
-                orelse=(
-                    AssignmentNode(
-                        expr_ref("entries[i * N_SHAPE + j]"),
-                        expr_ref("row_begin + ks[j]"),
-                    ),
-                ),
+            AssignmentNode(
+                expr_ref("entries[i * N_SHAPE + j]"),
+                expr_ref("row_begin + ks[j]"),
             )
         ],
     )
@@ -6492,7 +6484,6 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
         BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
         BufferDeclNode("count_t", "entries", ("N_SHAPE * N_SHAPE",)),
         BufferDeclNode("idx_t", "ks", ("N_SHAPE",)),
-        BufferDeclNode("bool", "valid_block_graph", (), expr_ref("true")),
         _counting_loop(
             "i",
             0,
@@ -6519,11 +6510,6 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                 ),
                 locate,
             ],
-        ),
-        IfNode(
-            expr_ref("!valid_block_graph"),
-            body=(ReturnNode(expr_ref("SFEM_FAILURE")),),
-            inline_body=True,
         ),
         _counting_loop(
             "i",
@@ -6556,7 +6542,6 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                 )
             ],
         ),
-        ReturnNode(expr_ref("SFEM_SUCCESS")),
     ]
     return _print_scatter_function(
         FunctionDefNode(
@@ -6569,7 +6554,6 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                 "scalar_t *const SFEM_RESTRICT values",
             ),
             body=tuple(body),
-            return_type="int",
             qualifier="static SFEM_INLINE",
             template_params=("typename scalar_t",),
         )
