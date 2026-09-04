@@ -370,16 +370,35 @@ namespace {
                 // concentrated in the pressure rows implicates the stabilisation, and one
                 // spread evenly implicates the discretisation as a whole.
                 real_t dn[N_FIELDS] = {0}, rn[N_FIELDS] = {0};
+                real_t ab[N_FIELDS] = {0}, aa[N_FIELDS] = {0};
                 for (ptrdiff_t k = 0; k < nc; ++k) {
                     const int    c = (int)(k % N_FIELDS);
                     const real_t d = g1[(size_t)k] - g2[(size_t)k];
                     dn[c] += d * d;
                     rn[c] += g1[(size_t)k] * g1[(size_t)k];
+                    ab[c] += g2[(size_t)k] * g1[(size_t)k];   // <A_c v, R A P v>
+                    aa[c] += g2[(size_t)k] * g2[(size_t)k];
                 }
-                std::printf("  coarse-op %d rel:", i);
                 const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+                std::printf("  coarse-op %d rel:  ", i);
                 for (int c = 0; c < N_FIELDS; ++c)
-                    std::printf("  %s %.4f", nm[c], (rn[c] > 0) ? std::sqrt(dn[c] / rn[c]) : 0.0);
+                    std::printf("%s %.4f  ", nm[c], (rn[c] > 0) ? std::sqrt(dn[c] / rn[c]) : 0.0);
+                // Best-fit scale per component. A rediscretised coarse operator is not
+                // meant to equal R A P -- the two differ by a fixed factor from the
+                // h-scaling convention -- so the raw mismatch above conflates that known
+                // factor with real disagreement. What matters is whether the velocity and
+                // pressure rows carry the SAME factor. If they do not, the coarse operator
+                // is not a scalar multiple of the Galerkin one, and no single scaling of
+                // the correction can reconcile it, which is why SFEM_GMG_CGC failed.
+                std::printf("\n  coarse-op %d scale:", i);
+                real_t su = 0;
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    const real_t sc = (aa[c] > 0) ? ab[c] / aa[c] : 0.0;
+                    std::printf("  %s %.4f", nm[c], sc);
+                    if (c < 3) su += sc / 3;
+                }
+                const real_t sp = (aa[3] > 0) ? ab[3] / aa[3] : 0.0;
+                std::printf("   -> pressure/velocity %.4f", (su != 0) ? sp / su : 0.0);
                 std::printf("\n");
             }
         }
@@ -441,7 +460,8 @@ namespace {
         // says whether the mismatch is a single scalar per level -- in which case one
         // factor repairs the cycle -- or a genuine difference in what the two operators
         // do, which no scalar can fix.
-        const real_t cgc = smesh::Env::read<real_t>("SFEM_GMG_CGC", real_t(1));
+        const real_t cgc    = smesh::Env::read<real_t>("SFEM_GMG_CGC", real_t(1));
+        const real_t pscale = smesh::Env::read<real_t>("SFEM_GMG_PSCALE", real_t(1));
         auto       wrap_p  = [&](const int i) -> std::shared_ptr<sfem::Operator<real_t>> {
             auto P = g.data->prolongations[i];
             if (!P || (!pfilter && cgc == real_t(1))) return P;
@@ -471,23 +491,49 @@ namespace {
             std::vector<mask_t> mask(mask_count(fi->space()->n_dofs()), 0);
             fi->constraints_mask(mask.data());
             const real_t omega = (i + 1 < nlevels)
-                                         ? smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.5))
+                                         ? smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35))
                                          : real_t(1);
             auto prec = make_block_jacobi(*g.level_ops[i], g.states[i]->data(), mask.data(), nn, omega);
 
+            // SFEM_GMG_PSCALE scales the continuity rows of every coarse level.
+            //
+            // Left-scaling a row does not change what the coarse system solves; it changes
+            // the correction the cycle takes from it. Unlike SFEM_GMG_RC_DECAY this leaves
+            // Df alone, so the balance between divergence and stabilisation inside the
+            // continuity row is untouched and the coarse operator keeps the stabilisation
+            // its own mesh needs. The value to use is not tuned: it is the pressure/velocity
+            // ratio of the best-fit scales printed by SFEM_GMG_CHECK=1.
+            auto lop = g.ops[i];
+            if (i > 0 && pscale != real_t(1)) {
+                const ptrdiff_t nd = fi->space()->n_dofs();
+                auto            inner = lop;
+                lop = sfem::make_op<real_t>(
+                        inner->rows(), inner->cols(),
+                        [inner, nd, pscale](const real_t *const x, real_t *const y) {
+                            std::vector<real_t> t((size_t)nd, real_t(0));
+                            inner->apply(x, t.data());
+                            for (ptrdiff_t k = 0; k < nd; ++k)
+                                y[k] += (k % N_FIELDS == 3) ? pscale * t[(size_t)k] : t[(size_t)k];
+                        },
+                        sfem::EXECUTION_SPACE_HOST);
+            }
+
             if (i + 1 < nlevels) {
-                auto sm = sfem::create_stationary<real_t>(g.ops[i], prec, sfem::EXECUTION_SPACE_HOST);
+                auto sm = sfem::create_stationary<real_t>(lop, prec, sfem::EXECUTION_SPACE_HOST);
                 sm->set_max_it(g.smoothing_steps);
-                g.mg->add_level(g.ops[i], sm, i == 0 ? nullptr : wrap_p(i), g.data->restrictions[i]);
+                g.mg->add_level(lop, sm, i == 0 ? nullptr : wrap_p(i), g.data->restrictions[i]);
             } else {
                 // Coarse solve. BiCGStab, not CG: the operator is not symmetric.
-                auto cs = sfem::create_bcgs<real_t>(g.ops[i], sfem::EXECUTION_SPACE_HOST);
+                auto cs = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
                 cs->set_max_it(smesh::Env::read<int>("SFEM_GMG_COARSE_MAX_IT", 200));
                 cs->set_rtol(1e-8);
                 cs->set_atol(1e-14);
-                cs->verbose = false;
+                // The coarse level is solved, not smoothed, so the cycle takes its answer
+                // at face value. If that solve stagnates the correction is noise, and a
+                // stagnating BiCGStab reports success by exhausting its iterations.
+                cs->verbose = smesh::Env::read<int>("SFEM_GMG_COARSE_VERBOSE", 0) != 0;
                 cs->set_preconditioner_op(prec);
-                g.mg->add_level(g.ops[i], cs, wrap_p(i), nullptr);
+                g.mg->add_level(lop, cs, wrap_p(i), nullptr);
             }
         }
         g.mg->set_max_it(1);  // one V-cycle per preconditioner application
@@ -832,6 +878,38 @@ int main(int argc, char **argv) {
                 // an order of magnitude per cycle at a rate independent of level, and one
                 // whose coarse correction contributes nothing stalls near the rate of the
                 // smoother alone.
+                // SFEM_GMG_CHECK=3: the smoother, standalone, as the stationary iteration
+                // it actually is inside the cycle.
+                //
+                // Its good showing as a BiCGStab preconditioner (SFEM_GMG=2) is no
+                // evidence that it converges: a Krylov method tolerates a preconditioner
+                // that would diverge if iterated. Inside a V-cycle it IS iterated, so a
+                // divergent smoother makes the cycle diverge regardless of what the coarse
+                // levels do -- and no coarse-grid fix can repair that.
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 3 && newton_it == 0) {
+                    const real_t om   = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                    auto         prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
+                    std::vector<real_t> xs((size_t)ndof, 0), r((size_t)ndof, 0), z((size_t)ndof, 0);
+                    real_t prev = 0;
+                    for (ptrdiff_t k = 0; k < ndof; ++k) prev += rhs[(size_t)k] * rhs[(size_t)k];
+                    prev = std::sqrt(prev);
+                    std::printf("smoother-only (omega=%g):\n", (double)om);
+                    for (int it = 0; it < smesh::Env::read<int>("SFEM_GMG_CHECK_IT", 10); ++it) {
+                        std::fill(r.begin(), r.end(), real_t(0));
+                        linop->apply(xs.data(), r.data());
+                        for (ptrdiff_t k = 0; k < ndof; ++k) r[(size_t)k] = rhs[(size_t)k] - r[(size_t)k];
+                        std::fill(z.begin(), z.end(), real_t(0));
+                        prec->apply(r.data(), z.data());
+                        for (ptrdiff_t k = 0; k < ndof; ++k) xs[(size_t)k] += z[(size_t)k];
+                        real_t nr = 0;
+                        for (ptrdiff_t k = 0; k < ndof; ++k) nr += r[(size_t)k] * r[(size_t)k];
+                        nr = std::sqrt(nr);
+                        std::printf("  sweep %2d  |r| %.6e  rate %.6f\n", it, (double)nr,
+                                    (double)(prev > 0 ? nr / prev : 0));
+                        prev = nr;
+                    }
+                }
+
                 if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 2 && newton_it == 0) {
                     std::vector<real_t> probe((size_t)ndof, 0);
                     gmg->mg->verbose = true;
@@ -852,7 +930,7 @@ int main(int argc, char **argv) {
                 // the smoothing count rose. This is the arm that separates the two. If the
                 // V-cycle cannot beat it, the hierarchy is only an expensive smoother and
                 // the fault is in the transfers or the coarse operator, not the smoother.
-                const real_t om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.5));
+                const real_t om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
                 auto prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
                 auto sm   = sfem::create_stationary<real_t>(linop, prec, sfem::EXECUTION_SPACE_HOST);
                 sm->set_max_it(2 * gmg_smooth);
