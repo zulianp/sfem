@@ -518,7 +518,24 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Eighteen, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Nineteen, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 19</div>
+    <div class="body">
+      <div class="op-title">The mesh geometry a kernel takes is now the plan's decision <span class="chip c-ok">done &mdash; 239 &rarr; 233</span></div>
+
+      <p>Choosing the next step by measurement rather than by feel: of the 239 decisions left in emission, <b>231 are in the two big emitters</b>, and they split cleanly by what they read. The residual emitter's 126 are dominated by <code>dependencies</code> (74), testing exactly the flags the plan layer already answers &mdash; <code>current</code>, <code>direction</code>, <code>previous</code>, <code>uses_adjugate</code>. The energy emitter's 110 are dominated by <code>form</code> (65), testing <code>name</code> and <code>weak_form</code>, for which <b>no plan exists</b>. So the residual side was ready and the energy side needs design first; this took the ready one.</p>
+
+      <p><b>Which geometry buffers cross a mesh kernel's boundary</b> &mdash; the symmetric gradient metric, or the Jacobian adjugate and determinant &mdash; was spelled by hand at twenty-five sites in the residual emitter, four in the energy one, and once more in the wrapper, each with its own <code>if</code> chain over the same flags. <code>plans/geometry_quantities.py</code> now states it once, and both the signatures and the calls are spelled from it.</p>
+
+      <p>This is the decision that <b>had already gone wrong</b>. The wrapper's copy spelled the adjugate unconditionally, so laplace generated for TRI3 or TET4 alone handed five geometry arguments to a kernel taking three and would not compile &mdash; OP 16's third defect. Fixing that made the instance go away; this makes the class go away, and a test pins it in the shape OP 3 established: the names the plan produces must appear in the emitted kernel, <em>and</em> changing the plan must change what is emitted, because the weaker assertion alone passes for an emitter that consults nothing.</p>
+
+      <p>All 505 files byte-identical at every step, so nothing about the generated code moved &mdash; only where the decision lives. The wrapper also stops recomputing <code>dim * (dim + 1) / 2</code> for itself and reads the plan's count, which is the arithmetic both sides previously agreed on only by coincidence.</p>
+
+      <div class="op-facts"><span><i>decisions</i> 239 &rarr; 233</span><span><i>sites unified</i> 25 + 4 + 1</span><span><i>byte-identical</i> 505 of 505</span><span><i>next, and it needs design</i> energy's 65 form branches</span></div>
+    </div>
+  </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 18</div>

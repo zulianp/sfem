@@ -3,6 +3,10 @@ import json
 import os
 import re
 
+from codegen.framework.plans.form_transformations import (
+    symmetric_metric_component_count,
+)
+
 
 def generate_op_registration_files(manifests, function_name="register_generated_ops"):
     entries = _registration_entries_from_manifests(manifests)
@@ -8152,7 +8156,16 @@ def _affine_geometry_offsets(dim):
 
 
 def _affine_metric_offsets(dim):
-    return ", ".join("geom_metric[%d]" % i for i in range(dim * (dim + 1) // 2))
+    # The count is the plan's, not a second copy of the arithmetic.  Both sides
+    # of this boundary have to agree on how many components a symmetric metric
+    # has, and they used to agree only by both spelling dim * (dim + 1) // 2 --
+    # which is the shape of agreement that stops holding the moment one side
+    # changes.  See ARCHITECTURE.html OP 16 for what the wrapper deriving
+    # geometry independently already cost once.
+    return ", ".join(
+        "geom_metric[%d]" % i
+        for i in range(symmetric_metric_component_count(dim))
+    )
 
 
 def _affine_dispatch_geometry_args(kernel_sources, function_name, dim):
