@@ -274,9 +274,20 @@ namespace {
                                                    const real_t *const      x,
                                                    const mask_t *const      mask,
                                                    const ptrdiff_t          nnodes,
-                                                   const real_t             omega = real_t(1)) {
+                                                   const real_t             omega = real_t(1),
+                                                   const real_t             prow  = real_t(1)) {
         std::vector<real_t> blocks((size_t)nnodes * 16, 0);
         op.hessian_block_diag(x, blocks.data());
+
+        // `prow` scales the continuity row of every block, matching SFEM_GMG_PSCALE's
+        // scaling of the level operator. The two must agree: the smoother preconditions
+        // the operator it smooths, so preconditioning a scaled operator with an unscaled
+        // diagonal leaves the pressure update wrong by 1/prow and turns the coarse
+        // smoother divergent as prow shrinks -- which is what an earlier reading of
+        // SFEM_GMG_PSCALE was actually measuring.
+        if (prow != real_t(1))
+            for (ptrdiff_t i = 0; i < nnodes; ++i)
+                for (int c = 0; c < 4; ++c) blocks[(size_t)i * 16 + 12 + c] *= prow;
 
         std::vector<real_t> inv((size_t)nnodes * 16, 0);
 #pragma omp parallel for schedule(static)
@@ -596,6 +607,19 @@ namespace {
                 }
                 const real_t sp = (aa[3] > 0) ? ab[3] / aa[3] : 0.0;
                 std::printf("   -> pressure/velocity %.4f", (su != 0) ? sp / su : 0.0);
+                // Residual left after removing each component's own best-fit scale. This
+                // is the part of the disagreement that no rescaling of any kind can reach,
+                // and it decides whether a cheap fix exists at all.
+                std::printf("\n  coarse-op %d after-scale:", i);
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    const real_t sc = (aa[c] > 0) ? ab[c] / aa[c] : 0.0;
+                    real_t       rr2 = 0;
+                    for (ptrdiff_t k = c; k < nc; k += N_FIELDS) {
+                        const real_t d = sc * g2[(size_t)k] - g1[(size_t)k];
+                        rr2 += d * d;
+                    }
+                    std::printf("  %s %.4f", nm[c], (rn[c] > 0) ? std::sqrt(rr2 / rn[c]) : 0.0);
+                }
                 std::printf("\n");
             }
         }
@@ -618,6 +642,150 @@ namespace {
             g.data->restrictions[i - 1]->apply(ones.data(), w.data());
             g.state_weights[(size_t)i] = std::move(w);
         }
+    }
+
+    // Is the derefined coarse operator the same operator as one built directly on the
+    // coarse space?
+    //
+    // The coarse operators come from derefine_op, walking down from the fine one. A driver
+    // run at that refine level would instead construct the operator on that space from
+    // scratch. Those two ought to be the same object, and if they are not, the hierarchy is
+    // not solving a coarse version of the problem at all -- which would be a defect rather
+    // than the known fact that rediscretisation differs from Galerkin coarsening.
+    void check_derefined_op(GmgLevels &g) {
+        auto            fs = g.data->functions[1]->space();
+        const ptrdiff_t nd = fs->n_dofs();
+
+        auto fresh = std::make_shared<sfem::CVFEMNavierStokes>(fs);
+        fresh->rho             = g.level_ops[0]->rho;
+        fresh->mu              = g.level_ops[0]->mu;
+        fresh->rhie_chow_scale = g.level_ops[1]->rhie_chow_scale;
+        fresh->geom            = g.level_ops[0]->geom;
+        fresh->pack_size       = 0;
+        if (fresh->initialize() != SFEM_SUCCESS) {
+            std::printf("derefined-op check: could not build a fresh coarse operator\n");
+            return;
+        }
+
+        std::vector<real_t> dir((size_t)nd), a((size_t)nd, 0), b((size_t)nd, 0);
+        for (ptrdiff_t k = 0; k < nd; ++k) dir[(size_t)k] = std::sin(0.9 * (real_t)k) + 0.2;
+
+        g.level_ops[1]->apply(g.states[1]->data(), dir.data(), a.data());
+        fresh->apply(g.states[1]->data(), dir.data(), b.data());
+
+        real_t dn[N_FIELDS] = {0}, rn[N_FIELDS] = {0};
+        for (ptrdiff_t k = 0; k < nd; ++k) {
+            const int    c = (int)(k % N_FIELDS);
+            const real_t d = a[(size_t)k] - b[(size_t)k];
+            dn[c] += d * d;
+            rn[c] += a[(size_t)k] * a[(size_t)k];
+        }
+        const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+        std::printf("derefined vs freshly built coarse operator, rel:");
+        for (int c = 0; c < N_FIELDS; ++c)
+            std::printf("  %s %.3e", nm[c], (rn[c] > 0) ? std::sqrt(dn[c] / rn[c]) : 0.0);
+        std::printf("\n");
+    }
+
+    // Two-level coarse-grid correction, measured on one prescribed error mode.
+    //
+    // The cycle's rate decays to the smoother's own and the stalled residual is pressure,
+    // so the question is narrow: given a smooth error the smoother cannot touch, does the
+    // coarse grid reproduce it? This applies the textbook correction operator
+    // P A_c^-1 R A to a chosen mode and reports what fraction of it survives. A working
+    // coarse grid leaves little; a value near 1 means the correction is doing nothing for
+    // that mode, and comparing a pressure mode against a velocity mode says whether the
+    // failure is specific to the pressure equation.
+    void check_cgc(GmgLevels &g, const int mode) {
+        const ptrdiff_t nf = g.data->functions[0]->space()->n_dofs();
+        const ptrdiff_t nc = g.data->functions[1]->space()->n_dofs();
+
+        std::vector<real_t> e((size_t)nf, 0), r((size_t)nf, 0), rc((size_t)nc, 0),
+                ec((size_t)nc, 0), ef((size_t)nf, 0);
+
+        // The mode is built as P applied to a coarse field, not as a formula in the node
+        // index. Node ids are not positions, so an index-based "smooth" mode need not be
+        // smooth at all, and a rough mode is supposed to survive a coarse correction. A
+        // mode in the range of the prolongation is exactly representable on the coarse
+        // grid by construction, so a correct two-level correction must reproduce it almost
+        // perfectly: with the Galerkin operator A_c = R A P the surviving fraction would be
+        // zero. Whatever survives is the rediscretisation error, measured on the modes the
+        // coarse grid is supposed to own.
+        {
+            std::vector<real_t> seed((size_t)nc, 0);
+            unsigned            st = 7u;
+            auto                rnd = [&st]() {
+                st = st * 1103515245u + 12345u;
+                return (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+            };
+            // A random coarse field is oscillatory at the coarse scale, which is the
+            // harshest case for a rediscretised operator. SFEM_GMG_CGC_SMOOTH seeds two
+            // levels down and prolongs, giving a field that is smooth relative to the
+            // coarse grid -- the case rediscretisation is actually supposed to handle. If
+            // the correction fails on that too, the verdict does not rest on an unfair test.
+            if (smesh::Env::read<int>("SFEM_GMG_CGC_SMOOTH", 0) && (int)g.ops.size() > 2) {
+                const ptrdiff_t n2 = g.data->functions[2]->space()->n_dofs();
+                std::vector<real_t> s2((size_t)n2, 0);
+                for (ptrdiff_t i = 0; i < n2 / N_FIELDS; ++i)
+                    s2[(size_t)i * N_FIELDS + (mode == 3 ? 3 : 0)] = rnd();
+                g.data->functions[2]->apply_zero_constraints(s2.data());
+                g.data->prolongations[2]->apply(s2.data(), seed.data());
+            } else {
+                for (ptrdiff_t i = 0; i < nc / N_FIELDS; ++i)
+                    seed[(size_t)i * N_FIELDS + (mode == 3 ? 3 : 0)] = rnd();
+            }
+            g.data->functions[1]->apply_zero_constraints(seed.data());
+            g.data->prolongations[1]->apply(seed.data(), e.data());
+        }
+        g.data->functions[0]->apply_zero_constraints(e.data());
+
+        g.ops[0]->apply(e.data(), r.data());
+        g.data->restrictions[0]->apply(r.data(), rc.data());
+
+        // Two coarse operators, same everything else. `galerkin` builds R A P explicitly by
+        // composing the transfers with the fine operator -- far too expensive for
+        // production, and exactly the right thing for a diagnostic, because with it the
+        // surviving fraction is zero by construction if the transfers are sound. Comparing
+        // the two separates a wrong rediscretisation from wrong transfers, which nothing
+        // measured so far has been able to do.
+        const bool use_galerkin = smesh::Env::read<int>("SFEM_GMG_GALERKIN", 0) != 0;
+        auto       coarse_op    = g.ops[1];
+        if (use_galerkin) {
+            auto Pop = g.data->prolongations[1];
+            auto Rop = g.data->restrictions[0];
+            auto Af  = g.ops[0];
+            coarse_op = sfem::make_op<real_t>(
+                    nc, nc,
+                    [Pop, Rop, Af, nf, nc](const real_t *const xc, real_t *const yc) {
+                        std::vector<real_t> t1((size_t)nf, 0), t2((size_t)nf, 0);
+                        Pop->apply(xc, t1.data());
+                        Af->apply(t1.data(), t2.data());
+                        Rop->apply(t2.data(), yc);
+                    },
+                    sfem::EXECUTION_SPACE_HOST);
+        }
+
+        auto cs = sfem::create_bcgs<real_t>(coarse_op, sfem::EXECUTION_SPACE_HOST);
+        cs->set_max_it(500);
+        cs->set_rtol(1e-10);
+        cs->verbose = false;
+        cs->apply(rc.data(), ec.data());
+
+        g.data->prolongations[1]->apply(ec.data(), ef.data());
+
+        real_t ne[N_FIELDS] = {0}, nd[N_FIELDS] = {0};
+        for (ptrdiff_t k = 0; k < nf; ++k) {
+            const int    c = (int)(k % N_FIELDS);
+            const real_t d = e[(size_t)k] - ef[(size_t)k];
+            ne[c] += e[(size_t)k] * e[(size_t)k];
+            nd[c] += d * d;
+        }
+        const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+        std::printf("cgc [%s] on %s mode: surviving fraction",
+                    use_galerkin ? "galerkin" : "rediscretised", mode == 3 ? "pressure" : "velocity");
+        for (int c = 0; c < N_FIELDS; ++c)
+            if (ne[c] > 0) std::printf("  %s %.4f", nm[c], std::sqrt(nd[c] / ne[c]));
+        std::printf("\n");
     }
 
     void refresh_gmg(GmgLevels &g) {
@@ -690,7 +858,8 @@ namespace {
             const real_t omega = (i + 1 < nlevels)
                                          ? smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35))
                                          : real_t(1);
-            auto prec = make_block_jacobi(*g.level_ops[i], g.states[i]->data(), mask.data(), nn, omega);
+            auto prec = make_block_jacobi(*g.level_ops[i], g.states[i]->data(), mask.data(), nn, omega,
+                                          (i > 0) ? pscale : real_t(1));
 
             // SFEM_GMG_PSCALE scales the continuity rows of every coarse level.
             //
@@ -976,7 +1145,13 @@ int main(int argc, char **argv) {
         if (gmg) build_state_weights(*gmg);
         if (gmg && smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
             refresh_gmg(*gmg);
-            check_transfers(*gmg);
+            if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 4) {
+                check_derefined_op(*gmg);
+                check_cgc(*gmg, 0);
+                check_cgc(*gmg, 3);
+            } else {
+                check_transfers(*gmg);
+            }
         }
         if (!gmg) {
             std::fprintf(stderr, "SFEM_GMG=1 but the hierarchy could not be built "
@@ -1122,6 +1297,28 @@ int main(int argc, char **argv) {
                     gmg->mg->apply(rhs.data(), probe.data());
                     gmg->mg->verbose = false;
                     gmg->mg->set_max_it(1);
+
+                    // Where does the stalled error live?
+                    //
+                    // The cycle's rate decays to the smoother's own, which means the coarse
+                    // correction stops contributing once the smoother has cleared the high
+                    // frequencies. What is left is the smooth error the coarse grid exists
+                    // to remove, and splitting it by component says which equation's smooth
+                    // modes are being missed.
+                    std::vector<real_t> rr((size_t)ndof, 0);
+                    linop->apply(probe.data(), rr.data());
+                    for (ptrdiff_t k = 0; k < ndof; ++k) rr[(size_t)k] = rhs[(size_t)k] - rr[(size_t)k];
+                    real_t n0[N_FIELDS] = {0}, n1[N_FIELDS] = {0};
+                    for (ptrdiff_t k = 0; k < ndof; ++k) {
+                        const int c = (int)(k % N_FIELDS);
+                        n0[c] += rhs[(size_t)k] * rhs[(size_t)k];
+                        n1[c] += rr[(size_t)k] * rr[(size_t)k];
+                    }
+                    const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+                    std::printf("residual by component  (start -> after cycles, and reduction)\n");
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        std::printf("  %s  %.4e -> %.4e   x%.3e\n", nm[c], std::sqrt(n0[c]),
+                                    std::sqrt(n1[c]), (n0[c] > 0) ? std::sqrt(n1[c] / n0[c]) : 0.0);
                 }
                 solver->set_preconditioner_op(gmg->mg);
             } else if (use_gmg == 2) {

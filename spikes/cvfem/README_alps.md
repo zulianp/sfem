@@ -882,3 +882,53 @@ good multigrid smoothers routinely look terrible measured this way. What is fata
 above 1, which is what the old default damping produced. With that fixed the smoother is
 doing its job, and the remaining weakness is in the coarse correction, where the velocity and
 pressure rows still coarsen with different best-fit scales (0.63 against 0.12).
+
+## Why the model's fix did not transfer: rediscretisation is the whole fault
+
+`SFEM_GMG_CHECK=4` applies the two-level correction operator `P A_c^-1 R A` to a chosen
+error mode and reports what fraction survives. The mode is built as `P` applied to a coarse
+field, so it is exactly representable on the coarse grid and a correct correction must
+remove essentially all of it. `SFEM_GMG_GALERKIN=1` swaps the rediscretised coarse operator
+for `R A P`, composed matrix-free, which is far too expensive for production and is exactly
+the right thing for a diagnostic: with it the surviving fraction is zero by construction if
+the transfers are sound. `SFEM_GMG_CGC_SMOOTH=1` seeds two levels down instead of one, so
+the mode is smooth relative to the coarse grid rather than oscillatory on it.
+
+| coarse operator | mode | velocity | pressure |
+|-----------------|------|----------|----------|
+| rediscretised   | coarse-oscillatory | 5.52 | 0.786 |
+| rediscretised   | coarse-smooth      | 0.312 | 0.601 |
+| Galerkin `R A P`| either             | 0.000 | 0.000 |
+
+The Galerkin correction is exact, which validates the transfers and the test at once. The
+rediscretised operator amplifies a coarse-representable velocity error more than fivefold,
+and removes only forty percent of a coarse-smooth pressure error. Rediscretisation is the
+entire fault; nothing else in the cycle is.
+
+Two checks close off the alternatives. The derefined coarse operator is bit-identical to one
+built directly on the coarse space -- `derefine_op` is not the problem. And the disagreement
+is not a scaling: removing each component's own best-fit scale still leaves 0.68, 0.52, 0.52
+and 0.40 relative error in ux, uy, uz and p. That is why `SFEM_GMG_PSCALE`, `SFEM_GMG_CGC`
+and `SFEM_GMG_RC_DECAY` all failed -- the entire family of scaling knobs was addressing a
+component of the error that is a minority of it.
+
+This is also the answer to why the independent evaluation's prediction did not transfer. In
+the model the mismatch between the coarse and Galerkin operators really was close to a pure
+per-block scaling, so scaling the coarse continuity rows by the measured ratio fixed it. In
+the driver it is not, so no scaling can. The model was right about itself and about the
+method; it was wrong about the driver because the two operators fail in different ways, and
+only measuring the after-scale residual in both revealed that.
+
+The V-cycle's behaviour follows exactly. Run long enough its rate climbs to 0.963, against
+the smoother's own 0.967: the coarse correction helps for a few cycles, then contributes
+nothing, and the residual left behind is pressure, reduced fifty times less than velocity.
+
+### What this means for the next step
+
+Galerkin coarsening works and rediscretisation does not, at least for the pressure block.
+Composing `R A P` at solve time is what the diagnostic does and is not an option here --
+it makes every coarse application cost fine-level work, which defeats the hierarchy. So the
+choice is between assembling the coarse levels once per Newton step and finding a coarse
+discretisation that behaves like the Galerkin operator without being it. The measurements
+above are the gate either way: any candidate coarse operator should be required to bring the
+surviving fraction near zero on coarse-representable modes before it is put into a cycle.
