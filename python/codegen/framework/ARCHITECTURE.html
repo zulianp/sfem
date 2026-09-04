@@ -580,20 +580,24 @@
         <tr><td>simplex, higher order</td><td>rules of its own, distinct from both.</td></tr>
       </table>
 
-      <p>That removes the design question this entry was about to pose. The strategy is not a property either front end sets; it follows from the element, and the defect is that the framework currently derives it from the formulation instead. <code>tools/evaluation_strategy.py</code> measures the gap against those three rules, across the whole generated tree:</p>
+      <p>That removes the design question this entry was about to pose. The strategy is not a property either front end sets; it follows from the element.</p>
+
+      <p><b>The first measurement of the gap was wrong, and wrong in the direction that invents work.</b> It reported 29 tensor-product elements without sum factorization, on the strength of counting <code>tensor_test&lt;</code>. There are <b>two</b> sum-factorised template families in <code>tensor_product_kernels.hpp</code>, not one: the energy path defers a flux and contracts it through <code>TensorProductWeakOps</code> (<code>tensor_test</code>), and the residual path evaluates and integrates through <code>TensorProductResidualOps</code> (<code>tensor_evaluate</code>, <code>tensor_integrate</code>). Both are sum factorization. Counting only the first reported every residual material as unfactorised.</p>
+
+      <p>A second error compounded it. The remaining sixteen were the Neumann conditions, which emit nothing but <code>*_boundary_operator.cpp</code> &mdash; surface integrals, not tensor-product volume elements missing a volume optimisation. The rule does not govern them.</p>
 
       <table class="measures" style="margin:8px 0 12px">
-        <tr><th>departure</th><th class="n">count</th></tr>
-        <tr><td>tensor-product elements without sum factorization</td><td class="n"><b>29</b></td></tr>
-        <tr><td>lowest-order simplices generating quadrature data</td><td class="n"><b>20</b></td></tr>
-        <tr><td>total</td><td class="n">49</td></tr>
+        <tr><th>departure</th><th class="n">first reported</th><th class="n">actual</th></tr>
+        <tr><td>tensor-product without sum factorization</td><td class="n">29</td><td class="n"><b>0</b></td></tr>
+        <tr><td>lowest-order simplices generating quadrature data</td><td class="n">20</td><td class="n"><b>20</b></td></tr>
+        <tr><td>total</td><td class="n">49</td><td class="n"><b>20</b></td></tr>
       </table>
 
-      <p>By material, sum factorization reaches every energy-formulated material and <b>none</b> of the residual-formulated ones &mdash; laplace, stokes, two-phase flow, the Neumann conditions. And every material generates quadrature loops on lowest-order simplices where the rule says none are needed: 48 apiece for the hyperelastic materials, 28 for two-phase flow, 4 for laplace.</p>
+      <p><b>So rule one is already met</b> &mdash; by two separate implementations of it, which is its own kind of duplication, but met. The real gap is rule two, and it is uniform: <b>every material, exactly two elements each</b> (TET4 and TRI3), twenty in total. Laplace generates 4 quadrature loops there, two-phase flow 28, the hyperelastic materials 48 apiece.</p>
 
-      <p>So OP 18's finding was a symptom of this one. <b>Laplace gets neither default</b>: no sum factorization on its tensor-product elements because it is written as a residual, and quadrature loops on its lowest-order simplices where the compact expanded form needs none. The hand-written fast path in the emitter is what someone wrote instead of fixing the rule. <code>tests/test_contraction_mode.py</code> pins the present coupling &mdash; including the assertion that strategy still tracks formulation exactly &mdash; so the day that stops being true is a test failure rather than a rediscovery.</p>
+      <p>That is what OP 18 found from the other end. The compact expanded form exists only as hand-written C transcribed into the emitter for the Laplacian, behind a six-condition gate, with the material special-cased by name on three element families. <code>tests/test_contraction_mode.py</code> pins the present coupling between contraction shape and formulation, so the day it stops being true is a test failure rather than a rediscovery.</p>
 
-      <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>strategy departures</i> 49</span><span><i>sum factorisation</i> energy only</span><span><i>laplace</i> residual, so none</span></div>
+      <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>strategy departures</i> 20, all rule two</span><span><i>rule one</i> met, twice over</span></div>
     </div>
   </div>
 
