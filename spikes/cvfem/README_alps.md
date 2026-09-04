@@ -1048,3 +1048,118 @@ crossover in wall time was not demonstrated: the iteration counts diverge fast e
 one should exist, but L=32 exceeded the time available here, so that remains a projection
 rather than a measurement, and projections of exactly this kind have been wrong twice
 already in this document.
+
+## State of the code, and where the solver is matrix-free
+
+### The shape of the method
+
+The solver is matrix-free where it is large and matrix-based where it is small, and that
+split is not a compromise -- each half was forced by a measurement.
+
+**Matrix-free, and staying that way: everything on the fine level.** The CVFEM
+Navier-Stokes operator over the semi-structured `sshex8` lattice is never assembled. The
+residual, the Jacobian action, the 4x4 block diagonal, and the 2x2 (velocity, pressure)
+block split are all element sweeps over macro-elements. The grid transfers are matrix-free
+lattice operations from `smesh`. The fine-level smoother's block-Jacobi is built from
+`hessian_block_diag`, which is `n_nodes x 16` values -- O(n) storage, not a matrix. This is
+the reason the semi-structured hierarchy exists and none of it changed.
+
+**Matrix-based, once per Newton step: the coarse levels.** Each coarse operator is an
+assembled BSR matrix formed by Galerkin coarsening, `A_c = R A P`, with entries recovered by
+probing under a distance-2 colouring. During the solve the coarse levels apply a sparse
+matrix and never touch a finer level.
+
+### Why the boundary sits there
+
+Three measurements put it there, in order.
+
+The rediscretised coarse operator -- the matrix-free choice, and the one the hierarchy was
+built around -- does not work. Applying the two-level correction operator to a mode that is
+exactly representable on the coarse grid leaves 5.52 of a velocity mode (it amplifies the
+error) and 0.79 of a pressure mode, where the Galerkin operator leaves 0.000. The
+disagreement is not a scaling: removing each component's own best-fit scale still leaves
+0.68, 0.52, 0.52 and 0.40 in ux, uy, uz and p, which is why every scaling knob tried
+(`PSCALE`, `CGC`, `RC_DECAY`) did nothing.
+
+Galerkin cannot be applied matrix-free. Composing `R A P` at solve time works and is kept
+as `SFEM_GMG_GALERKIN=1`, but it puts a fine-level application under every coarse
+application, so cost stops falling geometrically with depth. That is the one thing a
+hierarchy must not do.
+
+Assembling also fixes a second problem that has nothing to do with cost. A coarse smoother
+needs the diagonal of the operator it smooths; a matrix-free composite cannot supply one,
+and substituting the rediscretised diagonal mismatches the Galerkin operator by the
+per-block scale factors -- about 1.6 in velocity, 8 in pressure -- which by itself made the
+coarse levels diverge. An assembled matrix hands over its own diagonal.
+
+### What being matrix-based actually costs
+
+The fine matrix is still never formed, and that is the whole point: the assembled hierarchy
+is the coarse levels only.
+
+| | blocks | memory |
+|---|--------|--------|
+| assembled coarse hierarchy (L=16, N=1) | 70531 | 8.6 MiB |
+| the fine BSR, which is never formed | 507195 | 61.9 MiB |
+
+The hierarchy costs about 14% of what assembling the fine level would, because each level in
+3D is roughly eight times smaller than the one above it and the sum is dominated by the
+first coarse level rather than the fine one.
+
+Assembly costs 548 probe applications per Newton step at that size, of which only the 180 at
+the finest transfer involve a fine-level operator application; the rest are sparse
+applications on already-assembled coarse levels. Probing is what makes this affordable at
+all -- a distance-2 colouring means one application reveals a whole set of blocks, so the
+count scales with the stencil rather than with the number of coarse unknowns (41 colours and
+164 applications for 425 nodes, against 425 column by column).
+
+### The rest of the algorithmic configuration
+
+The coarse levels are smoothed with BiCGStab rather than a stationary iteration, because the
+Galerkin operators are denser and lack the diagonal dominance block-Jacobi needs -- under
+block-Jacobi they diverge at every damping. That makes the cycle vary between applications,
+so the outer solver is FGMRES rather than BiCGStab; the two changes are one change, and the
+driver selects FGMRES automatically whenever the smoother is Krylov.
+
+Recommended configuration as measured:
+
+```
+SFEM_GMG=1  SFEM_GMG_GALERKIN=2  SFEM_GMG_KSMOOTH=16  SFEM_GMG_OMEGA=0.35
+```
+
+### What is settled and what is not
+
+Settled: the V-cycle reduces iterations by a factor of twenty-three to thirty-six against
+block-Jacobi and, unlike every earlier configuration, does so reproducibly. On Grace at
+L=16, 60 iterations against 1408, reaching the same solution.
+
+Not settled: it is not yet faster. Same Grace run, 7.59 seconds against 4.23. Thirty-six
+times fewer iterations and 1.8 times the wall clock, because each iteration carries sixteen
+preconditioned BiCGStab iterations per level plus the per-Newton assembly. The gap is
+narrower on Grace than on the M1 (1.8 against 2.4), which is the direction one would expect
+from sparse coarse work vectorising better there, but a single pair of runs is not evidence
+of a trend.
+
+Also unsettled, and the reason the crossover has not been demonstrated: refine level 32 does
+not exist. It aborts in `smesh` with "Invalid element setup for proteus hex: 32", so the
+larger problem has to come from more macro-elements at a valid level rather than a deeper
+lattice. That sweep (N = 2 and 3 at L = 16) is running.
+
+### Instrumentation
+
+All of it is behind `SFEM_GMG_CHECK`, and all of it exists because something got past its
+absence.
+
+- `=1` transfers and their adjointness, a constraint census per level, the block-split sum
+  against the full operator, and coarse-operator consistency reported three ways: raw, the
+  per-component best-fit scale, and the residual left after removing that scale.
+- `=2` the cycle's own convergence rate standalone, plus the stalled residual split by
+  component.
+- `=3` the smoother alone, with no coarse space. This is the first thing to run when a cycle
+  misbehaves, and running it long enough to see the asymptote is part of the check: a rate
+  that is still moving when the measurement stops has not been measured.
+- `=4` the two-level correction operator applied to a prescribed mode, rediscretised against
+  Galerkin, on coarse-oscillatory or (with `SFEM_GMG_CGC_SMOOTH=1`) coarse-smooth modes.
+- The Galerkin assembly gates itself against the composite it was probed from and widens its
+  sparsity pattern until it agrees, because probing folds a non-zero lying outside the
+  pattern into the wrong entry rather than dropping it.
