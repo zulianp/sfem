@@ -83,3 +83,78 @@ def geometry_quantity(dependencies, dim, name):
         if quantity.name == name:
             return quantity
     return None
+
+
+#: The geometry a mesh-level kernel is handed, as opposed to the per-point
+#: values above.  Two shapes, and which one applies is a property of the
+#: lowered form.
+MESH_GEOMETRY_ROLES = ("metric", "adjugate", "determinant")
+
+
+@dataclass(frozen=True)
+class MeshGeometryStream:
+    """One geometry buffer crossing a mesh kernel's boundary."""
+
+    name: str
+    role: str
+
+    def __post_init__(self):
+        if self.role not in MESH_GEOMETRY_ROLES:
+            raise ValueError(
+                "mesh geometry role must be one of %s; got '%s'"
+                % (", ".join(MESH_GEOMETRY_ROLES), self.role)
+            )
+
+
+def mesh_geometry_streams(dependencies, dim, metric_components=None):
+    """The geometry buffers a mesh kernel takes, in the order its ABI lists them.
+
+    A form that contracts two reference gradients over an affine simplex takes
+    the symmetric gradient metric -- ``dim * (dim + 1) / 2`` components and no
+    determinant, because the metric already carries it.  Everything else takes
+    the Jacobian adjugate, when it needs one, followed by the determinant.
+
+    ``metric_components`` is the count when the metric applies and ``None``
+    when it does not; the caller knows because the metric is a property of the
+    lowering, not of this plan.
+
+    This was spelled by hand at twenty-five sites in the residual emitter and
+    four in the energy one, as three separate literal patterns --
+    ``g_geom_metric%d``, ``g_jacobian_adjugate%d`` and the determinant -- each
+    with its own ``if`` chain deciding which applied.  The wrapper made the
+    same choice a third time, and got it wrong: it spelled the adjugate
+    unconditionally, so laplace generated for TRI3 or TET4 alone handed five
+    geometry arguments to a kernel taking three and could not compile.  That
+    is ARCHITECTURE.html OP 16's defect, and this is the shape that makes it
+    unrepresentable rather than merely fixed.
+    """
+    if metric_components:
+        return tuple(
+            MeshGeometryStream("g_geom_metric%d" % index, "metric")
+            for index in range(int(metric_components))
+        )
+    streams = []
+    if getattr(dependencies, "uses_adjugate", False):
+        streams.extend(
+            MeshGeometryStream("g_jacobian_adjugate%d" % index, "adjugate")
+            for index in range(dim * dim)
+        )
+    streams.append(MeshGeometryStream("g_jacobian_determinant0", "determinant"))
+    return tuple(streams)
+
+
+def mesh_geometry_argument_names(dependencies, dim, metric_components=None):
+    """Those buffers, spelled as a call passes them."""
+    return tuple(
+        stream.name
+        for stream in mesh_geometry_streams(dependencies, dim, metric_components)
+    )
+
+
+def mesh_geometry_parameters(dependencies, dim, metric_components=None,
+                             scalar_type="const jacobian_t *const SFEM_RESTRICT"):
+    """The same buffers, spelled as a signature declares them."""
+    return tuple(
+        "%s %s" % (scalar_type, stream.name)
+        for stream in mesh_geometry_streams(dependencies, dim, metric_components)
+    )

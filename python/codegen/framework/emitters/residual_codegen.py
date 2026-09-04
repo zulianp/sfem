@@ -69,6 +69,8 @@ from codegen.framework.plans.residual_structure import (
     residual_mesh_phase_plans,
 )
 from codegen.framework.plans.geometry_quantities import (
+    mesh_geometry_argument_names,
+    mesh_geometry_parameters,
     local_geometry_quantities,
     uses_geometry_values,
 )
@@ -815,17 +817,15 @@ def _affine_mesh_public_wrapper_lines(
                 % (param, "," if index + 1 < len(typed_params) else "")
             )
         call_args = ["nelements", "nnodes", "elements"]
-        if uses_cached_affine_metric:
-            call_args.extend(
-                "g_geom_metric%d" % i
-                for i in range(gradient_metric.metric_components)
+        call_args.extend(
+            mesh_geometry_argument_names(
+                dependencies,
+                dim,
+                gradient_metric.metric_components
+                if uses_cached_affine_metric
+                else None,
             )
-        elif dependencies.uses_adjugate:
-            call_args.extend(
-                "g_jacobian_adjugate%d" % i for i in range(dim * dim)
-            )
-        if not uses_cached_affine_metric:
-            call_args.append("g_jacobian_determinant0")
+        )
         call_args.extend(map(str, dependencies.parameters))
         call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
         lines.extend(
@@ -4540,11 +4540,7 @@ def _mixed_affine_function(
         "const ptrdiff_t nnodes",
         "idx_t **const SFEM_RESTRICT elements",
     ]
-    params.extend(
-        "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
-        for i in _adjugate_components(dependencies, dim)
-    )
-    params.append("const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0")
+    params.extend(mesh_geometry_parameters(dependencies, dim))
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
     params.extend(_mixed_mesh_dependency_params(layout, dependencies))
     params.append("const ptrdiff_t out_stride")
@@ -4712,9 +4708,7 @@ def _mixed_affine_function(
         for index, param in enumerate(typed_params):
             lines.append("        %s%s" % (param, "," if index + 1 < len(typed_params) else ""))
         call_args = ["nelements", "nnodes", "elements"]
-        if dependencies.uses_adjugate:
-            call_args.extend("g_jacobian_adjugate%d" % i for i in range(dim * dim))
-        call_args.append("g_jacobian_determinant0")
+        call_args.extend(mesh_geometry_argument_names(dependencies, dim))
         call_args.extend(map(str, dependencies.parameters))
         call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
         call_args.append("out_stride")
@@ -5687,20 +5681,13 @@ def _mesh_operator_source(
         "const ptrdiff_t nnodes",
         "idx_t **const SFEM_RESTRICT elements",
     ]
-    if uses_cached_affine_metric:
-        params.extend(
-            "const jacobian_t *const SFEM_RESTRICT g_geom_metric%d" % i
-            for i in range(gradient_metric.metric_components)
+    params.extend(
+        mesh_geometry_parameters(
+            dependencies,
+            dim,
+            gradient_metric.metric_components if uses_cached_affine_metric else None,
         )
-    elif dependencies.uses_adjugate:
-        params.extend(
-            "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
-            for i in range(dim * dim)
-        )
-    if not uses_cached_affine_metric:
-        params.append(
-            "const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0"
-        )
+    )
     params.extend(
         "const scalar_t %s" % parameter for parameter in dependencies.parameters
     )
@@ -5983,17 +5970,15 @@ def _mesh_operator_source(
                 % (param, "," if index + 1 < len(typed_params) else "")
             )
         call_args = ["nelements", "nnodes", "elements"]
-        if uses_cached_affine_metric:
-            call_args.extend(
-                "g_geom_metric%d" % i
-                for i in range(gradient_metric.metric_components)
+        call_args.extend(
+            mesh_geometry_argument_names(
+                dependencies,
+                dim,
+                gradient_metric.metric_components
+                if uses_cached_affine_metric
+                else None,
             )
-        elif dependencies.uses_adjugate:
-            call_args.extend(
-                "g_jacobian_adjugate%d" % i for i in range(dim * dim)
-            )
-        if not uses_cached_affine_metric:
-            call_args.append("g_jacobian_determinant0")
+        )
         call_args.extend(map(str, dependencies.parameters))
         call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
         lines.extend(
@@ -9456,20 +9441,13 @@ def _scalar_packed_affine_jacobian_action_source(
         "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
         "const idx_t *const SFEM_RESTRICT ghost_idx",
     ]
-    if uses_cached_affine_metric:
-        params.extend(
-            "const jacobian_t *const SFEM_RESTRICT g_geom_metric%d" % i
-            for i in range(gradient_metric.metric_components)
+    params.extend(
+        mesh_geometry_parameters(
+            dependencies,
+            dim,
+            gradient_metric.metric_components if uses_cached_affine_metric else None,
         )
-    elif dependencies.uses_adjugate:
-        params.extend(
-            "const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d" % i
-            for i in range(dim * dim)
-        )
-    if not uses_cached_affine_metric:
-        params.append(
-            "const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0"
-        )
+    )
     params.extend("const scalar_t %s" % parameter for parameter in dependencies.parameters)
     params.extend(
         _mesh_stream_parameters(
@@ -9834,17 +9812,15 @@ def _scalar_packed_affine_jacobian_action_source(
             "ghost_ptr",
             "ghost_idx",
         ]
-        if uses_cached_affine_metric:
-            call_args.extend(
-                "g_geom_metric%d" % i
-                for i in range(gradient_metric.metric_components)
+        call_args.extend(
+            mesh_geometry_argument_names(
+                dependencies,
+                dim,
+                gradient_metric.metric_components
+                if uses_cached_affine_metric
+                else None,
             )
-        elif dependencies.uses_adjugate:
-            call_args.extend(
-                "g_jacobian_adjugate%d" % i for i in range(dim * dim)
-            )
-        if not uses_cached_affine_metric:
-            call_args.append("g_jacobian_determinant0")
+        )
         call_args.extend(map(str, dependencies.parameters))
         call_args.extend(
             _mesh_stream_arguments(
