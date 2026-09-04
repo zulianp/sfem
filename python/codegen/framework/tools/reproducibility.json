@@ -371,6 +371,58 @@
       "material": "two_phase_flow"
     }
   },
+  "refine=4": {
+    "laplace_jacobian_action_3d_affine_mesh_soa": {
+      "l1": 41.12397424428,
+      "l2": 4.405554317846,
+      "material": "laplace"
+    },
+    "laplace_jacobian_action_3d_affine_mesh_soa_aos": {
+      "l1": 41.12397424428,
+      "l2": 4.405554317846,
+      "material": "laplace"
+    },
+    "laplace_jacobian_action_3d_affine_mesh_soa_aos_unit": {
+      "l1": 46.20671263402,
+      "l2": 4.950061031288,
+      "material": "laplace"
+    },
+    "laplace_jacobian_action_3d_isoparametric_mesh_aos": {
+      "l1": 25.64388038446,
+      "l2": 2.887754214538,
+      "material": "laplace"
+    },
+    "laplace_jacobian_action_3d_isoparametric_mesh_soa": {
+      "l1": 41.12397301869,
+      "l2": 4.40555418655,
+      "material": "laplace"
+    },
+    "laplace_residual_3d_affine_mesh_soa": {
+      "l1": 32.26138846358,
+      "l2": 3.587708555707,
+      "material": "laplace"
+    },
+    "laplace_residual_3d_affine_mesh_soa_aos": {
+      "l1": 32.26138846358,
+      "l2": 3.587708555707,
+      "material": "laplace"
+    },
+    "laplace_residual_3d_affine_mesh_soa_aos_unit": {
+      "l1": 36.24875108267,
+      "l2": 4.03113320866,
+      "material": "laplace"
+    },
+    "laplace_residual_3d_isoparametric_mesh_aos": {
+      "l1": 18.80420952538,
+      "l2": 2.126297104722,
+      "material": "laplace"
+    },
+    "laplace_residual_3d_isoparametric_mesh_soa": {
+      "l1": 32.26138750211,
+      "l2": 3.587708448785,
+      "material": "laplace"
+    }
+  },
   "refine=6": {
     "laplace_jacobian_action_3d_affine_mesh_soa": {
       "l1": 20.47002422187,
