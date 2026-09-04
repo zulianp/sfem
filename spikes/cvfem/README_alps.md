@@ -256,6 +256,73 @@ CVFEM_CPUS=72 cvfem_run ./run_sshex8_sweep.sh
 SFEM_BENCH_PROBE_DIAG=1 ./build/cvfem_sshex8_bench   # block diag against the operator
 ```
 
+## Plan, revised against what has been measured
+
+The original list was written before any of this was measured. Five items are done, two
+were answered as side effects, two were measured and rejected, and the largest remaining
+item was not on the list at all -- it surfaced from an error in how the benchmarks were
+being compared.
+
+### Done
+
+| item | outcome |
+|---|---|
+| T1 assembled vs matrix-free | Assembled BSR is 1.48x cheaper at p=1 on CPU; assembly is under 1% of runtime. Matrix-free is the default anyway, because on Hopper the assembled BSR is 7.4 GB at n=128 and is a resolution ceiling, not a speed question. |
+| T2 baseline at saturation | Flat apply saturates at 2.36 ns/dof on Grace, 13.5 on an M1. Neither is bandwidth bound: compulsory traffic is 4% of peak on Grace, 13% on Hopper. |
+| T3 macro-local gather | 1.41x within the semi-structured kernel. |
+| T4 hoist affine-macro invariants | A further 1.30x, and larger than the gather on the laptop. The twelve Rhie-Chow coefficients were the cost. |
+| T10 level sweep | L=8 on both machines. |
+| T12 mixed precision | 25% off the BSR SpMV at saturation, for an environment variable. Not yet tried on the block diagonal. |
+| block diagonal (added) | Both layouts, 4.62x from the layout on Grace, and the sub-block split that a Schur scheme needs. |
+
+### Measured and rejected
+
+| item | why |
+|---|---|
+| T5 hoist the boundary-face test | Exactly zero on Grace, interleaved A/B in one binary. An interior micro-element costs six plane tests and a return; there was nothing to skip. |
+| T13 element matrix applied as a gemm | 10% behind direct evaluation on Grace after three revisions. In `subpar/`. |
+| T14 face-based flux dedup | Ruled out analytically: CVFEM sub-control-surfaces are interior to an element, not shared. |
+| T9 block-diagonal scratch cost | Real (3x an apply) but 0.08% of a solve. Superseded by the semi-structured block diagonal. |
+
+### Next, in order
+
+**1. Stop recomputing the nodal pressure gradient per apply.** Done, and it is the largest
+single win of the campaign: **1.26x off the whole linear solve**, 3636 to 2881 us per
+linear iteration in the frontend driver at N=12, matrix-free, interleaved. Larger than
+everything T3 and T4 won together.
+
+It was not on the original list. It surfaced only because the flat operator recomputed the
+gradient inside the timed region while the semi-structured benchmark hoisted it out, which
+is what made every cross-comparison wrong until the discrepancy was found -- the error
+pointed at the optimisation.
+
+It is opt-in, `SFEM_PGRAD_CACHE`, on by default in the driver and off in the operator.
+Switching it on is a promise about the caller's loop: after any change to the state,
+`update()` or `gradient()` must run before the next `apply()`. A Newton loop satisfies that,
+since the residual is evaluated right after the step and before the linear solve, but
+nothing enforces it and a caller who breaks it gets a stale gradient and a wrong answer
+rather than a failure. The operator caches per state pointer, so pointing it at a new
+vector is safe; changing the contents behind the same pointer is not, and that is why it
+is not the default. The gate checks the cached and uncached paths agree, at 3.5e-16.
+
+**2. Specialise the gather.** On Grace the gather-and-scatter floor is 35% of the operator
+and C costs 46%, so eleven points is all that is left for the pressure block without
+touching it. Every block currently loads all fourteen arrays regardless of need.
+
+**3. Wire the semi-structured kernels into the Op and the driver.** Everything measured so
+far is kernel-level. The end-to-end claim, and the multigrid work behind it, needs this.
+
+**4. Hopper.** Nothing semi-structured has run on a GPU, and layout conclusions have already
+inverted once between Grace and Hopper: packing is worth 10% on CPU and loses by 42% there.
+
+**5. Retire the pack machinery.** Semi-structured meshes give node contiguity by
+construction, which is what `PackedMesh` renumbering manufactures -- and that renumbering
+was the cause of a real segfault earlier in this work.
+
+Lower down: fusing residual and Jacobian into one sweep, mixed precision on the block
+diagonal, and SIMD strategy at macro granularity.
+
+
 ## Performance assessment: the 2x2 field blocks
 
 `sscvfem_apply_blocks` evaluates any subset of

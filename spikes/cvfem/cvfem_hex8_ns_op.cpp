@@ -33,6 +33,13 @@ namespace sfem {
         // Scratch for the block-diagonal assembly, kept so a smoother rebuilding the
         // preconditioner each Newton step does not reallocate n_nodes * 16 every time.
         std::vector<scalar_t> diag_scratch;
+
+        // See set_option("cache_nodal_pgrad"). pgrad_for is the state the cached gradient
+        // belongs to; a different pointer forces a recompute, which makes the common
+        // mistake of pointing the operator at a new vector safe. It cannot catch the
+        // state changing through the same pointer, which is why this is opt-in.
+        bool                cache_pgrad{false};
+        const real_t       *pgrad_for{nullptr};
     };
 
     CVFEMNavierStokes::CVFEMNavierStokes(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
@@ -131,11 +138,19 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    void CVFEMNavierStokes::set_option(const std::string &name, bool val) {
+        if (name == "cache_nodal_pgrad") {
+            impl_->cache_pgrad = val;
+            impl_->pgrad_for   = nullptr;  // nothing is cached yet
+        }
+    }
+
     int CVFEMNavierStokes::update(const real_t *const x) {
         if (!impl_->initialized) return SFEM_FAILURE;
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
         assemble_nodal_p_grad(impl_->d, to_geom_kind(geom));
+        impl_->pgrad_for = x;
         return SFEM_SUCCESS;
     }
 
@@ -144,7 +159,9 @@ namespace sfem {
         if (!impl_->initialized) return SFEM_FAILURE;
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
+        // apply_residual recomputes the gradient itself, so this leaves it current.
         apply_residual(impl_->d, rho, mu, to_geom_kind(geom));
+        impl_->pgrad_for = x;
         // sfem::Op accumulates into out, so add rather than overwrite.
         add_residual(impl_->d, out);
         return SFEM_SUCCESS;
@@ -155,7 +172,10 @@ namespace sfem {
         if (!impl_->initialized) return SFEM_FAILURE;
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
-        assemble_nodal_p_grad(impl_->d, to_geom_kind(geom));
+        if (!(impl_->cache_pgrad && impl_->pgrad_for == x)) {
+            assemble_nodal_p_grad(impl_->d, to_geom_kind(geom));
+            impl_->pgrad_for = x;
+        }
         apply_jacobian_action_accumulate(impl_->d, rho, mu, to_geom_kind(geom), h, out);
         return SFEM_SUCCESS;
     }
