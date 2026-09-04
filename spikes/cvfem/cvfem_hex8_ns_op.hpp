@@ -111,6 +111,12 @@ namespace sfem {
         int hessian_block_diag(const real_t *const x, real_t *const values);
 
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
+
+        // The operator this one produced for the next coarser level, or null. Function
+        // owns the coarse Function and does not hand its operators back, but a multigrid
+        // smoother needs each level's block diagonal, so the chain is recorded on the way
+        // down and walked from the finest.
+        std::shared_ptr<CVFEMNavierStokes> coarser() const;
         std::shared_ptr<Op> clone() const override;
 
         void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
