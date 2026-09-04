@@ -1257,3 +1257,46 @@ wrong normalisation is strengthened rather than changed: the fine smoother is th
 worth optimising, the assembly is a real but secondary 11%, and everything below the fine
 level together is under 8%. The reporter now excludes containers from its denominator and
 labels them, so the table cannot be read this way again.
+
+## Why it was slower, and the configuration that is not
+
+The V-cycle's fine-level smoother was itself BiCGStab preconditioned by block-Jacobi -- the
+same solver the whole cycle is competing against. So the cycle was running the baseline
+solver as a subroutine, sixteen iterations at a time, twice per cycle.
+
+Counted in fine operator applications per outer iteration:
+
+| | applications per outer iteration |
+|---|---|
+| baseline BiCGStab + block-Jacobi | 2 |
+| V-cycle with `ksmooth` 16 on the fine level | 64 = (pre + post) x 16 iterations x 2 |
+
+Thirty-two times the work per iteration, against an eleven-fold reduction in iterations. The
+cycle needed the iteration count to fall by 32x to break even and it fell by 11x, which is
+the entire explanation for a method that was measurably better per iteration and measurably
+worse per second. Nothing about the hierarchy was involved.
+
+The fix is to stop smoothing the fine level like a solver. Coarse levels keep sixteen
+BiCGStab iterations, because the assembled Galerkin operators genuinely need them and are
+cheap; the fine level takes two. That is `SFEM_GMG_KSMOOTH_FINE`, now defaulting to 2.
+
+Three repeats each, L=16, N=1, eight threads, two Newton steps:
+
+| arm | t_solve (s) | iterations |
+|-----|-------------|------------|
+| baseline BiCGStab + block-Jacobi | 6.98, 7.07, 4.64 | 1625, 1625, 1064 |
+| V-cycle, fine 1 | 5.25, 7.09, 6.87 | 133, 179, 174 |
+| **V-cycle, fine 2** | **3.25, 4.84, 2.99** | 65, 97, 60 |
+| V-cycle, fine 4 | 8.09, 11.37, 6.01 | 112, 157, 83 |
+| V-cycle, fine 16 | 27.12 | 66 |
+
+All reach the same solution (4.29148e-03 against the baseline's 4.29289e-03). At two
+fine iterations the cycle is about twice as fast as the baseline on median, having been four
+times slower at sixteen. This is the first configuration in this document that is faster
+rather than merely fewer-iterations, and it took the phase measurement to find, because the
+whole cost was in one line of the breakdown.
+
+The two fixes compound: clamping the coarse levels' thread count made coarse smoothing cheap
+enough that spending on it is affordable, which is what makes a weak fine smoother viable.
+Measured before the clamp, cheap fine smoothing looked worse, and that reading is what
+delayed this by a round.
