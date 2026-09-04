@@ -610,7 +610,14 @@ namespace {
                 }
                 real_t sx = 0;
                 for (ptrdiff_t k = 0; k < nd; ++k) sx += g.states[0]->data()[(size_t)k];
-                std::printf("  state checksum: %.17g\n", (double)sx);
+                // Sorted checksum too: summing in sorted order is invariant to node
+                // numbering, so if the plain sum varies and this one does not, the mesh is
+                // being numbered differently between runs and the values are the same.
+                std::vector<real_t> sv(g.states[0]->data(), g.states[0]->data() + nd);
+                std::sort(sv.begin(), sv.end());
+                real_t sxs = 0;
+                for (auto v : sv) sxs += v;
+                std::printf("  state checksum: %.17g  sorted: %.17g\n", (double)sx, (double)sxs);
                 std::printf("  apply checksum: %.17g   repeat-diff %.3e\n", (double)s1, (double)dmax);
 
                 // The other three kernels that scatter: residual, block diagonal, and one
@@ -680,6 +687,16 @@ namespace {
             g.data->restrictions[i]->apply(fine.data(), coarse.data());
             if (g.data->prolongations[i + 1]) g.data->prolongations[i + 1]->apply(coarse.data(), back.data());
 
+            {
+                // Full-precision checksums of the transfers themselves. The restriction
+                // accumulates fine contributions into coarse nodes, which is the same kind
+                // of operation the element scatter was, so it is a candidate for the same
+                // problem.
+                long double cr = 0, cp = 0;
+                for (ptrdiff_t k = 0; k < nc; ++k) cr += (long double)coarse[(size_t)k];
+                for (ptrdiff_t k = 0; k < nf; ++k) cp += (long double)back[(size_t)k];
+                std::printf("  transfer checksums: R %.17g  P %.17g\n", (double)cr, (double)cp);
+            }
             std::printf("transfer %d->%d: n %td->%td  |x| %.4e  |Rx| %.4e  |PRx| %.4e\n",
                         i, i + 1, nf, nc, nrm(fine), nrm(coarse), nrm(back));
 
@@ -1501,6 +1518,18 @@ int main(int argc, char **argv) {
         const auto *const py = mesh->points()->data()[1];
         const auto *const pz = mesh->points()->data()[2];
 
+        {
+            // Checksum the mesh coordinates. p_exact is a serial function of these, so if
+            // it varies between runs, they do.
+            long double cx = 0, cy = 0, cz = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                cx += (long double)px[i];
+                cy += (long double)py[i];
+                cz += (long double)pz[i];
+            }
+            std::printf("mesh coords checksum: %.17g %.17g %.17g\n", (double)cx, (double)cy, (double)cz);
+        }
+
         std::vector<idx_t>  uvw_nodes, uz_nodes;
         std::vector<real_t> uvw_ux, uvw_uy, uvw_uz, uz_vals;
         p_exact.assign((size_t)nnodes, real_t(0));
@@ -1592,6 +1621,14 @@ int main(int argc, char **argv) {
     // iterations for the same answer. Verification drivers against an analytic solution
     // are entitled to the better initial guess; the two must simply agree about it.
     for (ptrdiff_t i = 0; i < nnodes; ++i) x[(size_t)i * 4 + 3] = p_exact[(size_t)i];
+    {
+        // Checksum the state at construction, before any solver has touched it, to say
+        // whether the variation seen later is built in or acquired.
+        real_t s0 = 0, sp = 0;
+        for (ptrdiff_t i = 0; i < ndof; ++i) s0 += x[(size_t)i];
+        for (ptrdiff_t i = 0; i < nnodes; ++i) sp += p_exact[(size_t)i];
+        std::printf("initial state checksum: %.17g   p_exact: %.17g\n", (double)s0, (double)sp);
+    }
 
     std::vector<mask_t> cmask(mask_count(ndof), 0);
     f->constraints_mask(cmask.data());
