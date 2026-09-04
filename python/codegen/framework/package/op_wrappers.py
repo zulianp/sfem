@@ -17,10 +17,10 @@ def generate_op_registration_files(manifests, function_name="register_generated_
 def generate_op_files(material, elements, kernel_sources=None):
     c_abi_header = "sfem_%s_c_abi.hpp" % material.op_name if kernel_sources else None
     kernel_sources = dict(kernel_sources or {})
-    dispatch_sources = (
+    dispatch_sources, declared_signatures = (
         _dispatch_sources(material, elements, c_abi_header, kernel_sources)
         if c_abi_header
-        else {}
+        else ({}, {})
     )
     element_api_sources = _element_api_sources(material, elements, kernel_sources)
     abi_sources = dict(kernel_sources)
@@ -77,7 +77,7 @@ def generate_op_files(material, elements, kernel_sources=None):
             c_abi_path,
             element_api_sources,
         )
-    _verify_generated_calls(files, abi_sources)
+    _verify_generated_calls(files, abi_sources, declared_signatures)
     return files
 
 
@@ -99,7 +99,7 @@ def _call_argument_count(source, start):
     return None
 
 
-def _verify_generated_calls(files, abi_sources):
+def _verify_generated_calls(files, abi_sources, declared_signatures=None):
     """Every call the wrapper makes must match the kernel it calls.
 
     The wrapper and the kernels are written by different layers that derive the
@@ -128,6 +128,11 @@ def _verify_generated_calls(files, abi_sources):
     # defect it exists to catch was still present.
     signatures = dict(_c_abi_signatures(abi_sources))
     signatures.update(_c_abi_signatures(abi_sources, public_only=True))
+    # What L7 declared outranks what L7 parsed back.  These are the same
+    # functions either way; taking the declaration means the check compares the
+    # wrapper's calls against the signatures the dispatch sources were written
+    # with, rather than against a recovery of them.
+    signatures.update(declared_signatures or {})
     if not signatures:
         return
     mismatches = []
@@ -4814,12 +4819,38 @@ def _smesh_elem_type_value(name):
         raise ValueError("unsupported generated element API dispatch element %s" % name) from exc
 
 
+def _declared_dispatch_signatures(groups):
+    """The signatures the dispatch sources are about to be written with.
+
+    These entry points are authored here, in L7, by ``_dispatch_function_lines``
+    from ``group["params"]`` -- and they are also the entry points the generated
+    wrapper calls.  Recovering their shape by parsing the C++ that this same
+    function is about to print is a round trip through text for something
+    already held as data, and it is where the round trip lost the array extent
+    that made Stokes and poro-hyperelasticity uncallable.
+
+    So the declaration is recorded as it is written.  Parsing remains the
+    fallback for the kernels the emitters author, which L7 genuinely does not
+    see except as text.
+    """
+    declared = {}
+    for group in groups:
+        params = ("const smesh::ElemType element_type",) + tuple(group["params"])
+        parsed = [_parse_c_parameter(param) for param in params]
+        declared[group["name"]] = CSignature(
+            name=group["name"],
+            parameters=tuple(parameter for parameter in parsed if parameter),
+            declaration=None,
+        )
+    return declared
+
+
 def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
     declarations = _extract_c_abi_declarations(kernel_sources, public_only=False)
     groups = _dispatch_groups(material, elements, declarations)
     diagnostic_groups = _diagnostic_dispatch_groups(material, elements, declarations)
     if not groups and not diagnostic_groups:
-        return {}
+        return {}, {}
 
     sources = {}
     for kind, grouped in _dispatch_groups_by_source_kind(groups):
@@ -4830,7 +4861,7 @@ def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
         sources[
             "op/sfem_%s_diagnostics_dispatch.cpp" % material.op_name
         ] = _diagnostic_dispatch_source(c_abi_header, diagnostic_groups)
-    return sources
+    return sources, _declared_dispatch_signatures(groups)
 
 
 def _dispatch_source(c_abi_header, groups):
