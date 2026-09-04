@@ -110,6 +110,9 @@ from codegen.framework.emitters.quadrature_codegen import (
 )
 from codegen.framework.plans.reference_data import validate_reference_data_plan
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
+from codegen.framework.plans.affine_element_kernel import (
+    p1_simplex_metric_apply_plan,
+)
 from codegen.framework.plans.form_transformations import (
     constant_p1_simplex_reference_gradients,
     simplex_gradient_metric_transformation,
@@ -382,6 +385,31 @@ def _metric_component_load(component, scale, source=None):
     return "metric_factor * %s" % source
 
 
+def _p1_simplex_metric_apply_lines(dim, indent):
+    """The closed-form element contribution, printed from the plan.
+
+    Both dimensions were written out by hand here.  The 2D lines already used
+    the compact physical gradient; the 3D ones were a transcription of SFEM's
+    `tet4_laplacian_apply_fff`, which contracts in the degrees of freedom
+    instead and costs 47 operations where the gradient form costs 21.  The plan
+    derives both, so the two dimensions stop being independently maintained and
+    the cheaper form is the one that gets emitted.
+    """
+    plan = p1_simplex_metric_apply_plan(dim)
+    lines = []
+    for symbol, expression in plan.temporaries:
+        lines.append(
+            "%s    const scalar_t %s = %s;"
+            % (indent, symbol, _sfem_ccode(expression))
+        )
+    for shape, expression in enumerate(plan.outputs):
+        lines.append(
+            "%s    const scalar_t e%d = %s;"
+            % (indent, shape, _sfem_ccode(expression))
+        )
+    return lines
+
+
 def _simplex_metric_scalar_affine_loop_lines(
     system,
     rule,
@@ -475,32 +503,7 @@ def _simplex_metric_scalar_affine_loop_lines(
                 _metric_component_load(component, component_scale, source),
             )
         )
-    for d in range(system.dim):
-        lines.append("%s    const scalar_t grad%d = u%d - u0;" % (indent, d, d + 1))
-
-    if system.dim == 2:
-        lines.extend(
-            [
-                "%s    const scalar_t e1 = fff0 * grad0 + fff1 * grad1;" % indent,
-                "%s    const scalar_t e2 = fff1 * grad0 + fff2 * grad1;" % indent,
-                "%s    const scalar_t e0 = -(e1) - e2;" % indent,
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "%s    const scalar_t x0 = fff0 + fff1 + fff2;" % indent,
-                "%s    const scalar_t x1 = fff1 + fff3 + fff4;" % indent,
-                "%s    const scalar_t x2 = fff2 + fff4 + fff5;" % indent,
-                "%s    const scalar_t x3 = fff1 * u0;" % indent,
-                "%s    const scalar_t x4 = fff2 * u0;" % indent,
-                "%s    const scalar_t x5 = fff4 * u0;" % indent,
-                "%s    const scalar_t e0 = u0 * x0 + u0 * x1 + u0 * x2 - u1 * x0 - u2 * x1 - u3 * x2;" % indent,
-                "%s    const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;" % indent,
-                "%s    const scalar_t e2 = fff1 * u1 - fff3 * u0 + fff3 * u2 + fff4 * u3 - x3 - x5;" % indent,
-                "%s    const scalar_t e3 = fff2 * u1 + fff4 * u2 - fff5 * u0 + fff5 * u3 - x4 - x5;" % indent,
-            ]
-        )
+    lines.extend(_p1_simplex_metric_apply_lines(system.dim, indent))
     for shape in range(rule.n_shape):
         index = "ev%d" % shape if unit_stride else "ev%d * out_stride" % shape
         lines.extend(
