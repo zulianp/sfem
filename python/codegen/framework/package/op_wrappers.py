@@ -1631,7 +1631,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
             residual_common_args.append("FIELD_STRIDE")
             residual_common_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "data", kernel_sources)
             )
         if residual_dependencies.previous:
             residual_setup.extend(
@@ -1644,7 +1644,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
             residual_common_args.append("FIELD_STRIDE")
             residual_common_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data", kernel_sources)
             )
         residual_setup.extend(
             _residual_soa_view_declarations(
@@ -1655,13 +1655,13 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
         )
         residual_common_args.append("FIELD_STRIDE")
-        residual_common_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        residual_common_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out", kernel_sources))
         residual_unit_args = []
         if residual_dependencies.current:
             residual_unit_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "data", kernel_sources)
             )
-        residual_unit_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        residual_unit_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out", kernel_sources))
         residual_cases.append(
             _residual_dual_soa_case(
                 element,
@@ -1716,7 +1716,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
             action_common_args.append("FIELD_STRIDE")
             action_common_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "data", kernel_sources)
             )
         if action_dependencies.previous:
             action_setup.extend(
@@ -1729,7 +1729,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
             action_common_args.append("FIELD_STRIDE")
             action_common_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data", kernel_sources)
             )
         if action_dependencies.direction:
             action_setup.extend(
@@ -1742,7 +1742,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
             action_common_args.append("FIELD_STRIDE")
             action_common_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data", kernel_sources)
             )
         action_setup.extend(
             _residual_soa_view_declarations(
@@ -1753,13 +1753,13 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
         )
         action_common_args.append("FIELD_STRIDE")
-        action_common_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        action_common_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out", kernel_sources))
         action_unit_args = []
         if action_dependencies.direction:
             action_unit_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data", kernel_sources)
             )
-        action_unit_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        action_unit_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out", kernel_sources))
         action_cases.append(
             _residual_dual_soa_case(
                 element,
@@ -1814,7 +1814,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
             hessian_common_args.append("FIELD_STRIDE")
             hessian_common_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "data", kernel_sources)
             )
         if action_dependencies.previous:
             hessian_setup.extend(
@@ -1827,7 +1827,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             )
             hessian_common_args.append("FIELD_STRIDE")
             hessian_common_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "old_data", kernel_sources)
             )
         hessian_crs_function = "%s_hessian_crs_isoparametric_mesh_soa" % stem
         if _c_abi_function_exists(kernel_sources, hessian_crs_function):
@@ -4044,10 +4044,10 @@ def _coupled_cases(
         residual_previous_setup = _residual_soa_view_declarations(residual_fields, "previous", "old_data", "const real_t")
         residual_direction_setup = _residual_soa_view_declarations(residual_fields, "direction", "direction_data", "const real_t")
         residual_out_setup = _residual_soa_view_declarations(residual_fields, "out", "out", "real_t")
-        residual_state_args = _residual_soa_field_argument_names(residual_fields, "data")
-        residual_previous_args = _residual_soa_field_argument_names(residual_fields, "old_data")
-        residual_direction_args = _residual_soa_field_argument_names(residual_fields, "direction_data")
-        residual_out_args = _residual_soa_field_argument_names(residual_fields, "out")
+        residual_state_args = _residual_soa_field_argument_names(residual_fields, "data", kernel_sources)
+        residual_previous_args = _residual_soa_field_argument_names(residual_fields, "old_data", kernel_sources)
+        residual_direction_args = _residual_soa_field_argument_names(residual_fields, "direction_data", kernel_sources)
+        residual_out_args = _residual_soa_field_argument_names(residual_fields, "out", kernel_sources)
 
         geometry_affine = _affine_geometry_offsets(dim) + ", determinant"
         common_iso = "domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points"
@@ -4394,12 +4394,54 @@ def _residual_soa_view_declarations(fields, base, suffix, scalar_type):
     return lines
 
 
-def _residual_soa_field_argument_names(fields, suffix):
+_ARRAY_PARAMETER_CACHE = {}
+
+
+def _c_abi_declares_array_parameter(kernel_sources, name):
+    """Whether the emitted kernels declare ``name`` as an array parameter.
+
+    Two conventions cross the wrapper/kernel boundary for a multi-component
+    field.  Most kernels take one pointer per component -- ``u0, u1`` -- while
+    the mixed-order (Taylor-Hood) ones take a single array-of-pointer,
+    ``const real_t *const u_data[2]``, because the field's components live on
+    different spaces and ``plans.streams`` groups them.  Only stokes and
+    poro_elasticity emit the second form, and even they emit both: it is a
+    property of the individual kernel, not of the material or of the field.
+
+    So the wrapper cannot decide this from anything it holds; it has to read
+    what was actually emitted.  Looking the name up is exact rather than
+    positional because the array form is named for the field and suffix -- the
+    wrapper's own ``u_data`` -- while the component form is named ``u0``,
+    ``u1``, so a material using the component form declares no ``u_data`` at
+    all.
+
+    This is a workaround for the layering defect it exposes, not a fix for it:
+    L7 is reconstructing a decision L3 already made instead of being handed it.
+    See ARCHITECTURE.html, OP 16.
+    """
+    if not kernel_sources:
+        return False
+    key = (id(kernel_sources), name)
+    cached = _ARRAY_PARAMETER_CACHE.get(key)
+    if cached is None:
+        pattern = re.compile(r"SFEM_RESTRICT\s+" + re.escape(name) + r"\s*\[")
+        cached = any(pattern.search(source) for source in kernel_sources.values())
+        _ARRAY_PARAMETER_CACHE[key] = cached
+    return cached
+
+
+def _residual_soa_field_argument_names(fields, suffix, kernel_sources=None):
+    """The field arguments a residual-path mesh kernel is called with.
+
+    The setup lines declare a multi-component field as an array either way, so
+    the only question is whether the kernel wants the array or its elements --
+    which is settled per kernel by what was emitted, not by the field.
+    """
     names = []
     for field in fields:
         components = int(field.components)
         name = _safe_identifier("%s_%s" % (field.name, suffix))
-        if components == 1:
+        if components == 1 or _c_abi_declares_array_parameter(kernel_sources, name):
             names.append(name)
         else:
             names.extend("%s[%d]" % (name, component) for component in range(components))
@@ -5994,7 +6036,7 @@ def _residual_hessian_dispatch_body(
                 )
             )
             args.append("FIELD_STRIDE")
-            args.extend(_residual_soa_field_argument_names(fields, "data"))
+            args.extend(_residual_soa_field_argument_names(fields, "data", kernel_sources))
         if dependencies.previous:
             setup.extend(
                 _residual_soa_view_declarations(
@@ -6005,7 +6047,7 @@ def _residual_hessian_dispatch_body(
                 )
             )
             args.append("FIELD_STRIDE")
-            args.extend(_residual_soa_field_argument_names(fields, "old_data"))
+            args.extend(_residual_soa_field_argument_names(fields, "old_data", kernel_sources))
         args.extend(tail_args)
         for line in setup:
             lines.append(line)
@@ -6082,8 +6124,8 @@ def _residual_apply_dispatch_body(
                 )
             )
             field_args.append("FIELD_STRIDE")
-            field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "data"))
-            unit_field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "data"))
+            field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "data", kernel_sources))
+            unit_field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "data", kernel_sources))
         if dependencies.previous:
             setup.extend(
                 _residual_soa_view_declarations(
@@ -6094,7 +6136,7 @@ def _residual_apply_dispatch_body(
                 )
             )
             field_args.append("FIELD_STRIDE")
-            field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "old_data"))
+            field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "old_data", kernel_sources))
         if dependencies.direction:
             setup.extend(
                 _residual_soa_view_declarations(
@@ -6106,10 +6148,10 @@ def _residual_apply_dispatch_body(
             )
             field_args.append("FIELD_STRIDE")
             field_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data", kernel_sources)
             )
             unit_field_args.extend(
-                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data")
+                _residual_soa_field_argument_names(fields_by_dim[dim], "direction_data", kernel_sources)
             )
         setup.extend(
             _residual_soa_view_declarations(
@@ -6120,8 +6162,8 @@ def _residual_apply_dispatch_body(
             )
         )
         field_args.append("FIELD_STRIDE")
-        field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
-        unit_field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out"))
+        field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out", kernel_sources))
+        unit_field_args.extend(_residual_soa_field_argument_names(fields_by_dim[dim], "out", kernel_sources))
         for line in setup:
             lines.append(line)
 

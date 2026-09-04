@@ -87,8 +87,33 @@ _collect_include_dirs(SFEM_INCLUDE_DIRS
 # Configured headers -- sfem_config.h and friends -- sit at the build root.
 list(APPEND SFEM_INCLUDE_DIRS "${SFEM_BUILD_DIR}" "${SFEM_BUILD_DIR}/external/smesh")
 
+# Materials held out of the compile gate, with the reason.  Quarantine rather
+# than deletion: a held-out material is still generated, still driven by the
+# reproducibility harness and still measured -- only its wrappers are excluded
+# from this check, so the gate can be green for everything else instead of
+# permanently red for one known defect.
+#
+# Empty, and worth saying why.  poro_elasticity and stokes were both held out
+# when this spike first ran: their Taylor-Hood kernels declare vector fields as
+# array-of-pointer parameters, `const real_t *const u_data[2]`, and the wrapper
+# passed the elements instead -- two arguments where the kernel takes one, six
+# over for poro.  That turned out to be one defect in one function rather than
+# two material-specific problems, and fixing it made both compile.  The
+# mechanism stays for the next thing that genuinely cannot be fixed today.
+set(QUARANTINED_MATERIALS "" CACHE STRING
+    "Materials whose wrappers are excluded from the compile gate")
+
 file(GLOB_RECURSE GENERATED_SOURCES "${GENERATED_DIR}/*.cpp")
 list(FILTER GENERATED_SOURCES EXCLUDE REGEX "/cuda/")
+foreach(_material IN LISTS QUARANTINED_MATERIALS)
+    list(LENGTH GENERATED_SOURCES _before)
+    list(FILTER GENERATED_SOURCES EXCLUDE REGEX "/${_material}/")
+    list(LENGTH GENERATED_SOURCES _after)
+    math(EXPR _held "${_before} - ${_after}")
+    if(_held GREATER 0)
+        message(STATUS "quarantined: ${_material} (${_held} translation units held out)")
+    endif()
+endforeach()
 if(NOT GENERATED_SOURCES)
     message(FATAL_ERROR "no .cpp files under GENERATED_DIR '${GENERATED_DIR}'")
 endif()
