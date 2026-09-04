@@ -85,6 +85,14 @@ namespace sfem {
             impl_->semi_structured = true;
             const int level        = smesh::semistructured_level(*mesh);
             sscvfem_init(impl_->ss, mesh, level);
+
+            // Deterministic two-pass scatter, the semi-structured counterpart of the packed
+            // HEX8 layout. Off gives the atomic scatter, which is not reproducible across
+            // thread counts.
+            if (smesh::Env::read<int>("SFEM_SS_SCATTER", 1)) {
+                impl_->ss.scatter = std::make_shared<SSScatter>();
+                sscvfem_build_scatter(impl_->ss, *impl_->ss.scatter);
+            }
             impl_->ss.rhie_chow_scale = rhie_chow_scale;
             impl_->initialized        = true;
             return SFEM_SUCCESS;
