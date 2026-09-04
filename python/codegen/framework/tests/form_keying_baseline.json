@@ -1,0 +1,323 @@
+{
+  "laplace": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u",
+            "u"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "u"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u"
+        ]
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u",
+            "u"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "u"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u"
+        ]
+      }
+    }
+  },
+  "linear_elasticity": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    }
+  },
+  "stokes": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "p"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "p"
+          ],
+          [
+            "p",
+            "u0"
+          ],
+          [
+            "p",
+            "u1"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ],
+              [
+                "p",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "u"
+              ],
+              [
+                "u",
+                "p"
+              ],
+              [
+                "p",
+                "u"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1",
+          "p"
+        ]
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "u2"
+          ],
+          [
+            "u0",
+            "p"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "u2"
+          ],
+          [
+            "u1",
+            "p"
+          ],
+          [
+            "u2",
+            "u0"
+          ],
+          [
+            "u2",
+            "u1"
+          ],
+          [
+            "u2",
+            "u2"
+          ],
+          [
+            "u2",
+            "p"
+          ],
+          [
+            "p",
+            "u0"
+          ],
+          [
+            "p",
+            "u1"
+          ],
+          [
+            "p",
+            "u2"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ],
+              [
+                "p",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "u"
+              ],
+              [
+                "u",
+                "p"
+              ],
+              [
+                "p",
+                "u"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1",
+          "u2",
+          "p"
+        ]
+      }
+    }
+  }
+}
