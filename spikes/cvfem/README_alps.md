@@ -1518,3 +1518,57 @@ input state exactly: two runs sharing a state checksum of 206.55554942713621 bot
 differs. The state itself still varies between runs at 8 threads and is stable at one, so the
 remaining non-determinism is in the setup that builds the initial field, not in the operator.
 That and the Krylov reductions are what stand between this and a reproducible parallel solve.
+
+## Measures for the remaining non-determinism
+
+Four candidate sources were checked, not assumed. Two are clean, one is fixed, and two need
+work outside this spike.
+
+| source | status | evidence |
+|--------|--------|----------|
+| element scatter (operator) | **fixed** | repeat-diff 0.000e+00 across all five kernels |
+| grid transfers | clean | R and P checksums bit-identical over three runs |
+| mesh coordinates | **broken** | x varies at 8 threads, stable at 1; y and z exact everywhere |
+| Krylov reductions | broken by construction | `#pragma omp parallel for reduction(+ : ret)` |
+
+### 1. Mesh coordinates, in `smesh::to_semistructured`
+
+The x coordinate checksum varies between runs at 8 threads (16562.000025525689,
+16562.000030174851) and is stable at one (16562.000023022294), while y and z are identical
+everywhere. Only x, which fits shared lattice nodes being written by more than one
+macro-element: y and z land on exactly representable values so the order cannot matter, and
+x does not. Everything downstream inherits it -- the analytic pressure seed varies by 20%
+in its (near-cancelling) checksum, so the initial state differs before any solver runs.
+
+The measure is the one already applied to the element scatter: give each shared lattice node
+a single canonical writer. Better still, compute a node's coordinate as a pure function of
+the macro corners and its lattice index, evaluated once per node rather than once per
+incident macro-element, which removes the question rather than ordering it. This is in
+`smesh`, not here.
+
+### 2. Krylov reductions, in `algebra/openmp/sfem_openmp_blas.hpp`
+
+`dot` and `norm2` use `reduction(+ : ret)`, which combines partial sums in an unspecified
+order over chunks whose boundaries follow the thread count. `SFEM_DETERMINISTIC_BLAS=1` now
+selects a fixed 256-chunk decomposition, independent of the thread count, summed serially
+per chunk and combined in index order. Off by default, since it changes results in the last
+bits.
+
+It is **unverified in this build**: the flag never fires, because the spike links a prebuilt
+SFEM whose instantiation of these templates comes from the library rather than from the
+edited header. Confirming it needs SFEM itself rebuilt. The code is written and gated; the
+measurement is owed.
+
+### 3. What is already done
+
+The two-pass scatter, on by default (`SFEM_SS_SCATTER=1`), covering the Jacobian action, the
+nodal pressure gradient, the residual, the block diagonal and the block split.
+
+### 4. Measurement discipline, independent of the above
+
+Until the two remaining sources are closed, comparisons should pin the thread count and
+report medians of repeats rather than single runs, and prefer quantities measured as rates
+over iteration counts. `SFEM_ASSEMBLE_FINE=1` gives a deterministic operator for A/B work
+where the memory is affordable. It would be worth adding a determinism check to the test
+suite -- one checksum at one thread against the same at N -- so that a regression in any of
+this is caught rather than rediscovered.
