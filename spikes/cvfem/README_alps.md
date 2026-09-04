@@ -256,7 +256,7 @@ CVFEM_CPUS=72 cvfem_run ./run_sshex8_sweep.sh
 SFEM_BENCH_PROBE_DIAG=1 ./build/cvfem_sshex8_bench   # block diag against the operator
 ```
 
-### The 2x2 field blocks
+## Performance assessment: the 2x2 field blocks
 
 `sscvfem_apply_blocks` evaluates any subset of
 
@@ -266,35 +266,82 @@ SFEM_BENCH_PROBE_DIAG=1 ./build/cvfem_sshex8_bench   # block diag against the op
        | B     C   |   continuity rows
 ```
 
-with the unwanted terms compiled out rather than branched over. Cost as a share of the
-full operator, M1, 561924 dofs, L=8:
+with the unwanted terms compiled out. A scheme can then ask for the block it needs
+instead of evaluating J and discarding three quarters of it: a Schur approximation needs
+B and B^T to form `B A^-1 B^T`, a segregated scheme solves the momentum rows alone, and
+the pressure preconditioner explored in the standalone driver needs C by itself.
 
-| block | share of J |
-|---|---|
-| `pp` (C) | **36%** |
-| `pu` (B) | **49%** |
-| `con` rows (B and C) | 53% |
-| `up` (B^T) | 69% |
-| `uu` (A) | 94% |
-| `mom` rows | 100% |
+### Method
 
-The blocks a Schur-complement scheme needs are the cheap ones. C alone costs about a
-third of J, which matters for the pressure preconditioner: the standalone driver's
-SFEM_PC_PSCALE work needed exactly this block and had no way to ask for it. A_uu is
-barely cheaper than the whole operator, because the viscous and convective terms it keeps
-are most of the cost.
+Matched problem size -- `macros * level` held constant, so every row solves the same
+number of dofs -- swept over the macro-element level, on both machines. 4343300 dofs on
+one Grace socket, 561924 on an M1. `gather only` is a `Blocks = 0` sweep: it gathers the
+macro-element, computes nothing, and scatters zeros, which measures the floor any block
+specialisation can reach rather than leaving it to be inferred.
 
-One term does not go where the code's structure suggests. The convective flux contributes
-to both A_uu and B^T, because the mass-flux derivative carries a velocity part and a
-pressure part, `dmdot = rho/2 (v_i + v_j).A + c (q_i - q_j)`. Putting all of it in A_uu
-would hide the Rhie-Chow coupling inside the momentum block and quietly wreck any Schur
-approximation built on these blocks.
+### Cost as a share of the full operator
 
-Two checks, because one is not enough. Each specialised kernel is compared against a
-reference built by masking the inputs around the *unmodified* operator, which cannot
-disagree with it by construction; and the four blocks must sum back to the full operator,
-which is what catches a term landing in the wrong one. Both hold to 5.5e-16.
+| block | Grace L=4 | L=8 | L=16 | M1 L=8 | what wants it |
+|---|---|---|---|---|---|
+| **gather only (floor)** | 34.5% | **35.3%** | 33.4% | **14.9%** | -- |
+| `pp` (C) | 48.6% | **46.4%** | 46.5% | 38.1% | pressure preconditioner, Schur |
+| `pu` (B) | 54.2% | 53.0% | 53.2% | 52.4% | `B A^-1 B^T` |
+| `con` rows | 54.9% | 54.9% | 54.9% | 53.9% | segregated pressure solve |
+| `up` (B^T) | 68.3% | 66.9% | 67.1% | 73.2% | `B A^-1 B^T` |
+| `uu` (A) | 89.1% | 88.9% | 88.8% | 98.2% | momentum solve |
+| `mom` rows | 98.7% | 98.2% | 98.3% | 104.5% | -- |
+
+Grace is stable to within a point across L=4..16. L=2 is worse across the board -- the
+floor alone is 45% there -- because `(L+1)^3 / L^3` is 3.375, so a macro-element gathers
+more than three nodes for every micro-element it runs.
+
+### What the numbers say
+
+**The blocks a Schur scheme needs are the cheap half.** C costs 46% of J on Grace and B
+53%, against 89% for A_uu. A_uu is barely cheaper than the whole operator, because the
+viscous and convective terms it keeps are most of the cost.
+
+**Asking for the momentum rows is not worth it.** At 98% of J it is within noise of just
+evaluating the operator, and on the M1 it is slower. Use the full apply for that.
+
+**The floor is the gather, and how much that matters depends on the machine.** On Grace it
+is 35% of the operator, so C at 46% sits only eleven points above it and there is little
+left to win without specialising the gather itself. On the M1 the floor is 15%, because
+its kernels are roughly ten times slower per dof so the same fixed cost is a much smaller
+share. The two machines disagree about where the remaining headroom is, and Grace is the
+one to believe.
+
+**Two hypotheses of mine were wrong, in opposite directions.** I had written into the
+kernel that the upwind switch "cannot be specialised away". It can -- the continuity row
+is `dmdot_v + dmdot_q` with no `sgn` in it -- and removing it from the pressure rows was
+worth about 1%, not the large win expected. I then predicted the gather dominated, which
+the M1 flatly contradicted at a 15% floor, and Grace then confirmed at 35%. The
+measurement was right both times and the reasoning was not.
+
+### Where the remaining headroom is
+
+Specialise the gather. Every block currently loads all fourteen arrays and scatters all
+four components regardless of what it needs; C needs the coordinates and the pressure
+direction, and little else. On Grace that is the only change with room left in it, since
+the floor is most of what C costs.
+
+Then the boundary term. `boundary_scs_add_jacobian_action` runs on every micro-element and
+tests six faces before finding it has nothing to do, and the input-masked path adds a
+32-entry zero-and-copy on top. A macro-element in the interior cannot have a domain face
+on any of its micro-elements, so a per-macro flag skips it outright -- and it would help
+the full operator as much as the blocks.
+
+### Correctness
+
+Two checks, since either alone is insufficient. Each specialised kernel is compared
+against a reference built by masking the inputs around the *unmodified* operator, which
+cannot disagree with it by construction; and the four blocks must sum back to the full
+operator, which is what catches a term landing in the wrong block -- the convective flux
+contributes to both A_uu and B^T, and putting all of it in A_uu would still sum correctly
+overall while burying the Rhie-Chow coupling in the momentum block. Both hold to 5.5e-16
+and the benchmark fails on either.
 
 ```bash
-SFEM_BENCH_VERBOSE_BLOCKS=1 ./build/cvfem_sshex8_bench
+CVFEM_CPUS=72 cvfem_run ./run_block_assess.sh          # the sweep above
+SFEM_BENCH_VERBOSE_BLOCKS=1 ./build/cvfem_sshex8_bench # one size
 ```

@@ -262,12 +262,12 @@ int main(int argc, char **argv) {
                 if (verbose_blocks) {
                     std::printf("    uu+up+pu+pp vs full operator: %.3e\n", blk_sum_rel);
                     // What a scheme actually saves by asking for one block instead of J.
-                    const int   tm[7]  = {SSBLOCK_UU, SSBLOCK_UP, SSBLOCK_PU, SSBLOCK_PP,
+                    const int   tm[8]  = {0, SSBLOCK_UU, SSBLOCK_UP, SSBLOCK_PU, SSBLOCK_PP,
                                           SSBLOCK_MOM, SSBLOCK_CON, SSBLOCK_ALL};
-                    const char *tn[7]  = {"uu (A)", "up (B^T)", "pu (B)", "pp (C)",
+                    const char *tn[8]  = {"gather only", "uu (A)", "up (B^T)", "pu (B)", "pp (C)",
                                           "mom rows", "con rows", "all (J)"};
                     double      tall   = 0;
-                    for (int b = 0; b < 7; ++b) {
+                    for (int b = 0; b < 8; ++b) {
                         const double tb = time_it([&] {
                             std::fill(yb.begin(), yb.end(), scalar_t(0));
                             sscvfem_apply_blocks(d, rho, mu, tm[b], dir.data(), yb.data());
@@ -276,7 +276,7 @@ int main(int argc, char **argv) {
                         std::printf("    %-10s %8.3f ns/dof%s\n", tn[b], 1e9 * tb / (double)ndof,
                                     (tall > 0 && tm[b] != SSBLOCK_ALL) ? "" : "");
                     }
-                    for (int b = 0; b < 6; ++b) {
+                    for (int b = 0; b < 7; ++b) {
                         const double tb = time_it([&] {
                             std::fill(yb.begin(), yb.end(), scalar_t(0));
                             sscvfem_apply_blocks(d, rho, mu, tm[b], dir.data(), yb.data());
