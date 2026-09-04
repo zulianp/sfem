@@ -80,6 +80,14 @@
       "l1": 92.98847314483,
       "l2": 9.78662567185
     },
+    "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa": {
+      "l1": 466.056,
+      "l2": 11.21792480995
+    },
+    "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa_float": {
+      "l1": 466.0559687456,
+      "l2": 11.21792372311
+    },
     "linear_elasticity_objective_3d_affine_mesh_soa": {
       "l1": 31.10145785235,
       "l2": 7.008716663298
@@ -287,6 +295,14 @@
     "saint_venant_kirchhoff_gradient_3d_isoparametric_mesh_soa_float": {
       "l1": 2100.494601704,
       "l2": 197.6771469851
+    },
+    "saint_venant_kirchhoff_hessian_bsr_3d_isoparametric_mesh_soa": {
+      "l1": 12191.9752529,
+      "l2": 305.0810418807
+    },
+    "saint_venant_kirchhoff_hessian_bsr_3d_isoparametric_mesh_soa_float": {
+      "l1": 12191.97428641,
+      "l2": 305.0810133187
     },
     "saint_venant_kirchhoff_objective_3d_affine_mesh_soa": {
       "l1": 351.2802501094,
@@ -658,6 +674,14 @@
       "l1": 74.82587718853,
       "l2": 3.053226033539
     },
+    "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa": {
+      "l1": 1798.092,
+      "l2": 17.88312485948
+    },
+    "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa_float": {
+      "l1": 1798.091897044,
+      "l2": 17.88312312474
+    },
     "linear_elasticity_objective_3d_affine_mesh_soa": {
       "l1": 15.31561425434,
       "l2": 1.256059952018
@@ -865,6 +889,14 @@
     "saint_venant_kirchhoff_gradient_3d_isoparametric_mesh_soa_float": {
       "l1": 2951.694296869,
       "l2": 124.9512754323
+    },
+    "saint_venant_kirchhoff_hessian_bsr_3d_isoparametric_mesh_soa": {
+      "l1": 42843.96564903,
+      "l2": 474.155832641
+    },
+    "saint_venant_kirchhoff_hessian_bsr_3d_isoparametric_mesh_soa_float": {
+      "l1": 42843.96341037,
+      "l2": 474.155797838
     },
     "saint_venant_kirchhoff_objective_3d_affine_mesh_soa": {
       "l1": 325.5453369292,
