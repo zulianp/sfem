@@ -31,6 +31,16 @@ LAYER_ORDER = (
     "targets",
     "emitters",
     "backends",
+    # L7.  It was unranked, annotated "L7, which only ever runs after
+    # emission", and that is a sound reason not to constrain what may import
+    # it -- but it was read as putting the packaging layer outside the
+    # discipline altogether.  Nothing then required it to consume the plans
+    # describing what it packages, and it consumed none: it reconstructed the
+    # kernel ABI by parsing the C++ the layer above had just printed, and got
+    # it wrong for every mixed-order kernel.  Stokes and poro-hyperelasticity
+    # did not compile for as long as they had existed.  Running last is
+    # exactly why this layer has to agree with what ran before it.
+    "package",
 )
 
 # Packages that sit outside the lowering stack.  Frontend packages sit above the
@@ -39,13 +49,12 @@ LAYER_ORDER = (
 # Packages that sit outside the lowering stack.  `materials` and `generators`
 # are the frontend and sit above the whole stack.  `pipeline` is the driver: it
 # calls each layer in sequence and is imported by none of them, so ranking it
-# would be meaningless.  `package` is L7, which only ever runs after emission.
-# The rest is tooling, tests, and the out-of-scope mlir subtree.
+# would be meaningless.  The rest is tooling, tests, and the out-of-scope mlir
+# subtree.
 UNRANKED_PACKAGES = (
     "materials",
     "generators",
     "mlir",
-    "package",
     "pipeline",
     "scripts",
     "tests",
