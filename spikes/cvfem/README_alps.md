@@ -719,3 +719,64 @@ iteration count at every level and loses on work at every level.
 The next step is not a better smoother -- the evidence points away from that. It is the
 coarse pressure operator: either a stabilisation that coarsens consistently, or a coarse
 level built as a genuine Galerkin product for the pressure block instead of rediscretised.
+
+## Independent evaluation of the null-space treatment
+
+`nullspace_eval.py` is a standalone study of whether our constant-pressure null space is
+what limits the V-cycle, and whether the hybrid matrix-free elimination from the
+self-contact rigid-body-modes work helps if applied to it. It models a stabilised
+colocated Navier-Stokes system in 2D with the same constant-pressure null space and the
+same `Df = rc h^2 / (2 mu)` stabilisation, small enough to solve exactly.
+
+It is gated rather than merely run. Stage 1 requires the model to reproduce the driver's
+symptom before anything else is believed; stage 1b requires the smoother to converge at
+all; stage 1c requires the condensed operator to solve the problem to round-off before its
+cycle rate is quoted. All three gates fired during development and each caught a real
+error: a symmetric-indefinite model whose smoother diverged at every damping, a pure Stokes
+model missing the convective diagonal that makes our smoother work, a truncated inter-level
+transfer, and a right-hand side that double-counted `B_tilde C_lam^-1 g_tilde` by adding
+both of the paper's two equivalent forms for it.
+
+The model reproduces our failure closely. Coarse-operator consistency is about 0.5 in the
+velocity rows and 5.2 in the pressure rows, against 0.7 and 6.6 in the driver.
+
+**The gauge does not matter.** Pinning the same node on every level, pinning a
+level-dependent node, and projecting the constant mode out per level are
+indistinguishable, and none is far from the smoother alone:
+
+| treatment                  | rate (n=24) | n=16 | n=32 |
+|----------------------------|-------------|------|------|
+| pin, shared node           | 0.948       | 0.919| 0.972|
+| pin, level-dependent node  | 0.939       | 0.779| 1.143|
+| projection, per level      | 0.936       | 0.993| 0.944|
+| condensation, per level    | 12.2        | 0.922| 23.3 |
+
+No treatment wins consistently across sizes, which is itself the result: the differences
+are noise around a cycle that is limited by something else. The condensation is the
+exception in the wrong direction -- its operator is verified correct to 1e-12, so its
+divergence is a real property of the scheme here and not an implementation fault, and it
+worsens with problem size. That is not a mark against the method in its own setting: it
+changes the gauge, and a gauge is not what ails us. It also has to coarsen a dense global
+rank-one term on top of a stabilisation that already fails to coarsen.
+
+**The stabilisation is the lever**, and it is non-monotone:
+
+| rc scaled per level | pressure consistency | V-cycle rate |
+|---------------------|----------------------|--------------|
+| 1.0 (as now)        | 5.18                 | 0.948        |
+| 0.5                 | 2.21                 | 0.905        |
+| 0.25                | 0.75                 | **0.719**    |
+| 0.125               | 0.29                 | 9.81         |
+
+Consistency improves monotonically all the way down while the rate has an optimum at 0.25
+-- exactly the value that holds `Df` at the fine level's value -- and then diverges. This
+is the tension stated earlier made quantitative: consistency with the fine operator and
+stability on the coarse mesh are competing requirements, and the optimum is interior.
+
+One discrepancy to resolve rather than explain away: in the model `rc_decay = 0.25`
+improves the cycle (0.948 to 0.719), while in the driver the same setting made it worse
+(rates 0.41, 1.30, 1.52 against 0.185, 0.63, 1.05). The exponent is dimension-independent,
+since `Df ~ h^2` either way, so 0.25 should be right in 3D too. Candidate causes are the
+driver's Reynolds regime, its hierarchy depth, or something still wrong in the driver that
+the model does not carry. That is the next thing to chase, and it is a much narrower
+question than the one this evaluation started with.
