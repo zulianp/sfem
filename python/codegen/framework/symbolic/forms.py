@@ -110,6 +110,70 @@ class FormCollectionMixin:
     def standard_forms(self):
         return {form.standard_name: form for form in self.forms}
 
+    def component_blocks_for(self, order):
+        """The blocks of this form, one per lowered field component.
+
+        ``blocks_for`` keys by assembled field: Stokes reports ``u`` and ``p``
+        at 1-form order.  This keys by lowered field, so the same collection
+        reports ``u0``, ``u1``, ``u2``, ``p`` -- the representation everything
+        below actually consumes, and the one an energy formulation and a
+        residual formulation can share.
+
+        Nothing new is computed.  A residual lowering already builds both: the
+        per-component 1-form expressions sit in ``residual_expressions``,
+        aligned with ``residual_fields``, and the per-component 2-form blocks
+        in ``jacobian_action_blocks`` -- sixteen of them for Stokes, ``u0`` by
+        ``u0`` through ``p`` by ``p``.  They were reachable only under
+        residual-specific names, which is why the parallel representation has
+        49 consumers against the form accessors' 19.  This is the accessor
+        those consumers can move onto.
+
+        Returns an empty tuple where the collection carries no per-component
+        expansion -- today that is every energy formulation, which declares its
+        structure through ``add_energy(..., fields=..., variables=...)``
+        instead.  Deriving these for energy is the other half of the work; see
+        ARCHITECTURE.html OP 20.
+        """
+        order = FormOrder(order)
+        fields = tuple(getattr(self, "residual_fields", ()) or ())
+        if order is FormOrder.ONE:
+            expressions = tuple(getattr(self, "residual_expressions", ()) or ())
+            if not fields or len(expressions) != len(fields):
+                return ()
+            return tuple(
+                FormBlock(
+                    FormOrder.ONE,
+                    row_field=field.name,
+                    expression=expression,
+                )
+                for field, expression in zip(fields, expressions)
+            )
+        if order is FormOrder.TWO:
+            # The lowering's own block objects, not copies of them.  They
+            # already satisfy what a per-component block has to offer -- row
+            # field, column field, expression, name -- and re-wrapping them as
+            # ``FormBlock`` would rename them: ``FormBlock.name`` is derived as
+            # ``form_2_<row>_<column>``, while these carry the name that
+            # already appears in generated code.  Re-exposing is the job here;
+            # renaming is not, and a phase that must be byte-identical cannot
+            # afford it.
+            return tuple(getattr(self, "jacobian_action_blocks", ()) or ())
+        return ()
+
+    def component_block(self, order, row_field, column_field=None):
+        """One per-component block by name, or ``None`` if it does not exist.
+
+        Unlike ``block``, a missing block is not an error: a Jacobian is sparse
+        between components that do not couple, and asking is how a caller finds
+        out.
+        """
+        row_field = str(row_field)
+        column_field = None if column_field is None else str(column_field)
+        for block in self.component_blocks_for(order):
+            if block.row_field == row_field and block.column_field == column_field:
+                return block
+        return None
+
     def expressions(self):
         expressions = KernelExpressions()
         for form in self.forms:

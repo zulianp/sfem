@@ -22,6 +22,8 @@ from dataclasses import dataclass
 
 import sympy as sp
 
+from codegen.framework.symbolic.forms import FormOrder
+
 from codegen.framework.symbolic.core import KernelExpressions
 from codegen.framework.symbolic.residual import (
     CoupledResidualSystem,
@@ -152,7 +154,14 @@ def residual_emission_model(collection):
         dim=fields[0].dim,
         parameters=tuple(collection.parameters),
         residual_forms=residual_expressions,
-        jacobian_action_blocks=tuple(collection.jacobian_action_blocks),
+        # Read through the form accessor rather than under the collection's
+        # residual-specific name.  Same blocks, same names, same expressions --
+        # `component_blocks_for` re-exposes exactly these -- but the consumer
+        # now depends on the form layer instead of on the parallel
+        # representation, which is what lets that representation go.
+        jacobian_action_blocks=tuple(
+            collection.component_blocks_for(FormOrder.TWO)
+        ),
     )
 
 
