@@ -511,6 +511,16 @@ namespace sfem {
                                              const ryml::ConstNodeRef             &node) override;
 #endif  // SFEM_ENABLE_RYAML
 
+        //! The scalar type the kernels are asked for at run time.
+        //!
+        //! Mirrors GPULaplacian, which declares the same member with the same
+        //! default and hands it to every kernel call.  SMESH_DEFAULT resolves
+        //! to the build's real_t, so the default costs a caller nothing and is
+        //! the common path rather than a fallback.  The Op interface itself is
+        //! unchanged: its methods still take real_t*, which converts to void*
+        //! at the call, exactly as gpu_laplacian_block_vector relies on.
+        enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
+
     private:
         class Impl;
         std::unique_ptr<Impl> impl_;
@@ -3007,6 +3017,7 @@ def _boundary_residual_op(material, elements, c_abi_header=None, form_collection
         output_args = _boundary_soa_component_argument_names(fields, "out")
         call_args = _nonempty(
             "domain.element_type",
+            "real_type",
             "sideset->size()",
             "mesh->n_nodes()",
             "domain.block->elements()->data()",
@@ -3435,6 +3446,16 @@ namespace sfem {
         std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
 #endif  // SFEM_ENABLE_RYAML
+
+        //! The scalar type the kernels are asked for at run time.
+        //!
+        //! Mirrors GPULaplacian, which declares the same member with the same
+        //! default and hands it to every kernel call.  SMESH_DEFAULT resolves
+        //! to the build's real_t, so the default costs a caller nothing and is
+        //! the common path rather than a fallback.  The Op interface itself is
+        //! unchanged: its methods still take real_t*, which converts to void*
+        //! at the call, exactly as gpu_laplacian_block_vector relies on.
+        enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
 
     private:
         class Impl;
@@ -4186,8 +4207,8 @@ def _coupled_cases(
         geometry_affine = _affine_geometry_offsets(dim) + ", determinant"
         common_iso = "domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points"
         common_affine = "domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), %s" % geometry_affine
-        common_iso_dispatch = "domain.element_type, %s" % common_iso
-        common_affine_dispatch = "domain.element_type, %s" % common_affine
+        common_iso_dispatch = "domain.element_type, real_type, %s" % common_iso
+        common_affine_dispatch = "domain.element_type, real_type, %s" % common_affine
         energy_grad_args = ", ".join(
             _nonempty(
                 *_coupled_energy_field_args(
@@ -4566,7 +4587,17 @@ def _residual_soa_field_argument_names(fields, suffix, mixed_order=False):
         components = int(field.components)
         name = _safe_identifier("%s_%s" % (field.name, suffix))
         if components == 1 or mixed_order:
-            names.append(name)
+            if mixed_order and components > 1:
+                # The kernel takes `const void *const u_data[3]` now, and the
+                # local built above is `const real_t *const u_data[3]`.  A
+                # pointer converts to `void *` on its own; an array of them
+                # does not, so the element type has to be said explicitly.
+                names.append(
+                    "(%svoid *const *)%s"
+                    % ("" if suffix == "out" else "const ", name)
+                )
+            else:
+                names.append(name)
         else:
             names.extend("%s[%d]" % (name, component) for component in range(components))
     return tuple(names)
@@ -4926,7 +4957,10 @@ def _dispatch_source(c_abi_header, groups):
     private_declarations = []
     for group in groups:
         for variant in group["variants"]:
-            private_declarations.append(variant["declaration"])
+            if "declarations" in variant:
+                private_declarations.extend(variant["declarations"])
+            else:
+                private_declarations.append(variant["declaration"])
     lines.extend(_unique(private_declarations))
     if private_declarations:
         lines.append("")
@@ -5020,7 +5054,7 @@ def _dispatch_groups(material, elements, declarations):
             sorted(group["variants"], key=lambda item: item["mesh_element"])
         )
         ordered.append(group)
-    return tuple(ordered)
+    return _merge_precision_groups(tuple(ordered))
 
 
 def _dispatch_mapping(material_name, function_name, element_names):
@@ -5094,7 +5128,229 @@ def _split_c_parameters(body):
     return params
 
 
+#: Spelled once, next to the code that emits it.
+_RUNTIME_TYPE_PARAMETER = "const enum smesh::PrimitiveType real_type"
+_RUNTIME_TYPE_ARGUMENT = "real_type"
+_RESOLVED_RUNTIME_TYPE = "resolved_real_type"
+
+
+def _runtime_typed_parameter(param):
+    """One parameter, as the merged entry point declares it.
+
+    A pointer whose element type is the scalar being dispatched crosses as
+    ``void *``; a plain scalar crosses as ``real_t``.  Both are SFEM's own
+    choices -- ``cu_tet4_laplacian_apply`` takes ``const void *const x``, and
+    ``cu_linear_elasticity_apply`` takes ``const real_t mu`` rather than
+    putting the material parameter on the runtime axis.
+    """
+    if "*" in param:
+        return re.sub(r"\b(double|float)\b", "void", param, count=1)
+    return re.sub(r"\b(double|float)\b", "real_t", param, count=1)
+
+
+def _runtime_typed_argument(param, scalar_type):
+    """The same parameter, cast back to a concrete type at the call.
+
+    Two shapes reach here.  A plain buffer is one pointer and casts to one.  A
+    mixed-order field is an array of pointers -- ``const real_t *const
+    u_data[3]``, because its components live on different spaces -- and decays
+    to a pointer-to-pointer, so it casts to ``const float *const *`` rather
+    than to ``const float *``.
+    """
+    name = _c_parameter_name(param)
+    if "*" not in param:
+        return name
+    const = "const " if param.lstrip().startswith("const ") else ""
+    if re.search(r"\[\s*\d+\s*\]\s*$", param):
+        return "(%s%s *const *)%s" % (const, scalar_type, name)
+    return "(%s%s *)%s" % (const, scalar_type, name)
+
+
+def _merge_precision_pair(base, twin):
+    """One runtime-typed group from a ``(double, float)`` pair of groups.
+
+    The two declarations differ in exactly the parameters that carry the scalar
+    being dispatched, so diffing them identifies those parameters rather than
+    requiring a rule about which ones they ought to be.  Everything that agrees
+    -- the geometry, the strides, the connectivity -- is left alone, which is
+    what makes this safe: geometry is not on this axis in SFEM either, where
+    ``fff`` is cast to a fixed ``cu_jacobian_t``.
+
+    ``real_type`` is inserted immediately before the first pointer it governs,
+    the position ``cu_laplacian_apply`` puts ``real_type_xy`` in.
+    """
+    base_params, twin_params = list(base["params"]), list(twin["params"])
+    if len(base_params) != len(twin_params):
+        return None
+    typed = [i for i, (a, b) in enumerate(zip(base_params, twin_params)) if a != b]
+    if not typed:
+        return None
+    pointers = [i for i in typed if "*" in base_params[i]]
+    if not pointers:
+        return None
+    params = [_runtime_typed_parameter(p) if i in set(typed) else p
+              for i, p in enumerate(base_params)]
+    # Immediately after ``element_type``, which the emitter prepends.
+    #
+    # SFEM places this parameter next to the buffers it governs, and its
+    # position varies by operator -- mid-list in ``cu_laplacian_apply``, after
+    # the material scalars in ``cu_linear_elasticity_apply``.  Generated code
+    # cannot afford that latitude: every call site would have to work out where
+    # the field-stream group begins, in a signature whose shape depends on the
+    # form.  One fixed slot, next to the other "what kind of thing is this"
+    # parameter, is emittable identically from both sides.
+    params.insert(0, _RUNTIME_TYPE_PARAMETER)
+
+    by_element = {v["mesh_element"]: v for v in twin["variants"]}
+    variants = []
+    for variant in base["variants"]:
+        other = by_element.get(variant["mesh_element"])
+        if other is None:
+            return None
+        variants.append(
+            {
+                "mesh_element": variant["mesh_element"],
+                "by_scalar_type": {
+                    "double": variant["function"],
+                    "float": other["function"],
+                },
+                # Both leaves still need forward-declaring in the dispatch
+                # source; merging the public symbol does not merge them.
+                "declarations": (variant["declaration"], other["declaration"]),
+            }
+        )
+    return {
+        "name": base["name"],
+        "params": tuple(params),
+        "dim": base["dim"],
+        "variants": tuple(variants),
+        # By name.  The emitter sees the transformed parameters -- `void *`
+        # where these were `double *` -- so matching on the original text
+        # would never fire, which is exactly the bug the compile gate caught.
+        "runtime_typed": tuple(
+            _c_parameter_name(base_params[i])
+            for i in typed
+            if "*" in base_params[i]
+        ),
+    }
+
+
+def _merge_precision_groups(groups):
+    """Collapse every ``(name, name_float)`` pair into one runtime-typed group.
+
+    Pairs that cannot be merged -- a missing twin, a mismatched parameter list,
+    nothing actually differing -- are left exactly as they were rather than
+    forced, so an unexpected shape degrades to the old two-symbol form instead
+    of producing something that will not compile.
+    """
+    by_name = {group["name"]: group for group in groups}
+    merged, consumed = [], set()
+    for group in groups:
+        name = group["name"]
+        if name in consumed or name.endswith("_float"):
+            continue
+        twin = by_name.get("%s_float" % name)
+        if twin is None:
+            merged.append(group)
+            continue
+        pair = _merge_precision_pair(group, twin)
+        if pair is None:
+            merged.append(group)
+            continue
+        consumed.add(twin["name"])
+        merged.append(pair)
+    return tuple(
+        group for group in merged if group["name"] not in consumed
+    ) + tuple(
+        group for group in groups
+        if group["name"].endswith("_float") and group["name"] not in consumed
+        and "%s" % group["name"][:-6] not in by_name
+    )
+
+
+def _runtime_typed_dispatch_function_lines(group):
+    """One entry point where there were two, taking the scalar type as a value.
+
+    This is the shape ``operators/tet4/cuda/cu_tet4_laplacian.cu`` uses: the
+    buffers cross as ``void *`` and a ``smesh::PrimitiveType`` says what they
+    hold, the body switches, casts, and calls the concrete implementation.
+    SFEM splits the two switches across two functions -- element type in
+    ``cu_laplacian_apply``, scalar type in the leaf -- and they are nested here
+    only because this layer emits a single dispatcher.
+
+    ``SMESH_DEFAULT`` is resolved through ``smesh::TypeToEnum<real_t>``, so it
+    means what it means in ``GPULaplacian``: the build's own ``real_t``, not a
+    fixed width.  It is a caller's default rather than a fallback, so it is
+    resolved once, up front, rather than repeated in every element case.
+    """
+    runtime = set(group["runtime_typed"])
+    params = ("const smesh::ElemType element_type",) + tuple(group["params"])
+    lines = ['SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"]]
+    for index, param in enumerate(params):
+        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(
+        [
+            ") {",
+            "    const enum smesh::PrimitiveType %s =" % _RESOLVED_RUNTIME_TYPE,
+            "            (%s == smesh::SMESH_DEFAULT)" % _RUNTIME_TYPE_ARGUMENT,
+            "                    ? smesh::TypeToEnum<real_t>::value()",
+            "                    : %s;" % _RUNTIME_TYPE_ARGUMENT,
+            "    switch (element_type) {",
+        ]
+    )
+    cases = (("smesh::SMESH_FLOAT64", "double"), ("smesh::SMESH_FLOAT32", "float"))
+    for variant in group["variants"]:
+        lines.extend(
+            [
+                "        case smesh::%s: {" % variant["mesh_element"],
+                "            switch (%s) {" % _RESOLVED_RUNTIME_TYPE,
+            ]
+        )
+        for enum_value, scalar_type in cases:
+            args = [
+                _runtime_typed_argument(param, scalar_type)
+                if _c_parameter_name(param) in runtime
+                else _c_parameter_name(param)
+                for param in group["params"]
+                if param != _RUNTIME_TYPE_PARAMETER
+            ]
+            lines.extend(
+                [
+                    "                case %s:" % enum_value,
+                    "                    return %s(%s);"
+                    % (variant["by_scalar_type"][scalar_type], ", ".join(args)),
+                ]
+            )
+        lines.extend(
+            [
+                "                default:",
+                "                    break;",
+                "            }",
+                "            break;",
+                "        }",
+            ]
+        )
+    lines.extend(
+        [
+            "        default:",
+            "            break;",
+            "    }",
+            '    std::fprintf(stderr,',
+            '            "%s does not support element type %%d with real type %%d\\n",'
+            % group["name"],
+            "            (int)element_type,",
+            "            (int)%s);" % _RUNTIME_TYPE_ARGUMENT,
+            "    return SFEM_FAILURE;",
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
 def _dispatch_function_lines(group):
+    if group.get("runtime_typed"):
+        return _runtime_typed_dispatch_function_lines(group)
     params = ("const smesh::ElemType element_type",) + tuple(group["params"])
     arg_names = tuple(_c_parameter_name(param) for param in group["params"])
     lines = [
@@ -5226,7 +5482,10 @@ def _diagnostic_dispatch_source(c_abi_header, groups):
     private_declarations = []
     for group in groups:
         for variant in group["variants"]:
-            private_declarations.append(variant["declaration"])
+            if "declarations" in variant:
+                private_declarations.extend(variant["declarations"])
+            else:
+                private_declarations.append(variant["declaration"])
     lines.extend(_unique(private_declarations))
     if private_declarations:
         lines.append("")
@@ -6284,6 +6543,7 @@ def _residual_hessian_dispatch_body(
         setup = []
         args = [
             "domain.element_type",
+            "real_type",
             "domain.block->n_elements()",
             "mesh->n_nodes()",
             "domain.block->elements()->data()",
@@ -6377,6 +6637,7 @@ def _residual_apply_dispatch_body(
         }
         common_args = [
             "domain.element_type",
+            "real_type",
             "domain.block->n_elements()",
             "mesh->n_nodes()",
             "domain.block->elements()->data()",
@@ -6625,6 +6886,7 @@ def _residual_apply_dispatch_body(
                         ", ".join(
                             [
                                 "domain.element_type",
+                                "real_type",
                                 "packed->n_packs(packed_block)",
                                 "packed->n_elements_per_pack(packed_block)",
                                 "domain.block->n_elements()",
@@ -6744,6 +7006,7 @@ def _residual_apply_dispatch_body(
                         ", ".join(
                             [
                                 "domain.element_type",
+                                "real_type",
                                 "packed->n_packs(packed_block)",
                                 "packed->n_elements_per_pack(packed_block)",
                                 "domain.block->n_elements()",
@@ -6829,9 +7092,27 @@ def _packed_two_pass_extra_args():
     ]
 
 
+def _with_runtime_type_argument(leading_args):
+    """``leading_args`` with the runtime scalar type after the element type.
+
+    The merged entry point takes it second, so every caller has to supply it
+    there.  Doing it here rather than at each packed call site keeps the one
+    rule in one place.
+    """
+    args = list(leading_args)
+    if _RUNTIME_TYPE_ARGUMENT in args:
+        return tuple(args)
+    for index, arg in enumerate(args):
+        if arg == "domain.element_type":
+            args.insert(index + 1, _RUNTIME_TYPE_ARGUMENT)
+            return tuple(args)
+    return tuple(args)
+
+
 def _hyperelastic_packed_return(indent, function, leading_args, trailing_args, kernel_sources):
     """leading_args usually ['domain.element_type']; trailing follows ghost_idx."""
     two_pass = _packed_two_pass_function(function)
+    leading_args = _with_runtime_type_argument(leading_args)
     base = list(leading_args) + _packed_call_args_common()
     one_call = ", ".join(base + list(trailing_args))
     if not _c_abi_function_exists(kernel_sources, two_pass, public_only=True):
@@ -6887,6 +7168,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -6913,6 +7195,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -6942,6 +7225,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -6997,6 +7281,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "nelements",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -7022,6 +7307,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "nelements",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -7078,6 +7364,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "nelements",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -7106,6 +7393,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "nelements",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -7204,6 +7492,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -7268,6 +7557,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
@@ -7450,6 +7740,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "packed->n_packs(packed_block)",
                             "packed->n_elements_per_pack(packed_block)",
                             "domain.block->n_elements()",
@@ -7520,6 +7811,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "packed->n_packs(packed_block)",
                             "packed->n_elements_per_pack(packed_block)",
                             "domain.block->n_elements()",
@@ -7583,6 +7875,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     ", ".join(
                         [
                             "domain.element_type",
+                            "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
