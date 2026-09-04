@@ -61,6 +61,7 @@ namespace {
                      "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default); 0: assembled BSR\n"
                      "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
                      "  SFEM_GMG             1: V-cycle preconditioner (needs a refine level > 1)\n"
+                     "                       2: cost-matched control -- fine-level smoother, no hierarchy\n"
                      "  SFEM_GMG_SMOOTH      block-Jacobi smoothing steps (default 3)\n"
                      "  SFEM_ELEMENT_REFINE_LEVEL  >1: semi-structured macro-elements at that\n"
                      "                       internal level (default 1 = flat)\n"
@@ -192,7 +193,10 @@ namespace {
     //     BiCGStab.
     struct GmgLevels {
         std::shared_ptr<sfem::MultigridData>                   data;
-        std::vector<sfem::SharedBuffer<real_t>>                states;   // kept alive for the operators
+        std::vector<sfem::SharedBuffer<real_t>>                states;
+        // R = P^T sums; dividing by R applied to the constant 1 turns it into the
+        // partition-of-unity average that a state transfer needs. One per coarse level.
+        std::vector<std::vector<real_t>>                       state_weights;   // kept alive for the operators
         std::vector<std::shared_ptr<sfem::Operator<real_t>>>   ops;
         std::vector<std::shared_ptr<sfem::CVFEMNavierStokes>>  level_ops;
         std::shared_ptr<sfem::Multigrid<real_t>>               mg;
@@ -205,8 +209,22 @@ namespace {
                                          const int smoothing_steps) {
         auto data = sfem::create_gmg_data(f);
         if (!data) return nullptr;
-        const int nlevels = (int)data->functions.size();
+        int nlevels = (int)data->functions.size();
         if (nlevels < 2) return nullptr;
+
+        // SFEM_GMG_MAX_LEVELS caps the depth, keeping the finest levels and solving on the
+        // deepest one kept.
+        //
+        // The hierarchy bottoms out at the macro mesh, which for a small N is a handful of
+        // cells. A convection-dominated Navier-Stokes discretisation there does not
+        // approximate the fine operator in any useful sense, and because that level is
+        // solved to tolerance the cycle takes its answer at face value and prolongs a
+        // confidently wrong correction. Stopping the hierarchy while the coarse mesh still
+        // resolves the flow is the standard remedy.
+        {
+            const int cap = smesh::Env::read<int>("SFEM_GMG_MAX_LEVELS", 0);
+            if (cap > 1 && cap < nlevels) nlevels = cap;
+        }
 
         auto out             = std::make_shared<GmgLevels>();
         out->data            = data;
@@ -223,9 +241,19 @@ namespace {
         // The operator chain, so each level's block diagonal is reachable.
         out->level_ops.resize(nlevels);
         out->level_ops[0] = fine_op;
+        const real_t rc_decay = smesh::Env::read<real_t>("SFEM_GMG_RC_DECAY", real_t(1));
         for (int i = 1; i < nlevels; ++i) {
             out->level_ops[i] = out->level_ops[i - 1] ? out->level_ops[i - 1]->coarser() : nullptr;
             if (!out->level_ops[i]) return nullptr;
+
+            // Rhie-Chow does not survive rediscretisation unscaled. Its coefficient is
+            // Df = rc_scale * h^2 / (2 mu), so halving the lattice resolution per level
+            // quadruples Df, and the coarse pressure block ends up far stiffer than the
+            // fine block whose error it is supposed to correct. The operator inherits
+            // rc_scale from its parent, so left alone every level stabilises for its own
+            // h. SFEM_GMG_RC_DECAY rescales it per level; 0.25 keeps Df fixed at the fine
+            // level's value, which is what makes the coarse correction commensurate.
+            out->level_ops[i]->rhie_chow_scale = out->level_ops[i - 1]->rhie_chow_scale * rc_decay;
         }
 
         for (int i = 0; i < nlevels; ++i)
@@ -239,15 +267,204 @@ namespace {
     // only the linearisation moved. Rebuilding the whole hierarchy here instead was the
     // first attempt and it dominated the solve, since create_gmg_data derefines every
     // Function again.
+    // Transfer sanity check (SFEM_GMG_CHECK=1).
+    //
+    // A V-cycle that measures identically to its own smoother is suspicious in a specific
+    // way: it suggests the coarse-grid correction is not weak but absent. This applies the
+    // transfers to a smooth test field and reports what survives each hop, which separates
+    // "the correction is small" from "the correction is zero".
+    void check_transfers(GmgLevels &g) {
+        const int nlevels = (int)g.ops.size();
+        auto nrm = [](const std::vector<real_t> &v) {
+            real_t s = 0;
+            for (auto e : v) s += e * e;
+            return std::sqrt(s);
+        };
+
+        // Constraint census per level. A colocated Navier-Stokes system with velocity
+        // Dirichlet data all round fixes pressure only up to a constant, so the pressure
+        // needs a pin. If the fine level has one and a coarse level does not, that coarse
+        // operator is singular, its solve wanders along the constant-pressure null vector,
+        // and the prolonged correction carries that spurious mode back up -- which looks
+        // exactly like a V-cycle that diverges after the first couple of cycles.
+        for (int i = 0; i < nlevels; ++i) {
+            const ptrdiff_t     nd = g.data->functions[i]->space()->n_dofs();
+            std::vector<mask_t> m(mask_count(nd), 0);
+            g.data->functions[i]->constraints_mask(m.data());
+            int per[N_FIELDS] = {0};
+            for (ptrdiff_t k = 0; k < nd; ++k)
+                if (mask_get(k, m.data())) per[k % N_FIELDS]++;
+            std::printf("constraints level %d: n %td  ux %d  uy %d  uz %d  p %d\n",
+                        i, nd, per[0], per[1], per[2], per[3]);
+        }
+
+        for (int i = 0; i + 1 < nlevels; ++i) {
+            const ptrdiff_t nf = g.data->functions[i]->space()->n_dofs();
+            const ptrdiff_t nc = g.data->functions[i + 1]->space()->n_dofs();
+
+            std::vector<real_t> fine((size_t)nf), coarse((size_t)nc, 0), back((size_t)nf, 0);
+            // Smooth and non-zero on every component, so a component-selective bug shows.
+            for (ptrdiff_t k = 0; k < nf; ++k) fine[(size_t)k] = 1 + 0.1 * (real_t)(k % 7);
+
+            g.data->restrictions[i]->apply(fine.data(), coarse.data());
+            if (g.data->prolongations[i + 1]) g.data->prolongations[i + 1]->apply(coarse.data(), back.data());
+
+            std::printf("transfer %d->%d: n %td->%td  |x| %.4e  |Rx| %.4e  |PRx| %.4e\n",
+                        i, i + 1, nf, nc, nrm(fine), nrm(coarse), nrm(back));
+
+            // Adjoint test. A coarse-grid correction is only consistent when the residual
+            // restriction is the transpose of the correction prolongation, so that the
+            // coarse problem minimises the same error the fine level sees. If it is not,
+            // the correction is scaled wrongly and the cycle over- or under-corrects; a
+            // constant ratio here is exactly the factor it is out by.
+            if (g.data->prolongations[i + 1]) {
+                std::vector<real_t> xr((size_t)nf), yc((size_t)nc), Rx((size_t)nc, 0), Py((size_t)nf, 0);
+                unsigned            seed = 12345;
+                auto                rnd  = [&seed]() {
+                    seed = seed * 1103515245u + 12345u;
+                    return (real_t)((seed >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+                };
+                for (auto &e : xr) e = rnd();
+                for (auto &e : yc) e = rnd();
+
+                // Both transfers zero constrained dofs on their output, so the adjoint
+                // identity only holds on vectors that already satisfy the constraints.
+                // Probing with unconstrained noise measures the constraint handling, not
+                // the transfers, and reports a spurious mismatch.
+                g.data->functions[i]->apply_zero_constraints(xr.data());
+                g.data->functions[i + 1]->apply_zero_constraints(yc.data());
+
+                g.data->restrictions[i]->apply(xr.data(), Rx.data());
+                g.data->prolongations[i + 1]->apply(yc.data(), Py.data());
+
+                real_t lhs = 0, rhs2 = 0;
+                for (ptrdiff_t k = 0; k < nc; ++k) lhs += Rx[(size_t)k] * yc[(size_t)k];
+                for (ptrdiff_t k = 0; k < nf; ++k) rhs2 += xr[(size_t)k] * Py[(size_t)k];
+                std::printf("  adjoint %d: <Rx,y>=%.6e  <x,Py>=%.6e  ratio=%.6f\n",
+                            i, lhs, rhs2, (rhs2 != 0) ? lhs / rhs2 : 0.0);
+            }
+
+            // Coarse-operator consistency: A_c v against R A_f P v on a smooth coarse
+            // vector.
+            //
+            // The coarse level is rediscretised rather than assembled as R A_f P, which is
+            // the whole reason the hierarchy is affordable, but it is only a legitimate
+            // substitute if it acts like the Galerkin operator on the smooth vectors a
+            // coarse grid is supposed to carry. If the two disagree by O(1) here, the
+            // coarse solve is answering a different question from the one the fine level
+            // asked, and no smoother can repair the correction that comes back.
+            if (g.data->prolongations[i + 1]) {
+                std::vector<real_t> vc((size_t)nc), vf((size_t)nf, 0), wf((size_t)nf, 0),
+                        g1((size_t)nc, 0), g2((size_t)nc, 0);
+                for (ptrdiff_t k = 0; k < nc; ++k) vc[(size_t)k] = 1 + 0.1 * (real_t)(k % 7);
+                g.data->functions[i + 1]->apply_zero_constraints(vc.data());
+
+                g.data->prolongations[i + 1]->apply(vc.data(), vf.data());
+                g.ops[i]->apply(vf.data(), wf.data());
+                g.data->restrictions[i]->apply(wf.data(), g1.data());
+                g.ops[i + 1]->apply(vc.data(), g2.data());
+
+                // Split by component. The momentum and continuity rows coarsen very
+                // differently: Rhie-Chow's Df = rc_scale * h^2 / (2 mu) is the only term
+                // that depends on the lattice spacing outright, so an inconsistency
+                // concentrated in the pressure rows implicates the stabilisation, and one
+                // spread evenly implicates the discretisation as a whole.
+                real_t dn[N_FIELDS] = {0}, rn[N_FIELDS] = {0};
+                for (ptrdiff_t k = 0; k < nc; ++k) {
+                    const int    c = (int)(k % N_FIELDS);
+                    const real_t d = g1[(size_t)k] - g2[(size_t)k];
+                    dn[c] += d * d;
+                    rn[c] += g1[(size_t)k] * g1[(size_t)k];
+                }
+                std::printf("  coarse-op %d rel:", i);
+                const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+                for (int c = 0; c < N_FIELDS; ++c)
+                    std::printf("  %s %.4f", nm[c], (rn[c] > 0) ? std::sqrt(dn[c] / rn[c]) : 0.0);
+                std::printf("\n");
+            }
+        }
+    }
+
+    // R is the adjoint of the prolongation, which is what the residual transfer in a
+    // V-cycle must be, and is exactly wrong for moving a state down. Applied to a field it
+    // sums rather than averages and inflates it by the number of fine nodes feeding each
+    // coarse node -- measured here as a factor of about 3.8 per level. A coarse operator
+    // linearised about a state that large is not an approximation of the fine operator at
+    // all, so its correction is not a correction. Normalising by R applied to the constant
+    // 1 recovers the average, which is exact for constants and leaves a smooth field alone.
+    void build_state_weights(GmgLevels &g) {
+        const int nlevels = (int)g.ops.size();
+        g.state_weights.assign((size_t)nlevels, {});
+        for (int i = 1; i < nlevels; ++i) {
+            const ptrdiff_t nf = g.data->functions[i - 1]->space()->n_dofs();
+            const ptrdiff_t nc = g.data->functions[i]->space()->n_dofs();
+            std::vector<real_t> ones((size_t)nf, real_t(1)), w((size_t)nc, real_t(0));
+            g.data->restrictions[i - 1]->apply(ones.data(), w.data());
+            g.state_weights[(size_t)i] = std::move(w);
+        }
+    }
+
     void refresh_gmg(GmgLevels &g) {
         const int nlevels = (int)g.ops.size();
         for (int i = 1; i < nlevels; ++i) {
             g.data->restrictions[i - 1]->apply(g.states[i - 1]->data(), g.states[i]->data());
+
+            const auto     &w  = g.state_weights[(size_t)i];
+            real_t *const   sc = g.states[i]->data();
+            const ptrdiff_t nc = g.data->functions[i]->space()->n_dofs();
+            // Constrained dofs come back zeroed by the transfer and so does their weight;
+            // apply_constraints below writes the boundary values over them regardless.
+            for (ptrdiff_t k = 0; k < nc; ++k)
+                if (w[(size_t)k] > real_t(1e-12)) sc[(size_t)k] /= w[(size_t)k];
+
             g.data->functions[i]->apply_constraints(g.states[i]->data());
         }
 
         g.mg          = sfem::h_mg<real_t>();
         g.mg->verbose = false;
+
+        // SFEM_GMG_PFILTER=1: strip the constant pressure mode from each prolonged
+        // correction.
+        //
+        // Pressure here is fixed only by a single pin, so it is determined up to a
+        // constant and each level's pin is its own gauge. Nothing makes the coarse pin the
+        // same physical node as the fine one, so a coarse pressure correction can arrive
+        // carrying an arbitrary constant offset. That constant is a near-null mode of the
+        // fine operator, which is precisely what the smoother is worst at removing, so it
+        // accumulates from cycle to cycle instead of being damped.
+        const bool pfilter = smesh::Env::read<int>("SFEM_GMG_PFILTER", 0) != 0;
+
+        // SFEM_GMG_CGC scales the prolonged coarse-grid correction. The rediscretised
+        // coarse operator measures about six times the Galerkin operator R A P that the
+        // transfers imply (see the coarse-op line under SFEM_GMG_CHECK=1), so its inverse
+        // returns a correction scaled by the reciprocal of that. This is the knob that
+        // says whether the mismatch is a single scalar per level -- in which case one
+        // factor repairs the cycle -- or a genuine difference in what the two operators
+        // do, which no scalar can fix.
+        const real_t cgc = smesh::Env::read<real_t>("SFEM_GMG_CGC", real_t(1));
+        auto       wrap_p  = [&](const int i) -> std::shared_ptr<sfem::Operator<real_t>> {
+            auto P = g.data->prolongations[i];
+            if (!P || (!pfilter && cgc == real_t(1))) return P;
+            const ptrdiff_t nf = g.data->functions[i - 1]->space()->n_dofs();
+            return sfem::make_op<real_t>(
+                    P->rows(), P->cols(),
+                    [P, nf, pfilter, cgc](const real_t *const from, real_t *const to) {
+                        P->apply(from, to);
+                        if (cgc != real_t(1))
+                            for (ptrdiff_t k = 0; k < nf; ++k) to[k] *= cgc;
+                        if (!pfilter) return;
+                        real_t    sum = 0;
+                        ptrdiff_t cnt = 0;
+                        for (ptrdiff_t k = 3; k < nf; k += N_FIELDS) {
+                            sum += to[k];
+                            ++cnt;
+                        }
+                        if (!cnt) return;
+                        const real_t mean = sum / (real_t)cnt;
+                        for (ptrdiff_t k = 3; k < nf; k += N_FIELDS) to[k] -= mean;
+                    },
+                    sfem::EXECUTION_SPACE_HOST);
+        };
         for (int i = 0; i < nlevels; ++i) {
             auto            fi = g.data->functions[i];
             const ptrdiff_t nn = fi->space()->n_dofs() / N_FIELDS;
@@ -261,8 +478,7 @@ namespace {
             if (i + 1 < nlevels) {
                 auto sm = sfem::create_stationary<real_t>(g.ops[i], prec, sfem::EXECUTION_SPACE_HOST);
                 sm->set_max_it(g.smoothing_steps);
-                g.mg->add_level(g.ops[i], sm, i == 0 ? nullptr : g.data->prolongations[i],
-                                g.data->restrictions[i]);
+                g.mg->add_level(g.ops[i], sm, i == 0 ? nullptr : wrap_p(i), g.data->restrictions[i]);
             } else {
                 // Coarse solve. BiCGStab, not CG: the operator is not symmetric.
                 auto cs = sfem::create_bcgs<real_t>(g.ops[i], sfem::EXECUTION_SPACE_HOST);
@@ -271,7 +487,7 @@ namespace {
                 cs->set_atol(1e-14);
                 cs->verbose = false;
                 cs->set_preconditioner_op(prec);
-                g.mg->add_level(g.ops[i], cs, g.data->prolongations[i], nullptr);
+                g.mg->add_level(g.ops[i], cs, wrap_p(i), nullptr);
             }
         }
         g.mg->set_max_it(1);  // one V-cycle per preconditioner application
@@ -512,8 +728,13 @@ int main(int argc, char **argv) {
     // Built once: the hierarchy and its transfer operators depend on the mesh, not the
     // state. The level states are refreshed per Newton step below, since they do.
     std::shared_ptr<GmgLevels> gmg;
-    if (use_gmg) {
+    if (use_gmg == 1) {  // 2 is the no-hierarchy control and must not build one
         gmg = build_gmg(f, op, xbuf, gmg_smooth);
+        if (gmg) build_state_weights(*gmg);
+        if (gmg && smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
+            refresh_gmg(*gmg);
+            check_transfers(*gmg);
+        }
         if (!gmg) {
             std::fprintf(stderr, "SFEM_GMG=1 but the hierarchy could not be built "
                                  "(needs a semi-structured mesh with more than one level)\n");
@@ -601,7 +822,41 @@ int main(int argc, char **argv) {
             if (gmg) {
                 // The hierarchy is fixed but the linearisation is not.
                 refresh_gmg(*gmg);
+
+                // SFEM_GMG_CHECK=2: run the V-cycle standalone as a solver on this Newton
+                // step's right-hand side and let it report its own convergence rate.
+                //
+                // Outer Krylov iteration counts cannot tell a broken coarse correction
+                // from a weak smoother -- both just look like "many iterations". The
+                // cycle's own rate can: a working V-cycle drops the residual by roughly
+                // an order of magnitude per cycle at a rate independent of level, and one
+                // whose coarse correction contributes nothing stalls near the rate of the
+                // smoother alone.
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 2 && newton_it == 0) {
+                    std::vector<real_t> probe((size_t)ndof, 0);
+                    gmg->mg->verbose = true;
+                    gmg->mg->set_max_it(smesh::Env::read<int>("SFEM_GMG_CHECK_IT", 20));
+                    gmg->mg->apply(rhs.data(), probe.data());
+                    gmg->mg->verbose = false;
+                    gmg->mg->set_max_it(1);
+                }
                 solver->set_preconditioner_op(gmg->mg);
+            } else if (use_gmg == 2) {
+                // Cost-matched control for the V-cycle. The same damped block-Jacobi, run
+                // as a stationary iteration on the fine level for the same number of
+                // sweeps a V-cycle spends smoothing, with no hierarchy under it.
+                //
+                // Worth having as its own arm because "more smoothing steps help" says
+                // nothing on its own: a damped smoother converges by itself, so a V-cycle
+                // whose coarse-grid correction did nothing at all would still improve as
+                // the smoothing count rose. This is the arm that separates the two. If the
+                // V-cycle cannot beat it, the hierarchy is only an expensive smoother and
+                // the fault is in the transfers or the coarse operator, not the smoother.
+                const real_t om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.5));
+                auto prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
+                auto sm   = sfem::create_stationary<real_t>(linop, prec, sfem::EXECUTION_SPACE_HOST);
+                sm->set_max_it(2 * gmg_smooth);
+                solver->set_preconditioner_op(sm);
             } else {
                 solver->set_preconditioner_op(make_block_jacobi(*op, x, cmask.data(), nnodes));
             }
