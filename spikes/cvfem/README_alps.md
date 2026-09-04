@@ -932,3 +932,71 @@ choice is between assembling the coarse levels once per Newton step and finding 
 discretisation that behaves like the Galerkin operator without being it. The measurements
 above are the gate either way: any candidate coarse operator should be required to bring the
 surviving fraction near zero on coarse-representable modes before it is put into a cycle.
+
+## Galerkin coarse operators, assembled once per Newton step
+
+`SFEM_GMG_GALERKIN=2` assembles `A_c = R A P` into BSR once per Newton step and applies it
+as a sparse matrix, so no coarse level reaches back up to a finer one during the solve.
+(`=1` keeps the matrix-free composition, which is the diagnostic, not a solver: it puts
+fine-level work under every coarse application.)
+
+Assembly does two jobs. It removes the fine-level dependency, and it supplies the coarse
+smoother with the diagonal of the matrix it actually smooths -- the matrix-free composite
+cannot, and using the rediscretised diagonal instead mismatches the Galerkin operator by the
+per-block scale factors (about 1.6 in velocity, 8 in pressure), which alone made the coarse
+levels diverge.
+
+The entries are recovered by probing under a distance-2 colouring of the coarse node graph,
+so no row ever sees two neighbours of one colour and a whole set of blocks falls out per
+application. That is colours x 4 applications instead of one per coarse degree of freedom:
+41 colours and 164 applications for 425 nodes, against 1700 for column-by-column.
+
+The pattern is self-correcting, and needs to be. Probing does not drop a non-zero that lies
+outside the pattern -- it folds it into the wrong entry, so too narrow a pattern yields a
+wrong matrix rather than an approximate one. The coarse mesh graph is right while the mesh
+is fine enough that `R A P` does not reach past it, and is wrong on the coarsest levels,
+where a handful of nodes are all within reach of each other. The gate caught exactly that:
+levels 1 and 2 assembled to 2e-16 while the 20-node coarsest level came out at 3.8e-1. It
+now widens to the squared adjacency and then to a dense pattern, and all levels assemble
+exactly:
+
+```
+gate 2.1236e-16  OK   425 nodes, 8281 blocks, 41 colours, 164 applications
+gate 2.7612e-16  OK    81 nodes, 1225 blocks, 31 colours, 124 applications
+gate 1.5981e-16  OK    20 nodes,  400 blocks, 20 colours,  80 applications  (dense pattern)
+```
+
+### It works two-level and fails multi-level, for a specific reason
+
+Cycle rates at L=8, first three and last three of twelve:
+
+| hierarchy | coarse handling | rates |
+|-----------|-----------------|-------|
+| rediscretised, 2 levels | solved | 0.096, 0.546, 0.850 ... 0.964 |
+| Galerkin, 2 levels      | solved | 0.021, 0.207, 0.238 ... 0.861 |
+| Galerkin, 4 levels      | smoothed | 0.433, 5.319, 5.659 ... 5.671 |
+
+Two-level Galerkin is a clear improvement and behaves as the correction-operator measurement
+predicted. Four-level Galerkin diverges, and not for want of damping: omega 0.35, 0.2, 0.1
+and 0.05 give 5.67, 5.23, 3.09 and 1.32, improving steadily and never reaching 1.
+
+The difference between the two rows is not the number of levels but what happens on the
+intermediate ones: solved in the first case, smoothed in the second. The Galerkin operator is
+a much better approximation of the fine operator and a much worse candidate for block-Jacobi
+smoothing -- it is denser, and its diagonal is not dominant in the way the rediscretised
+operator's is. That is the standard trade between the two coarsenings, and it is now the
+binding constraint rather than a suspicion.
+
+### Where that leaves it
+
+The two coarse operators fail in opposite directions. Rediscretisation is smoothable and
+approximates badly enough that its correction is worthless; Galerkin approximates well and
+cannot be smoothed by the smoother available. Two-level Galerkin with a solved coarse level
+sidesteps the conflict and is the best cycle measured so far, at 0.861 against 0.964.
+
+The next thing to try is therefore not another coarse operator but a stronger coarse-level
+solver: a few Krylov iterations per level in place of the stationary smoother, which
+tolerates an operator that block-Jacobi cannot smooth. That carries a consequence worth
+stating before it is measured -- a Krylov smoother makes the preconditioner vary between
+applications, which BiCGStab does not admit, so the outer solver would have to become
+flexible (FGMRES) at the same time.
