@@ -523,7 +523,7 @@
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 20</div>
     <div class="body">
-      <div class="op-title">Energy and residual must lower to one form algebra <span class="chip c-part">phase 0 done &mdash; the evidence</span></div>
+      <div class="op-title">Energy and residual must lower to one form algebra <span class="chip c-part">phase 1a done &mdash; residual side re-exposed</span></div>
 
       <p><b>The requirement.</b> Both formulations lower to the same three objects &mdash; 0-form (energy, or a residual-based merit), 1-form (gradient, or the negated residual), 2-form (Hessian, or the Jacobian) &mdash; and nothing below the form layer distinguishes them.</p>
 
@@ -552,6 +552,12 @@
       <p><b>One correction to the plan this phase was written from.</b> It said the residual 0-form does not exist, on the strength of <code>FormMetadata(FormOrder.ZERO)</code> being appended with no blocks. The <em>metadata</em> has no blocks, but the <em>form</em> does have an expression: laplace's 0-form is <code>&kappa;&sup2;(&nabla;u&middot;&nabla;v)&sup2;/2</code>, which is already the shape of a merit. What is missing is the block metadata and a consumer, not the mathematics &mdash; so phase 2 is smaller than planned. Worth noting that this expression is the square of the weak-form integrand, test function included, rather than of the assembled residual vector; whether that is the intended merit is a question for whoever specifies it.</p>
 
       <p><b>What phase 0 leaves behind.</b> <code>tests/test_form_keying_baseline.py</code> records, for every material and dimension, which orders exist, what each order's blocks are keyed by, and what the lowered fields are called. Phase 1 then arrives as a diff against that file rather than as an assertion that nothing broke. It deliberately does not assert that the 1-form is the derivative of the 0-form: on the residual path the 0-form is a merit and the 1-form is the negated residual, and the two are not related that way.</p>
+
+      <p><b>Phase 1, first half: the residual side now reaches its per-component blocks through the form layer.</b> <code>FormCollection.component_blocks_for(order)</code> returns them &mdash; Stokes reports <code>u0</code>, <code>u1</code>, <code>u2</code>, <code>p</code> at 1-form order where <code>blocks_for</code> reports <code>u</code> and <code>p</code>, and sixteen blocks at 2-form order where <code>blocks_for</code> reports three. Nothing new is computed; the lowering already built all of it under residual-specific names. <code>plans/residual_model.py</code> is the first consumer moved onto the accessor, and all 505 files stay byte-identical.</p>
+
+      <p>One thing the attempt got wrong first, worth keeping. The blocks were re-wrapped as <code>FormBlock</code> to make the return type uniform &mdash; which renames them, because <code>FormBlock.name</code> is derived as <code>form_2_&lt;row&gt;_&lt;column&gt;</code> while the lowering's blocks carry a name that already appears in generated kernels. The accessor hands back the lowering's own objects instead. Re-exposing is the job; renaming is not, and a phase that must be byte-identical cannot afford it.</p>
+
+      <p><b>The second half is the energy side</b>, which has nothing to re-expose: it declares <code>fields=(u,)</code> and <code>variables=(F,)</code> at the API and never lowers a per-component expansion. Its 1-form is <code>dE/dF</code>, a nine-vector in the differentiation variables rather than in the field's components, so deriving per-component blocks means carrying <code>dF/du</code> &mdash; real work rather than re-exposure, and the reason this phase splits in two.</p>
 
       <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>energy block metadata</i> empty</span></div>
     </div>

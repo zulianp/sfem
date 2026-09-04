@@ -199,3 +199,84 @@ class FormKeyingBaselineTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ComponentBlocksTest(unittest.TestCase):
+    """The per-component representation, reached through the form layer.
+
+    Phase 1's first half.  A residual lowering already builds per-component
+    1-form expressions and per-component 2-form blocks; they were reachable
+    only under residual-specific names, which is why the parallel
+    representation has 49 consumers against the form accessors' 19.
+    ``component_blocks_for`` is the accessor those consumers move onto, and
+    ``plans/residual_model.py`` is the first that has.
+    """
+
+    maxDiff = None
+
+    def _collection(self, material_name, dim=3):
+        import importlib
+
+        material = importlib.import_module(
+            "codegen.framework.materials.%s" % material_name
+        ).material
+        system = material.systems.for_dim(dim)
+        return system.form_collection(system.equations[0])
+
+    def test_a_vector_field_reports_one_block_per_component(self):
+        """Stokes keys blocks u0, u1, u2, p where blocks_for keys u, p."""
+        collection = self._collection("stokes")
+        one = collection.component_blocks_for(FormOrder.ONE)
+        self.assertEqual(
+            [block.row_field for block in one], ["u0", "u1", "u2", "p"]
+        )
+        assembled = [block.row_field for block in collection.blocks_for(FormOrder.ONE)]
+        self.assertEqual(assembled, ["u", "p"])
+
+    def test_the_two_form_is_the_full_component_coupling(self):
+        """Four lowered fields couple sixteen ways, not three."""
+        collection = self._collection("stokes")
+        two = collection.component_blocks_for(FormOrder.TWO)
+        self.assertEqual(len(two), 16)
+        self.assertEqual(
+            sorted({block.row_field for block in two}), ["p", "u0", "u1", "u2"]
+        )
+
+    def test_re_exposure_does_not_rename(self):
+        """The names reach generated code, so the accessor must not coin new ones.
+
+        ``FormBlock`` derives its name as ``form_2_<row>_<column>``; the blocks
+        a residual lowering builds carry a different one that already appears
+        in emitted kernels.  Re-wrapping them would have changed it, which is
+        why this accessor hands back the lowering's own objects.
+        """
+        collection = self._collection("stokes")
+        for block, source in zip(
+            collection.component_blocks_for(FormOrder.TWO),
+            collection.jacobian_action_blocks,
+        ):
+            self.assertIs(block, source)
+
+    def test_a_scalar_field_is_its_own_single_component(self):
+        """Laplace has one field and one block, and both keyings agree."""
+        collection = self._collection("laplace")
+        one = collection.component_blocks_for(FormOrder.ONE)
+        self.assertEqual([block.row_field for block in one], ["u"])
+
+    def test_a_missing_coupling_is_reported_rather_than_raised(self):
+        """A Jacobian is sparse between components; asking is how you find out."""
+        collection = self._collection("stokes")
+        self.assertIsNotNone(collection.component_block(FormOrder.TWO, "u0", "u0"))
+        self.assertIsNone(collection.component_block(FormOrder.TWO, "u0", "nope"))
+
+    def test_energy_reports_nothing_here_yet(self):
+        """Phase 1's second half, pinned as absent so its arrival is visible.
+
+        An energy formulation declares its structure through
+        ``add_energy(..., fields=..., variables=...)`` rather than lowering a
+        per-component expansion, so there is nothing to re-expose.  Deriving
+        these from the declared fields and variables is the remaining work.
+        """
+        collection = self._collection("linear_elasticity")
+        self.assertEqual(collection.component_blocks_for(FormOrder.ONE), ())
+        self.assertEqual(collection.component_blocks_for(FormOrder.TWO), ())
