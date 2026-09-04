@@ -690,7 +690,14 @@ static void report_rate(const char *name, double seconds, ptrdiff_t nnodes) {
 
 
 def _call_block(name, args, inputs, outputs, repeats=0):
-    lines = ["    {"]
+    # Announce the kernel on stderr before running it.  A driver that dies
+    # silently -- and one did, with SIGABRT and no message -- otherwise names
+    # only the last kernel that *finished*, which is the one before the
+    # problem.  stderr rather than stdout so the digest parser is unaffected.
+    lines = [
+        "    {",
+        '        std::fprintf(stderr, "running %s\\n");' % name,
+    ]
     for buffer, scalar, param, components, extent, _length in inputs:
         if extent:
             for slot in range(extent):
@@ -733,8 +740,18 @@ def _call_block(name, args, inputs, outputs, repeats=0):
                 )
             )
         else:
+            # Sized for the larger of one entry per node and one per element,
+            # because the signature does not say which the kernel writes.  A
+            # residual scatters to nodes; an objective accumulates per element
+            # -- `value[evbegin + lane] += ...` -- and sizing that by nodes
+            # overruns the buffer whenever a mesh has more elements than nodes.
+            # A hexahedral grid never does, so this was invisible until a
+            # tetrahedral one was driven: six tets per cell against one hex,
+            # 162 elements against 64 nodes, and the heap corruption showed up
+            # as a silent SIGABRT in the *next* kernel's allocation.
             lines.append(
-                "        std::vector<%s> %s(nodes * %d, (%s)0);"
+                "        std::vector<%s> %s(std::max<size_t>((size_t)nodes * %d, "
+                "(size_t)mesh.nelements), (%s)0);"
                 % (scalar, buffer, components, scalar)
             )
     call = [
@@ -818,6 +835,25 @@ def _generate(root, generated, material):
         stderr=subprocess.STDOUT,
     )
     return completed
+
+
+class _KeptDirectory:
+    """A working directory that survives the run, for when the driver dies.
+
+    The driver is generated, compiled and thrown away, which is right until it
+    aborts: then the one artifact that would explain it is the thing that just
+    got deleted.  Set SFEM_REPRODUCIBILITY_KEEP=1 to keep it and print where.
+    """
+
+    def __init__(self, path):
+        self.path = path
+
+    def __enter__(self):
+        return self.path
+
+    def __exit__(self, *exc_info):
+        sys.stderr.write("kept the driver workspace at %s\n" % self.path)
+        return False
 
 
 def run_material(root, generated, material, refine, compiler, verbose=False, repeats=0):
@@ -924,7 +960,31 @@ def run_material(root, generated, material, refine, compiler, verbose=False, rep
     output = run.stdout.decode("utf-8", "replace")
     if run.returncode != 0:
         sys.stderr.write(output)
-        raise RuntimeError("driver failed to run for %s" % material)
+        # A driver killed by a signal reports a negative return code and prints
+        # nothing, so "failed to run" on its own says only that something went
+        # wrong somewhere in a few hundred kernels.  Naming the signal and the
+        # last kernel that did report turns that into a place to look.
+        signal_name = ""
+        if run.returncode < 0:
+            try:
+                import signal as _signal
+
+                signal_name = " (%s)" % _signal.Signals(-run.returncode).name
+            except (ValueError, AttributeError):
+                signal_name = ""
+        last = ""
+        for line in output.splitlines():
+            if line.startswith("kernel "):
+                last = line.split()[1]
+        raise RuntimeError(
+            "driver failed to run for %s: exit %d%s%s"
+            % (
+                material,
+                run.returncode,
+                signal_name,
+                "; last kernel to report was %s" % last if last else "",
+            )
+        )
     if verbose:
         print(output)
 
@@ -1057,7 +1117,13 @@ def main(argv=None):
 
     measured, measured_rates, skipped_all, failures = {}, {}, {}, []
     owner = {}
-    with tempfile.TemporaryDirectory(prefix="sfem_reproducibility_") as workdir:
+    keep = bool(os.environ.get("SFEM_REPRODUCIBILITY_KEEP"))
+    context = (
+        _KeptDirectory(tempfile.mkdtemp(prefix="sfem_reproducibility_"))
+        if keep
+        else tempfile.TemporaryDirectory(prefix="sfem_reproducibility_")
+    )
+    with context as workdir:
         generated = os.path.join(workdir, "generated")
         os.makedirs(generated)
         for material in materials:
