@@ -1436,3 +1436,49 @@ from the single-threaded ones.
 
 Assembling the fine operator costs 1.85 s single-threaded and 0.90 s on eight, which is
 already counted in the timings above.
+
+## The packed layout, brought to the semi-structured path
+
+The flat HEX8 path won on CPU with a packed mesh: each pack writes its exclusively owned
+nodes straight out, stages the shared ones, and a second pass gathers each shared node's
+contributions in a fixed order. The semi-structured path never had it. `initialize()`
+returns early for a semi-structured mesh, before the packing block, so those kernels
+accumulated locally within a macro-element and then scattered every node with `atomic_add`.
+
+That is where the irreproducibility came from. Atomic ordering follows thread timing and
+floating-point addition is not associative, so with 27 macro-elements on 8 threads the same
+operator application gave 0.080346978588455187 and 0.080346695382904176, while one thread
+gave the same value every time. The earlier check that appeared to show determinism was run
+at N=1, where there is a single macro-element and the atomics never contend -- a test that
+could not have failed.
+
+`SFEM_SS_SCATTER=1` (default) applies the packed layout's structure. It is simpler here
+because the split is geometric: every lattice node strictly inside a macro-element belongs to
+it alone, and only the skin is shared -- (L+1)^3 - (L-1)^3 nodes, 37% at L=4 falling to 12%
+at L=16. Interior nodes are written directly, skin nodes are staged, and a second pass sums
+each shared node's contributions in element order. It covers the Jacobian action and the
+nodal pressure gradient, which had its own set of atomics and fed the apply, so fixing only
+the first left the operator non-reproducible.
+
+Measured at N=3, L=4, 8 threads, with the pressure-gradient cache off so both kernels are
+exercised:
+
+| | repeat-diff within a run | two runs, same thread count |
+|---|---|---|
+| atomic scatter | 5.551e-17 | 0.080346978588455187, 0.080346695382904176 |
+| two-pass scatter | 0.000e+00 | 0.080346967363645994, 0.080346967363645994 |
+
+The operator is now bit-reproducible run to run at a fixed thread count, and it is faster:
+at N=3, L=8 the solve takes 8.79 to 9.73 s against 9.80 to 11.26 s, about 11%.
+
+Two things it does not do. Results still differ between one thread and eight, but that
+difference is in the initial state (206.55554994212025 against 206.55554942713621), which is
+a setup-phase reduction and not these kernels. And the full solve is still not reproducible
+run to run -- 1284, 1228, 1355 iterations -- because the Krylov method's dot products are
+OpenMP reductions whose order still follows the schedule. That is the same conclusion the
+assembled-operator experiment reached from the other direction: a deterministic operator is
+necessary for a reproducible parallel solve and not sufficient. Closing it needs a
+fixed-order reduction in the BLAS layer.
+
+Still atomic, and worth the same treatment: the residual, the block diagonal, and the
+2x2 block-split kernels, none of which are on the path measured above.

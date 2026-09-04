@@ -596,6 +596,23 @@ namespace {
                 dn += d * d;
                 fn += full[(size_t)k] * full[(size_t)k];
             }
+            // Full-precision checksum of one operator application, plus a repeat, so
+            // non-determinism is visible rather than hidden by the print width above.
+            // Compare this line across thread counts and across runs.
+            {
+                std::vector<real_t> y1((size_t)nd, 0), y2((size_t)nd, 0);
+                fop.apply(g.states[0]->data(), dir.data(), y1.data());
+                fop.apply(g.states[0]->data(), dir.data(), y2.data());
+                real_t s1 = 0, dmax = 0;
+                for (ptrdiff_t k = 0; k < nd; ++k) {
+                    s1 += y1[(size_t)k];
+                    dmax = std::max(dmax, std::fabs(y1[(size_t)k] - y2[(size_t)k]));
+                }
+                real_t sx = 0;
+                for (ptrdiff_t k = 0; k < nd; ++k) sx += g.states[0]->data()[(size_t)k];
+                std::printf("  state checksum: %.17g\n", (double)sx);
+                std::printf("  apply checksum: %.17g   repeat-diff %.3e\n", (double)s1, (double)dmax);
+            }
             std::printf("\n  sum vs full: rel %.4e  %s\n", (fn > 0) ? std::sqrt(dn / fn) : 0.0,
                         (fn > 0 && std::sqrt(dn / fn) < 1e-10) ? "OK" : "MISMATCH");
         }
