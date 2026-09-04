@@ -270,14 +270,15 @@ namespace {
                                                 std::move(freed), omega, inner);
     }
 
-    std::shared_ptr<BlockJacobi> make_block_jacobi(sfem::CVFEMNavierStokes &op,
-                                                   const real_t *const      x,
-                                                   const mask_t *const      mask,
-                                                   const ptrdiff_t          nnodes,
-                                                   const real_t             omega = real_t(1),
-                                                   const real_t             prow  = real_t(1)) {
-        std::vector<real_t> blocks((size_t)nnodes * 16, 0);
-        op.hessian_block_diag(x, blocks.data());
+    // Inverts a given 4x4 block diagonal. Split out from make_block_jacobi so a smoother
+    // can be built from an assembled matrix's own diagonal rather than from the operator's,
+    // which is what the Galerkin levels need: they smooth an assembled matrix, and
+    // preconditioning it with the rediscretised diagonal is what made those levels diverge.
+    std::shared_ptr<BlockJacobi> make_block_jacobi_from_diag(std::vector<real_t> blocks,
+                                                             const mask_t *const mask,
+                                                             const ptrdiff_t     nnodes,
+                                                             const real_t        omega = real_t(1),
+                                                             const real_t        prow  = real_t(1)) {
 
         // `prow` scales the continuity row of every block, matching SFEM_GMG_PSCALE's
         // scaling of the level operator. The two must agree: the smoother preconditions
@@ -338,6 +339,18 @@ namespace {
         }
         return std::make_shared<BlockJacobi>(nnodes, std::move(inv));
     }
+
+    std::shared_ptr<BlockJacobi> make_block_jacobi(sfem::CVFEMNavierStokes &op,
+                                                   const real_t *const      x,
+                                                   const mask_t *const      mask,
+                                                   const ptrdiff_t          nnodes,
+                                                   const real_t             omega = real_t(1),
+                                                   const real_t             prow  = real_t(1)) {
+        std::vector<real_t> blocks((size_t)nnodes * 16, 0);
+        op.hessian_block_diag(x, blocks.data());
+        return make_block_jacobi_from_diag(std::move(blocks), mask, nnodes, omega, prow);
+    }
+
 
     // ---------------------------------------------------------------------------
     // Semi-structured geometric multigrid, as a preconditioner for the Jacobian solve.
@@ -788,6 +801,207 @@ namespace {
         std::printf("\n");
     }
 
+    // Assembles the Galerkin coarse operator A_c = R A P into BSR, once per Newton step.
+    //
+    // Composing R A P at solve time works -- it is what SFEM_GMG_GALERKIN=1 measures -- but
+    // puts fine-level work under every coarse application, which is precisely what a
+    // hierarchy exists to avoid. Assembling it instead pays that cost once per Newton step
+    // and leaves the cycle applying a sparse matrix, so a coarse level never reaches back
+    // up to a finer one during the solve.
+    //
+    // Assembly also fixes the other half of the problem. A coarse smoother needs the
+    // diagonal of the operator it smooths, and the matrix-free composite cannot supply one;
+    // using the rediscretised diagonal instead mismatches the Galerkin operator by the
+    // per-block scale factors (about 1.6 in velocity and 8 in pressure) and makes the
+    // coarse smoother diverge. An assembled matrix hands over its own diagonal.
+    //
+    // The entries are recovered by probing. With a distance-2 colouring of the coarse node
+    // graph, no node has two neighbours of the same colour, so one application per colour
+    // and component reveals a whole set of blocks at once: colours x 4 applications rather
+    // than one per coarse degree of freedom.
+    std::shared_ptr<sfem::Operator<real_t>> assemble_galerkin(const std::shared_ptr<sfem::Function>         &f_coarse,
+                                                              const std::shared_ptr<sfem::Operator<real_t>> &A_above,
+                                                              const std::shared_ptr<sfem::Operator<real_t>> &P,
+                                                              const std::shared_ptr<sfem::Operator<real_t>> &R,
+                                                              const ptrdiff_t                                n_fine,
+                                                              std::vector<real_t>                           *diag_out) {
+        auto            graph = f_coarse->space()->node_to_node_graph();
+        const ptrdiff_t nn    = f_coarse->space()->n_dofs() / N_FIELDS;
+        const count_t *const g_rp = graph->rowptr()->data();
+        const idx_t *const   g_ci = graph->colidx()->data();
+
+        // The pattern is the coarse mesh graph, widened if that turns out to be too narrow.
+        //
+        // Probing recovers A_c(i,j) only for j inside the pattern being probed; a non-zero
+        // of R A P outside it is not dropped but folded into the wrong entry, so a pattern
+        // that is too narrow yields a wrong matrix rather than an approximate one. The mesh
+        // graph is right while the coarse mesh is fine enough that R A P does not reach past
+        // it, and stops being right on the coarsest levels, where a few nodes are all within
+        // reach of each other. `widen` squares the adjacency; at the second retry the level
+        // is small enough that a dense pattern costs nothing.
+        std::vector<std::vector<idx_t>> adj((size_t)nn);
+        auto build_pattern = [&](const int widen) {
+            for (ptrdiff_t i = 0; i < nn; ++i) {
+                std::vector<idx_t> row(g_ci + g_rp[i], g_ci + g_rp[i + 1]);
+                if (widen == 2) {
+                    row.clear();
+                    for (ptrdiff_t j = 0; j < nn; ++j) row.push_back((idx_t)j);
+                } else if (widen == 1) {
+                    for (count_t a = g_rp[i]; a < g_rp[i + 1]; ++a) {
+                        const idx_t j = g_ci[a];
+                        row.insert(row.end(), g_ci + g_rp[j], g_ci + g_rp[j + 1]);
+                    }
+                    std::sort(row.begin(), row.end());
+                    row.erase(std::unique(row.begin(), row.end()), row.end());
+                }
+                adj[(size_t)i] = std::move(row);
+            }
+        };
+
+        std::shared_ptr<sfem::Operator<real_t>> assembled;
+        for (int attempt = 0; attempt < 3; ++attempt) {
+        build_pattern(attempt);
+        std::vector<count_t> rpv((size_t)nn + 1, 0);
+        for (ptrdiff_t i = 0; i < nn; ++i) rpv[(size_t)i + 1] = rpv[(size_t)i] + (count_t)adj[(size_t)i].size();
+        std::vector<idx_t> civ;
+        civ.reserve((size_t)rpv[(size_t)nn]);
+        for (ptrdiff_t i = 0; i < nn; ++i) civ.insert(civ.end(), adj[(size_t)i].begin(), adj[(size_t)i].end());
+        const count_t *const rp  = rpv.data();
+        const idx_t *const   ci  = civ.data();
+        const ptrdiff_t      nnz = rp[nn];
+
+        // Greedy distance-2 colouring: two nodes sharing a neighbour must differ, so that a
+        // probe on one colour never mixes two contributions into the same row.
+        std::vector<int> color((size_t)nn, -1);
+        {
+            std::vector<int> used;
+            for (ptrdiff_t i = 0; i < nn; ++i) {
+                used.assign(64, 0);
+                for (count_t a = rp[i]; a < rp[i + 1]; ++a) {
+                    const idx_t j = ci[a];
+                    if (color[(size_t)j] >= 0) {
+                        if ((size_t)color[(size_t)j] >= used.size()) used.resize((size_t)color[(size_t)j] + 1, 0);
+                        used[(size_t)color[(size_t)j]] = 1;
+                    }
+                    for (count_t b = rp[j]; b < rp[j + 1]; ++b) {
+                        const idx_t k = ci[b];
+                        if (color[(size_t)k] >= 0) {
+                            if ((size_t)color[(size_t)k] >= used.size()) used.resize((size_t)color[(size_t)k] + 1, 0);
+                            used[(size_t)color[(size_t)k]] = 1;
+                        }
+                    }
+                }
+                int c = 0;
+                while (c < (int)used.size() && used[(size_t)c]) ++c;
+                color[(size_t)i] = c;
+            }
+        }
+        const int ncolors = 1 + *std::max_element(color.begin(), color.end());
+
+        auto rowptr = smesh::create_host_buffer<count_t>((size_t)nn + 1);
+        auto colidx = smesh::create_host_buffer<idx_t>((size_t)nnz);
+        auto values = smesh::create_host_buffer<real_t>((size_t)nnz * 16);
+        std::copy(rp, rp + nn + 1, rowptr->data());
+        std::copy(ci, ci + nnz, colidx->data());
+        std::fill(values->data(), values->data() + (size_t)nnz * 16, real_t(0));
+
+        const ptrdiff_t     ndc = nn * N_FIELDS;
+        std::vector<real_t> v((size_t)ndc), y((size_t)ndc), t1((size_t)n_fine), t2((size_t)n_fine);
+
+        for (int c = 0; c < ncolors; ++c) {
+            for (int b = 0; b < N_FIELDS; ++b) {
+                std::fill(v.begin(), v.end(), real_t(0));
+                for (ptrdiff_t j = 0; j < nn; ++j)
+                    if (color[(size_t)j] == c) v[(size_t)j * N_FIELDS + b] = real_t(1);
+
+                std::fill(t1.begin(), t1.end(), real_t(0));
+                std::fill(t2.begin(), t2.end(), real_t(0));
+                std::fill(y.begin(), y.end(), real_t(0));
+                P->apply(v.data(), t1.data());
+                A_above->apply(t1.data(), t2.data());
+                R->apply(t2.data(), y.data());
+
+                for (ptrdiff_t i = 0; i < nn; ++i)
+                    for (count_t a = rp[i]; a < rp[i + 1]; ++a)
+                        if (color[(size_t)ci[a]] == c)
+                            for (int r = 0; r < N_FIELDS; ++r)
+                                values->data()[(size_t)a * 16 + (size_t)r * N_FIELDS + b] =
+                                        y[(size_t)i * N_FIELDS + r];
+            }
+        }
+
+        // Both transfers zero constrained degrees of freedom on output, so the assembled
+        // rows for those are empty and the matrix would be singular. Restore the identity
+        // rows the constrained system actually has.
+        {
+            std::vector<mask_t> m(mask_count(f_coarse->space()->n_dofs()), 0);
+            f_coarse->constraints_mask(m.data());
+            for (ptrdiff_t i = 0; i < nn; ++i)
+                for (int r = 0; r < N_FIELDS; ++r) {
+                    if (!mask_get(i * N_FIELDS + r, m.data())) continue;
+                    for (count_t a = rp[i]; a < rp[i + 1]; ++a)
+                        for (int cc = 0; cc < N_FIELDS; ++cc)
+                            values->data()[(size_t)a * 16 + (size_t)r * N_FIELDS + cc] =
+                                    (ci[a] == i && cc == r) ? real_t(1) : real_t(0);
+                }
+        }
+
+        if (diag_out) {
+            diag_out->assign((size_t)nn * 16, real_t(0));
+            for (ptrdiff_t i = 0; i < nn; ++i)
+                for (count_t a = rp[i]; a < rp[i + 1]; ++a)
+                    if (ci[a] == i)
+                        std::copy(values->data() + (size_t)a * 16, values->data() + (size_t)a * 16 + 16,
+                                  diag_out->data() + (size_t)i * 16);
+        }
+
+        assembled = sfem::h_bsr_spmv<count_t, idx_t, real_t, real_t>(nn, nn, N_FIELDS, rowptr, colidx,
+                                                                     values, real_t(0));
+        bool gate_ok = false;
+
+        // Gate: the assembled matrix must reproduce the composite R A P it was probed from.
+        // Probing is only valid if every non-zero of R A P falls inside the pattern being
+        // probed; anything outside it lands in the wrong row and is silently absorbed.
+        {
+            std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
+            unsigned            st = 991u;
+            for (ptrdiff_t k = 0; k < ndc; ++k) {
+                st = st * 1103515245u + 12345u;
+                v[(size_t)k] = (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+            }
+            f_coarse->apply_zero_constraints(v.data());
+
+            assembled->apply(v.data(), ya.data());
+            std::fill(t1.begin(), t1.end(), real_t(0));
+            std::fill(t2.begin(), t2.end(), real_t(0));
+            P->apply(v.data(), t1.data());
+            A_above->apply(t1.data(), t2.data());
+            R->apply(t2.data(), yb.data());
+
+            real_t dn = 0, rnv = 0;
+            for (ptrdiff_t k = 0; k < ndc; ++k) {
+                const real_t d = ya[(size_t)k] - yb[(size_t)k];
+                dn += d * d;
+                rnv += yb[(size_t)k] * yb[(size_t)k];
+            }
+            const real_t rel = (rnv > 0) ? std::sqrt(dn / rnv) : 0.0;
+            gate_ok          = rel < 1e-10;
+            if (gate_ok || attempt == 2)
+                std::printf("galerkin assembly gate: |assembled - RAP| / |RAP| = %.4e  %s\n", rel,
+                            gate_ok ? "OK" : "MISMATCH");
+        }
+
+        if (gate_ok || attempt == 2) {
+            std::printf("galerkin assembly: %td nodes, %td blocks, %d colours, %d applications%s\n",
+                        nn, nnz, ncolors, ncolors * N_FIELDS,
+                        attempt == 0 ? "" : (attempt == 1 ? "  (widened pattern)" : "  (dense pattern)"));
+            return assembled;
+        }
+        }  // attempt
+
+        return assembled;
+    }
+
     void refresh_gmg(GmgLevels &g) {
         const int nlevels = (int)g.ops.size();
         for (int i = 1; i < nlevels; ++i) {
@@ -826,7 +1040,13 @@ namespace {
         // factor repairs the cycle -- or a genuine difference in what the two operators
         // do, which no scalar can fix.
         const real_t cgc    = smesh::Env::read<real_t>("SFEM_GMG_CGC", real_t(1));
-        const real_t pscale = smesh::Env::read<real_t>("SFEM_GMG_PSCALE", real_t(1));
+        const real_t pscale   = smesh::Env::read<real_t>("SFEM_GMG_PSCALE", real_t(1));
+        // 0 rediscretised, 1 Galerkin composed matrix-free (diagnostic), 2 Galerkin
+        // assembled once per Newton step (the usable form).
+        const int  galerkin_mode = smesh::Env::read<int>("SFEM_GMG_GALERKIN", 0);
+        const bool galerkin      = galerkin_mode == 1;
+        std::shared_ptr<sfem::Operator<real_t>> level_op_below;
+        std::vector<real_t>                     galerkin_diag;
         auto       wrap_p  = [&](const int i) -> std::shared_ptr<sfem::Operator<real_t>> {
             auto P = g.data->prolongations[i];
             if (!P || (!pfilter && cgc == real_t(1))) return P;
@@ -858,8 +1078,47 @@ namespace {
             const real_t omega = (i + 1 < nlevels)
                                          ? smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35))
                                          : real_t(1);
-            auto prec = make_block_jacobi(*g.level_ops[i], g.states[i]->data(), mask.data(), nn, omega,
-                                          (i > 0) ? pscale : real_t(1));
+            auto lop = g.ops[i];
+
+            // SFEM_GMG_GALERKIN=1: use R A P as the coarse operator instead of the
+            // rediscretised one, composed matrix-free and recursively, so level i applies
+            // the level i-1 operator between its transfers.
+            //
+            // This is deliberately the expensive form. Every coarse application reaches all
+            // the way up to the fine level, which is exactly what a hierarchy exists to
+            // avoid, so it is not a solution -- it is the experiment that says whether
+            // Galerkin coarsening fixes the cycle before any effort is spent making it
+            // affordable. If it does, the affordable version is to assemble these operators
+            // once per Newton step and apply them as sparse matrices.
+            if (i > 0 && galerkin) {
+                auto Pop   = g.data->prolongations[i];
+                auto Rop   = g.data->restrictions[i - 1];
+                auto below = level_op_below;           // already Galerkin for i-1
+                const ptrdiff_t nfine = g.data->functions[i - 1]->space()->n_dofs();
+                const ptrdiff_t ncrs  = fi->space()->n_dofs();
+                lop = sfem::make_op<real_t>(
+                        ncrs, ncrs,
+                        [Pop, Rop, below, nfine](const real_t *const xc, real_t *const yc) {
+                            std::vector<real_t> t1((size_t)nfine, 0), t2((size_t)nfine, 0);
+                            Pop->apply(xc, t1.data());
+                            below->apply(t1.data(), t2.data());
+                            Rop->apply(t2.data(), yc);
+                        },
+                        sfem::EXECUTION_SPACE_HOST);
+            }
+
+            if (i > 0 && galerkin_mode == 2) {
+                lop = assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
+                                        g.data->restrictions[i - 1],
+                                        g.data->functions[i - 1]->space()->n_dofs(), &galerkin_diag);
+            }
+
+            std::shared_ptr<BlockJacobi> prec;
+            if (i > 0 && galerkin_mode == 2)
+                prec = make_block_jacobi_from_diag(galerkin_diag, mask.data(), nn, omega);
+            else
+                prec = make_block_jacobi(*g.level_ops[i], g.states[i]->data(), mask.data(), nn, omega,
+                                         (i > 0) ? pscale : real_t(1));
 
             // SFEM_GMG_PSCALE scales the continuity rows of every coarse level.
             //
@@ -869,7 +1128,6 @@ namespace {
             // continuity row is untouched and the coarse operator keeps the stabilisation
             // its own mesh needs. The value to use is not tuned: it is the pressure/velocity
             // ratio of the best-fit scales printed by SFEM_GMG_CHECK=1.
-            auto lop = g.ops[i];
             if (i > 0 && pscale != real_t(1)) {
                 const ptrdiff_t nd = fi->space()->n_dofs();
                 auto            inner = lop;
@@ -887,8 +1145,10 @@ namespace {
             if (i + 1 < nlevels) {
                 auto sm = sfem::create_stationary<real_t>(lop, prec, sfem::EXECUTION_SPACE_HOST);
                 sm->set_max_it(g.smoothing_steps);
+                level_op_below = lop;
                 g.mg->add_level(lop, sm, i == 0 ? nullptr : wrap_p(i), g.data->restrictions[i]);
             } else {
+                level_op_below = lop;
                 // Coarse solve. BiCGStab, not CG: the operator is not symmetric.
                 auto cs = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
                 cs->set_max_it(smesh::Env::read<int>("SFEM_GMG_COARSE_MAX_IT", 200));
