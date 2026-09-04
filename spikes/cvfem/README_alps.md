@@ -255,3 +255,46 @@ cvfem_build --target cvfem_sshex8_bench
 CVFEM_CPUS=72 cvfem_run ./run_sshex8_sweep.sh
 SFEM_BENCH_PROBE_DIAG=1 ./build/cvfem_sshex8_bench   # block diag against the operator
 ```
+
+### The 2x2 field blocks
+
+`sscvfem_apply_blocks` evaluates any subset of
+
+```
+       | A_uu  B^T |   momentum rows
+  J =  |           |
+       | B     C   |   continuity rows
+```
+
+with the unwanted terms compiled out rather than branched over. Cost as a share of the
+full operator, M1, 561924 dofs, L=8:
+
+| block | share of J |
+|---|---|
+| `pp` (C) | **36%** |
+| `pu` (B) | **49%** |
+| `con` rows (B and C) | 53% |
+| `up` (B^T) | 69% |
+| `uu` (A) | 94% |
+| `mom` rows | 100% |
+
+The blocks a Schur-complement scheme needs are the cheap ones. C alone costs about a
+third of J, which matters for the pressure preconditioner: the standalone driver's
+SFEM_PC_PSCALE work needed exactly this block and had no way to ask for it. A_uu is
+barely cheaper than the whole operator, because the viscous and convective terms it keeps
+are most of the cost.
+
+One term does not go where the code's structure suggests. The convective flux contributes
+to both A_uu and B^T, because the mass-flux derivative carries a velocity part and a
+pressure part, `dmdot = rho/2 (v_i + v_j).A + c (q_i - q_j)`. Putting all of it in A_uu
+would hide the Rhie-Chow coupling inside the momentum block and quietly wreck any Schur
+approximation built on these blocks.
+
+Two checks, because one is not enough. Each specialised kernel is compared against a
+reference built by masking the inputs around the *unmodified* operator, which cannot
+disagree with it by construction; and the four blocks must sum back to the full operator,
+which is what catches a term landing in the wrong one. Both hold to 5.5e-16.
+
+```bash
+SFEM_BENCH_VERBOSE_BLOCKS=1 ./build/cvfem_sshex8_bench
+```
