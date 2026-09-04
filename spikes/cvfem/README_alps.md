@@ -780,3 +780,66 @@ since `Df ~ h^2` either way, so 0.25 should be right in 3D too. Candidate causes
 driver's Reynolds regime, its hierarchy depth, or something still wrong in the driver that
 the model does not carry. That is the next thing to chase, and it is a much narrower
 question than the one this evaluation started with.
+
+## The smoother was divergent, and the iteration counts were noise
+
+Two findings that overturn parts of the account above.
+
+### The default damping made the smoother diverge
+
+`SFEM_GMG_CHECK=3` runs the smoother standalone as the stationary iteration it actually is
+inside a cycle. Its good showing as a BiCGStab preconditioner proved nothing: a Krylov
+method tolerates a preconditioner that would diverge if iterated, and inside a V-cycle it
+is iterated.
+
+At the then-default `omega = 0.5` the residual falls for about twenty sweeps, bottoms out
+near 4.2e-3, and then grows; the per-sweep rate rises monotonically through 1 at around
+sweep 27 and reaches 1.038 by sweep 39. An earlier reading of this same measurement stopped
+at eight sweeps, saw 0.88 to 0.95, and called the smoother convergent. The rate was still
+rising at the point it was cut off.
+
+Asymptotic rates over sweeps 35-39: `omega` 0.5 gives 1.038 and rising, 0.3 gives 0.9717
+and flat, 0.15 gives 0.9855, 0.05 gives 0.9915. The default is now 0.35.
+
+This is what the earlier `SFEM_GMG_CGC=0` test was pointing at and what nothing else
+explained: with the coarse-grid correction switched off entirely the cycle still diverged
+(0.68, 0.80, 0.87, 0.98, 1.11, 1.21), while the smoother allegedly converged. A cycle that
+diverges with no coarse correction has nothing to do with its coarse grid.
+
+With a convergent smoother the V-cycle converges as an iteration for the first time.
+Cycle rates at L=8: `omega` 0.35 gives 0.25, 0.30, 0.35, 0.57, 0.51, 0.48; 0.3 and 0.25 are
+similar; 0.5 still diverges to 1.32.
+
+So the plan's P5 is back, and this time on direct evidence rather than on the inference
+that was withdrawn: the smoother is genuinely inadequate here, and damping only moves it
+from divergent to barely convergent at 0.97 per sweep.
+
+### The iteration counts in this report carry about a factor of two of noise
+
+Four runs of one identical configuration (L=8, `omega` 0.35, V-cycle) gave 3084, 2354, 2793
+and 1485 total linear iterations. Block-Jacobi under the same treatment gave 993 and 979.
+
+The V-cycle path performs far more operator applications, each carrying OpenMP atomic
+rounding non-determinism, and an outer BiCGStab that is close to stagnating amplifies the
+difference. The consequence is that any single-shot comparison of V-cycle iteration counts
+in this document is unreliable at better than a factor of two, which covers the
+`SFEM_GMG_PSCALE` sweep, the `omega` 0.35 against 0.5 comparison, and the earlier
+level-independence tables. Differences of that size were read as signal and were not.
+
+What survives is what was measured as a rate rather than a count -- the standalone smoother
+and cycle rates, which are monotone and reproducible -- and the block-Jacobi-against-V-cycle
+gap, which is larger than the spread. Block-Jacobi at about 985 still beats the V-cycle at
+1485 to 3084, so the cycle is still not competitive; it has merely stopped diverging.
+
+### What the independent evaluation does and does not transfer
+
+`nullspace_eval.py` predicted that scaling the coarse continuity rows by the measured
+pressure/velocity ratio of the best-fit block scales would fix the cycle, and in the model
+it does: the predicted beta is optimal at n = 16, 24 and 32 without tuning. The driver
+reports the same pathology -- best-fit scales of about 0.63 on velocity and 0.12 on
+pressure, a ratio of 0.196 -- but `SFEM_GMG_PSCALE` at that value does not help, before or
+after the damping fix, and the differences are inside the noise quantified above.
+
+The model's own stage 1b gate required a convergent smoother before reporting anything.
+The driver had no such gate until now, which is precisely how a divergent smoother survived
+several rounds of coarse-grid investigation.
