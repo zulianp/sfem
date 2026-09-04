@@ -612,6 +612,41 @@ namespace {
                 for (ptrdiff_t k = 0; k < nd; ++k) sx += g.states[0]->data()[(size_t)k];
                 std::printf("  state checksum: %.17g\n", (double)sx);
                 std::printf("  apply checksum: %.17g   repeat-diff %.3e\n", (double)s1, (double)dmax);
+
+                // The other three kernels that scatter: residual, block diagonal, and one
+                // block of the 2x2 split. Same question, same evidence.
+                {
+                    std::vector<real_t> r1((size_t)nd, 0), r2((size_t)nd, 0);
+                    fop.gradient(g.states[0]->data(), r1.data());
+                    fop.gradient(g.states[0]->data(), r2.data());
+                    real_t cs = 0, dm = 0;
+                    for (ptrdiff_t k = 0; k < nd; ++k) {
+                        cs += r1[(size_t)k];
+                        dm = std::max(dm, std::fabs(r1[(size_t)k] - r2[(size_t)k]));
+                    }
+                    std::printf("  residual checksum: %.17g   repeat-diff %.3e\n", (double)cs, (double)dm);
+
+                    const ptrdiff_t nnod = nd / N_FIELDS;
+                    std::vector<real_t> b1((size_t)nnod * 16, 0), b2((size_t)nnod * 16, 0);
+                    fop.hessian_block_diag(g.states[0]->data(), b1.data());
+                    fop.hessian_block_diag(g.states[0]->data(), b2.data());
+                    real_t bs = 0, bm = 0;
+                    for (size_t k = 0; k < b1.size(); ++k) {
+                        bs += b1[k];
+                        bm = std::max(bm, std::fabs(b1[k] - b2[k]));
+                    }
+                    std::printf("  blockdiag checksum: %.17g  repeat-diff %.3e\n", (double)bs, (double)bm);
+
+                    std::vector<real_t> k1((size_t)nd, 0), k2((size_t)nd, 0);
+                    fop.apply_blocks(g.states[0]->data(), dir.data(), k1.data(), sfem::CVFEM_BLOCK_PU);
+                    fop.apply_blocks(g.states[0]->data(), dir.data(), k2.data(), sfem::CVFEM_BLOCK_PU);
+                    real_t ks = 0, km = 0;
+                    for (ptrdiff_t k = 0; k < nd; ++k) {
+                        ks += k1[(size_t)k];
+                        km = std::max(km, std::fabs(k1[(size_t)k] - k2[(size_t)k]));
+                    }
+                    std::printf("  blocksplit checksum: %.17g repeat-diff %.3e\n", (double)ks, (double)km);
+                }
             }
             std::printf("\n  sum vs full: rel %.4e  %s\n", (fn > 0) ? std::sqrt(dn / fn) : 0.0,
                         (fn > 0 && std::sqrt(dn / fn) < 1e-10) ? "OK" : "MISMATCH");

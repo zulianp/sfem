@@ -82,7 +82,8 @@ struct SSScatter {
     std::vector<ptrdiff_t>    red_ptr;      // CRS over reduction rows
     std::vector<ptrdiff_t>    red_idx;      // staging slots feeding each row
     ptrdiff_t                 n_slots{0};
-    std::vector<scalar_t>     stage;        // n_slots * N_FIELDS
+    std::vector<scalar_t>     stage;        // n_slots * N_FIELDS, for the 4-wide kernels
+    std::vector<scalar_t>     stage16;      // n_slots * 16, for the block diagonal
 };
 
 inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
@@ -126,24 +127,49 @@ inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
         }
 
     s.stage.assign((size_t)s.n_slots * N_FIELDS, scalar_t(0));
+    s.stage16.assign((size_t)s.n_slots * 16, scalar_t(0));
     s.ready = true;
 }
 
-// Per-element scatter: exclusive nodes straight out, shared ones staged.
+// Per-element scatter: exclusive nodes straight out, shared ones staged. Templated on the
+// number of values per node so the same tables serve the 4-wide kernels (Jacobian action,
+// residual, block split) and the 16-wide block diagonal.
+template <int W>
+static SFEM_INLINE void sscvfem_scatter_element_w(const SSScatter &s, const int nxe, const ptrdiff_t e,
+                                                  const smesh::idx_t *const SFEM_RESTRICT lg,
+                                                  const scalar_t *const SFEM_RESTRICT     lout,
+                                                  scalar_t *const SFEM_RESTRICT           dst,
+                                                  scalar_t *const SFEM_RESTRICT           stage) {
+    for (int a = 0; a < nxe; ++a) {
+        const int sl = s.slot[(size_t)e * nxe + a];
+        if (sl < 0) {
+            const ptrdiff_t g = (ptrdiff_t)lg[a] * W;
+            for (int c = 0; c < W; ++c) dst[g + c] += lout[(size_t)a * W + c];
+        } else {
+            for (int c = 0; c < W; ++c) stage[(size_t)sl * W + c] = lout[(size_t)a * W + c];
+        }
+    }
+}
+
+template <int W>
+inline void sscvfem_reduce_shared_w(const SSScatter &s, scalar_t *const SFEM_RESTRICT dst,
+                                    const scalar_t *const SFEM_RESTRICT stage) {
+    const ptrdiff_t nrows = (ptrdiff_t)s.shared_node.size();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t r = 0; r < nrows; ++r) {
+        scalar_t acc[W] = {0};
+        for (ptrdiff_t k = s.red_ptr[(size_t)r]; k < s.red_ptr[(size_t)r + 1]; ++k)
+            for (int c = 0; c < W; ++c) acc[c] += stage[(size_t)s.red_idx[(size_t)k] * W + c];
+        const ptrdiff_t g = (ptrdiff_t)s.shared_node[(size_t)r] * W;
+        for (int c = 0; c < W; ++c) dst[g + c] += acc[c];
+    }
+}
+
 static SFEM_INLINE void sscvfem_scatter_element(const SSScatter &s, const int nxe, const ptrdiff_t e,
                                                 const smesh::idx_t *const SFEM_RESTRICT lg,
                                                 const scalar_t *const SFEM_RESTRICT     lout,
                                                 scalar_t *const SFEM_RESTRICT           jv) {
-    scalar_t *const stage = const_cast<scalar_t *>(s.stage.data());
-    for (int a = 0; a < nxe; ++a) {
-        const int sl = s.slot[(size_t)e * nxe + a];
-        if (sl < 0) {
-            const ptrdiff_t g = (ptrdiff_t)lg[a] * N_FIELDS;
-            for (int c = 0; c < N_FIELDS; ++c) jv[g + c] += lout[(size_t)a * N_FIELDS + c];
-        } else {
-            for (int c = 0; c < N_FIELDS; ++c) stage[(size_t)sl * N_FIELDS + c] = lout[(size_t)a * N_FIELDS + c];
-        }
-    }
+    sscvfem_scatter_element_w<N_FIELDS>(s, nxe, e, lg, lout, jv, const_cast<scalar_t *>(s.stage.data()));
 }
 
 // The same, for four separate destination arrays rather than one interleaved one. The
@@ -180,15 +206,7 @@ inline void sscvfem_reduce_shared_soa(const SSScatter &s, scalar_t *const dst[N_
 
 // Second pass: each shared node gathers its own contributions, in slot order.
 inline void sscvfem_reduce_shared(const SSScatter &s, scalar_t *const SFEM_RESTRICT jv) {
-    const ptrdiff_t nrows = (ptrdiff_t)s.shared_node.size();
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t r = 0; r < nrows; ++r) {
-        scalar_t acc[N_FIELDS] = {0};
-        for (ptrdiff_t k = s.red_ptr[(size_t)r]; k < s.red_ptr[(size_t)r + 1]; ++k)
-            for (int c = 0; c < N_FIELDS; ++c) acc[c] += s.stage[(size_t)s.red_idx[(size_t)k] * N_FIELDS + c];
-        const ptrdiff_t g = (ptrdiff_t)s.shared_node[(size_t)r] * N_FIELDS;
-        for (int c = 0; c < N_FIELDS; ++c) jv[g + c] += acc[c];
-    }
+    sscvfem_reduce_shared_w<N_FIELDS>(s, jv, s.stage.data());
 }
 
 static SFEM_INLINE int sscvfem_lidx(const int L, const int x, const int y, const int z) {
@@ -1095,6 +1113,8 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
+    const SSScatter *const sc = d.scatter ? d.scatter.get() : nullptr;
+
 #pragma omp parallel
     {
         std::vector<smesh::idx_t> lg((size_t)nxe);
@@ -1257,16 +1277,25 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
 
             // Scatter only the rows written: a continuity-row block touches one component
             // of four, and the atomics are the expensive half of the scatter.
-            for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = lg[(size_t)a];
-                if constexpr (uu || up)
-                    for (int c = 0; c < 3; ++c)
-                        atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
-                if constexpr (pu || pp)
-                    atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, lout[(size_t)a * N_FIELDS + 3]);
-            }
+            // The two-pass scatter moves all four components. The rows this block
+            // selection does not write are zero in lout, so they contribute nothing, and
+            // the saving the component-wise atomics bought no longer applies once the
+            // scatter is a plain write.
+            if (sc)
+                sscvfem_scatter_element(*sc, nxe, e, lg.data(), lout.data(), jv);
+            else
+                for (int a = 0; a < nxe; ++a) {
+                    const smesh::idx_t g = lg[(size_t)a];
+                    if constexpr (uu || up)
+                        for (int c = 0; c < 3; ++c)
+                            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                    if constexpr (pu || pp)
+                        atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, lout[(size_t)a * N_FIELDS + 3]);
+                }
         }
     }
+
+    if (sc) sscvfem_reduce_shared(*sc, jv);
 }
 
 // Runtime entry. The mask is a compile-time parameter inside, so each combination gets a
@@ -1357,6 +1386,8 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
+    const SSScatter *const sc = d.scatter ? d.scatter.get() : nullptr;
+
 #pragma omp parallel
     {
         std::vector<smesh::idx_t> lg((size_t)nxe);
@@ -1426,13 +1457,18 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                 }
             }
 
-            for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = lg[(size_t)a];
-                for (int c = 0; c < N_FIELDS; ++c)
-                    atomic_add(res + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
-            }
+            if (sc)
+                sscvfem_scatter_element(*sc, nxe, e, lg.data(), lout.data(), res);
+            else
+                for (int a = 0; a < nxe; ++a) {
+                    const smesh::idx_t g = lg[(size_t)a];
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        atomic_add(res + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                }
         }
     }
+
+    if (sc) sscvfem_reduce_shared(*sc, res);
 }
 
 // ---------------------------------------------------------------------------
@@ -1522,6 +1558,8 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
+    const SSScatter *const sc = d.scatter ? d.scatter.get() : nullptr;
+
 #pragma omp parallel
     {
         std::vector<smesh::idx_t> lg((size_t)nxe);
@@ -1594,12 +1632,19 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
                 }
             }
 
-            for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = lg[(size_t)a];
-                for (int k = 0; k < 16; ++k) atomic_add(out + (ptrdiff_t)g * 16 + k, 0, lout[(size_t)a * 16 + k]);
-            }
+            if (sc)
+                sscvfem_scatter_element_w<16>(*sc, nxe, e, lg.data(), lout.data(), out,
+                                              const_cast<scalar_t *>(sc->stage16.data()));
+            else
+                for (int a = 0; a < nxe; ++a) {
+                    const smesh::idx_t g = lg[(size_t)a];
+                    for (int k = 0; k < 16; ++k)
+                        atomic_add(out + (ptrdiff_t)g * 16 + k, 0, lout[(size_t)a * 16 + k]);
+                }
         }
     }
+
+    if (sc) sscvfem_reduce_shared_w<16>(*sc, out, sc->stage16.data());
 }
 
 // ---------------------------------------------------------------------------
