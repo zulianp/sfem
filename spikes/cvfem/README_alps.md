@@ -1163,3 +1163,65 @@ absence.
 - The Galerkin assembly gates itself against the composite it was probed from and widens its
   sparsity pattern until it agrees, because probing folds a non-zero lying outside the
   pattern into the wrong entry rather than dropping it.
+
+## Where the time actually goes
+
+Cost had been inferred from operator-application counts, which is a model rather than a
+measurement: it assumes every application costs the same and ignores the sparse coarse work,
+the transfers and the assembly. The driver now times each phase directly and prints a
+breakdown (SFEM's own tracing needs `SMESH_ENABLE_TRACE` compiled into smesh, which the
+installed one lacks). Note that `precond_total` contains the `smooth[*]` rows, so the
+"accounted" total double counts it.
+
+### The coarse levels were paying for threads they could not use
+
+The first breakdown showed the coarse smoothers costing 22.5, 21.3 and 21.2 ms per call on
+levels of 2673, 425 and 81 nodes -- flat, where work should fall roughly eightfold per
+level. It is not arithmetic: 324 unknowns cannot take 21 ms. It is the cost of starting a
+thread team for each vector operation on a level with nothing to distribute.
+
+Per smoother application on the 81-node level, and the whole solve:
+
+| threads | smooth[L3] | total wall |
+|---------|------------|------------|
+| 1       | 0.156 ms   | 14.87 s    |
+| 4       | 4.64 ms    | 4.85 s     |
+| 8       | 14.20 ms   | 13.00 s    |
+
+Ninety times slower for having eight cores instead of one, and the whole solve is fastest at
+four threads and slower at eight. Each level now runs with a thread count matched to its own
+size rather than the machine's (`SFEM_GMG_DOFS_PER_THREAD`, default 20000). After that the
+coarse levels decay as they should -- 5752, 778 and 161 us per call across the three -- the
+thread-count penalty is gone, and L=16 N=1 goes from 23.5 s to 18.3 s.
+
+This also disposes of the large-case results reported above. Those Grace runs used 72
+threads, where this penalty is far worse than at eight, so the 12x to 80x slowdowns at N=2
+and N=3 are not a property of the method and those numbers should not be read as one. They
+need re-running.
+
+### What remains is fine-level smoothing, and it is the whole story
+
+With the coarse levels fixed, the breakdown at L=16, N=1, eight threads is:
+
+| phase | seconds | share |
+|-------|---------|-------|
+| smooth[L0] (fine) | 10.36 | 42% |
+| galerkin_assembly | 1.47 | 6% |
+| all coarse levels together | 0.78 | 3% |
+| transfers, coarse solve, everything else | <0.4 | <2% |
+
+A fine operator application costs 2.43 ms. The baseline spends 959 iterations x 2 = 1918 of
+them. The cycle spends 86 iterations x 64 -- two smoothing applications per cycle, sixteen
+BiCGStab iterations each, two applications per iteration -- which is 5504.
+
+That is the arithmetic of the whole problem, and it is not about the hierarchy at all. To
+break even the cycle may spend at most about 22 fine applications per cycle and it spends
+64; equivalently, iteration count would have to fall by 32x and it falls by 11x. The
+assembly, the transfers and every coarse level together account for under 10% and are not
+where the decision lies.
+
+The lever is therefore the fine-level smoother: it has to become roughly three times cheaper
+per cycle without giving back the iteration count. Sixteen BiCGStab iterations there is
+strong smoothing bought at two operator applications each; the alternatives worth measuring
+are fewer Krylov iterations, a stationary sweep at one application each, or a Chebyshev
+smoother, which would need an eigenvalue estimate but costs one application per sweep.

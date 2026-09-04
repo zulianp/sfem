@@ -33,6 +33,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <omp.h>
+
+#include <map>
 #include <vector>
 
 using cvfem_case::FlowCase;
@@ -77,6 +80,81 @@ namespace {
     // velocity block by cofactors, and the pressure entry as a reciprocal. The pressure
     // diagonal is nonzero here only because Rhie-Chow stabilisation puts it there -- see
     // the SFEM_PC_PSCALE discussion in the standalone driver for what governs its size.
+    // Phase timing.
+    //
+    // Cost has so far been inferred from operator-application counts, which is a model, not
+    // a measurement -- it assumes every application costs the same and ignores the sparse
+    // coarse work, the transfers and the assembly entirely. This wraps each thing the cycle
+    // does in a timer so the breakdown is measured. SFEM's own tracing needs
+    // SMESH_ENABLE_TRACE compiled into smesh, which the installed one lacks.
+    struct Phase {
+        double t{0};
+        long   n{0};
+    };
+    std::map<std::string, Phase> g_phases;
+
+    void phase_add(const std::string &k, const double dt) {
+        auto &p = g_phases[k];
+        p.t += dt;
+        p.n += 1;
+    }
+
+    // Thread clamp for small levels.
+    //
+    // A coarse level has too little work to fill a thread team, and paying to start one per
+    // vector operation costs far more than the arithmetic. Measured on an 81-node level
+    // (324 unknowns): 156 us per smoother application on one thread, 4.6 ms on four,
+    // 14.2 ms on eight -- ninety times slower for having more cores. It also inverts the
+    // whole solve, which ran 14.9 s on one thread, 4.9 s on four and 13.0 s on eight, and it
+    // is why the same configuration that was merely slow on a laptop was an order of
+    // magnitude off on 72 Grace cores.
+    //
+    // So each level runs with a thread count matched to its size rather than the machine's.
+    // These calls happen between parallel regions, never inside one.
+    std::shared_ptr<sfem::Operator<real_t>> thread_clamped(const ptrdiff_t                                ndofs,
+                                                           const std::shared_ptr<sfem::Operator<real_t>> &op) {
+        if (!op) return op;
+        const ptrdiff_t per = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DOFS_PER_THREAD", 20000);
+        const int       mx  = omp_get_max_threads();
+        int             n   = (int)std::min<ptrdiff_t>(mx, std::max<ptrdiff_t>(1, ndofs / std::max<ptrdiff_t>(1, per)));
+        if (n >= mx) return op;  // big enough to use the machine as configured
+        return sfem::make_op<real_t>(
+                op->rows(), op->cols(),
+                [op, n, mx](const real_t *const x, real_t *const y) {
+                    omp_set_num_threads(n);
+                    op->apply(x, y);
+                    omp_set_num_threads(mx);
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    }
+
+    std::shared_ptr<sfem::Operator<real_t>> timed(const std::string                             &name,
+                                                  const std::shared_ptr<sfem::Operator<real_t>> &op) {
+        if (!op) return op;
+        return sfem::make_op<real_t>(
+                op->rows(), op->cols(),
+                [op, name](const real_t *const x, real_t *const y) {
+                    const double t0 = smesh::time_seconds();
+                    op->apply(x, y);
+                    phase_add(name, smesh::time_seconds() - t0);
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    }
+
+    void phase_report() {
+        if (g_phases.empty()) return;
+        double total = 0;
+        for (auto &kv : g_phases) total += kv.second.t;
+        std::vector<std::pair<std::string, Phase>> v(g_phases.begin(), g_phases.end());
+        std::sort(v.begin(), v.end(), [](const auto &a, const auto &b) { return a.second.t > b.second.t; });
+        std::printf("\nphase breakdown (%.3f s accounted)\n", total);
+        std::printf("  %-22s %10s %10s %12s %7s\n", "phase", "seconds", "calls", "us/call", "share");
+        for (auto &kv : v)
+            std::printf("  %-22s %10.3f %10ld %12.1f %6.1f%%\n", kv.first.c_str(), kv.second.t, kv.second.n,
+                        1e6 * kv.second.t / (double)std::max(1L, kv.second.n),
+                        100.0 * kv.second.t / std::max(1e-30, total));
+    }
+
     class BlockJacobi final : public sfem::Operator<real_t> {
     public:
         BlockJacobi(const ptrdiff_t nnodes, std::vector<real_t> inv) : nnodes_(nnodes), inv_(std::move(inv)) {}
@@ -1109,9 +1187,11 @@ namespace {
             }
 
             if (i > 0 && galerkin_mode == 2) {
-                lop = assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
-                                        g.data->restrictions[i - 1],
-                                        g.data->functions[i - 1]->space()->n_dofs(), &galerkin_diag);
+                const double t_asm = smesh::time_seconds();
+                lop                = assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
+                                                       g.data->restrictions[i - 1],
+                                                       g.data->functions[i - 1]->space()->n_dofs(), &galerkin_diag);
+                phase_add("galerkin_assembly", smesh::time_seconds() - t_asm);
             }
 
             std::shared_ptr<BlockJacobi> prec;
@@ -1154,7 +1234,25 @@ namespace {
                 // require that: it adapts to the operator it is given. The price is that
                 // the resulting cycle is no longer a fixed linear operator, which is why
                 // this must be paired with a flexible outer solver.
-                const int ksmooth = smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0);
+                // Coarse levels only. The Krylov smoother exists because the assembled
+                // Galerkin operators lack the diagonal dominance block-Jacobi needs; the
+                // fine level is the matrix-free rediscretised operator and has no such
+                // problem, and it is the level where work is expensive. Smoothing it with
+                // sixteen preconditioned BiCGStab iterations costs sixty-four fine
+                // operator applications per cycle, which is what made the large cases run
+                // an order of magnitude slower than plain block-Jacobi despite needing far
+                // fewer iterations.
+                // SFEM_GMG_KSMOOTH_FINE controls the fine level separately, because the
+                // right answer depends on size. Krylov smoothing the fine level buys
+                // iterations everywhere, but a BiCGStab iteration there costs two fine
+                // operator applications, so at 16 sweeps a cycle spends 64 of them on the
+                // finest level alone. When the coarse hierarchy dominates the work that is
+                // cheap; when the fine level dominates it is not, and the same setting that
+                // wins at one macro-element loses by an order of magnitude at twenty-seven.
+                // Default is to follow SFEM_GMG_KSMOOTH, i.e. smooth every level the same.
+                const int ksmooth = (i > 0) ? smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0)
+                                            : smesh::Env::read<int>("SFEM_GMG_KSMOOTH_FINE",
+                                                                    smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0));
                 std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> sm;
                 if (ksmooth > 0) {
                     auto ks = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
@@ -1171,7 +1269,11 @@ namespace {
                 }
                 auto sm_unused = sm;
                 level_op_below = lop;
-                g.mg->add_level(lop, sm, i == 0 ? nullptr : wrap_p(i), g.data->restrictions[i]);
+                const ptrdiff_t nd_lvl = fi->space()->n_dofs();
+                g.mg->add_level(timed("op[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, lop)),
+                                timed("smooth[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, sm)),
+                                i == 0 ? nullptr : timed("prolong", wrap_p(i)),
+                                timed("restrict", g.data->restrictions[i]));
             } else {
                 level_op_below = lop;
                 // Coarse solve. BiCGStab, not CG: the operator is not symmetric.
@@ -1184,7 +1286,10 @@ namespace {
                 // stagnating BiCGStab reports success by exhausting its iterations.
                 cs->verbose = smesh::Env::read<int>("SFEM_GMG_COARSE_VERBOSE", 0) != 0;
                 cs->set_preconditioner_op(prec);
-                g.mg->add_level(lop, cs, wrap_p(i), nullptr);
+                const ptrdiff_t nd_c = fi->space()->n_dofs();
+                g.mg->add_level(timed("op[coarsest]", thread_clamped(nd_c, lop)),
+                                timed("coarse_solve", thread_clamped(nd_c, cs)),
+                                timed("prolong", wrap_p(i)), nullptr);
             }
         }
         g.mg->set_max_it(1);  // one V-cycle per preconditioner application
@@ -1520,6 +1625,7 @@ int main(int argc, char **argv) {
         // assumes its preconditioner does not. It does not fail loudly when that is
         // violated -- it stagnates -- so the outer solver switches to FGMRES whenever the
         // preconditioner is not a fixed operator.
+        // Still flexible: a Krylov smoother on any level makes the cycle vary.
         const int  ksmooth_outer = smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0);
         const bool use_fgmres =
                 smesh::Env::read<int>("SFEM_FGMRES", (gmg && ksmooth_outer > 0) ? 1 : 0) != 0;
@@ -1530,8 +1636,9 @@ int main(int argc, char **argv) {
         std::function<int()>                                                 get_its;
         std::function<void(const real_t *, real_t *)>                        do_solve;
 
+        auto linop_timed = timed("outer_op", linop);
         if (use_fgmres) {
-            fsolver = std::make_shared<sfem::FGMRES<real_t>>(linop);
+            fsolver = std::make_shared<sfem::FGMRES<real_t>>(linop_timed);
             fsolver->set_max_it(lin_max_it);
             fsolver->set_rtol(lin_rtol);
             fsolver->set_atol(lin_atol);
@@ -1542,7 +1649,7 @@ int main(int argc, char **argv) {
             get_its  = [fsolver]() { return fsolver->iterations(); };
             do_solve = [fsolver](const real_t *b, real_t *x) { fsolver->apply(b, x); };
         } else {
-            bsolver = sfem::create_bcgs<real_t>(linop, sfem::EXECUTION_SPACE_HOST);
+            bsolver = sfem::create_bcgs<real_t>(linop_timed, sfem::EXECUTION_SPACE_HOST);
             bsolver->set_max_it(lin_max_it);
             bsolver->set_rtol(lin_rtol);
             bsolver->set_atol(lin_atol);
@@ -1637,7 +1744,7 @@ int main(int argc, char **argv) {
                         std::printf("  %s  %.4e -> %.4e   x%.3e\n", nm[c], std::sqrt(n0[c]),
                                     std::sqrt(n1[c]), (n0[c] > 0) ? std::sqrt(n1[c] / n0[c]) : 0.0);
                 }
-                set_prec(gmg->mg);
+                set_prec(timed("precond_total", gmg->mg));
             } else if (use_gmg == 2) {
                 // Cost-matched control for the V-cycle. The same damped block-Jacobi, run
                 // as a stationary iteration on the fine level for the same number of
@@ -1655,7 +1762,7 @@ int main(int argc, char **argv) {
                 sm->set_max_it(2 * gmg_smooth);
                 set_prec(sm);
             } else {
-                set_prec(make_block_jacobi(*op, x, cmask.data(), nnodes));
+                set_prec(timed("precond_total", make_block_jacobi(*op, x, cmask.data(), nnodes)));
             }
             t_prec += smesh::time_seconds() - t0;
         }
@@ -1700,7 +1807,8 @@ int main(int argc, char **argv) {
             u_linf = std::max(u_linf, std::fabs(x[(size_t)i * 4 + 2] - uz));
             p_linf = std::max(p_linf, std::fabs(x[(size_t)i * 4 + 3] - p));
         }
-        std::printf("u_linf: %.6e  p_linf: %.6e\n", u_linf, p_linf);
+        phase_report();
+    std::printf("u_linf: %.6e  p_linf: %.6e\n", u_linf, p_linf);
         std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
 
         if (!converged || u_linf > verify_tol) {
