@@ -1225,3 +1225,35 @@ per cycle without giving back the iteration count. Sixteen BiCGStab iterations t
 strong smoothing bought at two operator applications each; the alternatives worth measuring
 are fewer Krylov iterations, a stationary sweep at one application each, or a Chebyshev
 smoother, which would need an eigenvalue estimate but costs one application per sweep.
+
+### Correction: the breakdown percentages above were normalised wrongly
+
+`precond_total` is a container -- it wraps the whole V-cycle, so the smoother, operator,
+transfer and coarse-solve rows sit inside it. Summing every row double counts, and shares
+taken against that sum understate everything. The table in the previous section put
+fine-level smoothing at 42% on that basis, and there appeared to be half the runtime
+missing. There is not. Against wall time, with containers excluded from the denominator,
+top-level phases account for 99.6% of the run:
+
+| phase | seconds | share of wall |
+|-------|---------|---------------|
+| the V-cycle (`precond_total`) | 12.782 | 87.7% |
+| `galerkin_assembly` | 1.609 | 11.0% |
+| outer Krylov operator applications | 0.115 | 0.8% |
+| Newton residual, block diagonals | 0.012 | 0.1% |
+
+and inside the V-cycle:
+
+| phase | seconds | share of wall |
+|-------|---------|---------------|
+| `smooth[L0]`, the fine level | 11.495 | 78.9% |
+| `smooth[L1]` | 0.732 | 5.0% |
+| transfers | 0.172 | 1.2% |
+| `op[L0]` | 0.164 | 1.1% |
+| `smooth[L2]`, `smooth[L3]`, coarse solve | 0.124 | 0.9% |
+
+So fine-level smoothing is 79% of the solve, not 42%, and the conclusion drawn from the
+wrong normalisation is strengthened rather than changed: the fine smoother is the only thing
+worth optimising, the assembly is a real but secondary 11%, and everything below the fine
+level together is under 8%. The reporter now excludes containers from its denominator and
+labels them, so the table cannot be read this way again.
