@@ -23,6 +23,7 @@
 #include "smesh_glob.hpp"
 #include "smesh_buffer.hpp"
 #include "smesh_mesh.hpp"
+#include "smesh_semistructured.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -57,6 +58,8 @@ namespace {
                      "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
                      "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default); 0: assembled BSR\n"
                      "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
+                     "  SFEM_ELEMENT_REFINE_LEVEL  >1: semi-structured macro-elements at that\n"
+                     "                       internal level (default 1 = flat)\n"
                      "  SFEM_PGRAD_CACHE     1: reuse the nodal pressure gradient across a\n"
                      "                       Krylov solve rather than rebuilding it per apply\n"
                      "  SFEM_VERIFY_TOL      fail if velocity Linf exceeds this (default 1e-2)\n",
@@ -214,6 +217,19 @@ int main(int argc, char **argv) {
     const double tick = smesh::time_seconds();
 
     auto mesh = smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
+    // SFEM_ELEMENT_REFINE_LEVEL > 1 turns the mesh semi-structured: the cells above become
+    // macro-elements, each holding a level^3 lattice, and the operator switches to the
+    // sshex8 kernels on its own from what the space carries. The requested cell counts then
+    // describe macro-elements, so the problem is level^3 times larger than the flat run of
+    // the same SFEM_N -- which is the point, but worth knowing when comparing.
+    const int refine_level = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
+    if (refine_level > 1) {
+        mesh = smesh::to_semistructured(refine_level, mesh, true, false);
+        if (!mesh) {
+            std::fprintf(stderr, "to_semistructured failed for level %d\n", refine_level);
+            return EXIT_FAILURE;
+        }
+    }
     auto fs   = sfem::FunctionSpace::create(mesh, N_FIELDS);
     auto f    = sfem::Function::create(fs);
 
@@ -318,7 +334,8 @@ int main(int argc, char **argv) {
                     pin);
     }
 
-    std::printf("case: %s  geom: %s\n", case_name.c_str(), geom_name.c_str());
+    std::printf("case: %s  geom: %s  refine_level: %d  semi_structured: %d\n",
+                case_name.c_str(), geom_name.c_str(), refine_level, op->is_semi_structured() ? 1 : 0);
     std::printf("channel: L=(%g,%g,%g)  cells=(%d,%d,%d)\n", Lx, Ly, Lz, nx, ny, nz);
     std::printf("nnodes: %td  nelements: %td  ndof: %td\n", nnodes, mesh->n_elements(0), ndof);
     std::printf("rho: %g  mu: %g  U: %g  Re: %g\n", rho, mu, U, rho * U * Ly / mu);

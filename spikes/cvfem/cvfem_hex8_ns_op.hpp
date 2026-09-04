@@ -43,6 +43,15 @@ namespace sfem {
         const char *name() const override { return "cvfem:NavierStokes"; }
         bool        is_linear() const override { return false; }
 
+        // True when initialize() found a semi-structured mesh on the space and the
+        // operator is running the sshex8 kernels over macro-elements.
+        //
+        // That path is affine-macro only: it computes one Jacobian per macro-element and
+        // reuses it across the lattice, which is exact for a box and wrong for a curved
+        // macro-element. It ignores `geom` for the same reason, and refuses hessian_bsr --
+        // an assembled matrix per level is the memory a hierarchy exists to avoid.
+        bool is_semi_structured() const;
+
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;
 

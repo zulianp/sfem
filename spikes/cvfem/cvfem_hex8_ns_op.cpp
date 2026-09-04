@@ -2,6 +2,7 @@
 
 // The core is included here and nowhere a driver can see it. See the note in the header.
 #include "cvfem_hex8_ns_core.hpp"
+#include "cvfem_sshex8_ns.hpp"
 
 #include "smesh_mesh.hpp"
 
@@ -40,6 +41,12 @@ namespace sfem {
         // state changing through the same pointer, which is why this is opt-in.
         bool                cache_pgrad{false};
         const real_t       *pgrad_for{nullptr};
+
+        // Semi-structured path. When the space carries a semi-structured mesh the operator
+        // runs the sshex8 kernels over macro-elements instead of the flat ones, and `d`
+        // above is left unused. Chosen at initialize() from the space, not configured.
+        bool       semi_structured{false};
+        SSMeshData ss;
     };
 
     CVFEMNavierStokes::CVFEMNavierStokes(const std::shared_ptr<FunctionSpace> &space) : impl_(std::make_unique<Impl>()) {
@@ -56,6 +63,8 @@ namespace sfem {
         return std::make_unique<CVFEMNavierStokes>(space);
     }
 
+    bool CVFEMNavierStokes::is_semi_structured() const { return impl_->semi_structured; }
+
     ptrdiff_t CVFEMNavierStokes::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t CVFEMNavierStokes::n_dofs_image() const { return impl_->space->n_dofs(); }
 
@@ -64,6 +73,18 @@ namespace sfem {
 
         auto &d    = impl_->d;
         auto  mesh = impl_->space->mesh_ptr();
+
+        if (impl_->space->has_semi_structured_mesh()) {
+            // Affine macro-elements only; see the note on is_semi_structured(). `geom` is
+            // not consulted here, since the macro Jacobian is computed once and reused.
+            impl_->semi_structured = true;
+            const int level        = smesh::semistructured_level(*mesh);
+            sscvfem_init(impl_->ss, mesh, level);
+            impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            impl_->initialized        = true;
+            return SFEM_SUCCESS;
+        }
+
         if (!mesh || mesh->element_type(0) != smesh::HEX8) {
             SFEM_ERROR("cvfem:NavierStokes requires a HEX8 mesh\n");
             return SFEM_FAILURE;
@@ -147,6 +168,13 @@ namespace sfem {
 
     int CVFEMNavierStokes::update(const real_t *const x) {
         if (!impl_->initialized) return SFEM_FAILURE;
+        if (impl_->semi_structured) {
+            impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            sscvfem_unpack(impl_->ss, x);
+            sscvfem_nodal_p_grad(impl_->ss);
+            impl_->pgrad_for = x;
+            return SFEM_SUCCESS;
+        }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
         assemble_nodal_p_grad(impl_->d, to_geom_kind(geom));
@@ -157,6 +185,14 @@ namespace sfem {
     int CVFEMNavierStokes::gradient(const real_t *const x, real_t *const out) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::gradient");
         if (!impl_->initialized) return SFEM_FAILURE;
+        if (impl_->semi_structured) {
+            impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            sscvfem_unpack(impl_->ss, x);
+            sscvfem_nodal_p_grad(impl_->ss);
+            impl_->pgrad_for = x;
+            sscvfem_residual(impl_->ss, rho, mu, out, /*zero_first=*/false);
+            return SFEM_SUCCESS;
+        }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
         // apply_residual recomputes the gradient itself, so this leaves it current.
@@ -170,6 +206,16 @@ namespace sfem {
     int CVFEMNavierStokes::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::apply");
         if (!impl_->initialized) return SFEM_FAILURE;
+        if (impl_->semi_structured) {
+            impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            sscvfem_unpack(impl_->ss, x);
+            if (!(impl_->cache_pgrad && impl_->pgrad_for == x)) {
+                sscvfem_nodal_p_grad(impl_->ss);
+                impl_->pgrad_for = x;
+            }
+            sscvfem_apply(impl_->ss, rho, mu, h, out);
+            return SFEM_SUCCESS;
+        }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
         if (!(impl_->cache_pgrad && impl_->pgrad_for == x)) {
@@ -201,6 +247,13 @@ namespace sfem {
                                        real_t *const        values) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::hessian_bsr");
         if (!impl_->initialized) return SFEM_FAILURE;
+        if (impl_->semi_structured) {
+            // No BSR assembly on the semi-structured path, and not an oversight: an
+            // assembled matrix per level is the memory the hierarchy exists to avoid, and
+            // matrix-free is the default. Refusing beats returning a zero matrix.
+            SFEM_ERROR("cvfem:NavierStokes has no BSR assembly on a semi-structured mesh; use matrix-free\n");
+            return SFEM_FAILURE;
+        }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
 
@@ -218,6 +271,15 @@ namespace sfem {
     int CVFEMNavierStokes::hessian_block_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::hessian_block_diag");
         if (!impl_->initialized) return SFEM_FAILURE;
+        if (impl_->semi_structured) {
+            impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            sscvfem_unpack(impl_->ss, x);
+            sscvfem_nodal_p_grad(impl_->ss);
+            impl_->pgrad_for = x;
+            sscvfem_block_diag(impl_->ss, rho, mu, impl_->diag_scratch);
+            for (size_t i = 0; i < impl_->diag_scratch.size(); ++i) values[i] += impl_->diag_scratch[i];
+            return SFEM_SUCCESS;
+        }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
         assemble_block_diag(impl_->d, rho, mu, to_geom_kind(geom), impl_->diag_scratch);
@@ -229,6 +291,14 @@ namespace sfem {
     int CVFEMNavierStokes::hessian_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::hessian_diag");
         if (!impl_->initialized) return SFEM_FAILURE;
+        if (impl_->semi_structured) {
+            std::vector<real_t> blocks((size_t)impl_->ss.nnodes * 16, 0);
+            hessian_block_diag(x, blocks.data());
+            for (ptrdiff_t i = 0; i < impl_->ss.nnodes; ++i)
+                for (int c = 0; c < N_FIELDS; ++c)
+                    values[(size_t)i * N_FIELDS + c] += blocks[(size_t)i * 16 + c * 4 + c];
+            return SFEM_SUCCESS;
+        }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
         unpack_fields(impl_->d, x);
         assemble_block_diag(impl_->d, rho, mu, to_geom_kind(geom), impl_->diag_scratch);

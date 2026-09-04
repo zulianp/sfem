@@ -67,8 +67,8 @@ int main(int argc, char **argv) {
     const auto macros = parse_list(smesh::Env::read_string("SFEM_BENCH_MACROS", "2,4,6,8"));
     const auto levels = parse_list(smesh::Env::read_string("SFEM_BENCH_LEVELS", "2,4,8"));
 
-    std::printf("%-4s %-10s %-11s %-11s %-11s %-11s %-11s %-11s %-9s %-9s %-9s %-10s %-10s %-10s %s\n",
-                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "bd_nv", "bd_mac", "pgrad", "hoist+pg", "agree", "bd_agree", "blk_agree");
+    std::printf("%-4s %-10s %-11s %-11s %-11s %-11s %-11s %-11s %-9s %-9s %-9s %-10s %-10s %-10s %-10s %s\n",
+                "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "bd_nv", "bd_mac", "pgrad", "hoist+pg", "agree", "bd_agree", "blk_agree", "res_agree");
 
     int failures = 0;
 
@@ -227,6 +227,20 @@ int main(int argc, char **argv) {
             const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d, rho, mu, bd_naive); });
             const double t_bdm = time_it([&] { sscvfem_block_diag(d, rho, mu, bd_macro); });
 
+            // Residual: the two layouts must agree, as everywhere else.
+            double res_rel = 0;
+            {
+                std::vector<scalar_t> rn((size_t)ndof), rm((size_t)ndof);
+                sscvfem_residual_naive(d, rho, mu, rn.data());
+                sscvfem_residual(d, rho, mu, rm.data());
+                double m = 0, f = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i) {
+                    m = std::max(m, std::fabs((double)(rn[(size_t)i] - rm[(size_t)i])));
+                    f = std::max(f, std::fabs((double)rn[(size_t)i]));
+                }
+                res_rel = (f > 0) ? m / f : m;
+            }
+
             // The 2x2 field blocks. Each specialised kernel is checked against the
             // reference built by masking the inputs around the unmodified operator, and
             // the four of them must also sum back to the full operator -- a term landing
@@ -292,7 +306,7 @@ int main(int argc, char **argv) {
             // it is not measuring the same work.
             const double t_pg = time_it([&] { sscvfem_nodal_p_grad(d); });
 
-            std::printf("%-4d %-10td %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-9.3f %-9.3f %-9.3f %-10.3f %-10.2e %-10.2e %.2e%s\n",
+            std::printf("%-4d %-10td %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-11.3f %-9.3f %-9.3f %-9.3f %-10.3f %-10.2e %-10.2e %-10.2e %.2e%s\n",
                         L,
                         ndof,
                         1e9 * t_naive / (double)ndof,
@@ -308,8 +322,9 @@ int main(int argc, char **argv) {
                         rel,
                         std::max(bd_rel, bd_probe_rel),
                         std::max(blk_rel, blk_sum_rel),
+                        res_rel,
                         (rel < tol) ? "" : "  <-- MISMATCH");
-            if (rel >= tol || bd_rel >= tol || bd_probe_rel >= tol || blk_rel >= tol || blk_sum_rel >= tol) ++failures;
+            if (rel >= tol || res_rel >= tol || bd_rel >= tol || bd_probe_rel >= tol || blk_rel >= tol || blk_sum_rel >= tol) ++failures;
         }
     }
 

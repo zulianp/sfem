@@ -1124,6 +1124,151 @@ inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar
 }
 
 // ---------------------------------------------------------------------------
+// Residual. Newton needs it, and until now the semi-structured path had only the
+// Jacobian action, the block diagonal and the block split.
+//
+// Same two layouts as everything else, for the same reason: the naive one keeps the flat
+// gather and exists to check the macro-local one against.
+
+inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                                 scalar_t *const SFEM_RESTRICT res) {
+    SFEM_TRACE_SCOPE("sscvfem::residual_naive");
+    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
+
+    const int L = d.level;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        for (int zi = 0; zi < L; ++zi) {
+            for (int yi = 0; yi < L; ++yi) {
+                for (int xi = 0; xi < L; ++xi) {
+                    const int    base = sscvfem_lidx(L, xi, yi, zi);
+                    smesh::idx_t g[8];
+                    scalar_t     x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
+                    scalar_t     r[CVFEM_HEX8_N_DOF];
+                    for (int a = 0; a < 8; ++a) {
+                        g[a]   = d.elems[base + off[a]][e];
+                        x[a]   = (scalar_t)d.points[0][g[a]];
+                        y[a]   = (scalar_t)d.points[1][g[a]];
+                        z[a]   = (scalar_t)d.points[2][g[a]];
+                        ux[a]  = d.ux[(size_t)g[a]];
+                        uy[a]  = d.uy[(size_t)g[a]];
+                        uz[a]  = d.uz[(size_t)g[a]];
+                        p[a]   = d.p[(size_t)g[a]];
+                        pgx[a] = d.pgx[(size_t)g[a]];
+                        pgy[a] = d.pgy[(size_t)g[a]];
+                        pgz[a] = d.pgz[(size_t)g[a]];
+                    }
+                    const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                    scalar_t           adj[9], det;
+                    sscvfem_micro_geom(x, y, z, adj, &det);
+                    cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc);
+                    boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
+                    for (int a = 0; a < 8; ++a)
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            atomic_add(res + (ptrdiff_t)g[a] * N_FIELDS + c, 0, r[a * 4 + c]);
+                }
+            }
+        }
+    }
+}
+
+// zero_first=false accumulates, which is what sfem::Op::gradient needs: Function runs
+// every operator over one shared output buffer without clearing between them.
+inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                           scalar_t *const SFEM_RESTRICT res, const bool zero_first = true) {
+    SFEM_TRACE_SCOPE("sscvfem::residual");
+    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    if (zero_first)
+        for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
+
+    const int L   = d.level;
+    const int nxe = d.nxe;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+#pragma omp parallel
+    {
+        std::vector<smesh::idx_t> lg((size_t)nxe);
+        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
+        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
+        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
+        std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                lg[(size_t)a]        = g;
+                lx[(size_t)a]        = (scalar_t)d.points[0][g];
+                ly[(size_t)a]        = (scalar_t)d.points[1][g];
+                lz[(size_t)a]        = (scalar_t)d.points[2][g];
+                lux[(size_t)a]       = d.ux[(size_t)g];
+                luy[(size_t)a]       = d.uy[(size_t)g];
+                luz[(size_t)a]       = d.uz[(size_t)g];
+                lp[(size_t)a]        = d.p[(size_t)g];
+                lpgx[(size_t)a]      = d.pgx[(size_t)g];
+                lpgy[(size_t)a]      = d.pgy[(size_t)g];
+                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+            }
+            std::fill(lout.begin(), lout.end(), scalar_t(0));
+
+            SSMacroGeom mg;
+            {
+                scalar_t ex[8], ey[8], ez[8];
+                for (int a = 0; a < 8; ++a) {
+                    const int l = off[a];
+                    ex[a]       = lx[(size_t)l];
+                    ey[a]       = ly[(size_t)l];
+                    ez[a]       = lz[(size_t)l];
+                }
+                sscvfem_macro_geom(ex, ey, ez, rho, mu, d.rhie_chow_scale, mg);
+            }
+
+            for (int zi = 0; zi < L; ++zi) {
+                for (int yi = 0; yi < L; ++yi) {
+                    for (int xi = 0; xi < L; ++xi) {
+                        const int base = sscvfem_lidx(L, xi, yi, zi);
+                        scalar_t  x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
+                        scalar_t  r[CVFEM_HEX8_N_DOF];
+                        for (int a = 0; a < 8; ++a) {
+                            const int l = base + off[a];
+                            x[a]        = lx[(size_t)l];
+                            y[a]        = ly[(size_t)l];
+                            z[a]        = lz[(size_t)l];
+                            ux[a]       = lux[(size_t)l];
+                            uy[a]       = luy[(size_t)l];
+                            uz[a]       = luz[(size_t)l];
+                            p[a]        = lp[(size_t)l];
+                            pgx[a]      = lpgx[(size_t)l];
+                            pgy[a]      = lpgy[(size_t)l];
+                            pgz[a]      = lpgz[(size_t)l];
+                        }
+                        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+                        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r, rc);
+                        boundary_scs_add_residual(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                  ux, uy, uz, p, r);
+                        for (int a = 0; a < 8; ++a) {
+                            const int l = base + off[a];
+                            for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
+                        }
+                    }
+                }
+            }
+
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = lg[(size_t)a];
+                for (int c = 0; c < N_FIELDS; ++c)
+                    atomic_add(res + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Block diagonal: the 4x4 block per node, which is what a block-Jacobi smoother inverts.
 //
 // The multigrid path needs one of these at every level, so it is not the once-per-Newton

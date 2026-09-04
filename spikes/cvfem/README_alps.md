@@ -321,8 +321,30 @@ Two constraints cap what C can save. The boundary term takes the state velocity 
 is masked, and the macro geometry needs the coordinates, so C still gathers seven of the
 fourteen arrays rather than the three its own arithmetic uses.
 
-**3. Wire the semi-structured kernels into the Op and the driver.** Everything measured so
-far is kernel-level. The end-to-end claim, and the multigrid work behind it, needs this.
+**3. Wire the semi-structured kernels into the Op and the driver.** Done. The operator
+picks the path from what the space carries -- `has_semi_structured_mesh()` -- rather than
+being configured, and the driver turns a mesh semi-structured with
+`SFEM_ELEMENT_REFINE_LEVEL`. The same problem decomposed three ways:
+
+| | nodes | elements | newton | lin_it | u_linf |
+|---|---|---|---|---|---|
+| flat, N=8 | 2673 | 2048 | 19 | 15420 | 9.706443e-10 |
+| N=4, level 2 | 2673 | 512 macros | 19 | 15409 | 9.706011e-10 |
+| N=2, level 4 | 2673 | 32 macros | 19 | 15440 | 9.706217e-10 |
+
+Identical discrete problem, same Newton count, `u_linf` agreeing to six figures, solved
+through 32 macro-elements instead of 2048 flat ones.
+
+Writing this needed the residual, which the semi-structured path did not have -- it had
+the Jacobian action, the block diagonal and the block split, none of which Newton can
+start from. It is implemented in the same two layouts as everything else so the naive one
+gates the macro-local one, and agrees at 2.6e-15.
+
+Two limits are deliberate. The path is affine-macro only: one Jacobian per macro-element,
+reused across its lattice, which is exact for a box and wrong for a curved macro-element,
+and it ignores `SFEM_GEOM` for the same reason. And it refuses `hessian_bsr`, because an
+assembled matrix per level is the memory a hierarchy exists to avoid; refusing beats
+returning a zero matrix.
 
 **4. Hopper.** Nothing semi-structured has run on a GPU, and layout conclusions have already
 inverted once between Grace and Hopper: packing is worth 10% on CPU and loses by 42% there.
