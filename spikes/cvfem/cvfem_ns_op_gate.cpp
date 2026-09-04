@@ -202,13 +202,24 @@ int main(int argc, char **argv) {
             }
             const Diff dc = compare(spmv, std::vector<real_t>(op_jv.begin(), op_jv.end()));
 
+            // The cached nodal pressure gradient must not change the answer. The state is
+            // unchanged between these two applies, which is exactly the condition the
+            // option promises -- and a stale gradient would be silently wrong rather than
+            // an error, so it is checked rather than assumed.
+            std::vector<real_t> op_jv_cached((size_t)ndof, 0);
+            op->set_option("cache_nodal_pgrad", true);
+            op->update(x.data());
+            op->apply(x.data(), dir.data(), op_jv_cached.data());
+            op->set_option("cache_nodal_pgrad", false);
+            const Diff dpg = compare(std::vector<scalar_t>(op_jv.begin(), op_jv.end()), op_jv_cached);
+
             const Diff dr = compare(ref_r, op_r);
             const Diff dh = compare(ref_h, op_h);
             const Diff dj = compare(ref_jv, op_jv);
             const Diff db = compare(ref_bd, op_bd);
             const Diff ds = compare(ref_sd, op_sd);
 
-            std::printf("%-9s pack=%-5d  grad=%.3e  bsr=%.3e  apply=%.3e  blockdiag=%.3e  diag=%.3e  asm_vs_mf=%.3e\n",
+            std::printf("%-9s pack=%-5d  grad=%.3e  bsr=%.3e  apply=%.3e  blockdiag=%.3e  diag=%.3e  asm_vs_mf=%.3e  pgcache=%.3e\n",
                         gname,
                         pack_size,
                         dr.max_rel,
@@ -216,10 +227,11 @@ int main(int argc, char **argv) {
                         dj.max_rel,
                         db.max_rel,
                         ds.max_rel,
-                        dc.max_rel);
+                        dc.max_rel,
+                        dpg.max_rel);
 
             const bool ok = dr.max_rel < tol && dh.max_rel < tol && dj.max_rel < tol && db.max_rel < tol &&
-                            ds.max_rel < tol && dc.max_rel < tol;
+                            ds.max_rel < tol && dc.max_rel < tol && dpg.max_rel < tol;
             if (!ok) {
                 std::printf("  FAIL (tol %.1e)  |ref|_inf: grad %.6e  hess %.6e  apply %.6e\n",
                             tol,

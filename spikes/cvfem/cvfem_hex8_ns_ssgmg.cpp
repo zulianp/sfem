@@ -57,6 +57,8 @@ namespace {
                      "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
                      "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default); 0: assembled BSR\n"
                      "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
+                     "  SFEM_PGRAD_CACHE     1: reuse the nodal pressure gradient across a\n"
+                     "                       Krylov solve rather than rebuilding it per apply\n"
                      "  SFEM_VERIFY_TOL      fail if velocity Linf exceeds this (default 1e-2)\n",
                      argv0);
     }
@@ -221,6 +223,12 @@ int main(int argc, char **argv) {
     op->geom = (geom_name == "isoparam") ? sfem::CVFEMGeometry::Isoparam : sfem::CVFEMGeometry::Affine;
     op->pack_size = pack_size;
     if (op->initialize() != SFEM_SUCCESS) return EXIT_FAILURE;
+    // The Newton loop below evaluates the residual immediately after every step and
+    // before the linear solve, which is the condition this option asks for: the nodal
+    // pressure gradient is then current for the whole Krylov sweep and need not be
+    // rebuilt on each of its hundreds of applies. SFEM_PGRAD_CACHE=0 turns it off.
+    const int pgrad_cache = smesh::Env::read<int>("SFEM_PGRAD_CACHE", 1);
+    op->set_option("cache_nodal_pgrad", pgrad_cache != 0);
     f->add_operator(op);
 
     const ptrdiff_t     nnodes = mesh->n_nodes();

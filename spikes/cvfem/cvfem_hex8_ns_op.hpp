@@ -58,10 +58,22 @@ namespace sfem {
         // to keep the mesh untouched at the cost of the packed kernels.
         int initialize(const std::vector<std::string> &block_names = {}) override;
 
-        // Refreshes the nodal pressure gradient Rhie-Chow interpolation needs. The
-        // residual and assembly entry points recompute it themselves, so this is only
-        // worth calling to pay for it once across several of them.
+        // Refreshes the nodal pressure gradient Rhie-Chow interpolation needs, and marks
+        // it current for the state it was given.
         int update(const real_t *const x) override;
+
+        // "cache_nodal_pgrad": let apply() reuse the nodal pressure gradient computed by
+        // the last update() or gradient() instead of recomputing it.
+        //
+        // Worth having because the gradient is a full element sweep costing about 39% of
+        // an apply, and a Krylov solve applies the operator hundreds of times at a state
+        // that does not change. Off by default, because switching it on is a promise
+        // about the caller's loop: after any change to the state, update() or gradient()
+        // must run before the next apply(). A Newton loop satisfies that -- the residual
+        // is evaluated right after the step and before the linear solve -- but nothing
+        // enforces it, and a caller that breaks it gets a stale gradient and a wrong
+        // answer rather than a failure. Left off, apply() recomputes and is always right.
+        void set_option(const std::string &name, bool val) override;
 
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
