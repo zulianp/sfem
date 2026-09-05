@@ -48,44 +48,85 @@ def sfem_soa_kernel_form(
 
 @dataclass(frozen=True)
 class SfemSoAWeakForm:
+    """An energy density and the field gradient it is differentiated against.
+
+    The gradient is ``n_components x dim``: one row per component of the field,
+    one column per spatial direction.  A displacement in `dim` dimensions makes
+    that square and it is the deformation gradient, which is the only shape this
+    held for a long time.  A scalar field makes it ``1 x dim`` -- the gradient of
+    a potential like `kappa/2 * ||grad u||^2`, whose first Piola is the flux
+    `kappa * grad u`.
+
+    Nothing else about the lowering changes with the shape, which is why the
+    restriction was worth removing rather than working around: the derivative of
+    a scalar against a matrix of symbols does not care whether that matrix is
+    square, and neither does the contraction against test gradients below it.
+    """
+
     energy_density: sp.Expr
     deformation_gradient: Tuple[sp.Expr, ...]
     dim: int
+    n_components: Optional[int] = None
 
     def __post_init__(self):
         dim = int(self.dim)
         deformation_gradient = tuple(self.deformation_gradient)
+        n_components = dim if self.n_components is None else int(self.n_components)
         object.__setattr__(self, "dim", dim)
+        object.__setattr__(self, "n_components", n_components)
         object.__setattr__(self, "energy_density", sp.sympify(self.energy_density))
         object.__setattr__(self, "deformation_gradient", deformation_gradient)
         if dim <= 0:
             raise ValueError("weak form dim must be positive")
-        if len(deformation_gradient) != dim * dim:
-            raise ValueError("deformation_gradient must have dim * dim entries")
+        if n_components <= 0:
+            raise ValueError("weak form n_components must be positive")
+        if len(deformation_gradient) != n_components * dim:
+            raise ValueError(
+                "deformation_gradient must have n_components * dim entries"
+            )
+
+    @property
+    def is_deformation_gradient(self):
+        """Whether the variable is `I + grad(u)` rather than `grad(u)` itself.
+
+        Inferred from the shape: a square gradient in this framework is always a
+        displacement's deformation gradient, and the identity belongs in it.  A
+        scalar field's `1 x dim` gradient has no identity to add.
+
+        The shape is a proxy.  What actually settles it is the qualifier the
+        material used -- `gen.deformation_gradient(u)` against `gen.grad(u)` --
+        and that does not reach here.  Every material today is square and uses
+        the former, so the proxy is exact for all of them; a vector field whose
+        variable is a plain gradient would be the case that breaks it, and the
+        fix then is to carry the qualifier down rather than to guess better.
+        """
+        return self.n_components == self.dim
 
     def deformation_gradient_matrix(self):
-        return sp.Matrix(self.dim, self.dim, self.deformation_gradient)
+        return sp.Matrix(self.n_components, self.dim, self.deformation_gradient)
 
     def first_piola(self):
         variables = self.deformation_gradient
         return sp.Matrix(
-            self.dim,
+            self.n_components,
             self.dim,
             [sp.diff(self.energy_density, variable) for variable in variables],
         )
 
     def linearized_first_piola(self, trial_gradient):
         trial_gradient = tuple(trial_gradient)
-        if len(trial_gradient) != self.dim * self.dim:
-            raise ValueError("trial_gradient must have dim * dim entries")
+        if len(trial_gradient) != self.n_components * self.dim:
+            raise ValueError(
+                "trial_gradient must have n_components * dim entries"
+            )
         P = self.first_piola()
         variables = self.deformation_gradient
         return sp.Matrix(
-            self.dim,
+            self.n_components,
             self.dim,
             [
                 directional_derivative(P[i, j], variables, trial_gradient)
-                for i in range(self.dim)
+                for i in range(self.n_components)
                 for j in range(self.dim)
             ],
         )
@@ -96,18 +137,25 @@ class SfemSoAWeakForm:
         if has_direction:
             trial_gradient = tuple(
                 sp.symbols("trial_grad[%d]" % i)
-                for i in range(self.dim * self.dim)
+                for i in range(self.n_components * self.dim)
             )
             expressions.extend(tuple(self.linearized_first_piola(trial_gradient)))
         return tuple(expressions)
 
 
 def sfem_soa_weak_form(energy_density, deformation_gradient):
+    """Lower an energy density against a field gradient of any shape.
+
+    Rows are field components and columns are spatial directions.  This used to
+    demand a square matrix, which is the deformation gradient of a
+    `dim`-component displacement and excluded every scalar field -- a Laplacian
+    potential among them, whose gradient is `1 x dim`.
+    """
     deformation_gradient = _as_matrix(deformation_gradient, "deformation_gradient")
-    if deformation_gradient.shape[0] != deformation_gradient.shape[1]:
-        raise ValueError("deformation_gradient must be square")
+    rows, cols = deformation_gradient.shape
     return SfemSoAWeakForm(
         energy_density,
         tuple(deformation_gradient),
-        deformation_gradient.shape[0],
+        cols,
+        n_components=rows,
     )

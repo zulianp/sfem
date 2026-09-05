@@ -1003,11 +1003,14 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
 
 
 def _energy_codegen_unit(material_name, dim, evaluated):
-    if evaluated.data_symbols.shape != (dim, dim):
+    # Rows are field components, columns are spatial directions.  This demanded
+    # `dim x dim` -- the deformation gradient of a displacement -- which
+    # excluded every scalar field, a Laplacian potential among them.
+    if evaluated.data_symbols.shape[1] != dim:
         raise ValueError(
-            "energy code generation currently requires %d x %d explicit variables; "
-            "got %d variables for energy unit '%s'"
-            % (dim, dim, len(evaluated.form_evaluation.variables), evaluated.name or material_name)
+            "energy code generation requires variables with %d columns, one per "
+            "spatial direction; got shape %s for energy unit '%s'"
+            % (dim, evaluated.data_symbols.shape, evaluated.name or material_name)
         )
     weak_form = sfem_soa_weak_form(
         evaluated.form_evaluation.form(FormOrder.ZERO).expression,
@@ -1814,8 +1817,20 @@ def _equation_form_orders(equation):
 
 
 def _energy_data_symbols(dim, variables):
-    if len(variables) == dim * dim:
-        return sp.Matrix(dim, dim, variables)
+    """The energy's variables as `n_components x dim`.
+
+    An energy differentiates against a field gradient, which has one row per
+    field component and one column per spatial direction.  The count of
+    variables and `dim` determine the shape between them: nine variables in
+    three dimensions is a displacement's deformation gradient, three is a scalar
+    field's gradient.
+
+    Anything that does not divide by `dim` is not a gradient at all and keeps
+    the column shape it had, which is what the callers that pass a list of
+    unrelated variables rely on.
+    """
+    if len(variables) % dim == 0 and variables:
+        return sp.Matrix(len(variables) // dim, dim, variables)
     return sp.Matrix(len(variables), 1, variables)
 
 

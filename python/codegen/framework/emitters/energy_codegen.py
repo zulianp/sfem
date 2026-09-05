@@ -1598,15 +1598,19 @@ def _append_sfem_soa_tensor_weak_form_lines(
         return _work_item_name(source_builder, name, component)
 
     if uses_current:
-        lines.append("            scalar_t grad_u[%d];" % (dim * dim))
+        lines.append(
+            "            scalar_t grad_u[%d];" % (weak_form.n_components * dim)
+        )
     if uses_direction:
-        lines.append("            scalar_t trial_grad[%d];" % (dim * dim))
+        lines.append(
+            "            scalar_t trial_grad[%d];" % (weak_form.n_components * dim)
+        )
 
     lines.append(
         "            const scalar_t inv_jacobian_determinant = scalar_t(1) / %s;"
         % geometry_value("jacobian_determinant", 0)
     )
-    for row in range(dim):
+    for row in range(weak_form.n_components):
         for col in range(dim):
             if uses_current:
                 terms = [
@@ -1655,7 +1659,10 @@ def _append_sfem_soa_tensor_weak_form_lines(
         weak_form,
         form.name,
         deformation_gradient_substitutions,
-        tuple(sp.symbols("trial_grad[%d]" % i) for i in range(dim * dim)),
+        tuple(
+            sp.symbols("trial_grad[%d]" % i)
+            for i in range(weak_form.n_components * dim)
+        ),
     )
     lines.append("            scalar_t loperand[%d];" % (dim * dim))
     _append_transformed_loperand_lines(
@@ -1799,7 +1806,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         "            const scalar_t inv_jacobian_determinant = scalar_t(1) / %s;"
         % geometry_value("jacobian_determinant", 0)
     )
-    for row in range(dim):
+    for row in range(weak_form.n_components):
         for col in range(dim):
             if uses_current:
                 terms = [
@@ -1844,7 +1851,10 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         weak_form,
         form.name,
         deformation_gradient_substitutions,
-        tuple(sp.symbols("trial_grad%d" % i) for i in range(dim * dim)),
+        tuple(
+            sp.symbols("trial_grad%d" % i)
+            for i in range(weak_form.n_components * dim)
+        ),
     )
     _append_transformed_loperand_lines(
         lines,
@@ -2009,7 +2019,7 @@ def _append_sfem_soa_weak_form_lines(
         "        const scalar_t inv_jacobian_determinant = scalar_t(1) / %s;"
         % geometry_value("jacobian_determinant", 0)
     )
-    for row in range(dim):
+    for row in range(weak_form.n_components):
         for col in range(dim):
             if uses_current:
                 terms = [
@@ -2054,7 +2064,10 @@ def _append_sfem_soa_weak_form_lines(
         weak_form,
         form.name,
         deformation_gradient_substitutions,
-        tuple(sp.symbols("trial_grad%d" % i) for i in range(dim * dim)),
+        tuple(
+            sp.symbols("trial_grad%d" % i)
+            for i in range(weak_form.n_components * dim)
+        ),
     )
 
     _append_transformed_loperand_lines(
@@ -2130,14 +2143,17 @@ def _weak_form_deformation_gradient_substitutions(
     scalar_temporaries=False,
 ):
     substitutions = {}
-    for row in range(weak_form.dim):
+    # Loop-invariant: whether the identity belongs in the variable is a
+    # property of the weak form, not of the entry being substituted.
+    adds_identity = weak_form.is_deformation_gradient
+    for row in range(weak_form.n_components):
         for col in range(weak_form.dim):
             idx = row * weak_form.dim + col
             if scalar_temporaries:
                 value = sp.Symbol("%s%d" % (gradient_name, idx))
             else:
                 value = sp.Symbol("%s[%d]" % (gradient_name, idx))
-            if row == col:
+            if row == col and adds_identity:
                 value = sp.Integer(1) + value
             substitutions[weak_form.deformation_gradient[idx]] = value
     return substitutions
@@ -2145,11 +2161,12 @@ def _weak_form_deformation_gradient_substitutions(
 
 def _weak_form_deformation_gradient_substitutions_from_symbols(weak_form, gradient):
     substitutions = {}
-    for row in range(weak_form.dim):
+    adds_identity = weak_form.is_deformation_gradient
+    for row in range(weak_form.n_components):
         for col in range(weak_form.dim):
             idx = row * weak_form.dim + col
             value = gradient[idx]
-            if row == col:
+            if row == col and adds_identity:
                 value = sp.Integer(1) + value
             substitutions[weak_form.deformation_gradient[idx]] = value
     return substitutions
@@ -5520,7 +5537,10 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
         weak_form,
         form.name,
         _weak_form_deformation_gradient_substitutions(weak_form, "grad_u"),
-        tuple(sp.symbols("trial_grad[%d]" % i) for i in range(dim * dim)),
+        tuple(
+            sp.symbols("trial_grad[%d]" % i)
+            for i in range(weak_form.n_components * dim)
+        ),
     )
     lines = [
         "%sfor (int entry = 0; entry < NDOFS * NDOFS; ++entry) {" % indent,
@@ -8308,7 +8328,7 @@ def _sfem_soa_diagnostics_lines(
                     diagnostic_deformation_substitutions,
                     tuple(
                         sp.symbols("diag_trial_grad%d" % i)
-                        for i in range(form.weak_form.dim * form.weak_form.dim)
+                        for i in range(form.weak_form.n_components * form.weak_form.dim)
                     ),
                 )
             )
