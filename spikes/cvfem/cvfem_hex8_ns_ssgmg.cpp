@@ -2175,11 +2175,22 @@ namespace {
                 // Fine level only: the patch operator is read from the assembled fine matrix
                 // via the element-wise Galerkin path at q = 1, and the coarse levels have a
                 // different lattice. They keep block-Jacobi for now.
+                // Vanka is the default smoother. Block-Jacobi is retained only as a
+                // reference and for meshes with no lattice (SFEM_SMOOTHER=bjacobi).
+                //
+                // Measured: block-Jacobi has an asymptotic factor of 0.981 at Re=1 and diverges
+                // at omega >= 0.5, so it is not a smoother in any useful sense on this system;
+                // it damps momentum while discarding the continuity constraint. At 33,124 dofs
+                // on 72 cores it diverges outright at omega = 1 where Vanka converges at both
+                // Re=1 and Re=100. And Re=200, which block-Jacobi could never converge -- 40
+                // Newton steps, ramp stalling at Re~75 -- solves in 3 Newton steps with Vanka,
+                // to u_linf 2.28e-10 against the 2.9e-7 plateau of the run that never
+                // converged.
                 std::shared_ptr<sfem::Operator<real_t>> prec_op = prec;
                 // Coarse levels: same smoother, built from the matrix the element-wise Galerkin
                 // assembly already produced. A cycle is limited by its worst level, and leaving
                 // these on the point-block smoother would waste the fine-level gain.
-                if (i > 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "bjacobi") == "vanka" &&
+                if (i > 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka") == "vanka" &&
                     g.Amat[(size_t)i] && g.level_ops[(size_t)i] &&
                     g.level_ops[(size_t)i]->is_semi_structured()) {
                     std::vector<uint8_t> cb((size_t)fi->space()->n_dofs(), 0);
@@ -2190,7 +2201,7 @@ namespace {
                             smesh::Env::read<real_t>("SFEM_VANKA_OMEGA", real_t(1)));
                     if (vk) prec_op = vk;
                 }
-                if (i == 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "bjacobi") == "vanka" &&
+                if (i == 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka") == "vanka" &&
                     g.level_ops[0] && g.level_ops[0]->is_semi_structured()) {
                     const ptrdiff_t      nd0 = g.data->functions[0]->space()->n_dofs();
                     std::vector<mask_t>  m0(mask_count(nd0), 0);
@@ -2750,7 +2761,7 @@ int main(int argc, char **argv) {
                 // levels do -- and no coarse-grid fix can repair that.
                 if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 3 && newton_it == 0) {
                     const real_t om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
-                    const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "bjacobi");
+                    const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
                     std::shared_ptr<sfem::Operator<real_t>> prec;
                     if (kind == "vanka") {
                         // Diagonal Vanka: a coupled solve over each micro-element patch,
