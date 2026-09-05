@@ -24,6 +24,7 @@ namespace sfem {
 
         ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
         int       iterations_{0};
+        bool      diverged_{false};
 
         bool verbose{true};
 
@@ -55,9 +56,16 @@ namespace sfem {
         T   atol{1e-16};
         T   rtol{1e-10};
         int max_it{10000};
+        // Growth factor at which the solve is abandoned as divergent; 0 disables the test.
+        // The non-finite guards below catch a blow-up only once it has already overflowed,
+        // by which point the whole iteration budget has been spent. An iteration limit is a
+        // backstop, not a stopping criterion: a solve that is clearly failing should say so
+        // while the caller can still act on it.
+        T   dtol{0};
 
         void set_atol(const T val) { atol = val; }
         void set_rtol(const T val) { rtol = val; }
+        void set_dtol(const T val) { dtol = val; }
 
         void default_init() {
             blas = make_openmp_blas<T>();
@@ -73,6 +81,16 @@ namespace sfem {
             return residual < atol || (residual0 > 0 && residual / residual0 < rtol);
         }
 
+        bool diverging(const T residual, const T residual0) const {
+            return dtol > 0 && residual0 > 0 && residual > dtol * residual0;
+        }
+
+        // Why the last solve stopped. A caller comparing iteration counts needs this: a run
+        // that stopped on max_it reports a floor, not a result, and treating it as a result
+        // silently inflates any speedup measured against it.
+        bool has_diverged() const { return diverged_; }
+        bool hit_max_it() const { return iterations_ >= max_it; }
+
         void monitor(const int iter, const T residual, const T residual0) {
             if (!verbose) return;
             const T rel = (residual0 > 0) ? (residual / residual0) : residual;
@@ -85,6 +103,7 @@ namespace sfem {
         int apply(const ptrdiff_t n, const T* const b, T* const x) {
             SFEM_TRACE_SCOPE("BiCGStab::apply");
             iterations_ = 0;
+            diverged_   = false;
             if (left_preconditioner_op || right_preconditioner_op) {
                 return aux_apply_precond(n, b, x);
             } else {
@@ -188,6 +207,13 @@ namespace sfem {
                 if (!std::isfinite(r_norm)) {
                     blas->copy(n, h, x);
                     info = SFEM_FAILURE;
+                    break;
+                }
+
+                if (diverging(r_norm, r_norm0)) {
+                    blas->copy(n, h, x);
+                    diverged_ = true;
+                    info      = SFEM_FAILURE;
                     break;
                 }
 
@@ -318,6 +344,13 @@ namespace sfem {
                 if (!std::isfinite(r_norm)) {
                     blas->copy(n, h, x);
                     info = SFEM_FAILURE;
+                    break;
+                }
+
+                if (diverging(r_norm, r_norm0)) {
+                    blas->copy(n, h, x);
+                    diverged_ = true;
+                    info      = SFEM_FAILURE;
                     break;
                 }
 

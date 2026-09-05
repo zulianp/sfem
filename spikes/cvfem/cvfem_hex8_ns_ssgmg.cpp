@@ -2552,6 +2552,14 @@ int main(int argc, char **argv) {
     // is already fine enough, since no retry happens.
     const real_t re_step   = std::max(real_t(1.5), smesh::Env::read<real_t>("SFEM_RE_STEP", real_t(4)));
     const int    re_retry  = smesh::Env::read<int>("SFEM_RE_MAX_RETRY", 6);
+    // Adaptive step control. The schedule above is only a starting guess: what actually has
+    // to adapt during a run is the *increment*, not the destination. See the success and
+    // failure blocks in the stage loop for why aiming each stage at the final target wastes
+    // the retry budget.
+    const bool   re_adapt  = smesh::Env::read<int>("SFEM_RE_ADAPT", 1) != 0;
+    const real_t re_grow   = std::max(real_t(1), smesh::Env::read<real_t>("SFEM_RE_GROW", real_t(1.5)));
+    const real_t re_shrink = smesh::Env::read<real_t>("SFEM_RE_SHRINK", real_t(0.5));
+    const real_t re_fmin   = smesh::Env::read<real_t>("SFEM_RE_STEP_MIN", real_t(1.02));
 
     std::vector<real_t> rho_schedule;
     if (rho == real_t(0) || Re_phys <= real_t(1.5)) {
@@ -2573,6 +2581,7 @@ int main(int argc, char **argv) {
     }
     std::vector<real_t> x_stage_start((size_t)ndof, real_t(0));
     int                 re_retries = 0;
+    real_t              step_f     = re_step;  // current continuation step factor
 
     double t_op    = 0;  // building the Jacobian operator (assembly, or nothing)
     double t_prec  = 0;  // building the block-Jacobi preconditioner
@@ -2660,6 +2669,7 @@ int main(int argc, char **argv) {
     converged = false;
     real_t r_stage0 = 0;   // this stage's initial residual, the divergence reference
     bool   diverged = false;
+    int    lin_diverged_count = 0;
     for (newton_it = 0; newton_it <= max_newton; ++newton_it) {
         std::fill(r.begin(), r.end(), real_t(0));
         { const double t0 = smesh::time_seconds();
@@ -2737,6 +2747,7 @@ int main(int argc, char **argv) {
         std::shared_ptr<sfem::BiCGStab<real_t>>  bsolver;
         std::function<void(const std::shared_ptr<sfem::Operator<real_t>> &)> set_prec;
         std::function<int()>                                                 get_its;
+        std::function<bool()>                                                lin_failed;
         std::function<void(const real_t *, real_t *)>                        do_solve;
 
         // SFEM_ASSEMBLE_FINE=1 replaces the matrix-free fine operator with an assembled
@@ -2763,9 +2774,14 @@ int main(int argc, char **argv) {
             };
             get_its  = [fsolver]() { return fsolver->iterations(); };
             do_solve = [fsolver](const real_t *b, real_t *x) { fsolver->apply(b, x); };
+            lin_failed = []() { return false; };  // FGMRES has no divergence test yet
         } else {
             bsolver = sfem::create_bcgs<real_t>(linop_timed, sfem::EXECUTION_SPACE_HOST);
             bsolver->set_max_it(lin_max_it);
+            // A diverging Krylov solve otherwise burns the full iteration budget inside
+            // every Newton step and hands back a correction that the line search will only
+            // reject afterwards. Detecting it here stops the waste at its source.
+            bsolver->set_dtol(smesh::Env::read<real_t>("SFEM_LSOLVE_DTOL", real_t(1e4)));
             bsolver->set_rtol(lin_rtol);
             bsolver->set_atol(lin_atol);
             set_prec = [bsolver](const std::shared_ptr<sfem::Operator<real_t>> &p) {
@@ -2773,6 +2789,7 @@ int main(int argc, char **argv) {
             };
             get_its  = [bsolver]() { return bsolver->iterations(); };
             do_solve = [bsolver](const real_t *b, real_t *x) { bsolver->apply(b, x); };
+            lin_failed = [bsolver]() { return bsolver->has_diverged(); };
         }
         {
             const double t0 = smesh::time_seconds();
@@ -2896,6 +2913,17 @@ int main(int argc, char **argv) {
         }
         lin_it_total += get_its();
 
+        // React to a divergent linear solve immediately. The correction it returns cannot be
+        // trusted, and continuing would only spend a line search discovering that. Abandoning
+        // here lets the continuation shrink its step while the failure is still cheap.
+        if (lin_failed && lin_failed()) {
+            std::printf("  linear solve diverged after %d iterations -- abandoning stage\n",
+                        get_its());
+            ++lin_diverged_count;
+            diverged = true;
+            break;
+        }
+
         real_t dxinf = 0;
         for (ptrdiff_t i = 0; i < ndof; ++i) dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
 
@@ -2937,17 +2965,55 @@ int main(int argc, char **argv) {
     (void)diverged;
     ++stages_run;
     if (converged) rho_solved = std::max(rho_solved, rho_use);
+    if (converged && re_adapt && rho_solved > real_t(0) &&
+        rho_solved < rho * (real_t(1) - real_t(1e-12))) {
+        // The stage converged, so widen the step -- but re-plan from the state just solved,
+        // never straight at the final target. Aiming every stage at the target is what made
+        // the fixed schedule squander its retries: having solved Re 6400 it would attempt
+        // 10000, fail, bisect to 8000, fail, bisect to 7155, fail, ... paying a full stage
+        // for each. Stepping by a factor that has *just been shown to work* costs one stage
+        // per success and lets the ramp refine itself only where the problem is actually
+        // hard.
+        step_f = std::min(step_f * re_grow, re_step);
+        rho_schedule.erase(rho_schedule.begin() + (ptrdiff_t)stage + 1, rho_schedule.end());
+        real_t r = rho_solved;
+        while (r * step_f < rho) { r *= step_f; rho_schedule.push_back(r); }
+        rho_schedule.push_back(rho);
+    }
     if (!converged) {
         // Roll back and halve the step in log space rather than giving up. The stage that
         // failed is retried from the last state known to be good, via an intermediate Re.
-        if (stage > 0 && re_retries < re_retry) {
+        if ((stage > 0 || rho_solved > real_t(0)) && re_retries < re_retry) {
             std::copy(x_stage_start.begin(), x_stage_start.end(), x);
-            const real_t prev = rho_schedule[stage - 1];
-            const real_t mid  = std::sqrt(prev * rho_use);
-            rho_schedule.insert(rho_schedule.begin() + (ptrdiff_t)stage, mid);
+            real_t next;
+            if (re_adapt) {
+                // Shrink the increment towards 1 and re-step from the last solved state.
+                // The old rule bisected between the previous schedule entry and the failure,
+                // which converges on the ceiling from above and spends a stage per probe;
+                // shrinking the factor instead keeps every subsequent step small enough to
+                // stand a chance, so the budget buys progress rather than measurement.
+                const real_t base = rho_solved > real_t(0) ? rho_solved : rho_re1;
+                step_f = real_t(1) + (step_f - real_t(1)) * re_shrink;
+                // Cap the adaptive step by the geometric mean of the last success and the
+                // failure. Without this the step can overshoot the very target that just
+                // failed -- having solved 2749 with a factor of 1.59, the "next" attempt
+                // computes 4367 against a failing target of 3200, which is not a smaller
+                // step at all. The mean keeps the attempt strictly inside the bracket, so
+                // adaptive stepping degrades gracefully into bisection near a hard limit.
+                next   = std::min(base * step_f, std::sqrt(base * rho_use));
+                if (step_f < re_fmin || next <= base * (real_t(1) + real_t(1e-9))) {
+                    std::printf("  stage failed; step factor collapsed to %.4f -- stopping\n",
+                                (double)step_f);
+                    break;
+                }
+            } else {
+                next = std::sqrt(rho_schedule[stage - 1] * rho_use);
+            }
+            rho_schedule.insert(rho_schedule.begin() + (ptrdiff_t)stage, next);
             ++re_retries;
-            std::printf("  stage failed; retrying via Re = %g (retry %d/%d)\n",
-                        (double)(mid * U * Ly / std::max(mu, real_t(1e-30))), re_retries, re_retry);
+            std::printf("  stage failed; retrying via Re = %g (step x%.3f, retry %d/%d)\n",
+                        (double)(next * U * Ly / std::max(mu, real_t(1e-30))),
+                        (double)step_f, re_retries, re_retry);
             --stage;  // the for-increment lands back on the inserted stage
             continue;
         }
