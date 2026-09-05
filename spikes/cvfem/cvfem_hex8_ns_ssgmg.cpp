@@ -2183,8 +2183,8 @@ namespace {
                 const ptrdiff_t nd_lvl = fi->space()->n_dofs();
                 g.mg->add_level(timed("op[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, lop)),
                                 timed("smooth[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, sm)),
-                                i == 0 ? nullptr : timed("prolong", wrap_p(i)),
-                                timed("restrict", g.data->restrictions[i]));
+                                i == 0 ? nullptr : timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)),
+                                timed("restrict[L" + std::to_string(i) + "->" + std::to_string(i + 1) + "]", g.data->restrictions[i]));
             } else {
                 level_op_below = lop;
                 // Coarse solve. Dense LU when the level is small enough to factorise,
@@ -2218,7 +2218,7 @@ namespace {
                                     nd_coarse, rel < 1e-10 ? "OK" : "MISMATCH");
                     }
                     g.mg->add_level(timed("op[coarsest]", lop), timed("coarse_solve", lu),
-                                    timed("prolong", wrap_p(i)), nullptr);
+                                    timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)), nullptr);
                     continue;
                 }
 
@@ -2234,7 +2234,7 @@ namespace {
                 const ptrdiff_t nd_c = fi->space()->n_dofs();
                 g.mg->add_level(timed("op[coarsest]", thread_clamped(nd_c, lop)),
                                 timed("coarse_solve", thread_clamped(nd_c, cs)),
-                                timed("prolong", wrap_p(i)), nullptr);
+                                timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)), nullptr);
             }
         }
         g.mg->set_max_it(1);  // one V-cycle per preconditioner application
