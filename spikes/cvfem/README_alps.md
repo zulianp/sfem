@@ -1699,3 +1699,62 @@ to exploit -- few macro-elements, deep lattices -- that is the favourable regime
 The next step is not more tuning. It is to keep coarsening below the macro mesh, so the
 hierarchy does not terminate on a problem that is still large and dense; that is a change in
 `create_gmg_data` rather than in this spike.
+
+## Why it capped, and what fixing that revealed
+
+The N=2, L=16 failure above was not a weak preconditioner. The coarsest level's solve was
+diverging, and the cycle was faithfully prolonging the result.
+
+`SFEM_GMG_COARSE_VERBOSE=1` on that configuration shows BiCGStab on the 81-node coarsest
+operator taking its residual from 1.577 to 36066 over a hundred iterations, from 17.26 to
+82130, from 0.914 to 273. It then exhausts its 200-iteration cap and returns that amplified
+vector as the coarse-grid correction. The V-cycle amplified by 1e6 to 1e9 per cycle, FGMRES
+could not converge against such a preconditioner, the linear solve hit its own cap, and
+Newton stepped from a badly solved system to an answer three orders of magnitude wrong.
+Depth confirms the localisation: cycle rates are 0.06, 0.20 and 0.07 for two, three and four
+levels, and 2.8e6 at five.
+
+The tuning that appeared to rescue it was not addressing the cause. `MAX_LEVELS=3` removed
+the offending level and `COARSE_MAX_IT=30` limited how far the divergence could run.
+
+### The fix, and what it says about everything above
+
+A few hundred unknowns should not be handed to an iterative solver at all. The coarsest
+level is already stored dense, so it is now factorised: `DenseLU`, recovered by applying the
+operator to unit vectors, exact and incapable of diverging. `SFEM_GMG_DENSE_LU_BELOW`
+(default 4096 unknowns) selects it.
+
+With that in place, every case improves and the V-cycle wins everywhere:
+
+| case | dofs | baseline | V-cycle | speedup |
+|------|------|----------|---------|---------|
+| N=1, L=8  |  10,692 |  526 its, 0.72 s | 36 its, 0.32 s | 2.2x |
+| N=1, L=16 |  75,140 | 1834 its, 6.88 s | 80 its, 3.76 s | 1.8x |
+| N=2, L=8  |  75,140 | 1061 its, 2.69 s | 55 its, 1.79 s | 1.5x |
+| N=3, L=8  | 242,500 | 1178 its, 6.03 s | 71 its, 5.71 s | 1.06x |
+| N=2, L=16 | 561,924 | 1369 its, 25.7 s | 84 its, 15.8 s | 1.6x |
+
+Against the previous section, N=2 L=8 goes from 230 iterations and 10.35 s to 55 and 1.79 s,
+N=3 L=8 from 430 and 51.6 s to 71 and 5.71 s, and N=2 L=16 from a wrong answer to the
+fastest arm in the table.
+
+**This retracts the conclusion of the previous section.** That section read the N=1 wins and
+the N>1 losses as evidence that the method depends on lattice depth, and blamed the
+hierarchy terminating at the macro mesh. That was wrong. The variable was the coarsest
+level's solve, which fails harder at larger N because the coarsest operator is bigger and
+worse conditioned there; the correlation with macro-element count was real and the causal
+story attached to it was not.
+
+The iteration counts now say something the noisy measurements never could: 36, 80, 55, 71
+and 84 across 10,692 to 561,924 unknowns. Fifty times the problem for a bit over twice the
+iterations is close to the level independence a multigrid method is supposed to deliver, and
+the baseline over the same range goes from 526 to 1369.
+
+`cvfem_ns_op_gate` passes.
+
+### On the coarsening work that was proposed next
+
+It was proposed on the strength of the retracted conclusion, so its justification is gone
+rather than merely weakened. Coarsening below the macro mesh may still be worth doing -- at
+N=3 the margin is only 1.06x, and a deeper hierarchy is the obvious way to widen it -- but it
+should be argued from measurements taken with the coarse solve working, not from those above.
