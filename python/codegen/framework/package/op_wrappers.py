@@ -562,6 +562,7 @@ def _hyperelastic_op(
 ):
     if form_collections is None:
         raise ValueError("energy generated Op requires form collections")
+    n_field_components_by_dim = {}
     if kernel_sources is None:
         kernel_sources = {}
     parameters = tuple(str(name) for name, _ in material.parameter_defaults)
@@ -638,9 +639,11 @@ def _hyperelastic_op(
                 affine_flags=("apply_uses_affine",),
             )
         )
-        components = _components(dim)
+        n_field_components = _energy_field_component_count(collection, dim)
+        n_field_components_by_dim[dim] = n_field_components
+        components = _components(n_field_components)
         declarations.extend(
-            _hyperelastic_declarations(stem, dim, parameters, dependencies)
+            _hyperelastic_declarations(stem, dim, parameters, dependencies, n_field_components_by_dim=n_field_components_by_dim)
         )
         objective_args = "".join(
             ", %s" % arg for arg in _dependency_domain_parameter_args(objective_dependencies)
@@ -1477,36 +1480,42 @@ namespace sfem {
             kernel_sources,
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "gradient_packed_dispatch_body": _hyperelastic_gradient_packed_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "gradient_dispatch_body": _hyperelastic_gradient_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "objective_dispatch_body": _hyperelastic_objective_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "objective_steps_packed_dispatch_body": _hyperelastic_objective_steps_packed_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "objective_steps_dispatch_body": _hyperelastic_objective_steps_dispatch_body(
             material.name,
             kernel_sources,
             {dim: deps[0] for dim, deps in dependencies_by_dim.items()},
             indent="                ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_crs_dispatch_body": _hyperelastic_hessian_dispatch_body(
             material.name,
@@ -6469,8 +6478,8 @@ def _energy_declaration_field_args(dependencies, dim, components, current=False,
     return "".join(", %s" % arg for arg in args)
 
 
-def _hyperelastic_declarations(stem, dim, parameters, dependencies=None):
-    components = _components(dim)
+def _hyperelastic_declarations(stem, dim, parameters, dependencies=None, n_field_components_by_dim=None):
+    components = _components((n_field_components_by_dim or {}).get(dim, dim))
     if dependencies is None:
         dependencies = (None, None, None)
     objective_dependencies, gradient_dependencies, apply_dependencies = dependencies
@@ -7246,7 +7255,7 @@ def _hyperelastic_packed_return(indent, function, leading_args, trailing_args, k
     ]
 
 
-def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient_dependencies_by_dim, indent):
+def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient_dependencies_by_dim, indent, n_field_components_by_dim=None):
     lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
     emitted = False
     for dim in (2, 3):
@@ -7255,7 +7264,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
             continue
         prefix = "if" if not emitted else "else if"
         emitted = True
-        components = _components(dim)
+        components = _components((n_field_components_by_dim or {}).get(dim, dim))
         current_args = [str(arg) for arg in _energy_field_args(dependencies, dim, components, current="x")]
         output_args = [str(arg) for arg in _energy_output_args(dim, components)]
         affine = "%s_gradient_%dd_affine_mesh_soa" % (material_name, dim)
@@ -7369,7 +7378,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
     return "\n".join(lines)
 
 
-def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objective_dependencies_by_dim, indent):
+def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objective_dependencies_by_dim, indent, n_field_components_by_dim=None):
     lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
     emitted = False
     emitted_dims = []
@@ -7380,7 +7389,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
         prefix = "if" if not emitted else "else if"
         emitted = True
         emitted_dims.append(dim)
-        components = _components(dim)
+        components = _components((n_field_components_by_dim or {}).get(dim, dim))
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = [str(arg) for arg in _energy_field_args(dependencies, dim, components, current="x")]
         affine = "%s_objective_%dd_affine_mesh_soa" % (material_name, dim)
@@ -7451,7 +7460,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
     return "\n".join(lines)
 
 
-def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, objective_dependencies_by_dim, indent):
+def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, objective_dependencies_by_dim, indent, n_field_components_by_dim=None):
     lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
     emitted = False
     emitted_dims = []
@@ -7462,7 +7471,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
         prefix = "if" if not emitted else "else if"
         emitted = True
         emitted_dims.append(dim)
-        components = _components(dim)
+        components = _components((n_field_components_by_dim or {}).get(dim, dim))
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = [str(arg) for arg in _energy_field_args(dependencies, dim, components, current="x")]
         direction_args = [str(dim), _offsets("h", components)]
@@ -7540,7 +7549,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
     return "\n".join(lines)
 
 
-def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent):
+def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent, n_field_components_by_dim=None):
     lines = [
         "%sconst int dim = mesh->spatial_dimension();" % indent,
     ]
@@ -7550,9 +7559,12 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         uses_current = getattr(dependencies, "current", True)
         uses_direction = getattr(dependencies, "direction", True)
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
-        current_args = ([str(dim)] + ["x + %d" % d for d in range(dim)]) if uses_current else []
-        direction_args = ([str(dim)] + ["h + %d" % d for d in range(dim)]) if uses_direction else []
-        output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
+        # The stride and the offsets are the field's component count, not the
+        # spatial dimension: one array per component of the field being applied.
+        n_components = (n_field_components_by_dim or {}).get(dim, dim)
+        current_args = ([str(n_components)] + ["x + %d" % d for d in range(n_components)]) if uses_current else []
+        direction_args = ([str(n_components)] + ["h + %d" % d for d in range(n_components)]) if uses_direction else []
+        output_args = [str(n_components)] + ["out + %d" % d for d in range(n_components)]
         affine = "%s_apply_%dd_affine_mesh_soa" % (material_name, dim)
         isop = "%s_apply_%dd_isoparametric_mesh_soa" % (material_name, dim)
         packed = "%s_apply_packed_%dd_isoparametric_mesh_soa" % (material_name, dim)
@@ -7698,7 +7710,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
     return "\n".join(lines)
 
 
-def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, gradient_dependencies_by_dim, indent):
+def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, gradient_dependencies_by_dim, indent, n_field_components_by_dim=None):
     affine_lines = [
         "%sif (impl_->gradient_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
         "%s    auto packed = impl_->space->packed_mesh();" % indent,
@@ -7726,11 +7738,11 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
         emitted_affine = True
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = (
-            [str(dim)] + ["x + %d" % d for d in range(dim)]
+            [str(_packed_n_components(n_field_components_by_dim, dim))] + ["x + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
             if getattr(dependencies, "current", True)
             else []
         )
-        output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
+        output_args = [str(_packed_n_components(n_field_components_by_dim, dim))] + ["out + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
         affine_lines.append("%s        %s (dim == %d) {" % (indent, prefix, dim))
         affine_lines.extend(
             _hyperelastic_packed_return(
@@ -7781,11 +7793,11 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
         prefix = "if" if emitted and not any("if (dim ==" in line for line in lines) else "else if"
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = (
-            [str(dim)] + ["x + %d" % d for d in range(dim)]
+            [str(_packed_n_components(n_field_components_by_dim, dim))] + ["x + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
             if getattr(dependencies, "current", True)
             else []
         )
-        output_args = [str(dim)] + ["out + %d" % d for d in range(dim)]
+        output_args = [str(_packed_n_components(n_field_components_by_dim, dim))] + ["out + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
         lines.append("%s        %s (dim == %d) {" % (indent, prefix, dim))
         lines.extend(
             _hyperelastic_packed_return(
@@ -7816,7 +7828,7 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
     return "\n".join(packed_blocks)
 
 
-def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent):
+def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sources, apply_dependencies_by_dim, indent, n_field_components_by_dim=None):
     affine_lines = [
         "%sif (impl_->objective_uses_affine && impl_->space->has_packed_mesh()) {" % indent,
         "%s    auto packed = impl_->space->packed_mesh();" % indent,
@@ -7841,11 +7853,11 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
         emitted_affine = True
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = (
-            [str(dim)] + ["x + %d" % d for d in range(dim)]
+            [str(_packed_n_components(n_field_components_by_dim, dim))] + ["x + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
             if getattr(dependencies, "current", True)
             else []
         )
-        direction_args = [str(dim)] + ["h + %d" % d for d in range(dim)]
+        direction_args = [str(_packed_n_components(n_field_components_by_dim, dim))] + ["h + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
         affine_lines.extend(
             [
                 "%s        %s (dim == %d) {" % (indent, prefix, dim),
@@ -7910,12 +7922,12 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
         prefix = "if" if emitted and not any("if (dim ==" in line for line in lines) else "else if"
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         current_args = (
-            [str(dim)] + ["x + %d" % d for d in range(dim)]
+            [str(_packed_n_components(n_field_components_by_dim, dim))] + ["x + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
             if getattr(dependencies, "current", True)
             else []
         )
         direction_args = (
-            [str(dim)] + ["h + %d" % d for d in range(dim)]
+            [str(_packed_n_components(n_field_components_by_dim, dim))] + ["h + %d" % d for d in range(_packed_n_components(n_field_components_by_dim, dim))]
         )
         lines.extend(
             [
@@ -8249,6 +8261,25 @@ def _parameter_args(parameters):
         for name in parameters
     )
 
+
+def _energy_field_component_count(collection, dim):
+    """How many components the energy's field has, in this dimension.
+
+    The wrapper spelled this `dim`, naming one array per spatial direction.
+    That is right for a displacement -- which is every energy material the
+    framework had -- and wrong for a scalar field, whose gradient has `dim`
+    directions but whose value has one component.  It has to be asked per
+    dimension rather than once: a displacement really does have two components
+    in 2D and three in 3D.
+    """
+    fields = tuple(getattr(collection, "fields", ()) or ())
+    if not fields:
+        return dim
+    return max(1, int(getattr(fields[0], "components", dim)))
+
+def _packed_n_components(n_field_components_by_dim, dim):
+    """The field's component count for this dimension, defaulting to `dim`."""
+    return (n_field_components_by_dim or {}).get(dim, dim)
 
 def _components(dim):
     return ("x", "y", "z")[:dim]

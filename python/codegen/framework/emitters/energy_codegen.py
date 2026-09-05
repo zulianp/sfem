@@ -3236,13 +3236,13 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             for parameter in material_parameter_names
         )
         lines.append("        const ptrdiff_t u_stride,")
-        for d in range(dim):
+        for d in range(n_field_components):
             lines.append(
                 "        const %s *const SFEM_RESTRICT u%s,"
                 % (scalar_type, _component_name(d))
             )
         lines.append("        const ptrdiff_t h_stride,")
-        for d in range(dim):
+        for d in range(n_field_components):
             lines.append(
                 "        const %s *const SFEM_RESTRICT h%s,"
                 % (scalar_type, _component_name(d))
@@ -3564,6 +3564,7 @@ def _mesh_operator_parameters(
     `element_inputs`.  Same concept, two local structures -- which is what
     the two emitters have to stop having before they can share the plan.
     """
+    n_field_components = form_n_field_components(form, dim)
     base_params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
@@ -3584,20 +3585,20 @@ def _mesh_operator_parameters(
         field_params.append("const ptrdiff_t u_stride")
         field_params.extend(
             "const scalar_t *const SFEM_RESTRICT u%s" % _component_name(d)
-            for d in range(dim)
+            for d in range(n_field_components)
         )
     if uses_direction:
         field_params.append("const ptrdiff_t h_stride")
         field_params.extend(
             "const scalar_t *const SFEM_RESTRICT h%s" % _component_name(d)
-            for d in range(dim)
+            for d in range(n_field_components)
         )
     if not writes_per_shape(form):
         output_params = ("scalar_t *const SFEM_RESTRICT value",)
     else:
         output_params = tuple(["const ptrdiff_t out_stride"]) + tuple(
             "scalar_t *const SFEM_RESTRICT out%s" % _component_name(d)
-            for d in range(dim)
+            for d in range(n_field_components)
         )
 
     impl_params = (
@@ -4597,21 +4598,21 @@ def _sfem_soa_packed_apply_public_wrappers(
             )
             if uses_current:
                 lines.append("        const ptrdiff_t u_stride,")
-                for d in range(dim):
+                for d in range(n_field_components):
                     lines.append(
                         "        const %s *const SFEM_RESTRICT u%s,"
                         % (scalar_type, _component_name(d))
                     )
             if uses_direction:
                 lines.append("        const ptrdiff_t h_stride,")
-                for d in range(dim):
+                for d in range(n_field_components):
                     lines.append(
                         "        const %s *const SFEM_RESTRICT h%s,"
                         % (scalar_type, _component_name(d))
                     )
             lines.append("        const ptrdiff_t out_stride,")
-            for d in range(dim):
-                comma = "," if d + 1 < dim else ""
+            for d in range(n_field_components):
+                comma = "," if d + 1 < n_field_components else ""
                 lines.append(
                     "        %s *const SFEM_RESTRICT out%s%s"
                     % (scalar_type, _component_name(d), comma)
@@ -5154,12 +5155,12 @@ def _sfem_soa_mesh_objective_steps_function(
     field_params = ["const ptrdiff_t u_stride"]
     field_params.extend(
         "const scalar_t *const SFEM_RESTRICT u%s" % _component_name(d)
-        for d in range(dim)
+        for d in range(n_field_components)
     )
     field_params.append("const ptrdiff_t h_stride")
     field_params.extend(
         "const scalar_t *const SFEM_RESTRICT h%s" % _component_name(d)
-        for d in range(dim)
+        for d in range(n_field_components)
     )
     step_params = (
         "const int nsteps",
@@ -5872,7 +5873,7 @@ def _sfem_soa_hessian_packed_crs_passes(
             packed_state_params.append("const ptrdiff_t u_stride")
             packed_state_params.extend(
                 "const scalar_t *const SFEM_RESTRICT u%s" % _component_name(d)
-                for d in range(dim)
+                for d in range(n_field_components)
             )
         packed_fill_params = tuple(
             packed_common_params
