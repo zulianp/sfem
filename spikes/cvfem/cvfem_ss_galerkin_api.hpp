@@ -55,11 +55,25 @@ namespace cvfem_ss {
     // the way; only the returned matrices are assembled.
     //
     // `spaces[0]` is the fine space and `spaces[i]` level i; `masks[i]` is one byte per dof of
-    // level i (node * 4 + component). The returned matrices are raw `P^T A P` with the source
-    // masking folded in, exactly as the probe path's output was, so the caller applies the
-    // identity-row patch it already applies. Entry 0 of each vector is unused.
+    // level i (node * 4 + component). Entry 0 of each returned vector is unused.
+    //
+    // With `element_matrices`, every level but the coarsest is kept as element matrices and
+    // never assembled -- the hops coarsen element matrices to element matrices, so no global
+    // sparse structure is built for them at all. The coarsest is still assembled, because it is
+    // the one that gets factorised. Without it every level is assembled, which is the form the
+    // probe path produced and the one the gates compare against.
+    //
+    // Assembled levels come back raw, so the caller applies the identity-row patch it already
+    // applies; `op` and `diag` carry that treatment already for either form.
     struct CoarseHierarchy {
-        std::vector<std::shared_ptr<CoarseBSR>> A;
+        // Assembled form, null on any level kept as element matrices.
+        std::vector<std::shared_ptr<CoarseBSR>>              A;
+        // Apply for every level, whichever form backs it. Constrained rows behave as identity,
+        // so this is the operator the driver would have got from patch_identity_rows.
+        std::vector<std::shared_ptr<sfem::Operator<real_t>>> op;
+        // Block diagonal the smoothers invert, nnodes * 16 per level, identity on constrained
+        // rows for the same reason.
+        std::vector<std::vector<real_t>>                     diag;
     };
 
     // `state` is the fine-level state being linearised about. It is passed rather than assumed
@@ -69,7 +83,8 @@ namespace cvfem_ss {
     CoarseHierarchy assemble_hierarchy(sfem::CVFEMNavierStokes                                 &op,
                                        const real_t *const                                      state,
                                        const std::vector<std::shared_ptr<sfem::FunctionSpace>> &spaces,
-                                       const std::vector<std::vector<uint8_t>>                 &masks);
+                                       const std::vector<std::vector<uint8_t>>                 &masks,
+                                       const bool                                               element_matrices);
 
     // A coarse level kept as element matrices instead of assembled.
     //
