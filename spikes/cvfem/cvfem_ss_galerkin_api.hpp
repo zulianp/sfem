@@ -45,4 +45,24 @@ namespace cvfem_ss {
                                                         std::vector<real_t> *const                  diag_out,
                                                         const uint8_t *const fine_constrained = nullptr);
 
+    // A coarse level kept as element matrices instead of assembled.
+    //
+    // The returned operator applies sum_e P_e^T A_e P_e directly from the macro-elements, so
+    // this level never builds a sparse matrix; only the coarsest level, which is factorised,
+    // still needs one. Constrained coarse rows behave as identity, matching what
+    // patch_identity_rows gives the assembled form, and the apply accumulates into `y` like
+    // every other operator here.
+    //
+    // Storage and flops are both larger than the assembled form by the duplication at shared
+    // macro-element faces -- about 1.42x at a level-8 coarse lattice, 1.95x at level 4,
+    // improving as the lattice deepens -- traded for contiguous blocks and no column
+    // indirection. Which wins is a measurement.
+    std::shared_ptr<sfem::Operator<real_t>> make_element_matrix_level(
+            const sfem::CVFEMNavierStokes              &op,
+            const std::shared_ptr<sfem::FunctionSpace> &coarse,
+            const std::shared_ptr<sfem::FunctionSpace> &fine,
+            std::vector<real_t> *const                  diag_out,
+            const uint8_t *const                        fine_constrained,
+            const uint8_t *const                        coarse_constrained);
+
 }  // namespace cvfem_ss

@@ -1737,7 +1737,19 @@ namespace {
                 // slot instead of being dropped. Levels are built directly rather than
                 // chained, so no error accumulates through repeated triple products; the
                 // SFEM_GMG_CHECK=1 gates measure both claims at 2e-16.
-                const bool egal = smesh::Env::read<int>("SFEM_GMG_EGAL", 1) &&
+                // Element-wise Galerkin replaces the *probe*, and the probe was only ever
+                // needed at level 1 -- below that the level above is already a matrix and the
+                // triple product is exact and cheap. Restricting it to level 1 is not a
+                // limitation of the construction but of the constraint treatment: the
+                // hierarchy's transfers zero constrained dofs at every hop, so level 2 built
+                // by chaining coarsens a level-1 matrix that already carries identity rows,
+                // and those rows contribute to the product. Building level 2 straight from
+                // level 0 cannot see them. The operators still agree to 2e-16 on unconstrained
+                // columns, which is why this was invisible until the block diagonals were
+                // compared -- they differed by 1.2e-2 at level 2 and 5.7e-2 at level 3, and a
+                // smoother given wrong diagonals cost the solve its convergence (40 Newton
+                // steps against 27) while every operator gate still passed.
+                const bool egal = smesh::Env::read<int>("SFEM_GMG_EGAL", 1) && i == 1 &&
                                   g.level_ops[0] && g.level_ops[0]->is_semi_structured();
 
                 if (egal) {
@@ -1746,6 +1758,50 @@ namespace {
                     g.data->functions[0]->constraints_mask(m0.data());
                     std::vector<uint8_t> fmask((size_t)nd0, 0);
                     for (ptrdiff_t k = 0; k < nd0; ++k) fmask[(size_t)k] = mask_get(k, m0.data()) ? 1 : 0;
+
+                    // Element matrices instead of a matrix, on every level but the coarsest
+                    // -- which stays assembled because it is the one that gets factorised.
+                    // This is the "BSR only at the coarsest" form; it is off by default until
+                    // the two applies have been measured against each other, since it trades
+                    // about 1.4 to 2 times the block multiplies for contiguous blocks and no
+                    // column indirection.
+                    if (smesh::Env::read<int>("SFEM_GMG_EGAL_EM", 0) && i + 1 < nlevels) {
+                        const ptrdiff_t      ndc = fi->space()->n_dofs();
+                        std::vector<uint8_t> cmask((size_t)ndc, 0);
+                        for (ptrdiff_t k = 0; k < ndc; ++k)
+                            cmask[(size_t)k] = mask_get(k, mask.data()) ? 1 : 0;
+
+                        auto em = cvfem_ss::make_element_matrix_level(*g.level_ops[0], fi->space(),
+                                                                      g.data->functions[0]->space(),
+                                                                      &galerkin_diag, fmask.data(), cmask.data());
+
+                        if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
+                            // The element-matrix apply must equal the assembled one it
+                            // replaces. Same construction, same constraint treatment, so a
+                            // difference here is the apply itself.
+                            auto ref = cvfem_ss::assemble_coarse_operator(*g.level_ops[0], fi->space(),
+                                                                          g.data->functions[0]->space(), nullptr,
+                                                                          fmask.data());
+                            patch_identity_rows(ref, mask.data());
+                            std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
+                            for (ptrdiff_t k = 0; k < ndc; ++k)
+                                v[(size_t)k] = std::cos(real_t(0.23) * (real_t)k + real_t(0.5));
+                            em->apply(v.data(), ya.data());
+                            ref->apply(v.data(), yb.data());
+                            real_t dn = 0, rn = 0;
+                            for (ptrdiff_t k = 0; k < ndc; ++k) {
+                                const real_t d = ya[(size_t)k] - yb[(size_t)k];
+                                dn += d * d;
+                                rn += yb[(size_t)k] * yb[(size_t)k];
+                            }
+                            const real_t rel = rn > 0 ? std::sqrt(dn / rn) : std::sqrt(dn);
+                            std::printf("egal EM level %d: rel |A_em v - A_bsr v| = %.4e  %s\n", i, rel,
+                                        rel < 1e-12 ? "OK" : "MISMATCH");
+                        }
+
+                        g.Amat[(size_t)i] = nullptr;
+                        lop               = em;
+                    } else {
 
                     auto a_c = cvfem_ss::assemble_coarse_operator(*g.level_ops[0], fi->space(),
                                                                   g.data->functions[0]->space(), nullptr,
@@ -1783,11 +1839,29 @@ namespace {
                         if (i == 1 && g.Rmat[1] && g.Pmat[1] &&
                             smesh::Env::read<int>("SFEM_GMG_SYMBOLIC_PATTERN", 1))
                             pat = symbolic_rap_pattern(g.data->functions[0], g.Rmat[1], g.Pmat[1]);
+                        std::vector<real_t> pdiag;
                         assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
                                           g.data->restrictions[i - 1],
-                                          g.data->functions[i - 1]->space()->n_dofs(), nullptr, pat.get());
+                                          g.data->functions[i - 1]->space()->n_dofs(), &pdiag, pat.get());
                         auto probed = g_last_assembled;
                         g_last_assembled = saved;
+
+                        // The constrained rows, and the block diagonal, deliberately left out
+                        // of the comparison below. Both feed the smoother, so a difference
+                        // there does not show up as a wrong coarse operator but as a worse
+                        // cycle -- which is exactly the symptom that sent this back here.
+                        {
+                            real_t dd = 0, dr = 0;
+                            for (size_t k = 0; k < pdiag.size() && k < galerkin_diag.size(); ++k) {
+                                const real_t d = galerkin_diag[k] - pdiag[k];
+                                dd += d * d;
+                                dr += pdiag[k] * pdiag[k];
+                            }
+                            const real_t rd = dr > 0 ? std::sqrt(dd / dr) : std::sqrt(dd);
+                            std::printf("egal diag  %d: rel |diag_egal - diag_probe| = %.4e  %s (n %zu vs %zu)\n",
+                                        i, rd, rd < 1e-10 ? "OK" : "MISMATCH", galerkin_diag.size(),
+                                        pdiag.size());
+                        }
 
                         const ptrdiff_t ndc = fi->space()->n_dofs();
                         std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
@@ -1796,8 +1870,9 @@ namespace {
                         fi->apply_zero_constraints(v.data());
                         a_c->apply(v.data(), ya.data());
                         probed->apply(v.data(), yb.data());
-                        fi->apply_zero_constraints(ya.data());
-                        fi->apply_zero_constraints(yb.data());
+                        // Whole-vector comparison, constrained rows included. The earlier
+                        // version zeroed them on both sides, copying the rap gate, and that
+                        // hid whatever lives there.
                         real_t dn = 0, rn = 0;
                         for (ptrdiff_t k = 0; k < ndc; ++k) {
                             const real_t d = ya[(size_t)k] - yb[(size_t)k];
@@ -1812,6 +1887,7 @@ namespace {
 
                     g.Amat[(size_t)i] = a_c;
                     lop               = a_c;
+                    }
                 } else
                 // Level 1 is the only level that must be probed: the operator above it is
                 // matrix-free and has no matrix form. Below that the level above IS a

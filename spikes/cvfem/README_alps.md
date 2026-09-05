@@ -1977,11 +1977,25 @@ fly and applies it with GEMM -- and the pieces are already in this spike:
 | level 1 |   8 |  32 | 0.01 | 0.27 |
 
 The last hop is a 32x32 element matrix, which is exactly the `em32` shape the bench already
-measures. Note the storage comparison runs the other way at the shallow end: a dense element
-matrix at level 4 costs about seven times the assembled BSR, because it is dense and
-duplicated across shared faces. That is the argument for assembling on the fly at the levels
-where it is large, which is what the linear elasticity path already does, rather than an
-argument against the approach.
+measures.
+
+**Correction, from building it.** The table above compares a *dense* element matrix against
+the BSR, and on that basis the storage runs the other way at the shallow end -- level 4 costs
+about seven times the assembled BSR. The kernel that was actually written does not store a
+dense element matrix. A coarse node couples only to its 3x3x3 lattice neighbourhood, so the
+local operator is a 27-point stencil of `(Lc+1)^3 * 27` blocks, and the only excess over the
+assembled BSR is duplication at shared macro-element faces:
+
+| coarse lattice | dense EM vs BSR | 27-stencil EM vs BSR |
+|----------------|-----------------|----------------------|
+| level 2 | 1.0x | 3.38x |
+| level 4 | 4.6x | 1.95x |
+| level 8 | 27.0x | 1.42x |
+
+So the storage objection to keeping intermediate levels as element matrices is much weaker
+than the first estimate suggested, and it *improves* with lattice depth rather than worsening.
+That reopens "BSR only at the coarsest" as a real option rather than something the numbers
+argue against; what settles it is a measurement of the two applies, not the storage.
 
 One property makes this cleaner than it first appears. The prolongation composed within a
 macro element is itself a trilinear interpolation, so any level's element matrix can be
@@ -2002,3 +2016,155 @@ sparse matrix above the coarsest level -- so the unsorted-column hazard, the `mm
 sizing and the host-only serial transpose all stop applying. The coarse block diagonals the
 smoothers need come from summing element contributions, which the deterministic two-pass
 scatter already does.
+
+### Element-wise Galerkin, implemented
+
+`SFEM_GMG_EGAL=1` (default) builds the level-1 coarse operator as `sum_e P_e^T A_e P_e`
+straight from the fine macro-elements. That is where the probe was -- level 1 is the only
+level whose operator above it is matrix-free and has no matrix form; below it the level above
+IS a matrix and `rap` is already exact and cheap. It does not turn Galerkin coarsening on:
+that is still `SFEM_GMG_GALERKIN=2`, off by default, so a run setting neither still gets
+rediscretised coarse operators.
+
+**What made it cheap.** Three structural facts, none of which needed new physics:
+
+1. *The micro-cell matrix was already reachable.* Passing identity slots (`sl[k] = k`) to
+   `cvfem_hex8_ns_upwind_jacobian_add_slots` writes a dense 8x8-block cell matrix into a local
+   buffer -- the trick `assemble_block_diag` already used. So the entries come out directly
+   and nothing is probed.
+2. *A micro-cell's coarse support is exactly eight nodes.* The cell spans fine indices
+   `[xi, xi+1]`, whose coarse floors differ by at most one, so per axis it reaches coarse
+   indices `{ax, ax+1}` and no more -- for any ratio `q`, not only 2:1. The triple product is
+   a fixed 8x8 -> 8x8 contraction rather than something growing with `L`.
+3. *The weights depend only on the offset class* `(xi%q, yi%q, zi%q)`. There are `q^3` of them,
+   shared by every cell and macro-element, so they are a table built once and never an array
+   indexed per entry -- the principle `cvfem_ss_transfer.hpp` applies to the prolongation.
+
+**Cost.** Per micro-cell the two contraction stages are `8*27` and `27*8` block
+multiply-accumulates, so 432 against the 1024 a dense 8x8 -> 8x8 contraction would need. The
+27 is the average row count of the prolongation restricted to a cell: one corner interpolates
+from 1 coarse node, three from 2, three from 4, one from 8, and `1+6+12+8 = 27`. Stage 1
+contracts through a precomputed transpose of that map so each output block is stored once
+rather than zeroed and accumulated into, saving 1024 scalars of zeroing per cell for the same
+arithmetic. Assembly runs in chunks of macro-elements sized to keep the staging buffer near
+32 MiB.
+
+**The pattern is derived, not guessed.** An entry exists exactly where two coarse nodes share
+a macro-element and sit within one lattice step of each other, which is the true Galerkin
+pattern. That removes the probe's worst failure mode outright: an entry outside a too-narrow
+guess was not dropped but folded into the wrong slot, so a bad guess gave a wrong matrix
+rather than an approximate one, and the retry loop that widened it is what produced the
+7,144,929-block dense coarse operator. The derived pattern is also tighter than the probe's --
+112 blocks at the coarsest level where the probe padded to 144, which `rap` independently
+confirms is the true count.
+
+**Determinism** comes for free: accumulation runs over destinations rather than sources, each
+block summing its own contributions in a fixed order with chunks in fixed order too, so there
+are no atomics and the matrix is the same bits on any thread count. This is the two-pass
+packed idea from the apply path, applied to assembly.
+
+### Levels chain after all, once constraints are in play
+
+The design note above claimed a level at ratio `q` could be built straight from the fine
+element matrices, with no chaining, because piecewise-linear interpolation on nested uniform
+lattices composes to the direct map. That is true of the **raw** operator, and the gates
+measure it at 2.2e-16 and 4.4e-16 through the last hop.
+
+It is false for the hierarchy the driver actually builds. Its transfers zero constrained
+degrees of freedom at *every* hop, so the composite is `R2 Z1 (R1 Z0 A Z0 P1) Z1 P2` -- a `Z`
+at each level, not only at the fine end. Level 2 built by chaining therefore coarsens a
+level-1 matrix that already carries identity rows, and those rows contribute to the product.
+A level built directly from level 0 cannot see them.
+
+This did not show up in any operator comparison, because the operators agree to 2e-16 on
+unconstrained columns. It showed up in the **block diagonal**, which differed by 1.2e-2 at
+level 2 and 5.7e-2 at level 3 -- and the block diagonal is what the smoother inverts. Those
+are not round-off; the smoother was being handed wrong diagonals at two of the three coarse
+levels.
+
+Masking the constrained coarse columns as well is *not* the fix; it makes level 1 disagree too
+(4.4e-18 -> 7.3e-3), because the probe does not mask them. The fix is to leave the chaining
+alone: element-wise Galerkin replaces the probe at level 1, and `rap` continues to build the
+levels below from the level above, which is the already-validated path. With that, every gate
+reads machine precision at every Newton step -- the level-1 operator at 4e-16 and its block
+diagonal at 1.5e-17.
+
+**The gate that missed it** was copied from the `rap` check, which zeroes constrained rows on
+both sides with the comment that "those rows are not part of what is being tested". That is
+right for testing a triple product and wrong for testing a replacement construction: it makes
+the comparison blind to precisely the rows where two constraint treatments differ. Comparing
+the block diagonals, which no operator gate covers, is what located it.
+
+### Gates
+
+On a 2x1x1 macro mesh at L=8 with `SFEM_GMG_CHECK=1 SFEM_GMG_GALERKIN=2`:
+
+| gate | what it settles | result |
+|------|-----------------|--------|
+| `egal identity (q=1)` | the assembly reproduces `A` itself -- cell matrix, geometry, Rhie-Chow, pattern, scatter, at once | 1.540e-16 |
+| `egal galerkin (0->1)` | the coarsening reproduces `P^T A P` against the matrix-free composite | 2.199e-16 |
+| `egal galerkin (0->2,3)` | direct equals chained for the raw operator | 2.210e-16, 4.444e-16 |
+| `egal level 1` | the constrained operator equals the probed composite it replaces | 2.1e-16 |
+| `egal diag 1` | the block diagonal the smoother inverts equals the probed one | 4.4e-18 |
+| `rap level 2,3` | the levels below, unchanged | 1.8e-16, 1.8e-16 |
+
+The identity gate is the one worth keeping. At `q = 1` the prolongation is the identity, so
+`P^T A P` is `A`, and one comparison covers everything the construction rests on: that
+identity slots really do yield the micro-cell matrix, that the hoisted geometry and Rhie-Chow
+struct fed to the assembly are the ones the apply uses, that the derived pattern holds every
+entry, and that the inverted-index accumulation lands each block where it belongs.
+
+### BSR only at the coarsest level: implemented, and why it does not yet pay
+
+The element matrices can also be kept and applied directly rather than assembled: gather a
+macro-element's coarse nodes, run the 27-point stencil over its local matrix, reduce.
+`SFEM_GMG_EGAL_EM=1` selects that, and `SFEM_GMG_CHECK=1` compares it against the assembled
+operator it replaces, same construction and same constraint treatment.
+
+The storage objection is weaker than the design note above estimated, because that estimate
+was for a *dense* element matrix and the kernel builds a stencil one. Both storage and block
+multiplies exceed the assembled form only by duplication at shared macro-element faces --
+3.38x at a level-2 coarse lattice, 1.95x at level 4, 1.42x at level 8 -- improving as the
+lattice deepens rather than worsening. What is bought is contiguous 4x4 blocks with no column
+indirection.
+
+It is off by default for a structural reason rather than a performance one. Level 1 is the
+only level element-wise Galerkin builds, and the levels below it are built by `rap` *from*
+level 1's matrix. Leaving level 1 as element matrices removes that matrix, so level 2 falls
+back to probing -- trading one probe for another, further down. Making this pay needs the
+whole hierarchy built element-wise, which is what the constraint chaining above currently
+blocks: the transfers zero constrained dofs at each hop, and an element-wise level has no way
+to see the identity rows the level above it carries.
+
+So the honest position is that the apply is written and correct, and the path to "BSR only at
+the coarsest" runs through the constraint treatment, not through the assembly kernel. The
+options are to stop zeroing at intermediate levels, or to carry the identity rows down the
+element-wise construction explicitly. Neither is measured yet.
+
+### Measured
+
+`SFEM_GMG_GALERKIN=2`, N=2x1x1 at L=8, 8 threads, same binary for both arms:
+
+| | probe | element-wise |
+|---|-------|--------------|
+| `galerkin_assembly`, total | 9.286 s | **0.181 s** |
+| per call | 49.9 ms | **0.78 ms** |
+| share of measured phases | 4.0% | 0.1% |
+
+So the assembly itself is about **64x cheaper per call**. What that is worth end to end is
+smaller than it sounds: the symbolic-pattern fix earlier in this section had already removed
+the catastrophic part of probing, leaving assembly at 4% of the solve at this size. The case
+for the element-wise construction is therefore mostly the other three properties -- an exact
+derived pattern that cannot be too narrow, a tighter one than the probe's guess, and bitwise
+reproducibility -- with the speed following at larger coarse levels, where probing costs
+colours and this costs one sweep.
+
+**A control that was missing.** The element arm did not converge at N=2 (40 Newton steps
+against the probe's 27), which looked like a defect the gates had missed. Running the probe at
+N=1 L=8 settles it: it does not converge there either (40 Newton steps, 31269 linear
+iterations, 84.9 s), while the element-wise arm on the same case is slightly better (30361
+iterations, 71.1 s). Both constructions sit near the convergence boundary at these sizes, and
+which one falls the right side of it is not evidence about either. The diagonal defect above
+was real and is fixed on its own evidence -- the gate reads 1.5e-17 now against 1.2e-2 before
+-- but attributing the non-convergence to it, as this note first did, was a conclusion drawn
+without the control.

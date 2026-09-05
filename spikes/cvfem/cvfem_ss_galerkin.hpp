@@ -539,4 +539,112 @@ namespace cvfem_ss {
             for (int a = 0; a < g.nc; ++a) g.gid[(size_t)e * g.nc + a] = rows[(size_t)a][e];
     }
 
+    // ------------------------------------------------------------------
+    // Applying a level as element matrices, so only the coarsest needs a BSR.
+    //
+    // A level held this way is never assembled: the apply gathers the coarse nodes of a
+    // macro-element, runs the 27-point stencil over its local matrix, and reduces. Storage
+    // is (Lc+1)^3 * 27 blocks per element against n_coarse * 27 for the assembled form, so
+    // the excess is duplication at shared macro-element faces alone -- 1.42x at a level-8
+    // coarse lattice, 1.95x at level 4 -- and it improves as the lattice deepens. The flops
+    // scale the same way, which is the honest cost: the apply trades about 1.4 to 2 times
+    // the block multiplies for contiguous blocks and no column indirection, so which wins is
+    // a measurement rather than a deduction.
+    //
+    // The coarsest level is still assembled, because it is factorised.
+
+    struct GalerkinReduce {
+        std::vector<ptrdiff_t> ptr;  // n_coarse + 1
+        std::vector<ptrdiff_t> idx;  // (e * nc + a) sources feeding each coarse node
+    };
+
+    inline void galerkin_build_node_reduce(const GalerkinLevel &g, GalerkinReduce &r) {
+        r.ptr.assign((size_t)g.n_coarse + 1, 0);
+        for (size_t k = 0; k < g.gid.size(); ++k) r.ptr[(size_t)g.gid[k] + 1]++;
+        for (ptrdiff_t i = 0; i < g.n_coarse; ++i) r.ptr[(size_t)i + 1] += r.ptr[(size_t)i];
+
+        r.idx.assign((size_t)r.ptr[(size_t)g.n_coarse], 0);
+        std::vector<ptrdiff_t> at(r.ptr.begin(), r.ptr.end());
+        for (size_t k = 0; k < g.gid.size(); ++k) r.idx[(size_t)at[(size_t)g.gid[k]]++] = (ptrdiff_t)k;
+    }
+
+    // Two passes, like the packed scatter: elements write their own staging slots, then each
+    // coarse node sums the slots that feed it in a fixed order. No atomics, same bits on any
+    // thread count.
+    inline SFEM_NOINLINE void galerkin_apply(const GalerkinLevel &g, const GalerkinReduce &r,
+                                             std::vector<scalar_t> &stage,
+                                             const scalar_t *const SFEM_RESTRICT x,
+                                             scalar_t *const SFEM_RESTRICT       y) {
+        SFEM_TRACE_SCOPE("cvfem_ss::galerkin_apply");
+        const int nc = g.nc, Lc = g.Lc;
+        stage.resize((size_t)g.nmacro * (size_t)nc * N_FIELDS);
+
+        // Stencil slot -> local lattice offset, once: the neighbour of node a at slot s is
+        // a + step[s] whenever it stays inside the lattice, which the bounds below decide.
+        const int Lp1 = Lc + 1;
+        int       step[27];
+        for (int s = 0; s < 27; ++s)
+            step[s] = ((s / 9) - 1) * Lp1 * Lp1 + (((s / 3) % 3) - 1) * Lp1 + ((s % 3) - 1);
+
+#pragma omp parallel
+        {
+            std::vector<scalar_t> xl((size_t)nc * N_FIELDS);
+#pragma omp for schedule(static)
+            for (ptrdiff_t e = 0; e < g.nmacro; ++e) {
+                for (int a = 0; a < nc; ++a) {
+                    const size_t gn = (size_t)g.gid[(size_t)e * nc + a];
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        xl[(size_t)a * N_FIELDS + (size_t)c] = x[gn * N_FIELDS + (size_t)c];
+                }
+
+                const scalar_t *const SFEM_RESTRICT Ce = g.C.data() + (size_t)(e - g.e0) * (size_t)nc * 27 * 16;
+                scalar_t *const SFEM_RESTRICT       st = stage.data() + (size_t)e * (size_t)nc * N_FIELDS;
+
+                for (int a = 0; a < nc; ++a) {
+                    const int ci = a % Lp1, cj = (a / Lp1) % Lp1, ck = a / (Lp1 * Lp1);
+                    scalar_t  acc[N_FIELDS] = {scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0)};
+
+                    for (int s = 0; s < 27; ++s) {
+                        const int di = (s % 3) - 1, dj = ((s / 3) % 3) - 1, dk = (s / 9) - 1;
+                        if (ci + di < 0 || ci + di > Lc || cj + dj < 0 || cj + dj > Lc || ck + dk < 0 ||
+                            ck + dk > Lc)
+                            continue;
+                        const scalar_t *const SFEM_RESTRICT blk = Ce + ((size_t)a * 27 + (size_t)s) * 16;
+                        const scalar_t *const SFEM_RESTRICT v   = &xl[(size_t)(a + step[s]) * N_FIELDS];
+                        for (int rr = 0; rr < N_FIELDS; ++rr)
+                            for (int cc = 0; cc < N_FIELDS; ++cc) acc[rr] += blk[rr * 4 + cc] * v[cc];
+                    }
+                    for (int c = 0; c < N_FIELDS; ++c) st[(size_t)a * N_FIELDS + (size_t)c] = acc[c];
+                }
+            }
+        }
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t n = 0; n < g.n_coarse; ++n) {
+            scalar_t acc[N_FIELDS] = {scalar_t(0), scalar_t(0), scalar_t(0), scalar_t(0)};
+            for (ptrdiff_t k = r.ptr[(size_t)n]; k < r.ptr[(size_t)n + 1]; ++k) {
+                const scalar_t *const SFEM_RESTRICT src = stage.data() + (size_t)r.idx[(size_t)k] * N_FIELDS;
+                for (int c = 0; c < N_FIELDS; ++c) acc[c] += src[c];
+            }
+            for (int c = 0; c < N_FIELDS; ++c) y[(size_t)n * N_FIELDS + (size_t)c] = acc[c];
+        }
+    }
+
+    // The smoother's block diagonal: the centre slot summed over the elements at each node.
+    inline void galerkin_block_diag(const GalerkinLevel &g, const GalerkinReduce &r,
+                                    scalar_t *const SFEM_RESTRICT diag) {
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t n = 0; n < g.n_coarse; ++n) {
+            scalar_t acc[16];
+            for (int c = 0; c < 16; ++c) acc[c] = scalar_t(0);
+            for (ptrdiff_t k = r.ptr[(size_t)n]; k < r.ptr[(size_t)n + 1]; ++k) {
+                const scalar_t *const SFEM_RESTRICT blk =
+                        g.C.data() + ((size_t)r.idx[(size_t)k] * 27 + 13) * 16;
+#pragma omp simd
+                for (int c = 0; c < 16; ++c) acc[c] += blk[c];
+            }
+            for (int c = 0; c < 16; ++c) diag[(size_t)n * 16 + c] = acc[c];
+        }
+    }
+
 }  // namespace cvfem_ss
