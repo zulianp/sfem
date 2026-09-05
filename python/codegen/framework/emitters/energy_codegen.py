@@ -3477,6 +3477,275 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
     return lines
 
 
+def _mesh_operator_parameters(
+    form,
+    dim,
+    geometry_mode,
+    element_inputs,
+    uses_current,
+    uses_direction,
+):
+    """The signature a mesh operator declares, and its wrapper spelling.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.  That
+    function is six hundred lines with three axes woven through it --
+    geometry mode, contraction, and whether the form writes per shape --
+    and nothing in it can be selected from a table while they are
+    interleaved.  Taking the parameter list out first is the smallest
+    piece that stands on its own: it reads six values and produces two,
+    and only `impl_params` and `wrapper_params` were used downstream.
+
+    The `geometry_mode` branch inside is the one worth noticing.  The
+    residual emitter asks the same question through
+    `plans.geometry_quantities.mesh_geometry_parameters`, but derives the
+    names from `dependencies` where this derives them from
+    `element_inputs`.  Same concept, two local structures -- which is what
+    the two emitters have to stop having before they can share the plan.
+    """
+    base_params = [
+        "const ptrdiff_t nelements",
+        "const ptrdiff_t nnodes",
+        "idx_t **const SFEM_RESTRICT elements",
+    ]
+    if geometry_mode == "affine":
+        base_params.extend(
+            "const jacobian_t *const SFEM_RESTRICT g_%s" % stream
+            for array_input in element_inputs
+            for stream in _soa_array_stream_names(array_input)
+        )
+    else:
+        base_params.append("const geometry_t *const *const SFEM_RESTRICT points")
+
+    material_params = _form_material_parameter_declarations(form)
+    field_params = []
+    if uses_current:
+        field_params.append("const ptrdiff_t u_stride")
+        field_params.extend(
+            "const scalar_t *const SFEM_RESTRICT u%s" % _component_name(d)
+            for d in range(dim)
+        )
+    if uses_direction:
+        field_params.append("const ptrdiff_t h_stride")
+        field_params.extend(
+            "const scalar_t *const SFEM_RESTRICT h%s" % _component_name(d)
+            for d in range(dim)
+        )
+    if not writes_per_shape(form):
+        output_params = ("scalar_t *const SFEM_RESTRICT value",)
+    else:
+        output_params = tuple(["const ptrdiff_t out_stride"]) + tuple(
+            "scalar_t *const SFEM_RESTRICT out%s" % _component_name(d)
+            for d in range(dim)
+        )
+
+    impl_params = (
+        tuple(base_params)
+        + tuple(material_params)
+        + tuple(field_params)
+        + tuple(output_params)
+    )
+    wrapper_params = tuple(
+        param.replace("geometry_t", "geom_t").replace("jacobian_t", "geom_t")
+        for param in impl_params
+    )
+    return impl_params, wrapper_params
+
+
+def _append_mesh_operator_stream_arrays(
+    lines,
+    form,
+    dim,
+    n_nodes,
+    use_stream_arrays,
+    compact_stream_buffers,
+    stream_shape_order,
+    uses_current,
+    uses_direction,
+):
+    """The stream pointer arrays a mesh operator hands its block kernel.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.  It reads
+    nine values and writes only to `lines`, which is what makes it safe to
+    move: nothing it computes is read further down.
+    """
+    if use_stream_arrays:
+        lines.append("")
+        if uses_current and compact_stream_buffers:
+            lines.extend(
+                _ordered_stream_pointer_array_lines(
+                    "const scalar_t *",
+                    "block_u_streams",
+                    "block_u_data",
+                    dim,
+                    stream_shape_order,
+                    "        ",
+                )
+            )
+        elif uses_current:
+            lines.append(
+                "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
+                % (
+                    dim,
+                    ", ".join(
+                        "block_%s" % stream
+                        for stream in streams_in_shape_order(
+                            _field_stream_names("u", dim, n_nodes),
+                            dim,
+                            stream_shape_order,
+                        )
+                    ),
+                )
+            )
+        if uses_direction:
+            if compact_stream_buffers:
+                lines.extend(
+                    _ordered_stream_pointer_array_lines(
+                        "const scalar_t *",
+                        "block_h_streams",
+                        "block_h_data",
+                        dim,
+                        stream_shape_order,
+                        "        ",
+                    )
+                )
+            else:
+                lines.append(
+                    "        const scalar_t *const block_h_streams[N_SHAPE * %d] = {%s};"
+                    % (
+                        dim,
+                        ", ".join(
+                            "block_%s" % stream
+                            for stream in streams_in_shape_order(
+                                _field_stream_names("h", dim, n_nodes),
+                                dim,
+                                stream_shape_order,
+                            )
+                        ),
+                    )
+                )
+        if writes_per_shape(form):
+            if compact_stream_buffers:
+                lines.extend(
+                    _ordered_stream_pointer_array_lines(
+                        "scalar_t *",
+                        "block_out_streams",
+                        "block_out_data",
+                        dim,
+                        stream_shape_order,
+                        "        ",
+                    )
+                )
+            else:
+                lines.append(
+                    "        scalar_t *const block_out_streams[N_SHAPE * %d] = {%s};"
+                    % (
+                        dim,
+                        ", ".join(
+                            "block_%s" % stream
+                            for stream in streams_in_shape_order(
+                                _output_stream_names(form, dim, n_nodes),
+                                dim,
+                                stream_shape_order,
+                            )
+                        ),
+                    )
+                )
+
+
+def _append_mesh_operator_scalar_output(
+    lines,
+    form,
+    dim,
+    n_nodes,
+    compact_stream_buffers,
+    work_item,
+    source_builder,
+):
+    """How a 0-form returns its single accumulated value.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.  The guard
+    stays inside because it is what the block is: everything here exists
+    only for a form that accumulates a scalar rather than scattering to
+    shape functions.  Seven inputs, and nothing it binds is read further
+    down.
+    """
+    if not writes_per_shape(form):
+        lines.extend(_work_item_loop_lines(source_builder, "        "))
+        lines.append("            value[evbegin + %s] += block_value[%s];" % (work_item, work_item))
+        lines.append("        }")
+    else:
+        if compact_stream_buffers:
+            lines.append("        scalar_t *const out_components[DIM] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(dim)))
+            lines.extend(
+                [
+                    "",
+                    "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                    "            for (int d = 0; d < DIM; ++d) {",
+                    *_scatter_add_lines(
+                        source_builder,
+                        "out_components[d]",
+                        "ev[shape * VECTOR_SIZE + %s] * out_stride",
+                        "block_out_data[shape * DIM + d][%s]",
+                        "                ",
+                    ),
+                    "            }",
+                    "        }",
+                ]
+            )
+        else:
+            for shape in range(n_nodes):
+                for d in range(dim):
+                    component = _component_name(d)
+                    lines.extend(
+                        list(
+                            _scatter_add_lines(
+                                source_builder,
+                                "out%s" % component,
+                                "ev[%d * VECTOR_SIZE + %%s] * out_stride" % shape,
+                                "block_out%s%d[%%s]" % (component, shape),
+                                "        ",
+                            )
+                        )
+                        + [""]
+                    )
+
+
+def _append_mesh_operator_compact_buffers(
+    compact_coordinate_buffers,
+    compact_stream_buffers,
+    dim,
+    form,
+    geometry_mode,
+    lines,
+    n_nodes,
+    uses_current,
+    uses_direction
+):
+    """The compacted per-element buffers a mesh operator stages into.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.  Its loop
+    variables shadow names the function reuses further down, which is why
+    the automated escape check flagged them; they do not escape, and the
+    byte-identity gate is what settles that rather than the reading.
+    """
+    if compact_stream_buffers:
+        if uses_current:
+            lines.append("        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        if uses_direction:
+            lines.append("        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        if writes_per_shape(form):
+            lines.append("        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];")
+        else:
+            lines.append("        scalar_t block_value[VECTOR_SIZE];")
+        if compact_coordinate_buffers:
+            lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
+    elif compact_coordinate_buffers:
+        lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
+    elif geometry_mode == "isoparametric":
+        for stream in _coordinate_stream_names(dim, n_nodes):
+            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+
+
 def _sfem_soa_mesh_operator_function(
     form,
     prefix,
@@ -3549,51 +3818,13 @@ def _sfem_soa_mesh_operator_function(
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
     coordinate_streams_name = "block_coordinate_data"
 
-    base_params = [
-        "const ptrdiff_t nelements",
-        "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
-    ]
-    if geometry_mode == "affine":
-        base_params.extend(
-            "const jacobian_t *const SFEM_RESTRICT g_%s" % stream
-            for array_input in element_inputs
-            for stream in _soa_array_stream_names(array_input)
-        )
-    else:
-        base_params.append("const geometry_t *const *const SFEM_RESTRICT points")
-
-    material_params = _form_material_parameter_declarations(form)
-    field_params = []
-    if uses_current:
-        field_params.append("const ptrdiff_t u_stride")
-        field_params.extend(
-            "const scalar_t *const SFEM_RESTRICT u%s" % _component_name(d)
-            for d in range(dim)
-        )
-    if uses_direction:
-        field_params.append("const ptrdiff_t h_stride")
-        field_params.extend(
-            "const scalar_t *const SFEM_RESTRICT h%s" % _component_name(d)
-            for d in range(dim)
-        )
-    if not writes_per_shape(form):
-        output_params = ("scalar_t *const SFEM_RESTRICT value",)
-    else:
-        output_params = tuple(["const ptrdiff_t out_stride"]) + tuple(
-            "scalar_t *const SFEM_RESTRICT out%s" % _component_name(d)
-            for d in range(dim)
-        )
-
-    impl_params = (
-        tuple(base_params)
-        + tuple(material_params)
-        + tuple(field_params)
-        + tuple(output_params)
-    )
-    wrapper_params = tuple(
-        param.replace("geometry_t", "geom_t").replace("jacobian_t", "geom_t")
-        for param in impl_params
+    impl_params, wrapper_params = _mesh_operator_parameters(
+        form,
+        dim,
+        geometry_mode,
+        element_inputs,
+        uses_current,
+        uses_direction,
     )
 
     lines = [
@@ -3665,22 +3896,17 @@ def _sfem_soa_mesh_operator_function(
     lines.append("        idx_t ev[VECTOR_SIZE * N_SHAPE];")
 
     compact_stream_buffers = use_stream_arrays
-    if compact_stream_buffers:
-        if uses_current:
-            lines.append("        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
-        if uses_direction:
-            lines.append("        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
-        if writes_per_shape(form):
-            lines.append("        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];")
-        else:
-            lines.append("        scalar_t block_value[VECTOR_SIZE];")
-        if compact_coordinate_buffers:
-            lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
-    elif compact_coordinate_buffers:
-        lines.append("        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];")
-    elif geometry_mode == "isoparametric":
-        for stream in _coordinate_stream_names(dim, n_nodes):
-            lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
+    _append_mesh_operator_compact_buffers(
+        compact_coordinate_buffers,
+        compact_stream_buffers,
+        dim,
+        form,
+        geometry_mode,
+        lines,
+        n_nodes,
+        uses_current,
+        uses_direction,
+    )
     if geometry_mode == "isoparametric":
         for array_input in element_inputs:
             for stream in _soa_array_stream_names(array_input):
@@ -3798,88 +4024,17 @@ def _sfem_soa_mesh_operator_function(
             lines.append("            block_%s[%s] = scalar_t(0);" % (stream, work_item))
         lines.append("        }")
 
-    if use_stream_arrays:
-        lines.append("")
-        if uses_current and compact_stream_buffers:
-            lines.extend(
-                _ordered_stream_pointer_array_lines(
-                    "const scalar_t *",
-                    "block_u_streams",
-                    "block_u_data",
-                    dim,
-                    stream_shape_order,
-                    "        ",
-                )
-            )
-        elif uses_current:
-            lines.append(
-                "        const scalar_t *const block_u_streams[N_SHAPE * %d] = {%s};"
-                % (
-                    dim,
-                    ", ".join(
-                        "block_%s" % stream
-                        for stream in streams_in_shape_order(
-                            _field_stream_names("u", dim, n_nodes),
-                            dim,
-                            stream_shape_order,
-                        )
-                    ),
-                )
-            )
-        if uses_direction:
-            if compact_stream_buffers:
-                lines.extend(
-                    _ordered_stream_pointer_array_lines(
-                        "const scalar_t *",
-                        "block_h_streams",
-                        "block_h_data",
-                        dim,
-                        stream_shape_order,
-                        "        ",
-                    )
-                )
-            else:
-                lines.append(
-                    "        const scalar_t *const block_h_streams[N_SHAPE * %d] = {%s};"
-                    % (
-                        dim,
-                        ", ".join(
-                            "block_%s" % stream
-                            for stream in streams_in_shape_order(
-                                _field_stream_names("h", dim, n_nodes),
-                                dim,
-                                stream_shape_order,
-                            )
-                        ),
-                    )
-                )
-        if writes_per_shape(form):
-            if compact_stream_buffers:
-                lines.extend(
-                    _ordered_stream_pointer_array_lines(
-                        "scalar_t *",
-                        "block_out_streams",
-                        "block_out_data",
-                        dim,
-                        stream_shape_order,
-                        "        ",
-                    )
-                )
-            else:
-                lines.append(
-                    "        scalar_t *const block_out_streams[N_SHAPE * %d] = {%s};"
-                    % (
-                        dim,
-                        ", ".join(
-                            "block_%s" % stream
-                            for stream in streams_in_shape_order(
-                                _output_stream_names(form, dim, n_nodes),
-                                dim,
-                                stream_shape_order,
-                            )
-                        ),
-                    )
-                )
+    _append_mesh_operator_stream_arrays(
+        lines,
+        form,
+        dim,
+        n_nodes,
+        use_stream_arrays,
+        compact_stream_buffers,
+        stream_shape_order,
+        uses_current,
+        uses_direction,
+    )
 
     if form.weak_form is None:
         lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
@@ -4026,45 +4181,15 @@ def _sfem_soa_mesh_operator_function(
         lines.append("        }")
     lines.append("")
 
-    if not writes_per_shape(form):
-        lines.extend(_work_item_loop_lines(source_builder, "        "))
-        lines.append("            value[evbegin + %s] += block_value[%s];" % (work_item, work_item))
-        lines.append("        }")
-    else:
-        if compact_stream_buffers:
-            lines.append("        scalar_t *const out_components[DIM] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(dim)))
-            lines.extend(
-                [
-                    "",
-                    "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
-                    "            for (int d = 0; d < DIM; ++d) {",
-                    *_scatter_add_lines(
-                        source_builder,
-                        "out_components[d]",
-                        "ev[shape * VECTOR_SIZE + %s] * out_stride",
-                        "block_out_data[shape * DIM + d][%s]",
-                        "                ",
-                    ),
-                    "            }",
-                    "        }",
-                ]
-            )
-        else:
-            for shape in range(n_nodes):
-                for d in range(dim):
-                    component = _component_name(d)
-                    lines.extend(
-                        list(
-                            _scatter_add_lines(
-                                source_builder,
-                                "out%s" % component,
-                                "ev[%d * VECTOR_SIZE + %%s] * out_stride" % shape,
-                                "block_out%s%d[%%s]" % (component, shape),
-                                "        ",
-                            )
-                        )
-                        + [""]
-                    )
+    _append_mesh_operator_scalar_output(
+        lines,
+        form,
+        dim,
+        n_nodes,
+        compact_stream_buffers,
+        work_item,
+        source_builder,
+    )
 
     lines.extend(
         [
