@@ -71,9 +71,27 @@ overhead does not, so by L2 the barriers cost more than the arithmetic. `restric
 clearest single symptom.
 
 **Barrier waiting is now the largest item after the fine apply.** `libgomp` is about 46% of
-profile samples, spread over a dozen entries. That is threads spinning, not runtime cost: 108
-macro-elements over 72 threads is 1.5 each, so the critical path is 2 elements while half the
-threads idle. 54 threads (108/54 = 2 exactly) measures 0.359 s against 72 threads' 0.406 s.
+profile samples, spread over a dozen entries -- threads spinning, not runtime cost.
+
+**There is a thread-count optimum at 54, and it is not explained.** Three repeats, spread under
+0.005 s:
+
+| threads | 108 % n | `t_solve` |
+|---------|---------|-----------|
+| 27 | divisor | 0.514 s |
+| 36 | divisor | 0.424 s |
+| 48 | rem 12  | 0.437 s |
+| **54** | **divisor** | **0.357 s** |
+| 64 | rem 44  | 0.379 s |
+| 72 | rem 36  | 0.392 s |
+
+54 is reproducibly 9% faster than the full socket, which is worth taking. The obvious
+explanation -- that 108 macro-elements over 72 threads is 1.5 each, so the critical path is two
+elements while half the threads idle, while 108/54 is exactly 2 -- was tested and **does not
+hold**: 64 threads leaves a remainder of 44 and still beats both 36 and 48, and 36 divides 108
+exactly. Nor is the curve monotonic in thread count, since 48 is worse than 36. Whatever sets
+the optimum is not element-count divisibility, and is not yet identified; suspect the socket's
+own topology rather than the decomposition.
 
 **Two environment settings matter more than they should.** `OMP_WAIT_POLICY=active` is worth
 4%; `passive` is **4.2x worse** and `GOMP_SPINCOUNT=0` **4.8x worse**. A job script that sets a
