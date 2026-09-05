@@ -4,6 +4,7 @@ from codegen.framework.plans.form_emission import (
     FormContraction,
     form_contraction,
     form_order,
+    objective_kernel_variants,
     writes_per_shape,
 )
 from codegen.framework.plans.evaluation_strategy import (
@@ -2781,28 +2782,32 @@ def _sfem_soa_operator_source(
             )
         )
         lines.append("")
+        objective_variants = objective_kernel_variants(
+            form, source_builder.emit_objective_steps
+        )
         if _sfem_soa_has_adjugate_geometry_inputs(array_inputs, dim):
             affine_rule = affine_quadrature_rule
-            lines.append("")
-            lines.extend(
-                _sfem_soa_mesh_operator_function(
-                    form,
-                    prefix,
-                    dim,
-                    n_nodes,
-                    affine_rule.n_qp,
-                    vector_size,
-                    local_prefix,
-                    array_inputs,
-                    affine_rule,
-                    basis_family,
-                    geometry_family,
-                    use_shared_weak_local,
-                    geometry_mode="affine",
-                    matrix_format_plan=matrix_format_plan,
-                    source_builder=source_builder,
+            if "plain" in objective_variants:
+                lines.append("")
+                lines.extend(
+                    _sfem_soa_mesh_operator_function(
+                        form,
+                        prefix,
+                        dim,
+                        n_nodes,
+                        affine_rule.n_qp,
+                        vector_size,
+                        local_prefix,
+                        array_inputs,
+                        affine_rule,
+                        basis_family,
+                        geometry_family,
+                        use_shared_weak_local,
+                        geometry_mode="affine",
+                        matrix_format_plan=matrix_format_plan,
+                        source_builder=source_builder,
+                    )
                 )
-            )
             fast_aos_unit_lines = _tet4_linear_elasticity_aos_unit_mesh_operator_function(
                 form,
                 prefix,
@@ -2814,7 +2819,7 @@ def _sfem_soa_operator_source(
             if fast_aos_unit_lines:
                 lines.append("")
                 lines.extend(fast_aos_unit_lines)
-            if not writes_per_shape(form) and source_builder.emit_objective_steps:
+            if "steps" in objective_variants:
                 lines.append("")
                 lines.extend(
                     _sfem_soa_mesh_objective_steps_function(
@@ -2834,27 +2839,28 @@ def _sfem_soa_operator_source(
                         source_builder=source_builder,
                     )
                 )
-            lines.append("")
-            lines.extend(
-                _sfem_soa_mesh_operator_function(
-                    form,
-                    prefix,
-                    dim,
-                    n_nodes,
-                    n_qp,
-                    vector_size,
-                    local_prefix,
-                    array_inputs,
-                    quadrature_rule,
-                    basis_family,
-                    geometry_family,
-                    use_shared_weak_local,
-                    geometry_mode="isoparametric",
-                    matrix_format_plan=matrix_format_plan,
-                    source_builder=source_builder,
+            if "plain" in objective_variants:
+                lines.append("")
+                lines.extend(
+                    _sfem_soa_mesh_operator_function(
+                        form,
+                        prefix,
+                        dim,
+                        n_nodes,
+                        n_qp,
+                        vector_size,
+                        local_prefix,
+                        array_inputs,
+                        quadrature_rule,
+                        basis_family,
+                        geometry_family,
+                        use_shared_weak_local,
+                        geometry_mode="isoparametric",
+                        matrix_format_plan=matrix_format_plan,
+                        source_builder=source_builder,
+                    )
                 )
-            )
-            if not writes_per_shape(form) and source_builder.emit_objective_steps:
+            if "steps" in objective_variants:
                 lines.append("")
                 lines.extend(
                     _sfem_soa_mesh_objective_steps_function(

@@ -1222,10 +1222,10 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("generated_quad4_iso_objective_quad4_objective_isoparametric_soa_impl", operator_source)
         self.assertNotIn('extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_soa', operator_source)
         section = operator_source.split(
-            "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_isoparametric_mesh_soa_impl",
+            "static SFEM_INLINE int generated_quad4_iso_objective_quad4_objective_steps_isoparametric_mesh_soa_impl",
             1,
         )[1].split(
-            'extern "C" int generated_quad4_iso_objective_quad4_objective_isoparametric_mesh_soa',
+            'extern "C" int generated_quad4_iso_objective_quad4_objective_steps_isoparametric_mesh_soa',
             1,
         )[0]
         self.assertIn(
