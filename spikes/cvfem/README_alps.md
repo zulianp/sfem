@@ -2181,6 +2181,33 @@ macro-element faces -- 3.38x at a level-2 coarse lattice, 1.95x at level 4, 1.42
 improving as the lattice deepens rather than worsening. What is bought is contiguous 4x4 blocks
 with no column indirection, and no global sparse structure above the coarsest level.
 
+**Measured on Grace, and it loses.** 108 macro-elements at L=8, 242,500 dofs, 72 threads, two
+Newton steps so all three arms do the same work:
+
+| | probe | element-wise, assembled | element-wise, element matrices |
+|-----------------------|---------|---------|---------|
+| assembly, total       | 1.114 s | 0.030 s | 0.015 s |
+| assembly, share       | 2.9%    | 0.1%    | 0.0%    |
+| linear iterations     | 1040    | 1040    | 1040    |
+| us per linear iteration | 44077 | 43121   | 63326   |
+| `t_solve`             | 45.84 s | 44.85 s | 65.86 s |
+
+Identical iteration counts across all three confirm the preconditioners are equivalent, so this
+is a pure cost comparison. Keeping the levels as element matrices gives the cheapest assembly
+of the three -- half the assembled form's, since it stops before building a pattern -- and then
+loses all of it and more on the apply: 47% more time per linear iteration, 65.86 s against
+44.85 s.
+
+That is the duplication showing up exactly where the estimate said it would. The coarse levels
+here are at ratios where the element form does 1.95x and 3.38x the block multiplies, and the
+apply is memory-bound, so the contiguity and the absent column indirection do not come close to
+paying for the extra traffic. It is not an implementation defect to be tuned away; it is what
+storing a shared node once per incident macro-element costs.
+
+So `SFEM_GMG_EGAL_EM` stays off. It remains worth having built: it is the form the hops
+naturally produce, it is what a device port would want (no indirection, no gather), and the
+comparison above is the reason to keep assembling rather than an assumption that we should.
+
 **Verified on Grace.** The gates hold on aarch64 under the alps toolchain at the same machine
 precision they reach on the development machine -- level 1 at 2.7e-16 with its block diagonal
 at 4.1e-18, level 2 at 1.6e-16 and 5.2e-18, the coarsest at 1.1e-16 and exactly zero -- with
@@ -6020,6 +6047,12 @@ giving the coarse levels enough nodes to matter, changes the picture substantial
 |-----------------|-----------------|------------------------|---------|-------------------------------|
 | 2x2x2, 8 elements  | 66.6 ms | **0.56 ms** | 120x | 45.5% -> 0.2% |
 | 4x2x2, 16 elements | 72.0 ms | **0.79 ms** |  92x | 45.6% -> 0.8% |
+
+Both of those are still on 8 threads with 8 and 16 macro-elements. At saturation on Grace --
+108 macro-elements at L=8 on 72 threads -- the assembly total falls from 1.114 s to 0.030 s,
+a factor of 37, and its share of the solve from 2.9% to 0.1%, with the linear iteration count
+unchanged at 1040. The per-call figures are not comparable between the two paths any more,
+since the element-wise path times one hierarchy build where the probe times one level.
 
 At these configurations probing is **45% of the measured phase time** and the element-wise
 construction takes it under 1%. That is the scaling the two costs predict: probing pays a
