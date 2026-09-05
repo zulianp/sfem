@@ -392,6 +392,26 @@ class FormPipeline:
     def residual(cls, residual, variables, directions=None, *, merit=None):
         return cls(FormKind.RESIDUAL, residual, variables, directions, merit=merit)
 
+    def admits(self, order):
+        """Whether this pipeline can produce a form of this order at all.
+
+        Every order exists for an energy, and orders one and two exist for any
+        residual.  The 0-form is the one that can genuinely be absent: it is a
+        potential, and a residual whose flux Jacobian is not symmetric is not
+        the gradient of anything.  Asking is how a caller avoids requesting a
+        form that does not exist, rather than catching the failure to build it.
+        """
+        order = FormOrder(order)
+        if order is not FormOrder.ZERO or self.kind is FormKind.ENERGY:
+            return True
+        if self._merit is not None:
+            return True
+        try:
+            self._recovered_potential()
+        except ValueError:
+            return False
+        return True
+
     def form(self, order):
         order = FormOrder(order)
         if self.kind is FormKind.ENERGY:
@@ -474,10 +494,118 @@ class FormPipeline:
         return self.directions
 
     def _merit_expression(self):
+        """The residual's 0-form: a potential the residual is the gradient of.
+
+        This used to return ``1/2 * sum(r_i**2)`` over the *element-local*
+        residual entries.  That is not a merit function for the assembled
+        system and it cannot be made into one, for two separate reasons.
+
+        It is not zero at the solution.  Element residuals cancel when they are
+        scattered; their squares do not.  On a 1D Laplacian with two elements
+        at the exact discrete solution the assembled residual is zero while
+        ``sum_e 1/2*||r_e||^2`` is 1/2.
+
+        And it is not additive, which is what ``Op::value`` has to be:
+        ``Function::value`` loops over its operators letting each accumulate
+        into one scalar, so an operator's contribution must be a term of a sum.
+        ``1/2*||sum_op R_op||^2`` is not the sum of ``1/2*||R_op||^2``.
+
+        What *is* additive, and is an element integral exactly like an energy,
+        is a potential -- a scalar whose gradient is the residual.  One exists
+        precisely when the flux's Jacobian is symmetric, and then the Poincare
+        line integral recovers it in closed form.  For a Laplacian this returns
+        ``kappa/2 * ||grad u||^2``, which is the energy the residual was
+        derived from in the first place; the derivation simply runs backwards.
+
+        A residual with a non-symmetric Jacobian has no potential, and the
+        merit such a system needs -- ``1/2*||R||^2`` over the *assembled*
+        residual -- is a functional of the whole vector rather than an integral
+        over an element, so it cannot be produced here at all.  This raises
+        rather than returning something that would silently be wrong.
+        """
         if self._merit is not None:
             return self._merit
-        residual = sp.Matrix(self.zero_form)
-        return sp.simplify(sp.Rational(1, 2) * sum(value * value for value in residual))
+        return self._recovered_potential()
+
+    def _flux_and_fields(self):
+        """The residual as a flux vector, paired with the fields it varies in.
+
+        A residual reaches this pipeline in one of two shapes, and the
+        potential is recovered from either the same way once they are put in
+        these terms.
+
+        A weak form is a scalar linear in test symbols named for the field they
+        test -- ``u_test_grad_0`` beside ``u_grad_0`` -- so the flux is what
+        multiplies each test symbol, and the pairing is recovered from the
+        names rather than passed alongside the expression.  The field a test
+        symbol pairs with need not itself appear: a Neumann traction ``-t . v``
+        contains no ``u`` at all, its flux is the constant ``-t``, and its
+        potential is the linear work ``-t . u``.
+
+        A residual vector is already one entry per variable, so it *is* the
+        flux and the pipeline's declared variables are the fields.
+        """
+        if getattr(self.zero_form, "is_Matrix", False) and len(self.zero_form) > 1:
+            flux = sp.Matrix(self.zero_form)
+            if len(flux) == len(self.variables):
+                return flux, tuple(self.variables)
+
+        residual = (
+            sp.Matrix(self.zero_form)
+            if getattr(self.zero_form, "is_Matrix", False)
+            else sp.Matrix([self.zero_form])
+        )
+        expression = sum(residual)
+        symbols = sorted(expression.free_symbols, key=lambda symbol: symbol.name)
+        declared = set(self.variables)
+        tests, fields = [], []
+        for symbol in symbols:
+            if "_test" not in symbol.name:
+                continue
+            field = sp.Symbol(symbol.name.replace("_test", ""))
+            if field not in symbols and field not in declared:
+                return None, ()
+            tests.append(symbol)
+            fields.append(field)
+        if not tests:
+            return None, ()
+        flux = sp.Matrix([sp.diff(expression, test) for test in tests])
+        return flux, tuple(fields)
+
+    def _recovered_potential(self):
+        flux, fields = self._flux_and_fields()
+        if flux is None:
+            raise ValueError(
+                "cannot derive a 0-form for this residual: it is neither a "
+                "vector with one entry per variable nor a weak form whose "
+                "test symbols pair with field symbols, so there is nothing to "
+                "integrate a potential over"
+            )
+        trials = fields
+        jacobian = flux.jacobian(sp.Matrix(trials))
+        # `expand`, not `simplify`.  This runs for every residual the framework
+        # lowers, including two-phase flow, whose Jacobian is large enough that
+        # `simplify` on the difference does not finish in a useful time -- and
+        # it was returning None there anyway, which is `simplify` saying it
+        # could not decide.  Expansion settles the symmetric cases, which are
+        # the ones that go on to have a potential; anything it cannot show to
+        # be zero is treated as having none, which is the safe direction.
+        difference = sp.expand(jacobian - jacobian.T)
+        if not all(entry == 0 for entry in difference):
+            raise ValueError(
+                "this residual has no potential: the flux Jacobian is not "
+                "symmetric, so no scalar has it as a gradient.  A 0-form for "
+                "such a system is 1/2*||R||^2 over the assembled residual, "
+                "which is a functional of the global vector and cannot be "
+                "emitted as an element integral"
+            )
+        parameter = sp.Dummy("t", positive=True)
+        scaled = {trial: parameter * trial for trial in trials}
+        integrand = sum(
+            component.subs(scaled) * trial
+            for component, trial in zip(flux, trials)
+        )
+        return sp.simplify(sp.integrate(sp.expand(integrand), (parameter, 0, 1)))
 
 
 def energy_form_pipeline(energy, variables, directions=None):

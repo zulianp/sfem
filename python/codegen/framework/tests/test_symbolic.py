@@ -120,7 +120,21 @@ class SymbolicFrameworkTest(unittest.TestCase):
             ],
         )
         self.assertEqual(energy_forms[1].expression, sp.Matrix([2 * u0 + u1, u0]))
-        self.assertEqual(residual_forms[0].expression, u0**2 + u1**2)
+        # The residual's 0-form is a potential -- a scalar the residual is the
+        # gradient of -- so the property is what to assert, not the literal.
+        # It used to be `u0**2 + u1**2`, which is `1/2*||R||^2` over the local
+        # residual entries: a quantity that is not zero at the solution and
+        # does not add across operators, so it could not serve as the merit it
+        # was named for.
+        potential = residual_forms[0].expression
+        self.assertEqual(potential, u0**2 / 2 + u0 * u1 - u1**2 / 2)
+        self.assertTrue(
+            sp.simplify(
+                sp.Matrix([sp.diff(potential, u0), sp.diff(potential, u1)]) - residual
+            ).is_zero_matrix,
+            "the 0-form must be a potential of the residual: its gradient is "
+            "the residual itself",
+        )
         self.assertEqual(
             tuple(form.standard_name for form in energy_forms),
             ("form_0", "form_1", "form_2"),
