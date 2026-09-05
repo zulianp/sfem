@@ -48,6 +48,7 @@ class ExpressionRole(str, Enum):
     JACOBIAN_ACTION = "jacobian_action"
     HESSIAN_ACTION = "hessian_action"
     MERIT = "merit"
+    POTENTIAL = "potential"
     OPERATOR_EVALUATION = "operator_evaluation"
 
 

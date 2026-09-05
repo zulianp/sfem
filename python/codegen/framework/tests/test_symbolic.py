@@ -109,7 +109,12 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(
             [(form.kind, form.order, form.role, form.name) for form in residual_forms],
             [
-                (FormKind.RESIDUAL, FormOrder.ZERO, ExpressionRole.MERIT, "merit"),
+                (
+                    FormKind.RESIDUAL,
+                    FormOrder.ZERO,
+                    ExpressionRole.POTENTIAL,
+                    "potential",
+                ),
                 (FormKind.RESIDUAL, FormOrder.ONE, ExpressionRole.RESIDUAL, "residual"),
                 (
                     FormKind.RESIDUAL,

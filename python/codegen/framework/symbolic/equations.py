@@ -620,19 +620,11 @@ def _build_form_collection(system, equation, orders):
             for field in residual_system.fields
             for symbol in field.directions
         )
-        pipeline = residual_form_pipeline(
+        evaluation = residual_form_pipeline(
             residual_vector,
             variables,
             directions,
-        )
-        # A residual's 0-form is a potential, and not every residual has one --
-        # a saddle point or a genuinely non-symmetric system is the gradient of
-        # nothing.  Callers ask for all three orders without knowing that, so
-        # the orders that cannot be produced are dropped here rather than
-        # raising: the collection then simply has two forms instead of three,
-        # and what consumes it sees the absence directly.
-        orders = tuple(order for order in orders if pipeline.admits(order))
-        evaluation = pipeline.evaluate(orders)
+        ).evaluate(orders)
         residual_metadata = []
         if FormOrder.ZERO in orders:
             residual_metadata.append(FormMetadata(FormOrder.ZERO))
