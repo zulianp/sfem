@@ -196,6 +196,25 @@ def _direct_output_targets(output_targets):
     return direct_output_targets, len(direct_output_targets) != len(output_targets)
 
 
+def parameter_list_lines(params, indent=8):
+    """A C parameter list, one per line, comma-separated, the last one bare.
+
+    Eighteen sites across the emitters and the wrapper package spelled this
+    out, each as its own two- or three-line loop over ``enumerate(params)``
+    recomputing ``"," if index + 1 < len(params) else ""``.  Identical every
+    time, because there is only one way a C parameter list can end.
+
+    It is a printer concern in the strictest sense -- nothing about it depends
+    on the form, the element or the plan -- so it belongs here with the rest of
+    the syntax rather than being rebuilt inside each function that declares a
+    signature.
+    """
+    return [
+        "%s%s%s" % (" " * indent, param, "," if index + 1 < len(params) else "")
+        for index, param in enumerate(params)
+    ]
+
+
 def runtime_typed_entry_point(function_name, params, body, return_type="int"):
     """A kernel body emitted once, behind one runtime-typed entry point.
 
@@ -216,8 +235,7 @@ def runtime_typed_entry_point(function_name, params, body, return_type="int"):
 
     implementation = "%s_tpl" % function_name
     lines = ["template <typename scalar_t>", "static %s %s(" % (return_type, implementation)]
-    for index, param in enumerate(params):
-        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(parameter_list_lines(params))
     lines.append(") {")
     lines.extend(body)
     lines.extend(["}", ""])
@@ -225,8 +243,7 @@ def runtime_typed_entry_point(function_name, params, body, return_type="int"):
     lines.append('extern "C" %s %s(' % (return_type, function_name))
     entry_params = [_runtime_typed_param(param) for param in params]
     entry_params.insert(0, "const enum smesh::PrimitiveType real_type")
-    for index, param in enumerate(entry_params):
-        lines.append("        %s%s" % (param, "," if index + 1 < len(entry_params) else ""))
+    lines.extend(parameter_list_lines(entry_params))
     lines.extend(
         [
             ") {",
