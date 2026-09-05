@@ -45,6 +45,32 @@ namespace cvfem_ss {
                                                         std::vector<real_t> *const                  diag_out,
                                                         const uint8_t *const fine_constrained = nullptr);
 
+    // Every coarse operator in the hierarchy, built element-wise.
+    //
+    // Level 1 comes from the micro-cell matrices; each level below is one element-local
+    // coarsening hop from the level above. The hops reproduce the composite the driver's
+    // transfers define -- Z_i Rhat A_{i-1} Z_{i-1} Phat -- by masking the source level's
+    // columns with that level's own constraints, which SFEM already provides because
+    // create_gmg_data derefines the Function at every level. Nothing global is built along
+    // the way; only the returned matrices are assembled.
+    //
+    // `spaces[0]` is the fine space and `spaces[i]` level i; `masks[i]` is one byte per dof of
+    // level i (node * 4 + component). The returned matrices are raw `P^T A P` with the source
+    // masking folded in, exactly as the probe path's output was, so the caller applies the
+    // identity-row patch it already applies. Entry 0 of each vector is unused.
+    struct CoarseHierarchy {
+        std::vector<std::shared_ptr<CoarseBSR>> A;
+    };
+
+    // `state` is the fine-level state being linearised about. It is passed rather than assumed
+    // because the operator's cached fields are whatever its last apply(), gradient() or
+    // update() left there, which makes an assembly that just reads them depend on call order --
+    // a dependency that is invisible when it holds and a wrong linearisation when it does not.
+    CoarseHierarchy assemble_hierarchy(sfem::CVFEMNavierStokes                                 &op,
+                                       const real_t *const                                      state,
+                                       const std::vector<std::shared_ptr<sfem::FunctionSpace>> &spaces,
+                                       const std::vector<std::vector<uint8_t>>                 &masks);
+
     // A coarse level kept as element matrices instead of assembled.
     //
     // The returned operator applies sum_e P_e^T A_e P_e directly from the macro-elements, so

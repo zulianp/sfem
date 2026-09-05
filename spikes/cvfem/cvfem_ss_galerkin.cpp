@@ -71,6 +71,79 @@ namespace cvfem_ss {
                                                                             ci, va, real_t(0));
     }
 
+    namespace {
+        // Assemble one level's element matrices into a BSR. Shared by both entry points.
+        std::shared_ptr<CoarseBSR> level_to_bsr(const GalerkinLevel &gl) {
+            std::vector<sfem::count_t> rowptr;
+            std::vector<sfem::idx_t>   colidx;
+            galerkin_build_pattern(gl, rowptr, colidx);
+
+            std::vector<ptrdiff_t> pos, iptr, iidx;
+            galerkin_build_scatter(gl, rowptr, colidx, pos);
+            const ptrdiff_t nblocks = (ptrdiff_t)colidx.size();
+            galerkin_build_inverse(pos, nblocks, 0, pos.size(), iptr, iidx);
+
+            std::vector<scalar_t> acc((size_t)nblocks * 16, scalar_t(0));
+            galerkin_accumulate(gl, iptr, iidx, acc.data());
+
+            auto rp = smesh::create_host_buffer<sfem::count_t>(rowptr.size());
+            auto ci = smesh::create_host_buffer<sfem::idx_t>(colidx.size());
+            auto va = smesh::create_host_buffer<real_t>((size_t)nblocks * 16);
+            std::copy(rowptr.begin(), rowptr.end(), rp->data());
+            std::copy(colidx.begin(), colidx.end(), ci->data());
+            std::copy(acc.begin(), acc.end(), va->data());
+
+            return sfem::h_bsr_spmv<sfem::count_t, sfem::idx_t, real_t, real_t>(gl.n_coarse, gl.n_coarse,
+                                                                                N_FIELDS, rp, ci, va, real_t(0));
+        }
+    }  // namespace
+
+    CoarseHierarchy assemble_hierarchy(sfem::CVFEMNavierStokes                                 &op,
+                                       const real_t *const                                      state,
+                                       const std::vector<std::shared_ptr<sfem::FunctionSpace>> &spaces,
+                                       const std::vector<std::vector<uint8_t>>                 &masks) {
+        SFEM_TRACE_SCOPE("cvfem_ss::assemble_hierarchy");
+        if (state) op.update(state);
+        const ::SSMeshData *const ss = op.semi_structured_data();
+        if (!ss) SFEM_ERROR("assemble_hierarchy: the operator is not semi-structured\n");
+
+        const int nlevels = (int)spaces.size();
+        CoarseHierarchy out;
+        out.A.assign((size_t)nlevels, nullptr);
+        if (nlevels < 2) return out;
+
+        // Level 1, straight from the micro-cell matrices, with the fine mask on the columns.
+        GalerkinLevel cur;
+        {
+            const int Lf = ss->level;
+            const int Lc = spaces[1]->has_semi_structured_mesh()
+                                   ? smesh::semistructured_level(spaces[1]->mesh())
+                                   : 1;
+            if (Lc < 1 || Lf % Lc) SFEM_ERROR("assemble_hierarchy: level %d does not divide %d\n", Lc, Lf);
+            galerkin_init(*ss, Lf / Lc, cur);
+            galerkin_gid_from_spaces(spaces[1], spaces[0], cur);
+            cur.fine_constrained = masks[0];
+            galerkin_assemble(*ss, (scalar_t)op.rho, (scalar_t)op.mu, cur, 0, cur.nmacro);
+        }
+        out.A[1] = level_to_bsr(cur);
+
+        // Each level below is one element-local hop, masking the level above's columns.
+        for (int i = 2; i < nlevels; ++i) {
+            GalerkinLevel nxt;
+            nxt.Lc = spaces[i]->has_semi_structured_mesh() ? smesh::semistructured_level(spaces[i]->mesh()) : 1;
+            nxt.q  = cur.Lc / nxt.Lc;
+            nxt.nc = (nxt.Lc + 1) * (nxt.Lc + 1) * (nxt.Lc + 1);
+            nxt.nmacro = cur.nmacro;
+            galerkin_gid_from_spaces(spaces[i], spaces[0], nxt);
+
+            galerkin_hop(cur, masks[(size_t)i - 1].empty() ? nullptr : masks[(size_t)i - 1].data(), nxt);
+            out.A[i] = level_to_bsr(nxt);
+            cur      = std::move(nxt);
+        }
+
+        return out;
+    }
+
     std::shared_ptr<sfem::Operator<real_t>> make_element_matrix_level(
             const sfem::CVFEMNavierStokes              &op,
             const std::shared_ptr<sfem::FunctionSpace> &coarse,
