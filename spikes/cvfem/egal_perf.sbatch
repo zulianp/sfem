@@ -52,7 +52,19 @@ srun -u --ntasks=1 --cpus-per-task=72 --uenv="$UENV_IMAGE" --view="$UENV_VIEW" \
     2>&1 | grep -vE "^\[ perf record|Warning|bind: warning"
 
 echo
+echo "=== perf stat: is the cycle memory-bound? ==="
+srun -u --ntasks=1 --cpus-per-task=72 --uenv="$UENV_IMAGE" --view="$UENV_VIEW" \
+    bash -lc "OMP_NUM_THREADS=72 OMP_PROC_BIND=close OMP_PLACES=cores \
+              SFEM_CASE=poiseuille SFEM_NX=12 SFEM_NY=3 SFEM_NZ=3 \
+              SFEM_ELEMENT_REFINE_LEVEL=8 SFEM_GMG=1 SFEM_GMG_GALERKIN=2 \
+              SFEM_GMG_EGAL=1 SFEM_NL_MAX_IT=1 SFEM_LSOLVE_MAX_IT=${CYCLES} \
+              SFEM_VERIFY_TOL=1e9 \
+              perf stat -e instructions,cycles,cache-references,cache-misses,stalled-cycles-backend \
+                        stdbuf -oL ${BIN} ${OUT}" \
+    2>&1 | grep -E "instructions|cycles|cache|stalled|elapsed|insn per" 
+
+echo
 echo "=== flat profile (self time) ==="
 srun -u --ntasks=1 --cpus-per-task=8 --uenv="$UENV_IMAGE" --view="$UENV_VIEW" \
-    bash -lc "perf report -i ${DATA} --stdio --no-children --percent-limit 0.4 2>/dev/null \
-              | grep -vE '^#|^$' | head -30"
+    bash -lc "perf report -i ${DATA} --stdio --no-children --percent-limit 0.25 2>/dev/null \
+              | grep -vE '^#|^$' | head -34"
