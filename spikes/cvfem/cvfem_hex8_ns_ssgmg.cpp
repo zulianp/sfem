@@ -2614,6 +2614,12 @@ int main(int argc, char **argv) {
 
     int  newton_it    = 0;
     int  lin_it_total = 0;
+    // Newton steps summed over every continuation stage. `newton_it` below is the inner loop
+    // variable and restarts at each stage, so on its own it reports only the last stage --
+    // which, after a good ramp, is the cheapest one. Printing it beside the cumulative
+    // lin_it_total invited exactly the wrong reading: "3 Newton steps, 1346 linear iterations".
+    int  newton_total = 0;
+    int  stages_run   = 0;
     bool converged    = false;
     // Set once from the first nonzero residual and kept across stages, as in the
     // standalone driver: the continuation stage and the physical stage are measured
@@ -2864,7 +2870,9 @@ int main(int argc, char **argv) {
             dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
         }
         std::printf("  lin_it: %d  |dx|_inf: %.6e\n", get_its(), dxinf);
+        ++newton_total;
     }
+    ++stages_run;
     if (!converged) {
         // Roll back and halve the step in log space rather than giving up. The stage that
         // failed is retried from the last state known to be good, via an intermediate Re.
@@ -2898,7 +2906,9 @@ int main(int argc, char **argv) {
                     at_target ? "(AT TARGET)" : "(STALLED SHORT OF TARGET)");
         if (!at_target) converged = false;
     }
-    std::printf("newton_converged: %d  newton_it: %d  lin_it_total: %d\n", converged ? 1 : 0, newton_it, lin_it_total);
+    std::printf("newton_converged: %d  newton_it: %d (last stage)  newton_total: %d over %d stage(s)  "
+                "lin_it_total: %d\n",
+                converged ? 1 : 0, newton_it, newton_total, stages_run, lin_it_total);
     std::printf("matrix_free: %d  t_operator: %.4f s  t_precond: %.4f s  t_solve: %.4f s  us_per_lin_it: %.2f\n",
                 matrix_free,
                 t_op,
