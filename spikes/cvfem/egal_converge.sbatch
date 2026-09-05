@@ -40,6 +40,6 @@ for eg in 0 1; do
                   SFEM_CASE=poiseuille SFEM_NX=12 SFEM_NY=3 SFEM_NZ=3 \
                   SFEM_ELEMENT_REFINE_LEVEL=8 SFEM_GMG=1 SFEM_GMG_GALERKIN=2 \
                   SFEM_GMG_EGAL=${eg} ${BIN} ${OUT}" \
-        2>&1 | grep -E "newton_converged|t_solve|galerkin_assembly|u_linf:|lin_it_total"
+        2>&1 | grep -E "nnodes|ndof|newton_converged|t_solve|galerkin_assembly|u_linf:|lin_it_total"
     echo
 done
