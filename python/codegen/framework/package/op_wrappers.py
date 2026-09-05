@@ -3,6 +3,7 @@ import json
 import os
 import re
 
+from codegen.framework.emitters.cprinter import parameter_list_lines
 from codegen.framework.plans.form_transformations import (
     symmetric_metric_component_count,
 )
@@ -4812,9 +4813,7 @@ def _element_api_dispatch_function_lines(function_name, operation, suffix, entri
         "static SFEM_INLINE int %s(" % function_name,
         "        const elem_type_t element_type%s" % ("," if params else ""),
     ]
-    for idx, param in enumerate(params):
-        comma = "," if idx + 1 < len(params) else ""
-        lines.append("        %s%s" % (param, comma))
+    lines.extend(parameter_list_lines(params))
     arg_names = ", ".join(_element_api_param_name(param) for param in params)
     lines.extend(
         [
@@ -5290,8 +5289,7 @@ def _runtime_typed_dispatch_function_lines(group):
     runtime = set(group["runtime_typed"])
     params = ("const smesh::ElemType element_type",) + tuple(group["params"])
     lines = ['SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"]]
-    for index, param in enumerate(params):
-        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(parameter_list_lines(params))
     lines.extend(
         [
             ") {",
@@ -5360,8 +5358,7 @@ def _dispatch_function_lines(group):
     lines = [
         'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"],
     ]
-    for index, param in enumerate(params):
-        lines.append("        %s%s" % (param, "," if index + 1 < len(params) else ""))
+    lines.extend(parameter_list_lines(params))
     lines.extend(
         [
             ") {",

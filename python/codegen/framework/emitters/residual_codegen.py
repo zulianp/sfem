@@ -6430,6 +6430,170 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
     return lines
 
 
+def _scalar_crs_precision_entry_points(
+    dependencies,
+    function_base,
+    impl,
+    lines,
+    matrix_formats,
+    packed_crs_passes,
+    packed_discover_impl,
+    packed_fill_impl,
+    packed_fill_params,
+    packed_params,
+    params,
+    state_dependencies,
+    system,
+):
+    """One entry point per supported precision, over a shared implementation.
+
+    Lifted out of `_scalar_crs_matrix_assembly_source` unchanged.
+    """
+    for scalar_type, suffix in precision_axis():
+        typed_params = [
+            param.replace("scalar_t", scalar_type) for param in params
+        ]
+        if "crs" in matrix_formats:
+            lines.append('extern "C" int %s%s(' % (function_base, suffix))
+            for index, param in enumerate(typed_params):
+                lines.append(
+                    "        %s%s" % (param, "," if index + 1 < len(typed_params) else "")
+                )
+            call_args = ["nelements", "nnodes", "elements", "points"]
+            call_args.extend(map(str, dependencies.parameters))
+            call_args.extend(
+                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+            )
+            call_args.extend(("rowptr", "colidx", "values"))
+            lines.extend(
+                [
+                    ") {",
+                    "    return sfem::codegen::%s<%s>(%s);"
+                    % (impl, scalar_type, ", ".join(call_args)),
+                    "}",
+                    "",
+                ]
+            )
+        if "bsr" in matrix_formats:
+            bsr_name = function_base.replace("_hessian_crs_", "_hessian_bsr_")
+            lines.append('extern "C" int %s%s(' % (bsr_name, suffix))
+            for index, param in enumerate(typed_params):
+                lines.append(
+                    "        %s%s" % (param, "," if index + 1 < len(typed_params) else "")
+                )
+            call_args = ["nelements", "nnodes", "elements", "points"]
+            call_args.extend(map(str, dependencies.parameters))
+            call_args.extend(
+                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+            )
+            call_args.extend(("rowptr", "colidx", "values"))
+            lines.extend(
+                [
+                    ") {",
+                    "    return sfem::codegen::%s<%s>(%s);"
+                    % (impl, scalar_type, ", ".join(call_args)),
+                    "}",
+                    "",
+                ]
+            )
+        if "crs" in matrix_formats and "one_pass" in packed_crs_passes:
+            one_pass_name = function_base.replace(
+                "_hessian_crs_",
+                "_hessian_crs_packed_one_pass_",
+            )
+            typed_packed_fill_params = [
+                param.replace("scalar_t", scalar_type) for param in packed_fill_params
+            ]
+            lines.append('extern "C" int %s%s(' % (one_pass_name, suffix))
+            for index, param in enumerate(typed_packed_fill_params):
+                lines.append(
+                    "        %s%s" % (param, "," if index + 1 < len(typed_packed_fill_params) else "")
+                )
+            call_args = [
+                "n_packs",
+                "n_elements_per_pack",
+                "nelements",
+                "nnodes",
+                "max_nodes_per_pack",
+                "elements",
+                "owned_nodes_ptr",
+                "n_shared_nodes",
+                "ghost_ptr",
+                "ghost_idx",
+                "points",
+            ]
+            call_args.extend(map(str, dependencies.parameters))
+            call_args.extend(
+                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+            )
+            call_args.extend(("packed_element_entries", "values"))
+            lines.extend(
+                [
+                    ") {",
+                    "    return sfem::codegen::%s<%s>(%s);"
+                    % (packed_fill_impl, scalar_type, ", ".join(call_args)),
+                    "}",
+                    "",
+                ]
+            )
+        if "crs" in matrix_formats and "two_pass" in packed_crs_passes:
+            two_pass_name = function_base.replace(
+                "_hessian_crs_",
+                "_hessian_crs_packed_two_pass_",
+            )
+            typed_two_pass_params = [
+                param.replace("scalar_t", scalar_type)
+                for param in (
+                    packed_params
+                    + [
+                        "const count_t *const SFEM_RESTRICT rowptr",
+                        "const idx_t *const SFEM_RESTRICT colidx",
+                        "count_t *const SFEM_RESTRICT packed_element_entries",
+                        "scalar_t *const SFEM_RESTRICT values",
+                    ]
+                )
+            ]
+            lines.append('extern "C" int %s%s(' % (two_pass_name, suffix))
+            for index, param in enumerate(typed_two_pass_params):
+                lines.append(
+                    "        %s%s" % (param, "," if index + 1 < len(typed_two_pass_params) else "")
+                )
+            common_args = [
+                "n_packs",
+                "n_elements_per_pack",
+                "nelements",
+                "nnodes",
+                "max_nodes_per_pack",
+                "elements",
+                "owned_nodes_ptr",
+                "n_shared_nodes",
+                "ghost_ptr",
+                "ghost_idx",
+            ]
+            fill_args = common_args + ["points"]
+            fill_args.extend(map(str, dependencies.parameters))
+            fill_args.extend(
+                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
+            )
+            fill_args.extend(("packed_element_entries", "values"))
+            lines.extend(
+                [
+                    ") {",
+                    "    const int graph_status = sfem::codegen::%s<%s>(%s);"
+                    % (
+                        packed_discover_impl,
+                        scalar_type,
+                        ", ".join(common_args + ["rowptr", "colidx", "packed_element_entries"]),
+                    ),
+                    "    if (graph_status != SFEM_SUCCESS) return graph_status;",
+                    "    return sfem::codegen::%s<%s>(%s);"
+                    % (packed_fill_impl, scalar_type, ", ".join(fill_args)),
+                    "}",
+                    "",
+                ]
+            )
+
+
 def _scalar_crs_matrix_assembly_source(
     system,
     prefix,
@@ -6788,6 +6952,13 @@ def _scalar_crs_matrix_assembly_source(
             "",
         ]
     )
+    # Bound inside the guard below, and read afterwards by the precision entry
+    # points -- whose own reads sit behind the same predicate, so they were safe
+    # while the two lived in one function body and Python never evaluated the
+    # dead branch.  Passing them across a call makes the read eager, so they
+    # have to exist even when no packed CRS pass was requested.
+    packed_discover_impl = packed_fill_impl = None
+    packed_params = packed_fill_params = ()
     if packed_crs_passes:
         packed_fill_impl = "%s_packed_fill_impl" % function_base
         packed_discover_impl = "%s_packed_discover_impl" % function_base
@@ -7178,149 +7349,21 @@ def _scalar_crs_matrix_assembly_source(
             "",
         ]
     )
-    for scalar_type, suffix in precision_axis():
-        typed_params = [
-            param.replace("scalar_t", scalar_type) for param in params
-        ]
-        if "crs" in matrix_formats:
-            lines.append('extern "C" int %s%s(' % (function_base, suffix))
-            for index, param in enumerate(typed_params):
-                lines.append(
-                    "        %s%s" % (param, "," if index + 1 < len(typed_params) else "")
-                )
-            call_args = ["nelements", "nnodes", "elements", "points"]
-            call_args.extend(map(str, dependencies.parameters))
-            call_args.extend(
-                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
-            )
-            call_args.extend(("rowptr", "colidx", "values"))
-            lines.extend(
-                [
-                    ") {",
-                    "    return sfem::codegen::%s<%s>(%s);"
-                    % (impl, scalar_type, ", ".join(call_args)),
-                    "}",
-                    "",
-                ]
-            )
-        if "bsr" in matrix_formats:
-            bsr_name = function_base.replace("_hessian_crs_", "_hessian_bsr_")
-            lines.append('extern "C" int %s%s(' % (bsr_name, suffix))
-            for index, param in enumerate(typed_params):
-                lines.append(
-                    "        %s%s" % (param, "," if index + 1 < len(typed_params) else "")
-                )
-            call_args = ["nelements", "nnodes", "elements", "points"]
-            call_args.extend(map(str, dependencies.parameters))
-            call_args.extend(
-                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
-            )
-            call_args.extend(("rowptr", "colidx", "values"))
-            lines.extend(
-                [
-                    ") {",
-                    "    return sfem::codegen::%s<%s>(%s);"
-                    % (impl, scalar_type, ", ".join(call_args)),
-                    "}",
-                    "",
-                ]
-            )
-        if "crs" in matrix_formats and "one_pass" in packed_crs_passes:
-            one_pass_name = function_base.replace(
-                "_hessian_crs_",
-                "_hessian_crs_packed_one_pass_",
-            )
-            typed_packed_fill_params = [
-                param.replace("scalar_t", scalar_type) for param in packed_fill_params
-            ]
-            lines.append('extern "C" int %s%s(' % (one_pass_name, suffix))
-            for index, param in enumerate(typed_packed_fill_params):
-                lines.append(
-                    "        %s%s" % (param, "," if index + 1 < len(typed_packed_fill_params) else "")
-                )
-            call_args = [
-                "n_packs",
-                "n_elements_per_pack",
-                "nelements",
-                "nnodes",
-                "max_nodes_per_pack",
-                "elements",
-                "owned_nodes_ptr",
-                "n_shared_nodes",
-                "ghost_ptr",
-                "ghost_idx",
-                "points",
-            ]
-            call_args.extend(map(str, dependencies.parameters))
-            call_args.extend(
-                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
-            )
-            call_args.extend(("packed_element_entries", "values"))
-            lines.extend(
-                [
-                    ") {",
-                    "    return sfem::codegen::%s<%s>(%s);"
-                    % (packed_fill_impl, scalar_type, ", ".join(call_args)),
-                    "}",
-                    "",
-                ]
-            )
-        if "crs" in matrix_formats and "two_pass" in packed_crs_passes:
-            two_pass_name = function_base.replace(
-                "_hessian_crs_",
-                "_hessian_crs_packed_two_pass_",
-            )
-            typed_two_pass_params = [
-                param.replace("scalar_t", scalar_type)
-                for param in (
-                    packed_params
-                    + [
-                        "const count_t *const SFEM_RESTRICT rowptr",
-                        "const idx_t *const SFEM_RESTRICT colidx",
-                        "count_t *const SFEM_RESTRICT packed_element_entries",
-                        "scalar_t *const SFEM_RESTRICT values",
-                    ]
-                )
-            ]
-            lines.append('extern "C" int %s%s(' % (two_pass_name, suffix))
-            for index, param in enumerate(typed_two_pass_params):
-                lines.append(
-                    "        %s%s" % (param, "," if index + 1 < len(typed_two_pass_params) else "")
-                )
-            common_args = [
-                "n_packs",
-                "n_elements_per_pack",
-                "nelements",
-                "nnodes",
-                "max_nodes_per_pack",
-                "elements",
-                "owned_nodes_ptr",
-                "n_shared_nodes",
-                "ghost_ptr",
-                "ghost_idx",
-            ]
-            fill_args = common_args + ["points"]
-            fill_args.extend(map(str, dependencies.parameters))
-            fill_args.extend(
-                _mesh_stream_arguments(state_dependencies, system.fields, output=False)
-            )
-            fill_args.extend(("packed_element_entries", "values"))
-            lines.extend(
-                [
-                    ") {",
-                    "    const int graph_status = sfem::codegen::%s<%s>(%s);"
-                    % (
-                        packed_discover_impl,
-                        scalar_type,
-                        ", ".join(common_args + ["rowptr", "colidx", "packed_element_entries"]),
-                    ),
-                    "    if (graph_status != SFEM_SUCCESS) return graph_status;",
-                    "    return sfem::codegen::%s<%s>(%s);"
-                    % (packed_fill_impl, scalar_type, ", ".join(fill_args)),
-                    "}",
-                    "",
-                ]
-            )
+    _scalar_crs_precision_entry_points(
+        dependencies,
+        function_base,
+        impl,
+        lines,
+        matrix_formats,
+        packed_crs_passes,
+        packed_discover_impl,
+        packed_fill_impl,
+        packed_fill_params,
+        packed_params,
+        params,
+        state_dependencies,
+        system,
+    )
     return lines
 
 
