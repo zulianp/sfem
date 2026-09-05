@@ -175,3 +175,21 @@ def objective_kernel_variants(form, emits_steps):
     # kernel is the only one and must still be emitted.  Getting this wrong
     # deletes the kernel outright rather than replacing it.
     return ("plain",)
+
+
+def form_n_components(form, dim):
+    """How many components the field this form acts on has.
+
+    The generated kernels call this `DIM`, because for a displacement it equals
+    the spatial dimension and every energy material the framework has is a
+    displacement.  It is not the same number: it is the block size, the degrees
+    of freedom per node, and a scalar field has one of them in any dimension.
+
+    The lowered weak form knows it -- its flux has one row per component -- so
+    the question is answered there when there is a weak form, and falls back to
+    the spatial dimension when there is not, which is what every caller assumed
+    unconditionally before.
+    """
+    weak_form = getattr(form, "weak_form", None)
+    n_components = getattr(weak_form, "n_components", None)
+    return dim if n_components is None else int(n_components)

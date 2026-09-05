@@ -1524,7 +1524,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             '#include "geometry_kernels.hpp"',
             operator_source,
         )
-        self.assertIn("geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>", operator_source)
+        self.assertIn("geometry_jacobian_adjugate_and_determinant<scalar_t, SPATIAL_DIM, N_QP, VECTOR_SIZE>", operator_source)
         self.assertNotIn(
             "block_jacobian_determinant0[q * VECTOR_SIZE + lane] = J00 * (J11 * J22",
             operator_source,
@@ -1616,7 +1616,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             isoparametric_mesh_source,
         )
         self.assertIn(
-            "geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>",
+            "geometry_jacobian_adjugate_and_determinant<scalar_t, SPATIAL_DIM, N_QP, VECTOR_SIZE>",
             isoparametric_mesh_source,
         )
         self.assertIn(

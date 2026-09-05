@@ -4,6 +4,7 @@ from codegen.framework.plans.form_emission import (
     FormContraction,
     form_contraction,
     form_order,
+    form_n_components,
     objective_kernel_variants,
     writes_per_shape,
 )
@@ -1172,6 +1173,7 @@ def _sfem_soa_weak_form_block_function(
     constant_p1_gradient_expansion=False,
 ):
     """The quadrature kernel: a form with a lowered weak form."""
+    n_components = form_n_components(form, dim)
     source_builder = shared.source_builder
     use_stream_arrays = use_shared_weak_local
     omit_reference_basis_inputs = (
@@ -1201,7 +1203,7 @@ def _sfem_soa_weak_form_block_function(
             params.append("scalar_t *const SFEM_RESTRICT value")
         else:
             params.append(
-                "scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * %d]" % dim
+                "scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * %d]" % n_components
             )
     else:
         if shared.uses_current:
@@ -1555,6 +1557,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
     use_stream_arrays,
     source_builder=None,
 ):
+    n_components = form_n_components(form, dim)
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
@@ -1573,7 +1576,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
     if writes_per_shape(form):
         lines.append("    scalar_t loperand_q[%s];" % block_extent)
 
-    for row in range(dim):
+    for row in range(n_components):
         output_offset = "%d * N_QP * %d * VECTOR_SIZE" % (row, dim)
         if uses_current:
             lines.append(
@@ -1608,8 +1611,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
         % _work_item_name(source_builder, "jacobian_determinant", 0)
     )
     if uses_current:
-        lines.append("            scalar_t grad_u_ref[%d];" % (dim * dim))
-        for row in range(dim):
+        lines.append("            scalar_t grad_u_ref[%d];" % (n_components * dim))
+        for row in range(n_components):
             for col in range(dim):
                 component = row * dim + col
                 lines.append(
@@ -1617,8 +1620,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     % (component, row, dim, col, work_item)
                 )
     if uses_direction:
-        lines.append("            scalar_t grad_h_ref[%d];" % (dim * dim))
-        for row in range(dim):
+        lines.append("            scalar_t grad_h_ref[%d];" % (n_components * dim))
+        for row in range(n_components):
             for col in range(dim):
                 component = row * dim + col
                 lines.append(
@@ -1696,7 +1699,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
             for i in range(weak_form.n_components * dim)
         ),
     )
-    lines.append("            scalar_t loperand[%d];" % (dim * dim))
+    lines.append("            scalar_t loperand[%d];" % (n_components * dim))
     _append_transformed_loperand_lines(
         lines,
         material,
@@ -1704,14 +1707,14 @@ def _append_sfem_soa_tensor_weak_form_lines(
         "weak_mat_tmp",
         geometry_value,
     )
-    for row in range(dim):
+    for row in range(n_components):
         for col in range(dim):
             lines.append(
                 "            loperand_q[((%d * N_QP + q) * %d + %d) * VECTOR_SIZE + %s] = loperand[%d];"
                 % (row, dim, col, work_item, row * dim + col)
             )
     lines.extend(["        }", "    }"])
-    for row in range(dim):
+    for row in range(n_components):
         lines.append(
             "    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, &loperand_q[%d * N_QP * %d * VECTOR_SIZE], %s, %d);"
             % (dim, row, dim, out_streams, row)
@@ -1762,6 +1765,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     use_stream_arrays,
     source_builder,
 ):
+    n_components = form_n_components(form, dim)
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
     uses_current = _form_uses_current(form, default=True)
@@ -1805,7 +1809,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         "            const scalar_t %s = jacobian_determinant0[geometry_offset];"
         % geometry_value("jacobian_determinant", 0)
     )
-    for row in range(dim):
+    for row in range(n_components):
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
@@ -1899,7 +1903,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
     op = "+=" if form.output_mode == "accumulate" else "="
     for shape in range(dim + 1):
-        for row in range(dim):
+        for row in range(n_components):
             terms = []
             for col in range(dim):
                 factor = _constant_reference_gradient_expr(reference_gradients, shape, col)
@@ -1935,6 +1939,7 @@ def _append_sfem_soa_weak_form_lines(
     source_builder=None,
     constant_p1_gradient_expansion=False,
 ):
+    n_components = form_n_components(form, dim)
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
@@ -1993,7 +1998,7 @@ def _append_sfem_soa_weak_form_lines(
 
     lines.append("        for (int q = 0; q < N_QP; ++q) {")
     lines.append("            const scalar_t qw = q_weight[q];")
-    for row in range(dim):
+    for row in range(n_components):
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
@@ -2001,9 +2006,9 @@ def _append_sfem_soa_weak_form_lines(
             if uses_direction:
                 lines.append("            scalar_t grad_h_ref%d_values[VECTOR_SIZE];" % idx)
     if writes_per_shape(form):
-        for component in range(dim * dim):
+        for component in range(n_components * dim):
             lines.append("            scalar_t loperand%d_values[VECTOR_SIZE];" % component)
-    for row in range(dim):
+    for row in range(n_components):
         for col in range(dim):
             idx = row * dim + col
             lines.extend(_work_item_loop_lines(source_builder, "            "))
@@ -2013,7 +2018,7 @@ def _append_sfem_soa_weak_form_lines(
                 lines.append("                grad_h_ref%d_values[%s] = scalar_t(0);" % (idx, work_item))
             lines.append("            }")
     lines.append("            for (int shape = 0; shape < N_SHAPE; ++shape) {")
-    for row in range(dim):
+    for row in range(n_components):
         for col in range(dim):
             idx = row * dim + col
             lines.extend(_work_item_loop_lines(source_builder, "                "))
@@ -2040,7 +2045,7 @@ def _append_sfem_soa_weak_form_lines(
         "            const scalar_t %s = jacobian_determinant0[geometry_offset];"
         % geometry_value("jacobian_determinant", 0)
     )
-    for row in range(dim):
+    for row in range(n_components):
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
@@ -2110,11 +2115,11 @@ def _append_sfem_soa_weak_form_lines(
         geometry_value,
         scalar_temporaries=True,
     )
-    for component in range(dim * dim):
+    for component in range(n_components * dim):
         lines.append("            loperand%d_values[%s] = loperand%d;" % (component, work_item, component))
     lines.append("            }")
     lines.append("            for (int shape = 0; shape < N_SHAPE; ++shape) {")
-    for row in range(dim):
+    for row in range(n_components):
         terms = [
             "loperand%d_values[%s] * %s" % (row * dim + col, work_item, reference_gradient(col))
             for col in range(dim)
@@ -2623,6 +2628,7 @@ def _sfem_soa_isoparametric_geometry_lines(
     work_item = _work_item_index(source_builder)
     stream_array_name = "block_jacobian_adjugate_streams"
     lines = isoparametric_adjugate_stream_array_lines(
+        dim_name="SPATIAL_DIM",
         dim=dim,
         indent="            ",
         stream_array_name=stream_array_name,
@@ -3625,6 +3631,7 @@ def _append_mesh_operator_stream_arrays(
     nine values and writes only to `lines`, which is what makes it safe to
     move: nothing it computes is read further down.
     """
+    n_components = form_n_components(form, dim)
     if use_stream_arrays:
         lines.append("")
         if uses_current and compact_stream_buffers:
@@ -3726,13 +3733,14 @@ def _append_mesh_operator_scalar_output(
     shape functions.  Seven inputs, and nothing it binds is read further
     down.
     """
+    n_components = form_n_components(form, dim)
     if not writes_per_shape(form):
         lines.extend(_work_item_loop_lines(source_builder, "        "))
         lines.append("            value[evbegin + %s] += block_value[%s];" % (work_item, work_item))
         lines.append("        }")
     else:
         if compact_stream_buffers:
-            lines.append("        scalar_t *const out_components[DIM] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(dim)))
+            lines.append("        scalar_t *const out_components[DIM] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(n_components)))
             lines.extend(
                 [
                     "",
@@ -3948,11 +3956,12 @@ def _append_mesh_operator_stream_buffer_views(
 
     Lifted out of `_sfem_soa_mesh_operator_function` unchanged.
     """
+    n_components = form_n_components(form, dim)
     if compact_stream_buffers:
         if uses_current:
-            lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(dim)))
+            lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(n_components)))
         if uses_direction:
-            lines.append("        const scalar_t *const h_components[DIM] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(dim)))
+            lines.append("        const scalar_t *const h_components[DIM] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(n_components)))
         lines.extend(
             [
                 "",
@@ -4129,6 +4138,7 @@ def _sfem_soa_mesh_operator_function(
     matrix_format_plan=None,
     source_builder=None,
 ):
+    n_components = form_n_components(form, dim)
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
@@ -4204,7 +4214,7 @@ def _sfem_soa_mesh_operator_function(
     lines.extend(
         [
             ") {",
-            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int DIM = %d;" % n_components,
                 "    static constexpr int SPATIAL_DIM = %d;" % dim,
             "    static constexpr int N_QP = %d;" % n_qp,
             "    static constexpr int N_SHAPE = %d;" % n_nodes,
@@ -5068,6 +5078,7 @@ def _sfem_soa_mesh_objective_steps_function(
     geometry_mode="affine",
     source_builder=None,
 ):
+    n_components = form_n_components(form, dim)
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     if writes_per_shape(form) or form.weak_form is None:
@@ -5180,7 +5191,7 @@ def _sfem_soa_mesh_objective_steps_function(
     lines.extend(
         [
             ") {",
-            "    static constexpr int DIM = %d;" % dim,
+            "    static constexpr int DIM = %d;" % n_components,
                 "    static constexpr int SPATIAL_DIM = %d;" % dim,
             "    static constexpr int N_QP = %d;" % n_qp,
             "    static constexpr int N_SHAPE = %d;" % n_nodes,
@@ -5310,8 +5321,8 @@ def _sfem_soa_mesh_objective_steps_function(
 
     if compact_stream_buffers:
         lines.append("")
-        lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(dim)))
-        lines.append("        const scalar_t *const h_components[DIM] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(dim)))
+        lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(n_components)))
+        lines.append("        const scalar_t *const h_components[DIM] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(n_components)))
         lines.extend(
             [
                 *_ordered_stream_pointer_array_lines(
@@ -9196,6 +9207,7 @@ def _sfem_soa_element_api_operation_lines(
     use_shared_weak_local,
     source_builder,
 ):
+    n_components = form_n_components(form, dim)
     output_kind = "value" if public == "energy" else "vector"
     output_param = "scalar_t *const SFEM_RESTRICT values" if public == "energy" else "scalar_t *const *const SFEM_RESTRICT out_streams"
     lines = []
@@ -9213,7 +9225,7 @@ def _sfem_soa_element_api_operation_lines(
         lines.extend(
             [
                 ") {",
-                "    static constexpr int DIM = %d;" % dim,
+                "    static constexpr int DIM = %d;" % n_components,
                 "    static constexpr int SPATIAL_DIM = %d;" % dim,
                 "    static constexpr int N_SHAPE = %d;" % n_nodes,
                 "    static constexpr int N_QP = %d;" % n_qp,

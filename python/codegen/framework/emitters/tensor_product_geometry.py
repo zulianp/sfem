@@ -241,10 +241,11 @@ def isoparametric_adjugate_stream_array_lines(
     indent,
     stream_array_name,
     adjugate_streams,
+    dim_name="DIM",
 ):
     return [
-        "%sscalar_t *%s[DIM * DIM] = {%s};"
-        % (indent, stream_array_name, ", ".join(adjugate_streams))
+        "%sscalar_t *%s[%s * %s] = {%s};"
+        % (indent, stream_array_name, dim_name, dim_name, ", ".join(adjugate_streams))
     ]
 
 
@@ -357,6 +358,7 @@ def tensor_product_isoparametric_geometry_lines(
         raise ValueError("tensor-product geometry requires a Jacobian sum-factorization plan")
     lines.extend(
         tensor_product_adjugate_determinant_lines(
+            dim_name=dim_name,
             dim=dim,
             gradient_name=gradient_name,
             indent=indent,
@@ -587,6 +589,7 @@ def tensor_product_gradient_isoparametric_geometry_lines(
     )
     lines.extend(
         tensor_product_adjugate_determinant_lines(
+            dim_name=dim_name,
             dim=dim,
             gradient_name=gradient_name,
             indent=indent,
@@ -613,14 +616,15 @@ def tensor_product_adjugate_determinant_lines(
     work_item_index=None,
     simd_lines=None,
     single_work_item=False,
+    dim_name="DIM",
 ):
     if adjugate_streams is not None and determinant_stream is not None:
         return [
             "",
-            "%sscalar_t *%s_adjugate_streams[DIM * DIM] = {%s};"
-            % (indent, gradient_name, ", ".join(adjugate_streams)),
-            "%sgeometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>("
-            % indent,
+            "%sscalar_t *%s_adjugate_streams[%s * %s] = {%s};"
+            % (indent, gradient_name, dim_name, dim_name, ", ".join(adjugate_streams)),
+            "%sgeometry_jacobian_adjugate_and_determinant<scalar_t, %s, N_QP, VECTOR_SIZE>("
+            % (indent, dim_name),
             "%s        nelems, %s, %s_adjugate_streams, %s);"
             % (indent, gradient_name, gradient_name, determinant_stream),
         ]
