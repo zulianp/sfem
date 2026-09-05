@@ -392,6 +392,305 @@ class FormPipeline:
     def residual(cls, residual, variables, directions=None, *, merit=None):
         return cls(FormKind.RESIDUAL, residual, variables, directions, merit=merit)
 
+    def form(self, order):
+        order = FormOrder(order)
+        for form in self.forms:
+            if form.order is order:
+                return form
+        raise ValueError("form order %s was not evaluated" % order.name)
+
+    def standard_form(self, name):
+        name = StandardFormName(name)
+        for form in self.forms:
+            if form.standard_form is name:
+                return form
+        raise ValueError("standard form %s was not evaluated" % name.value)
+
+    def standard_forms(self):
+        return {form.standard_name: form for form in self.forms}
+
+    def component_blocks_for(self, order):
+        """The blocks of this form, one per lowered field component.
+
+        ``blocks_for`` keys by assembled field: Stokes reports ``u`` and ``p``
+        at 1-form order.  This keys by lowered field, so the same collection
+        reports ``u0``, ``u1``, ``u2``, ``p`` -- the representation everything
+        below actually consumes, and the one an energy formulation and a
+        residual formulation can share.
+
+        Nothing new is computed.  A residual lowering already builds both: the
+        per-component 1-form expressions sit in ``residual_expressions``,
+        aligned with ``residual_fields``, and the per-component 2-form blocks
+        in ``jacobian_action_blocks`` -- sixteen of them for Stokes, ``u0`` by
+        ``u0`` through ``p`` by ``p``.  They were reachable only under
+        residual-specific names, which is why the parallel representation has
+        49 consumers against the form accessors' 19.  This is the accessor
+        those consumers can move onto.
+
+        Returns an empty tuple where the collection carries no per-component
+        expansion -- today that is every energy formulation, which declares its
+        structure through ``add_energy(..., fields=..., variables=...)``
+        instead.  Deriving these for energy is the other half of the work; see
+        ARCHITECTURE.html OP 20.
+        """
+        order = FormOrder(order)
+        fields = tuple(getattr(self, "residual_fields", ()) or ())
+        if order is FormOrder.ONE:
+            expressions = tuple(getattr(self, "residual_expressions", ()) or ())
+            if not fields or len(expressions) != len(fields):
+                return ()
+            return tuple(
+                FormBlock(
+                    FormOrder.ONE,
+                    row_field=field.name,
+                    expression=expression,
+                )
+                for field, expression in zip(fields, expressions)
+            )
+        if order is FormOrder.TWO:
+            # The lowering's own block objects, not copies of them.  They
+            # already satisfy what a per-component block has to offer -- row
+            # field, column field, expression, name -- and re-wrapping them as
+            # ``FormBlock`` would rename them: ``FormBlock.name`` is derived as
+            # ``form_2_<row>_<column>``, while these carry the name that
+            # already appears in generated code.  Re-exposing is the job here;
+            # renaming is not, and a phase that must be byte-identical cannot
+            # afford it.
+            return tuple(getattr(self, "jacobian_action_blocks", ()) or ())
+        return ()
+
+    def component_block(self, order, row_field, column_field=None):
+        """One per-component block by name, or ``None`` if it does not exist.
+
+        Unlike ``block``, a missing block is not an error: a Jacobian is sparse
+        between components that do not couple, and asking is how a caller finds
+        out.
+        """
+        row_field = str(row_field)
+        column_field = None if column_field is None else str(column_field)
+        for block in self.component_blocks_for(order):
+            if block.row_field == row_field and block.column_field == column_field:
+                return block
+        return None
+
+    def expressions(self):
+        expressions = KernelExpressions()
+        for form in self.forms:
+            form.add_to(expressions)
+        return expressions
+
+
+@dataclass(frozen=True)
+class UnifiedForm:
+    kind: FormKind
+    order: FormOrder
+    role: ExpressionRole
+    name: str
+    expression: object
+
+    @property
+    def standard_name(self):
+        return StandardFormName.from_order(self.order).value
+
+    @property
+    def standard_form(self):
+        return StandardFormName.from_order(self.order)
+
+    def add_to(self, expressions):
+        return expressions.add(self.role, self.expression, self.name)
+
+
+@dataclass(frozen=True)
+class FormEvaluation(FormCollectionMixin):
+    kind: FormKind
+    forms: tuple
+
+
+@dataclass(frozen=True)
+class FormCollection(FormCollectionMixin):
+    equation_name: str
+    kind: FormKind
+    fields: tuple
+    forms: tuple
+    measure: str = "dx"
+    variables: tuple = ()
+    directions: tuple = ()
+    coefficients: tuple = ()
+    qualifiers: tuple = ()
+    dependencies: object = None
+    blocks: tuple = ()
+    # The lowered residual field records, carrying the value, gradient, test,
+    # previous and direction symbols that downstream planning needs.  These used
+    # to be reached through `source`, i.e. by holding on to the pre-lowering
+    # system; carrying them explicitly is what lets the planning layer stop
+    # doing that.
+    residual_fields: tuple = ()
+    # The per-field residual expressions and the per-component Jacobian-action
+    # blocks, aligned with `residual_fields`.  These cannot be inferred from the
+    # 1-/2-form blocks: for mixed formulations those are keyed by assembled field
+    # name (`u`), while the lowered fields are per component (`u0`, `u1`).
+    residual_expressions: tuple = ()
+    jacobian_action_blocks: tuple = ()
+    parameters: tuple = ()
+    metadata: tuple = ()
+
+    def form_metadata(self, order):
+        order = FormOrder(order)
+        for metadata in self.metadata:
+            if metadata.order is order:
+                return metadata
+        raise ValueError("metadata for form order %s is not available" % order.name)
+
+    def blocks_for(self, order):
+        return self.form_metadata(order).blocks
+
+    def block(self, order, row_field, column_field=None):
+        order = FormOrder(order)
+        row_field = str(row_field)
+        column_field = None if column_field is None else str(column_field)
+        for block in self.blocks_for(order):
+            if block.row_field == row_field and block.column_field == column_field:
+                return block
+        if column_field is None:
+            raise ValueError(
+                "block for form order %s and row field '%s' is not available"
+                % (order.name, row_field)
+            )
+        raise ValueError(
+            "block for form order %s, row field '%s', and column field '%s' is not available"
+            % (order.name, row_field, column_field)
+        )
+
+    def block_matrix(self, order):
+        fields = tuple(field.name for field in self.fields)
+        blocks = {
+            (block.row_field, block.column_field): block
+            for block in self.blocks_for(order)
+        }
+        return tuple(
+            tuple(blocks.get((row, column)) for column in fields)
+            for row in fields
+        )
+
+    @classmethod
+    def from_evaluation(
+        cls,
+        equation_name,
+        evaluation,
+        *,
+        measure="dx",
+        fields=(),
+        variables=(),
+        directions=(),
+        coefficients=(),
+        qualifiers=(),
+        dependencies=None,
+        blocks=(),
+        residual_fields=(),
+        residual_expressions=(),
+        jacobian_action_blocks=(),
+        parameters=(),
+        metadata=(),
+    ):
+        return cls(
+            str(equation_name),
+            evaluation.kind,
+            tuple(fields),
+            tuple(evaluation.forms),
+            str(measure),
+            tuple(variables),
+            tuple(directions),
+            tuple(coefficients),
+            tuple(qualifiers),
+            dependencies,
+            tuple(blocks),
+            tuple(residual_fields),
+            tuple(residual_expressions),
+            tuple(jacobian_action_blocks),
+            tuple(parameters),
+            tuple(metadata),
+        )
+
+
+@dataclass(frozen=True)
+class FormQualifier:
+    target: str
+    name: str
+    value: object = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "target", str(self.target))
+        object.__setattr__(self, "name", str(self.name))
+
+
+@dataclass(frozen=True)
+class FormBlock:
+    order: FormOrder
+    row_field: str
+    column_field: str = None
+    expression: object = None
+    coefficients: tuple = ()
+    dependencies: object = None
+
+    def __post_init__(self):
+        object.__setattr__(self, "order", FormOrder(self.order))
+        object.__setattr__(self, "row_field", str(self.row_field))
+        if self.column_field is not None:
+            object.__setattr__(self, "column_field", str(self.column_field))
+        object.__setattr__(self, "expression", sp.sympify(self.expression))
+        object.__setattr__(self, "coefficients", tuple(self.coefficients))
+
+    @property
+    def name(self):
+        if self.column_field is None:
+            return "%s_%s" % (
+                StandardFormName.from_order(self.order).value,
+                self.row_field,
+            )
+        return "%s_%s_%s" % (
+            StandardFormName.from_order(self.order).value,
+            self.row_field,
+            self.column_field,
+        )
+
+    @property
+    def is_diagonal(self):
+        return self.column_field is None or self.row_field == self.column_field
+
+    @property
+    def is_coupling(self):
+        return self.column_field is not None and self.row_field != self.column_field
+
+
+@dataclass(frozen=True)
+class FormMetadata:
+    order: FormOrder
+    coefficients: tuple = ()
+    dependencies: object = None
+    blocks: tuple = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "order", FormOrder(self.order))
+        object.__setattr__(self, "coefficients", tuple(self.coefficients))
+        object.__setattr__(self, "blocks", tuple(self.blocks))
+
+
+class FormPipeline:
+    def __init__(self, kind, zero_form, variables, directions=None, *, merit=None):
+        self.kind = FormKind(kind)
+        self.zero_form = sp.sympify(zero_form)
+        self.variables = tuple(variables)
+        self.directions = None if directions is None else tuple(directions)
+        self._merit = None if merit is None else sp.sympify(merit)
+
+    @classmethod
+    def energy(cls, energy, variables, directions=None):
+        return cls(FormKind.ENERGY, energy, variables, directions)
+
+    @classmethod
+    def residual(cls, residual, variables, directions=None, *, merit=None):
+        return cls(FormKind.RESIDUAL, residual, variables, directions, merit=merit)
+
     def admits(self, order):
         """Whether this pipeline can produce a form of this order at all.
 
@@ -461,13 +760,7 @@ class FormPipeline:
 
     def _residual_form(self, order):
         if order is FormOrder.ZERO:
-            return UnifiedForm(
-                FormKind.RESIDUAL,
-                order,
-                ExpressionRole.MERIT,
-                "merit",
-                self._merit_expression(),
-            )
+            return self._residual_zero_form()
         if order is FormOrder.ONE:
             return UnifiedForm(
                 FormKind.RESIDUAL,
@@ -486,6 +779,51 @@ class FormPipeline:
                 self.variables,
                 self._require_directions(),
             ),
+        )
+
+    def _residual_zero_form(self):
+        """A residual always has a 0-form.  There are two of them.
+
+        When the flux Jacobian is symmetric the residual is the gradient of a
+        potential, and that potential is an element integral: it is summed over
+        elements exactly like an energy, and it adds across operators, so it
+        can be a term in the sum `Function::value` accumulates.
+
+        When it is not -- a saddle point, or any genuinely non-symmetric system
+        -- there is still a scalar to measure, and it is the one a Newton line
+        search actually wants: ``1/2 * ||R||^2`` over the *assembled* residual.
+        Nothing about that is unavailable.  R is what the 1-form already
+        computes, so the merit costs no new element kernel at all: assemble,
+        then take one dot product.
+
+        What separates the two is not whether the 0-form exists but where its
+        reduction happens -- inside the element loop, or after the scatter.
+        So the merit form carries the residual itself rather than an integrand,
+        because the residual is the thing to be assembled before reducing, and
+        the role says which reduction applies.
+
+        The consequence worth being explicit about: an assembled norm is not
+        additive over operators.  ``1/2*||sum_op R_op||^2`` is not the sum of
+        ``1/2*||R_op||^2``, so this 0-form belongs to whoever holds the whole
+        residual -- the Function -- and an operator can only report it when it
+        is the only contributor.  A potential has no such restriction.
+        """
+        try:
+            potential = self._recovered_potential()
+        except ValueError:
+            return UnifiedForm(
+                FormKind.RESIDUAL,
+                FormOrder.ZERO,
+                ExpressionRole.MERIT,
+                "merit",
+                self.zero_form,
+            )
+        return UnifiedForm(
+            FormKind.RESIDUAL,
+            FormOrder.ZERO,
+            ExpressionRole.POTENTIAL,
+            "potential",
+            potential,
         )
 
     def _require_directions(self):

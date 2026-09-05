@@ -195,8 +195,8 @@
             "form": true
           },
           "ZERO": {
-            "blocks": null,
-            "form": null
+            "blocks": [],
+            "form": true
           }
         },
         "residual_fields": [
@@ -307,8 +307,8 @@
             "form": true
           },
           "ZERO": {
-            "blocks": null,
-            "form": null
+            "blocks": [],
+            "form": true
           }
         },
         "residual_fields": [

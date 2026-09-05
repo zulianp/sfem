@@ -87,3 +87,63 @@ def form_contraction(form):
         if getattr(form, "weak_form", None) is None
         else FormContraction.DEFERRED_FLUX
     )
+
+
+class FormReduction(Enum):
+    """Where a 0-form's reduction to one scalar happens.
+
+    Both formulations produce a 0-form, and below the form layer they differ in
+    exactly one respect: whether the scalar is finished inside the element loop
+    or after the scatter.
+
+    ``ELEMENT_SUM`` is an energy or a recovered potential.  Each element
+    contributes a number, the numbers are summed, and the total adds across
+    operators -- which is what lets it be a term in the sum ``Function::value``
+    accumulates.
+
+    ``ASSEMBLED_NORM`` is ``1/2 * ||R||^2`` over the assembled residual, for a
+    system that is the gradient of nothing.  It needs no element kernel of its
+    own: the 1-form already computes R, so the whole reduction is one dot
+    product over the degrees of freedom once the scatter is done.  It is not
+    additive over operators, so it belongs to whoever holds the complete
+    residual rather than to any one operator contributing part of it.
+    """
+
+    ELEMENT_SUM = "element_sum"
+    ASSEMBLED_NORM = "assembled_norm"
+
+
+#: The reduction each 0-form role implies.  A table rather than a chain of
+#: comparisons, so emission reads the answer instead of deciding it.
+FORM_REDUCTION_BY_ROLE = {
+    "energy": FormReduction.ELEMENT_SUM,
+    "potential": FormReduction.ELEMENT_SUM,
+    "merit": FormReduction.ASSEMBLED_NORM,
+}
+
+
+def form_reduction(form):
+    """How this 0-form reduces, from the role the form layer gave it.
+
+    Raises for any other order: a 1-form and a 2-form scatter per shape and
+    reduce nothing, so asking is a category error rather than a case to
+    default.
+    """
+    # A lowered form states its own order; only a kernel name has to be looked
+    # up in the table.  Both reach here, so prefer what the form already knows.
+    order = getattr(form, "order", None)
+    order = FormOrder(order) if order is not None else form_order(form)
+    if order is not FormOrder.ZERO:
+        raise ValueError(
+            "only a 0-form has a reduction; %s is a %s"
+            % (getattr(form, "name", form), order.name)
+        )
+    role = getattr(form, "role", None)
+    role = getattr(role, "value", role)
+    try:
+        return FORM_REDUCTION_BY_ROLE[str(role)]
+    except KeyError:
+        raise ValueError(
+            "no reduction defined for 0-form role '%s'; the framework defines %s"
+            % (role, ", ".join(sorted(FORM_REDUCTION_BY_ROLE)))
+        )
