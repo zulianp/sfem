@@ -105,4 +105,23 @@ namespace cvfem_ss {
             const uint8_t *const                        fine_constrained,
             const uint8_t *const                        coarse_constrained);
 
+    // Diagonal Vanka smoother, as an sfem operator applying M^-1.
+    //
+    // Replaces the nodal 4x4 block solve with a coupled solve over each micro-element patch
+    // (8 corners, 32 dofs), with the velocity block approximated by its diagonal so the
+    // velocities eliminate and an 8x8 pressure Schur complement per cell remains. That
+    // recovers the velocity-pressure coupling a point-block smoother discards, which is why
+    // block-Jacobi measures rho = 0.981 here.
+    //
+    // `state` is the linearisation point; the factorisations are valid for one Newton step and
+    // the operator holds them, so it must be rebuilt when the state changes -- the same
+    // lifetime as the element-wise Galerkin coarse operators. `constrained` is one byte per
+    // dof; those dofs receive no correction.
+    //
+    // Additive over patches, averaged by patch multiplicity, accumulated through the two-pass
+    // scatter, so a sweep is bitwise reproducible on any thread count.
+    std::shared_ptr<sfem::Operator<real_t>> make_diagonal_vanka(
+            sfem::CVFEMNavierStokes &op, const std::shared_ptr<sfem::FunctionSpace> &space,
+            const real_t *const state, const uint8_t *const constrained, const real_t omega);
+
 }  // namespace cvfem_ss
