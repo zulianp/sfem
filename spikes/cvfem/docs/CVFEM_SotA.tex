@@ -1,0 +1,369 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!55!black,citecolor=blue!50!black]{hyperref}
+\usepackage{fancyvrb}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+\usepackage{titlesec}
+
+\titleformat{\section}{\normalfont\Large\bfseries\color{blue!45!black}}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries\color{blue!30!black}}{\thesubsection}{1em}{}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\Rey}{\mathrm{Re}}
+
+\title{\bfseries State of the Art:\\ Newton Globalization and Solver Performance\\ for Implicit CFD}
+\author{Survey for the SFEM CVFEM semi-structured multigrid solver}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{tcolorbox}[colback=red!4,colframe=red!55!black,title=\bfseries Headline finding]
+Our solver needs $\sim$\textbf{1000} Krylov iterations per Newton step and fails above
+$\Rey \approx 200$. Published incompressible Navier--Stokes solvers using an
+augmented-Lagrangian preconditioner need \textbf{4--8} iterations per Newton step and reach
+$\Rey = 10\,000$. Plain Newton with \emph{no} globalization at all is documented to reach
+$\Rey \approx 2500$.
+
+Meanwhile our \emph{cost per cycle} is normal: our V-cycle runs at 6.06\,M nodes/s, and FUN3D
+on the same Grace silicon completes a full nonlinear iteration at $\approx 6.0$\,M points/s.
+
+\medskip
+\textbf{The conclusion is therefore that the linear solve, and specifically the smoother, is
+the binding constraint --- not the continuation strategy.}
+\end{tcolorbox}
+
+\section{Scope and baseline}
+
+This surveys how established implicit CFD codes get Newton to converge at high Reynolds
+number, and what throughput they achieve, in order to judge our own numbers. Our reference
+configuration throughout:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Discretisation & colocated FV/CVFEM, hexahedra, Rhie--Chow stabilisation \\
+Solver & Newton + geometric multigrid V-cycle, block-Jacobi smoother, block size 4 \\
+Hardware & one NVIDIA Grace socket, 72 Neoverse V2 cores \\
+Measured & 242\,500 dof, one V-cycle $\approx$ 10\,ms; 646\,MDOF/s operator apply \\
+Converged run & $\Rey=100$, 33\,124 dof: 32 Newton steps, $\approx$30\,000 linear iterations \\
+Failure & diverges above $\Rey \approx 200$--$400$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Pseudo-transient continuation: the formulas}
+
+The underlying iteration adds a pseudo-time term to the Jacobian, recovering Newton as
+$\Delta t \to \infty$:
+\begin{equation}
+\left[ \frac{M}{\Delta t} + \frac{\partial R}{\partial U} \right] \Delta U^k = -R(U^k),
+\qquad U^{k+1} = U^k + \omega^k \Delta U^k,
+\qquad \mathrm{CFL} = \frac{\lambda_{\max}\,\Delta t_\kappa}{L_\kappa}.
+\end{equation}
+Convergence theory: Kelley \& Keyes, \emph{SINUM} \textbf{35}(2), 1998, 508--523,
+\href{https://doi.org/10.1137/S0036142996304796}{doi:10.1137/S0036142996304796}.
+
+\subsection{SER --- switched evolution relaxation}
+Mulder \& van Leer, \emph{JCP} \textbf{59} (1985) 232--246
+(\href{https://homepage.tudelft.nl/a1k53/Papers/Journal/JCP59_Mulder.pdf}{PDF}). The CFL is
+scaled by the inverse residual ratio:
+\begin{equation}
+\mathrm{CFL}^k = \min\!\left( \mathrm{CFL}^{k-1}\,
+\frac{\lVert R^{k-1}\rVert_2}{\lVert R^{k}\rVert_2},\; \mathrm{CFL}_{\max} \right)
+\end{equation}
+A variant references the \emph{initial} residual instead of the previous one:
+\begin{equation}
+\mathrm{CFL}^n = \frac{\mathrm{CFL}_0}{r_n}, \qquad
+r_n = \max\!\left( \frac{\lVert R(q^n)\rVert_2}{\lVert R(q^0)\rVert_2},\;
+\frac{\lVert R(q^n)\rVert_\infty}{\lVert R(q^0)\rVert_\infty} \right)
+\end{equation}
+PETSc's \href{https://petsc.org/main/manualpages/TS/TSPSEUDO/}{\code{TSPSEUDO}} implements both
+forms, with growth factor \code{-ts\_pseudo\_increment} and cap \code{-ts\_pseudo\_max\_dt}.
+
+\subsection{EXPur --- driven by the under-relaxation factor}
+Ceze \& Fidkowski, AIAA 2013-2686
+(\href{https://public.websites.umich.edu/~kfid/MYPUBS/Ceze_Fidkowski_2013_PTC.pdf}{PDF}), eqn.~(13):
+\begin{equation}
+\mathrm{CFL}^{k+1} =
+\begin{cases}
+\beta\,\mathrm{CFL}^k & \omega^k = 1 \quad (\beta>1)\\
+\mathrm{CFL}^k & \omega_{\min} < \omega^k < 1\\
+\kappa\,\mathrm{CFL}^k & \omega^k < \omega_{\min} \quad (\kappa<1)
+\end{cases}
+\end{equation}
+Parameters used: $\omega_{\min}=0.01$, $\beta = 1.05$--$2.0$, $\kappa = 0.1$.
+
+\subsection{RDM --- residual difference method (bounded SER)}
+Same reference, eqn.~(14). Growth is capped at $\beta$, with equality only when the residual
+vanishes:
+\begin{equation}
+\mathrm{CFL}^k = \min\!\left( \mathrm{CFL}^{k-1}
+\beta^{\left[(\lVert R^{k-1}\rVert_2 - \lVert R^{k}\rVert_2)/\lVert R^{k-1}\rVert_2\right]},\;
+\mathrm{CFL}_{\max}\right)
+\end{equation}
+The \emph{monotonic} variant mRDM forces the exponent to zero when the residual increases.
+
+\section{What the production codes actually do}
+
+\subsection{FUN3D: HANIM}
+Wang, Diskin, Nielsen \& Liu, AIAA 2021-0857
+(\href{https://ntrs.nasa.gov/api/citations/20205010283/downloads/fun3d_hanim.pdf}{PDF}). The
+legacy scheme was a \emph{linear} CFL ramp specified as two namelist arrays (CFL $1 \to 500$
+over 200 iterations) with 15 multicolour Gauss--Seidel sweeps and no Krylov method.
+
+HANIM replaced it with a module hierarchy --- preconditioner, GCR, realizability check,
+nonlinear control, CFL adaption --- in which \textbf{any module reporting failure discards the
+update, cuts the CFL, and repeats from the same state}:
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+success & $\mathrm{CFL} \leftarrow \mathrm{CFL} \times 2$ \\
+failure & $\mathrm{CFL} \leftarrow \mathrm{CFL} \times 0.1$ \\
+bounds  & $\mathrm{CFL}_{\min} = 10^{-12}$, $\mathrm{CFL}_{\max} = 10^{10}$ \quad (22 orders) \\
+\bottomrule
+\end{tabular}
+\end{center}
+On failure only the \emph{Jacobian diagonal} is updated for the new CFL; fluxes are not
+re-linearized. The Krylov success criterion is deliberately loose,
+$\lVert r_k\rVert/\lVert r_0\rVert \le \mu_{\mathrm{GCR}} = 0.92$ --- an 8\,\% reduction per
+outer step. The line search is a \emph{quadratic search with a closed-form minimiser} that
+reuses the linear residual GCR has already computed, so it costs one extra residual
+evaluation rather than a sequence:
+\begin{equation}
+\omega = -\frac{g(1)-f(0)}{2\,(f(1)-g(1))},\qquad
+g(1) = \left\lVert \tfrac{V}{\Delta\tau}\Delta Q + \tfrac{\partial R}{\partial Q}\Delta Q + R(Q^n)\right\rVert
+\end{equation}
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Case & Grid & Cores & Iterations (legacy $\to$ HANIM) & Speedup \\
+\midrule
+Hemisphere-cylinder & 9.0\,M & 160 & $8976 \to 675$ & 2.6$\times$ \\
+Hemisphere-cylinder & 71.4\,M & 1400 & $10\,907 \to 1874$ & 2.1$\times$ \\
+Supersonic duct & 3.17\,M & 240 & $9721 \to 1283$ & 2.2$\times$ \\
+Juncture flow & 13.0\,M & 320 & no convergence in 72\,h $\to$ converged & 6.8$\times$ \\
+Juncture flow & 37.1\,M & 756 & --- & 7.8$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{NASA LAURA / HyperSolve: the most directly implementable controller}
+Thompson \& O'Connell
+(\href{https://ntrs.nasa.gov/api/citations/20200002615/downloads/20200002615.pdf}{NASA PDF}),
+Algorithm 1, verbatim:
+\begin{Verbatim}[fontsize=\small,frame=single,framesep=3mm]
+CFL <- 1.0 ;  Q_safe <- Q
+while |R(Q)|_2 > tolerance:
+    Dt_i  <- CFL * V_i / sum_f (|u_f| + c) A_f
+    dQ    <- (M/Dt + dR/dQ)^-1 R_t
+    eta   <- line search s.t. |R_t(Q)|_2 > |R_t(Q + eta dQ)|_2
+    if eta > 0.1:  CFL <- 1.5*CFL ;  Q <- Q + eta dQ ;  Q_safe <- Q
+    else:          CFL <- 0.1*CFL ;  Q <- Q_safe
+\end{Verbatim}
+The critical detail is that the time term appears on \emph{both} sides, so the merit function
+and the Jacobian stay consistent:
+$R_t = R + (M/\Delta t)\Delta Q$ and
+$[M/\Delta t + \partial R/\partial Q]\Delta Q = -(M/\Delta t)\Delta Q - R(Q^n)$.
+
+\subsection{SU2: the shipping controller}
+From \code{config\_template.cfg}: \code{CFL\_ADAPT\_PARAM = (0.1, 2.0, 10.0, 1e10, 0.001, 0)},
+i.e.\ factor-down, factor-up, min, max, \emph{acceptable linear-solver convergence}, start
+iteration. The fifth parameter matters for us: \textbf{SU2 cuts the CFL when the linear solver
+fails to converge sufficiently}. A naive SER controller ramps on residual history alone and
+will happily accelerate while the linear solve silently degrades. Guidance: Euler and laminar
+tolerate doubling to a very high cap; RANS wants factor-up $\approx 1.2$ and
+$\mathrm{CFL}_{\max}\approx 10^3$.
+
+\section{Reynolds continuation versus pseudo-transient}
+
+The split is by regime, not preference. Compressible aerodynamic codes (FUN3D, SU2, CFL3D,
+OVERFLOW, LAURA) use PTC exclusively: there is no natural continuation parameter, and
+pseudo-time is the physically meaningful homotopy. The \emph{finite-element incompressible}
+community uses Reynolds continuation, because $\nu$ is an explicit coefficient and the Stokes
+problem at $\Rey \to 0$ is trivially solvable and supplies a free starting point.
+
+\begin{tcolorbox}[colback=blue!4,colframe=blue!50!black,title=\bfseries The reference for our regime]
+Farrell, Mitchell \& Wechsung, \emph{SISC} \textbf{41}(5), A3073--A3096
+(\href{https://arxiv.org/pdf/1810.03315}{arXiv:1810.03315}). Augmented-Lagrangian
+preconditioner for 3D stationary incompressible Navier--Stokes at high Reynolds number.
+
+\medskip
+Their schedule: solve \textbf{Stokes} first, then $\Rey = 10 \to 100$, then in steps of 100 up
+to $\Rey = 10\,000$, each solution seeding the next. Newton globalized with a PETSc $L^2$
+line search.
+\end{tcolorbox}
+
+\subsection{Their iteration counts --- the benchmark we should measure against}
+Krylov iterations per Newton step, 3D lid-driven cavity:
+\begin{center}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Refinements & dof & $\Rey{=}10$ & 100 & 1000 & 5000 & 10\,000 \\
+\midrule
+1 & $1.0\times10^4$ & 2.50 & 4.33 & 6.00 & 8.00 & 14.00 \\
+4 & $6.6\times10^5$ & 2.50 & 2.67 & 5.00 & 8.00 & 8.50 \\
+\bottomrule
+\end{tabular}
+\end{center}
+For contrast, PCD/LSC preconditioning (IFISS) needs 22--26 at $\Rey{=}10$ and 100--210 at
+$\Rey{=}1000$. Against SIMPLE on the same problem, serial:
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+$\Rey$ & AL iters & AL time & SIMPLE iters & SIMPLE time \\
+\midrule
+10 & 4 & 0.21\,min & 515 & 1.06\,min \\
+100 & 8 & 0.38 & 979 & 2.01 \\
+200 & 10 & 0.46 & 1185 & 2.48 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Each SIMPLE iteration is 22--26$\times$ cheaper and it still loses.
+\textbf{Our $\sim$1000 cycles per Newton step sits in the SIMPLE column.}
+
+\subsection{The alternative that needs no continuation at all}
+Rebholz et al.\ (\href{https://arxiv.org/pdf/2402.12304}{arXiv:2402.12304}) compose one Picard
+step with one Newton step. The Picard half supplies the stability Newton lacks --- global
+stability for plain Newton does \emph{not} hold --- while retaining local quadratic
+convergence.
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Method (same mesh, zero initial guess, no continuation) & Converges to \\
+\midrule
+Newton & $\Rey \lesssim 2500$ \\
+Newton + line search & $\Rey \lesssim 3000$ \\
+Picard & $\Rey \lesssim 4000$ \\
+\textbf{Picard--Newton} & $\mathbf{\Rey \approx 10\,000\text{--}12\,000}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\textbf{Plain Newton's own documented limit is $\Rey\approx2500$, an order of magnitude above
+our $\Rey\approx200$--400.} This is the strongest single piece of evidence that our problem is
+the linear solve rather than the globalization.
+
+\section{Inexact Newton: Eisenstat--Walker forcing terms}
+Eisenstat \& Walker, \emph{SISC} \textbf{17} (1996) 16--32
+(\href{https://users.wpi.edu/~walker/Papers/forcing_terms,SISC_17,1996,16-32.pdf}{PDF}). This
+directly attacks over-solving the linear system early in the Newton sequence. PETSc's default
+(version 2):
+\begin{equation}
+\eta_k = \gamma \left( \frac{\lVert F_k\rVert}{\lVert F_{k-1}\rVert} \right)^{\alpha},
+\qquad \alpha = \tfrac{1+\sqrt 5}{2} \approx 1.618,\;\; \gamma = 1,
+\end{equation}
+with $\eta_0 = 0.3$, $\eta_{\max} = 0.9$, and a safeguard
+$\eta_k \leftarrow \max(\eta_k, \gamma\,\eta_{k-1}^{\alpha})$ when that exceeds $0.1$.
+
+\section{Smoother strength: local Fourier analysis for Stokes}
+Claus \& Bolten (\href{https://arxiv.org/pdf/2008.08719}{arXiv:2008.08719}), asymptotic
+convergence factors:
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Smoother & $\rho$ (periodic) & $\rho$ (Dirichlet) \\
+\midrule
+Vanka & \textbf{0.08} & 0.10 \\
+Triad Gauss--Seidel & 0.26 & 0.36 \\
+Triad Jacobi & 0.49 & \emph{divergent} \\
+\bottomrule
+\end{tabular}
+\end{center}
+Our point-block Jacobi is weaker than triad-Jacobi, which that study reports degrades to a
+\emph{divergent} method under Dirichlet boundary conditions --- the case we run.
+
+\section{Throughput: are our per-cycle costs reasonable?}
+
+\subsection{FUN3D}
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Metric & Value & Hardware & Problem \\
+\midrule
+Full nonlinear iteration & $\approx$6.0\,M points/s & \textbf{GH200 Grace, 72 cores} & 5\,M points \\
+3000 iterations & 2818\,s / 1639\,s / 430\,s & SKL node / EPYC node / A100 & 3.68\,M vertices \\
+Derived & 3.91 / 6.73 / 25.6\,M points/s & SKL / EPYC / A100 & same \\
+15 multicolour GS sweeps & 166\,ms $\to$ 30.9\,ms & SKL $\to$ A100 (81\,\% of peak BW) & 1.12\,M vertices \\
+\bottomrule
+\end{tabular}
+\end{center}
+\textbf{The comparison.} Our V-cycle is $242\,500\,\mathrm{dof} / 10\,\mathrm{ms} =
+6.06$\,M~nodes/s. FUN3D on the same Grace silicon completes an entire nonlinear iteration
+(residual, Jacobian, 15 Gauss--Seidel sweeps) at $\approx 6.0$\,M~points/s. Our V-cycle costs
+about what a full production nonlinear iteration costs. NASA's own framing: \emph{``FUN3D is
+memory bound: in general, performance scales with memory bandwidth.''}
+
+\subsection{OpenFOAM: the throughput-versus-loading curve}
+Galeazzo et al.\ 2024, one HLRS Hawk node ($2\times$EPYC 7742, 128 cores)
+(\href{https://iopscience.iop.org/article/10.1088/1757-899X/1312/1/012009}{IOP MSE 1312 012009}):
+\begin{center}
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+Cells/rank & kcells/s/core & L3 miss:hit & MPI ratio & Parallel eff. \\
+\midrule
+210\,938 & 24.4 & 0.823 & 0.056 & 0.96 \\
+62\,500 & 39.1 & 0.520 & 0.089 & 0.92 \\
+26\,367 & 100.8 & 0.083 & 0.279 & 0.77 \\
+\textbf{15\,259} & \textbf{106.0 (peak)} & 0.054 & 0.353 & 0.71 \\
+7\,813 & 104.7 & 0.050 & 0.469 & 0.65 \\
+3\,296 & 82.0 & 0.095 & 0.625 & 0.54 \\
+122 & 7.0 & 0.342 & 0.875 & 0.19 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Two consequences for us. First, our 842 nodes/core sits on the \emph{steep left flank},
+between the 3296 and 122 rows, where MPI and parallel overhead dominate --- so our measured
+throughput is more likely \textbf{understated} than inflated, and re-measuring at
+$\approx$15\,000 nodes/core ($\approx$4.3\,M dof on 72 cores) should \emph{raise} it. Second,
+peak throughput and peak parallel efficiency move in opposite directions: the peak sits at
+71\,\% efficiency, not 95\,\%. Both numbers should be reported.
+
+Our V-cycle costs 84\,knodes/s/core, inside OpenFOAM's 24--106\,kcells/s/core band for a
+\emph{complete segregated timestep}. Two independent codes therefore agree that our per-cycle
+cost is production-normal.
+
+\section{Ranked recommendations}
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Picard$\to$Newton composition.} We already have both linearizations: Newton's
+Jacobian minus the $b^*(u^{k+1},\hat u,v)$ term \emph{is} Picard. Largest robustness gain per
+line changed; reaches $\Rey\approx10\,000$ with no continuation at all.
+\item \textbf{Eisenstat--Walker forcing terms.} A few lines; directly attacks over-solving.
+\item \textbf{Stokes start plus $\Rey$ continuation} on Farrell's schedule, replacing our
+current weak two-stage version.
+\item \textbf{Full multigrid / nested iteration.} We already own the hierarchy; near-free.
+\item \textbf{PTC with the LAURA controller} ($\approx$30 lines, fully specified above,
+including the \code{Q\_safe} rollback that makes it safe).
+\item \textbf{Per-step physicality limiting} ($\eta_{\max} = 10\,\%$ fractional change).
+\item \textbf{HANIM in full}, if 1--6 prove insufficient.
+\end{enumerate}
+
+\begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=\bfseries Caveat on the ordering]
+None of items 1--6 will rescue a solver that needs 1000 V-cycles per Newton step. The
+smoother must be measured alone --- as a stationary iteration run to its asymptote, with no
+coarse space --- before any of this is worth implementing.
+\end{tcolorbox}
+
+\section{Where comparison is unsound}
+\begin{itemize}[leftmargin=*]
+\item FUN3D's published numbers are \textbf{compressible}, block size 5. Its incompressible
+path (block size 4) has no published performance figures.
+\item Farrell et al.\ use a \textbf{finite-element} discretisation with an augmented-Lagrangian
+preconditioner; we use colocated FV with Rhie--Chow. The iteration counts are comparable as a
+target, the preconditioner is not directly transplantable.
+\item OpenFOAM figures are per \emph{segregated timestep}, not per Newton step.
+\item The OHC-1 benchmark paper reports mutually inconsistent absolute MFVOPS figures
+(\S4.2.2 versus Table 3); only its \emph{ratios} should be cited.
+\item The SU2 smoother details (BCSR $5\times5$; ILU(0) tolerating roughly half the CFL of a
+GMRES smoother) were \textbf{not verified against the primary text} and should be confirmed
+before being designed around.
+\end{itemize}
+
+\end{document}
