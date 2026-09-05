@@ -2159,12 +2159,37 @@ derived pattern that cannot be too narrow, a tighter one than the probe's guess,
 reproducibility -- with the speed following at larger coarse levels, where probing costs
 colours and this costs one sweep.
 
-**A control that was missing.** The element arm did not converge at N=2 (40 Newton steps
-against the probe's 27), which looked like a defect the gates had missed. Running the probe at
-N=1 L=8 settles it: it does not converge there either (40 Newton steps, 31269 linear
-iterations, 84.9 s), while the element-wise arm on the same case is slightly better (30361
-iterations, 71.1 s). Both constructions sit near the convergence boundary at these sizes, and
-which one falls the right side of it is not evidence about either. The diagonal defect above
-was real and is fixed on its own evidence -- the gate reads 1.5e-17 now against 1.2e-2 before
--- but attributing the non-convergence to it, as this note first did, was a conclusion drawn
-without the control.
+**What this measurement is not.** N=2x1x1 is two macro-elements, and the assembly's parallel
+loop is over macro-elements, so on 8 threads six of them are idle. The 0.78 ms per call is a
+latency, not a throughput, and it says nothing about how the kernel scales -- for that the
+macro-element count has to be large enough to fill the machine, which is the discipline the
+rest of this section already follows for the applies. Parallelising inside a macro-element
+instead would race on the element's local matrix, so the fix if this ever matters is more
+macro-elements, not a different loop.
+
+**The Newton step count is not the right measurement, and chasing it wasted a round.** The
+element arm first appeared not to converge at N=2 -- 40 Newton steps against the probe's 27 --
+which looked like a defect every gate had missed. Three measurements settle it, in increasing
+order of sharpness.
+
+First, the missing control: the probe does not converge at N=1 L=8 either (40 Newton steps,
+31269 linear iterations, 84.9 s), where the element-wise arm is slightly *better* (30361
+iterations, 71.1 s). A difference whose sign flips with problem size is not evidence about
+either construction.
+
+Second, raising the Newton cap shows both converge, at 27 steps against 62, and shows why the
+count is meaningless here: both plateau at an absolute residual of 2 to 4e-10 while the 1e-8
+*relative* tolerance sits inside that plateau, so the step at which a run first dips under the
+threshold is decided by noise rather than by the preconditioner.
+
+Third, and decisive, `SFEM_GMG_CHECK=2` measures the cycle itself rather than the Newton loop
+around it. Both constructions take **36 linear iterations** on the first Newton step and land
+on residuals agreeing to eight digits (1.4453e-10 against 1.2294e-10). The preconditioners are
+equivalent, which is what the operator and block-diagonal gates already said and what the
+Newton count was never going to show.
+
+The lesson for this section's own gates: when a change is meant to be exactly equivalent,
+measure the object that is supposed to be equivalent -- here the cycle -- not an outer loop
+whose stopping test sits in its own noise. The block-diagonal defect above was real and is
+fixed on its own evidence (1.5e-17 now against 1.2e-2 before); attributing the Newton counts to
+it, as this note first did, was a conclusion drawn from the wrong instrument.
