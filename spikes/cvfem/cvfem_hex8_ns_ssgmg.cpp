@@ -2164,6 +2164,33 @@ namespace {
                 const int ksmooth  = (i > 0) ? kdefault
                                              : smesh::Env::read<int>("SFEM_GMG_KSMOOTH_FINE",
                                                                      kdefault > 0 ? 2 : 0);
+                // SFEM_SMOOTHER=vanka replaces the point-block smoother on the fine level.
+                //
+                // Measured standalone at Re=1, 150 sweeps to the asymptote: block-Jacobi
+                // 0.981 (and divergent for omega >= 0.5), additive Vanka 0.883, multiplicative
+                // 8-colour Vanka 0.63 at omega = 1 with no damping needed. The point-block
+                // smoother discards the velocity-pressure coupling that determines the
+                // pressure; the patch solve keeps it.
+                //
+                // Fine level only: the patch operator is read from the assembled fine matrix
+                // via the element-wise Galerkin path at q = 1, and the coarse levels have a
+                // different lattice. They keep block-Jacobi for now.
+                std::shared_ptr<sfem::Operator<real_t>> prec_op = prec;
+                if (i == 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "bjacobi") == "vanka" &&
+                    g.level_ops[0] && g.level_ops[0]->is_semi_structured()) {
+                    const ptrdiff_t      nd0 = g.data->functions[0]->space()->n_dofs();
+                    std::vector<mask_t>  m0(mask_count(nd0), 0);
+                    g.data->functions[0]->constraints_mask(m0.data());
+                    std::vector<uint8_t> cb((size_t)nd0, 0);
+                    for (ptrdiff_t k = 0; k < nd0; ++k) cb[(size_t)k] = mask_get(k, m0.data()) ? 1 : 0;
+                    const double t_v = smesh::time_seconds();
+                    prec_op = cvfem_ss::make_diagonal_vanka(*g.level_ops[0], g.data->functions[0]->space(),
+                                                            g.states[0]->data(), cb.data(),
+                                                            smesh::Env::read<real_t>("SFEM_VANKA_OMEGA",
+                                                                                     real_t(1)));
+                    phase_add("vanka_setup", smesh::time_seconds() - t_v);
+                }
+
                 std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> sm;
                 if (ksmooth > 0) {
                     auto ks = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
@@ -2171,10 +2198,10 @@ namespace {
                     ks->set_rtol(1e-12);
                     ks->set_atol(1e-30);
                     ks->verbose = false;
-                    ks->set_preconditioner_op(prec);
+                    ks->set_preconditioner_op(prec_op);
                     sm = ks;
                 } else {
-                    auto st = sfem::create_stationary<real_t>(lop, prec, sfem::EXECUTION_SPACE_HOST);
+                    auto st = sfem::create_stationary<real_t>(lop, prec_op, sfem::EXECUTION_SPACE_HOST);
                     st->set_max_it(g.smoothing_steps);
                     sm = st;
                 }
@@ -2711,7 +2738,15 @@ int main(int argc, char **argv) {
                     const real_t om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
                     const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "bjacobi");
                     std::shared_ptr<sfem::Operator<real_t>> prec;
-                    if (kind == "simple")
+                    if (kind == "vanka") {
+                        // Diagonal Vanka: a coupled solve over each micro-element patch,
+                        // measured through the same gate as block-Jacobi so the asymptotic
+                        // rates are directly comparable.
+                        std::vector<uint8_t> cb((size_t)ndof, 0);
+                        for (ptrdiff_t k = 0; k < ndof; ++k)
+                            cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                        prec = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om);
+                    } else if (kind == "simple")
                         prec = make_simple(*op, x, cmask.data(), nnodes, om,
                                            smesh::Env::read<int>("SFEM_SIMPLE_INNER", 1),
                                            smesh::Env::read<real_t>("SFEM_SIMPLE_DS", real_t(1)));
