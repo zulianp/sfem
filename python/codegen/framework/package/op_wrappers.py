@@ -432,19 +432,37 @@ def _equation_form_orders(equation):
     raise ValueError("unsupported equation form")
 
 
-def _header(material, residual):
+def _header(material, residual, publishes_value_steps=None):
+    """The Op's declared interface.
+
+    ``publishes_value_steps`` says whether this Op offers the Newton
+    line-search 0-form.  It used to be spelled ``not residual``, which is true
+    for the two single-equation paths -- an energy has an objective, a residual
+    was never given one -- and false for a coupled Op, which has an energy
+    equation and therefore a perfectly good objective, generates the
+    ``objective_steps`` kernels for it, and then did not declare the method
+    that would call them.  Adding a residual block to an energy material
+    silently removed its line search.
+
+    Whether the method is published is a question about the forms the material
+    lowered to, not about which ``add_*`` call produced them, so it is asked
+    separately here.  The default keeps the two single-equation paths spelling
+    it the way they always have.
+    """
+    if publishes_value_steps is None:
+        publishes_value_steps = not residual
     extra = """
         int update(const real_t *const x) override;
         int update(const real_t *const previous, const real_t *const current) override;
         void set_field(const char *name,
                        const std::shared_ptr<Buffer<real_t>> &values,
                        int component) override;""" if residual else ""
-    value_steps = "" if residual else """
+    value_steps = """
         int value_steps(const real_t *x,
                         const real_t *h,
                         const int nsteps,
                         const real_t *const steps,
-                        real_t *const out) override;"""
+                        real_t *const out) override;""" if publishes_value_steps else ""
     matrix_methods = """
         int hessian_bsr(const real_t *const x,
                         const count_t *const rowptr,
@@ -3846,6 +3864,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         });
     }
+%(value_steps_method)s
     void %(op)s::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
@@ -3990,6 +4009,9 @@ namespace sfem {
         "gradient_cases": "\n".join(cases["gradient"]),
         "apply_cases": "\n".join(cases["apply"]),
         "objective_cases": "\n".join(cases["objective"]),
+        "value_steps_method": _coupled_value_steps_method(
+            material.op_name, cases["objective_steps"]
+        ),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
             "gradient_uses_affine",
@@ -4006,7 +4028,14 @@ namespace sfem {
             owner="ret->impl_",
         ),
     }
-    return _header(material, True), source
+    return (
+        _header(
+            material,
+            True,
+            publishes_value_steps=bool(cases["objective_steps"]),
+        ),
+        source,
+    )
 
 
 def _coupled_dependency_flags(systems_by_dim, energy_name, residual_name):
@@ -4058,6 +4087,85 @@ def _coupled_apply_state_check(op_name, uses_current, uses_previous):
     )
 
 
+def _coupled_value_steps_method(op_name, objective_steps_cases):
+    """The line-search 0-form for a coupled Op, or nothing if it has no kernel.
+
+    This is `value` with two changes.  The scratch buffer holds `nsteps` values
+    per element rather than one, so it is grown here rather than sized once at
+    initialize; and the reduction runs per step, because the kernel has laid
+    the steps out contiguously -- step-major, `nelements` apart -- so that the
+    element loop visits the mesh once for all of them.
+
+    That is the whole point of the pattern: a Newton line search asks for the
+    energy at several trial step lengths, and evaluating them together reuses
+    each element's geometry and coefficients instead of re-reading the mesh
+    once per candidate.
+    """
+    if not objective_steps_cases:
+        return ""
+    return """
+    int %(op)s::value_steps(const real_t *state,
+                            const real_t *h,
+                            const int nsteps,
+                            const real_t *const steps,
+                            real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::value_steps");
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        if (nsteps <= 0) {
+            return SFEM_SUCCESS;
+        }
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const ptrdiff_t nelements = domain.block->n_elements();
+            const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
+            const geom_t *const *adjugate = nullptr;
+            const geom_t *determinant = nullptr;
+            if (impl_->objective_uses_affine) {
+                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
+                        domain.user_data);
+                if (!jacobian) {
+                    SFEM_ERROR("%(op)s affine objective_steps requires cached geometry\\n");
+                    return SFEM_FAILURE;
+                }
+                adjugate = reinterpret_cast<const geom_t *const *>(
+                        jacobian->jacobian_adjugate_SoA()->data());
+                determinant = reinterpret_cast<const geom_t *>(
+                        jacobian->jacobian_determinant()->data());
+            }
+            if (nvalues > impl_->element_capacity) {
+                impl_->element_values.reset(new real_t[nvalues]);
+                impl_->element_capacity = nvalues;
+            }
+            std::fill(impl_->element_values.get(),
+                      impl_->element_values.get() + nvalues,
+                      real_t(0));
+            real_t storage[MAX_PARAMETERS];
+            parameter_array(*domain.parameters, storage);
+            int status = SFEM_FAILURE;
+            switch (domain.element_type) {
+%(objective_steps_cases)s
+                default:
+                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
+            }
+            if (status != SFEM_SUCCESS) return status;
+            for (int step = 0; step < nsteps; ++step) {
+                real_t sum = 0;
+#pragma omp simd reduction(+ : sum)
+                for (ptrdiff_t element = 0; element < nelements; ++element) {
+                    sum += impl_->element_values[(ptrdiff_t)step * nelements + element];
+                }
+                out[step] += sum;
+            }
+            return SFEM_SUCCESS;
+        });
+    }
+""" % {
+        "op": op_name,
+        "objective_steps_cases": "\n".join(objective_steps_cases),
+    }
+
 def _coupled_cases(
     material,
     elements,
@@ -4075,6 +4183,7 @@ def _coupled_cases(
         "gradient": [],
         "apply": [],
         "objective": [],
+        "objective_steps": [],
         "performance": {"value": [], "gradient": [], "apply": []},
     }
     for element in elements:
@@ -4105,6 +4214,16 @@ def _coupled_cases(
             and _c_abi_function_defined(
                 kernel_sources,
                 "%s_objective_isoparametric_mesh_soa" % energy_stem,
+            )
+        )
+        has_objective_steps = (
+            _c_abi_function_defined(
+                kernel_sources,
+                "%s_objective_steps_affine_mesh_soa" % energy_stem,
+            )
+            and _c_abi_function_defined(
+                kernel_sources,
+                "%s_objective_steps_isoparametric_mesh_soa" % energy_stem,
             )
         )
         has_gradient = (
@@ -4198,6 +4317,7 @@ def _coupled_cases(
         energy_components = tuple(range(int(energy_field.components)))
         energy_data = _component_offsets("state", field_offsets[energy_field.name], energy_components)
         energy_direction = _component_offsets("direction", field_offsets[energy_field.name], energy_components)
+        energy_increment = _component_offsets("h", field_offsets[energy_field.name], energy_components)
         energy_out = _component_offsets("out", field_offsets[energy_field.name], energy_components)
         residual_state_setup = _residual_soa_view_declarations(residual_fields, "state", "data", "const real_t")
         residual_current_setup = _residual_soa_view_declarations(residual_fields, "current", "data", "const real_t")
@@ -4348,6 +4468,44 @@ def _coupled_cases(
                     "cases": _mesh_case_labels(element, "                "),
                     "affine": energy_objective_affine,
                     "isoparametric": energy_objective_iso,
+                }
+            )
+
+        # The steps kernel is the objective's, with the increment and the step
+        # lengths threaded in ahead of the output: the same energy evaluated at
+        # `state + steps[s] * h` for every s in one traversal of the mesh.
+        energy_objective_steps_args = ", ".join(
+            _nonempty(
+                *_coupled_energy_field_args(
+                    energy_objective_dependencies,
+                    block_size,
+                    current=energy_data,
+                ),
+                str(block_size),
+                energy_increment,
+                "nsteps",
+                "steps",
+                "impl_->element_values.get()",
+            )
+        )
+        energy_objective_steps_affine = (
+            "%s_objective_steps_%dd_affine_mesh_soa(%s%s, %s)"
+            % (energy_dispatch_stem, dim, common_affine_dispatch,
+               energy_objective_params, energy_objective_steps_args)
+        )
+        energy_objective_steps_iso = (
+            "%s_objective_steps_%dd_isoparametric_mesh_soa(%s%s, %s)"
+            % (energy_dispatch_stem, dim, common_iso_dispatch,
+               energy_objective_params, energy_objective_steps_args)
+        )
+        if has_objective_steps:
+            cases["objective_steps"].append(
+                """%(cases)s
+                    status = impl_->objective_uses_affine ? %(affine)s : %(isoparametric)s;
+                    break;""" % {
+                    "cases": _mesh_case_labels(element, "                "),
+                    "affine": energy_objective_steps_affine,
+                    "isoparametric": energy_objective_steps_iso,
                 }
             )
     return cases
