@@ -124,4 +124,17 @@ namespace cvfem_ss {
             sfem::CVFEMNavierStokes &op, const std::shared_ptr<sfem::FunctionSpace> &space,
             const real_t *const state, const uint8_t *const constrained, const real_t omega);
 
+    // Same smoother for a coarse level, built from a matrix that already exists.
+    //
+    // A V-cycle is limited by its worst level, and the coarse levels were still running the
+    // point-block smoother the fine level just replaced. They need no new assembly: the
+    // element-wise Galerkin path has already produced each level's BSR, and each level's
+    // operator carries its own lattice, which is all vanka_setup wants.
+    //
+    // `op` supplies the lattice only, so it must be the operator for THAT level; `A` is that
+    // level's assembled matrix with its identity rows already patched.
+    std::shared_ptr<sfem::Operator<real_t>> make_diagonal_vanka_from_bsr(
+            sfem::CVFEMNavierStokes &op, const std::shared_ptr<CoarseBSR> &A,
+            const uint8_t *const constrained, const real_t omega);
+
 }  // namespace cvfem_ss

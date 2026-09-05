@@ -2176,6 +2176,20 @@ namespace {
                 // via the element-wise Galerkin path at q = 1, and the coarse levels have a
                 // different lattice. They keep block-Jacobi for now.
                 std::shared_ptr<sfem::Operator<real_t>> prec_op = prec;
+                // Coarse levels: same smoother, built from the matrix the element-wise Galerkin
+                // assembly already produced. A cycle is limited by its worst level, and leaving
+                // these on the point-block smoother would waste the fine-level gain.
+                if (i > 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "bjacobi") == "vanka" &&
+                    g.Amat[(size_t)i] && g.level_ops[(size_t)i] &&
+                    g.level_ops[(size_t)i]->is_semi_structured()) {
+                    std::vector<uint8_t> cb((size_t)fi->space()->n_dofs(), 0);
+                    for (ptrdiff_t k = 0; k < fi->space()->n_dofs(); ++k)
+                        cb[(size_t)k] = mask_get(k, mask.data()) ? 1 : 0;
+                    auto vk = cvfem_ss::make_diagonal_vanka_from_bsr(
+                            *g.level_ops[(size_t)i], g.Amat[(size_t)i], cb.data(),
+                            smesh::Env::read<real_t>("SFEM_VANKA_OMEGA", real_t(1)));
+                    if (vk) prec_op = vk;
+                }
                 if (i == 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "bjacobi") == "vanka" &&
                     g.level_ops[0] && g.level_ops[0]->is_semi_structured()) {
                     const ptrdiff_t      nd0 = g.data->functions[0]->space()->n_dofs();

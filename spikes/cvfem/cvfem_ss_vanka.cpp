@@ -53,4 +53,36 @@ namespace cvfem_ss {
                 sfem::EXECUTION_SPACE_HOST);
     }
 
+    std::shared_ptr<sfem::Operator<real_t>> make_diagonal_vanka_from_bsr(
+            sfem::CVFEMNavierStokes &op, const std::shared_ptr<CoarseBSR> &A,
+            const uint8_t *const constrained, const real_t omega) {
+        const ::SSMeshData *const ss = op.semi_structured_data();
+        if (!ss || !A) return nullptr;
+
+        struct State {
+            const ::SSMeshData        *ss{nullptr};
+            std::shared_ptr<CoarseBSR> A;
+            VankaData                  v;
+            scalar_t                   omega{1};
+            bool                       mult{true};
+            std::vector<scalar_t>      work;
+        };
+        auto st   = std::make_shared<State>();
+        st->ss    = ss;
+        st->A     = A;
+        st->omega = (scalar_t)omega;
+        st->mult  = smesh::Env::read<int>("SFEM_VANKA_MULT", 1) != 0;
+
+        vanka_setup(*ss, constrained, A->row_ptr->data(), A->col_idx->data(), A->values->data(), st->v);
+
+        const ptrdiff_t ndof = ss->nnodes * N_FIELDS;
+        return sfem::make_op<real_t>(
+                ndof, ndof,
+                [st](const real_t *const r, real_t *const y) {
+                    if (st->mult) vanka_apply_mult(*st->ss, st->v, st->omega, r, y, st->work);
+                    else          vanka_apply(*st->ss, st->v, st->omega, r, y, st->work);
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    }
+
 }  // namespace cvfem_ss
