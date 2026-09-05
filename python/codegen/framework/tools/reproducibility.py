@@ -247,6 +247,10 @@ def _manifest_entries(generated_dir, material):
 #: Scalar element types the harness can pass a value for.
 SCALARS = ("const double", "const float", "const real_t", "const int")
 
+#: How many trial step lengths a `value_steps` kernel is driven with.  More than
+#: one, so the per-step layout is exercised rather than just the first slot.
+N_STEPS = 3
+
 #: Pointer element types that name a field the kernel reads or writes.
 IN_FIELDS = (
     "const double *const SFEM_RESTRICT",
@@ -342,6 +346,14 @@ def _bind(params, element, components, block_values=None):
             args.append(RUNTIME_TYPE_VALUE)
         elif name.endswith("_stride") and ctype == "const ptrdiff_t":
             args.append("1")
+        elif name == "nsteps" and ctype == "const int":
+            # The line-search step count.  It fell through to `material_scalar`,
+            # which is a seeded double: truncated to an int it came out zero, so
+            # every `objective_steps` kernel returned before its first loop and
+            # digested as exactly 0.0 -- for every material, since this session
+            # began.  The 0-form was generated, compiled, and never once
+            # checked against a number.
+            args.append(str(N_STEPS))
         elif ctype in SCALARS:
             args.append("material_scalar(\"%s\")" % name)
         elif ctype in OUT_FIELDS and name == "values":
@@ -750,10 +762,14 @@ def _call_block(name, args, inputs, outputs, repeats=0):
             # tetrahedral one was driven: six tets per cell against one hex,
             # 162 elements against 64 nodes, and the heap corruption showed up
             # as a silent SIGABRT in the *next* kernel's allocation.
+            # A stepped objective writes `value[step * nelements + element]`,
+            # so its output is `N_STEPS` times what a plain one needs.  Sizing
+            # by the larger for every kernel costs a few thousand doubles and
+            # removes a way to overrun this buffer.
             lines.append(
                 "        std::vector<%s> %s(std::max<size_t>((size_t)nodes * %d, "
-                "(size_t)mesh.nelements), (%s)0);"
-                % (scalar, buffer, components, scalar)
+                "(size_t)mesh.nelements * %d), (%s)0);"
+                % (scalar, buffer, components, N_STEPS, scalar)
             )
     call = [
         "        %s(" % name,
