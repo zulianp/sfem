@@ -229,13 +229,13 @@ def _mesh_arguments(unit, emission_plan, kind):
 
 def _mesh_field_arguments(unit, kind):
     dependencies = _merged_dependencies(unit.expression_plans)
-    n_components = _field_component_count(unit)
+    n_field_components = _field_component_count(unit)
     arguments = []
     if _dependencies_use_current(dependencies, default=False):
         arguments.append(
             KernelArgument(
                 "current",
-                "const scalar_t *const SFEM_RESTRICT current[%d]" % n_components,
+                "const scalar_t *const SFEM_RESTRICT current[%d]" % n_field_components,
                 "field",
             )
         )
@@ -243,7 +243,7 @@ def _mesh_field_arguments(unit, kind):
         arguments.append(
             KernelArgument(
                 "previous",
-                "const scalar_t *const SFEM_RESTRICT previous[%d]" % n_components,
+                "const scalar_t *const SFEM_RESTRICT previous[%d]" % n_field_components,
                 "previous",
             )
         )
@@ -251,7 +251,7 @@ def _mesh_field_arguments(unit, kind):
         arguments.append(
             KernelArgument(
                 "direction",
-                "const scalar_t *const SFEM_RESTRICT direction[%d]" % n_components,
+                "const scalar_t *const SFEM_RESTRICT direction[%d]" % n_field_components,
                 "direction",
             )
         )
