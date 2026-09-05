@@ -1612,6 +1612,12 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     if "ds" in measures:
         raise ValueError("generated residual Op wrappers cannot mix dx and ds forms yet")
 
+    # A residual whose 0-form is a merit can compute it here: it is half the
+    # squared norm of what `gradient` already produces.  One whose 0-form is a
+    # potential needs an element kernel this emitter cannot yet build, so it
+    # keeps the failing stub rather than being handed a different quantity.
+    emits_merit = _residual_zero_form_is_assembled_norm(form_collections)
+
     defaults = _seed_lines(material.parameter_defaults)
     declarations = []
     residual_cases = []
@@ -2285,7 +2291,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
 
-#include <cstring>
+#include <cstring>%(merit_include)s
 
 %(declaration_block)s
 
@@ -2754,11 +2760,7 @@ namespace sfem {
 %(hessian_dia_body)s
     }
 
-    int %(op)s::value(const real_t *, real_t *const) {
-        SFEM_TRACE_SCOPE("%(op)s::value");
-        return SFEM_FAILURE;
-    }
-}  // namespace sfem
+%(merit_methods)s}  // namespace sfem
 """ % {
         "op": material.op_name,
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -2778,6 +2780,17 @@ namespace sfem {
         "laplace_packed_member": laplace_packed_member,
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
         "performance_methods": _performance_methods(material.op_name, material.name, elements, performance_cases),
+        # Only the merit uses std::vector, so only the merit brings its header.
+        "merit_include": "\n#include <vector>" if emits_merit else "",
+        "merit_methods": (
+            _residual_merit_methods(material.op_name)
+            if emits_merit
+            else """    int %s::value(const real_t *, real_t *const) {
+        SFEM_TRACE_SCOPE("%s::value");
+        return SFEM_FAILURE;
+    }
+""" % (material.op_name, material.op_name)
+        ),
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
         "residual_dispatch_body": _residual_apply_dispatch_body(
@@ -2973,7 +2986,7 @@ namespace sfem {
             else ""
         ),
     }
-    return _header(material, True), source
+    return _header(material, True, publishes_value_steps=emits_merit), source
 
 
 def _boundary_residual_op(material, elements, c_abi_header=None, form_collections=None):
@@ -3947,7 +3960,7 @@ namespace sfem {
         "gradient_cases": "\n".join(cases["gradient"]),
         "apply_cases": "\n".join(cases["apply"]),
         "objective_cases": "\n".join(cases["objective"]),
-        "value_steps_method": _coupled_value_steps_method(material.op_name, ()),
+        "value_steps_method": _residual_merit_methods(material.op_name),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
             "gradient_uses_affine",
@@ -4019,7 +4032,29 @@ def _coupled_apply_state_check(op_name, uses_current, uses_previous):
     )
 
 
-def _coupled_value_steps_method(op_name, objective_steps_cases):
+def _residual_zero_form_is_assembled_norm(form_collections):
+    """Whether this residual system's 0-form is a merit over its assembled residual.
+
+    The form layer answers this by the role it gave the 0-form: `merit` for a
+    residual that is the gradient of nothing, `potential` for one that is.  A
+    merit is computable here and now -- it is half the squared norm of what
+    `gradient` already produces -- while a potential needs an element kernel
+    the residual emitter cannot yet build, so the two cases are not
+    interchangeable and only the first is emitted.
+    """
+    from codegen.framework.plans.form_emission import FormReduction, form_reduction
+    from codegen.framework.symbolic.forms import FormOrder
+
+    for collection in (form_collections or {}).values():
+        for form in getattr(collection, "forms", ()):
+            if getattr(form, "order", None) is not FormOrder.ZERO:
+                continue
+            if form_reduction(form) is not FormReduction.ASSEMBLED_NORM:
+                return False
+            return True
+    return False
+
+def _residual_merit_methods(op_name):
     """The 0-form of a mixed energy/residual system: one residual merit.
 
     A material that declares both an energy and a residual has, in general, no
