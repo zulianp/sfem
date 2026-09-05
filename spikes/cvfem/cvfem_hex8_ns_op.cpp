@@ -68,6 +68,10 @@ namespace sfem {
 
     bool CVFEMNavierStokes::is_semi_structured() const { return impl_->semi_structured; }
 
+    const ::SSMeshData *CVFEMNavierStokes::semi_structured_data() const {
+        return impl_->semi_structured ? &impl_->ss : nullptr;
+    }
+
     std::shared_ptr<CVFEMNavierStokes> CVFEMNavierStokes::coarser() const { return impl_->coarser; }
 
     ptrdiff_t CVFEMNavierStokes::n_dofs_domain() const { return impl_->space->n_dofs(); }

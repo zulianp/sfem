@@ -169,7 +169,7 @@ cvfem_subpar_target(cvfem_hex8_ns_steady)
 
 # The sfem::Op face of the same kernels, for the semi-structured GMG work. Kept as a
 # library so the Op compiles and is gated on its own before any driver depends on it.
-add_library(cvfem_ns_op STATIC cvfem_hex8_ns_op.cpp)
+add_library(cvfem_ns_op STATIC cvfem_hex8_ns_op.cpp cvfem_ss_galerkin.cpp)
 target_link_libraries(cvfem_ns_op
     PUBLIC
         SFEM::sfem
