@@ -1804,3 +1804,53 @@ probe applications in the best-iteration arm, against 20 nodes and 80 in the wor
 So the configuration that converges best is the one probing punishes hardest. Removing the
 probing does not merely save its own 30-70%; it unlocks the split that wins on iterations.
 That is the case for Phase 1, and it is stronger than the one the plan was written on.
+
+### Correction: the Phase 2 gate was run in the wrong regime
+
+The conclusion above -- that coarsening below the macro mesh is not worth building -- is
+withdrawn. It was drawn from experiments whose coarsest level was 20 to 425 nodes, where the
+exact coarse solve is free and extra levels can therefore only add cost. The gate could not
+have returned anything else.
+
+The cost that coarsening removes is the *terminal* problem's size, and a dense factorisation
+is O(n^3) in time and O(n^2) in memory:
+
+| macro nodes | dofs | LU storage | factor flops | |
+|---|---|---|---|---|
+| 425 | 1,700 | 22 MiB | 1.6e9 | free |
+| 1,024 | 4,096 | 128 MiB | 2.3e10 | marginal (per Newton step) |
+| 4,096 | 16,384 | 2.0 GiB | 1.5e12 | impossible |
+| 65,536 | 262,144 | 512 GiB | 6.0e15 | impossible |
+
+`SFEM_GMG_DENSE_LU_BELOW` is 4096 dofs, i.e. 1024 macro nodes. Beyond it the driver falls
+back to the BiCGStab that was measured to diverge on this operator. So today there is a hard
+ceiling at about a thousand macro elements, above which there is neither a working exact
+coarse solve nor any way to make the coarse problem smaller.
+
+Extending the M2 ladder one rung into that regime, same fine mesh of 64x16x16 throughout:
+
+| macro / L | coarsest | assembly | t_precond | t_solve | total |
+|-----------|----------|----------|-----------|---------|-------|
+| 8x2x2 / L=8   | 81 nodes | 6,561 blocks, 324 applications | 1.60 | 1.83 | 3.43 |
+| 16x4x4 / L=4  | 425 nodes | 180,625 blocks, 1,700 applications | 4.88 | 1.66 | 6.55 |
+| **32x8x8 / L=2** | **2,673 nodes** | **7,144,929 blocks (915 MB), 10,692 applications** | **144.4** | **386.1** | **~530** |
+| baseline | - | - | 0.01 | 7.20 | 7.20 |
+
+Seventy-four times slower than the baseline on the same discretisation. Both failure modes
+appear together: the probing assembly goes fully dense at 7.1 million blocks, and the coarse
+solve drops to a Krylov method that cannot be trusted on this operator.
+
+This is the regime that matters for a real macro mesh, and it needs both phases rather than
+one:
+
+- **Phase 1** removes the dense-pattern probing, which is what produced the 915 MB operator
+  and the 10,692 applications per Newton step. A sparse triple product yields the exact
+  pattern, which for a 2,673-node level is a normal sparse matrix rather than a dense one.
+- **Phase 2 is reinstated**, but its purpose is not the one the plan gave it. It is not there
+  to add levels for faster convergence -- M2 correctly showed that does not help when the
+  coarse problem is already small. It is there to **bound the size of the terminal problem**,
+  so the exact coarse solve stays affordable as the macro mesh grows. That is invisible below
+  the factorisation knee and decisive above it.
+
+The gate should be re-run above the knee once Phase 1 lands, since Phase 1 changes the
+assembly cost that currently dominates this measurement.
