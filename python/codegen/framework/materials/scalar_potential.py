@@ -10,9 +10,16 @@ found by hand, one at a time, because no maintained material exercised the
 path.
 
 This is that material.  Its energy `kappa/2 * ||grad u||^2` is the potential
-whose gradient is the Laplacian residual, so `laplace` is its reference: the
-same operator declared the other way round, already generated and already
-gated.  Where the two disagree, one of them is wrong.
+whose gradient is the Laplacian residual, so it is `laplace` declared the other
+way round.
+
+The two cannot be compared digest-for-digest, though, and it is worth saying
+why before someone tries: the harness seeds each input buffer from the
+parameter's name, and the two formulations do not name the field the same --
+the residual takes `u`, the energy takes `ux` -- so they are driven with
+different data.  What does check this material is internal: its affine and
+isoparametric kernels compute the same operator through independent geometry,
+and the harness compares them.
 """
 
 from pathlib import Path

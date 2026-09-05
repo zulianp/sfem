@@ -1171,11 +1171,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("for (int lane = 0; lane < nelems; ++lane)", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
-            "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>",
+            "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2, 2>",
             local_source,
         )
         self.assertIn(
-            "tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>",
+            "tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2, 2>",
             local_source,
         )
         self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)
@@ -1293,11 +1293,11 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("for (int lane = 0; lane < nelems; ++lane)", local_source)
         self.assertNotIn("grad_ref_data", local_source)
         self.assertIn(
-            "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>",
+            "tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>",
             local_source,
         )
         self.assertIn(
-            "tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>",
+            "tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>",
             local_source,
         )
         self.assertNotIn("scalar_t element_vector[N_SHAPE", local_source)
@@ -1378,8 +1378,8 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("integer_root(N_QP, 3)", tensor_source)
         self.assertIn("integer_root(N_SHAPE, 3)", tensor_source)
         self.assertIn("for (int q = 0; q < N_QP; ++q)", shared_local)
-        self.assertIn("tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>", shared_local)
-        self.assertIn("tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>", shared_local)
+        self.assertIn("tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>", shared_local)
+        self.assertIn("tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>", shared_local)
         self.assertIn("const int shape = sx + S * (sy + S * sz);", tensor_source)
         self.assertNotIn("tensor_shape_index", shared_local)
         self.assertNotIn("scalar_t u[N_SHAPE", shared_local)
