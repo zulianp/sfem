@@ -22,6 +22,8 @@ asking -- but it makes the question one the form layer answers, which is the
 precondition for answering it in a table instead.
 """
 
+from enum import Enum
+
 from codegen.framework.symbolic.forms import FormOrder
 
 #: What each kernel name is, as an order.  The names come from the material's
@@ -59,3 +61,29 @@ def writes_per_shape(form):
     follows from the order rather than from the name.
     """
     return form_order(form) is not FormOrder.ZERO
+
+
+class FormContraction(Enum):
+    """How a form's integrand is contracted against the test functions."""
+
+    #: The form carries a weak form: a strong flux is computed and contracted
+    #: afterwards, which is what lets a tensor-product element sum-factorise it.
+    DEFERRED_FLUX = "deferred_flux"
+
+    #: The contraction is already done, pointwise, before emission sees it.
+    POINTWISE = "pointwise"
+
+
+def form_contraction(form):
+    """Which contraction this form uses.
+
+    Asked twenty-three times in the energy emitter as ``form.weak_form is
+    None`` or ``is not None``, eight of them in one function.  It is a property
+    of the form, and naming it is what lets the two paths be selected from a
+    table rather than branched on.
+    """
+    return (
+        FormContraction.POINTWISE
+        if getattr(form, "weak_form", None) is None
+        else FormContraction.DEFERRED_FLUX
+    )

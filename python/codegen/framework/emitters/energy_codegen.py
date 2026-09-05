@@ -1,6 +1,8 @@
 import sympy as sp
 
 from codegen.framework.plans.form_emission import (
+    FormContraction,
+    form_contraction,
     form_order,
     writes_per_shape,
 )
@@ -1112,20 +1114,15 @@ def _sfem_soa_block_function(
         uses_direction=_form_uses_direction(form, default=form.has_direction),
         source_builder=source_builder,
     )
-    if form.weak_form is None:
-        return _sfem_soa_pointwise_block_function(
-            form,
-            dim,
-            n_nodes,
-            array_inputs,
-            quadrature_rule,
-            shared,
-        )
-    return _sfem_soa_weak_form_block_function(
+    # Selected, not branched on.  Both take the same arguments now, so which
+    # one runs is a lookup on a property of the form rather than a conditional
+    # in emission.
+    return _BLOCK_FUNCTION_BY_CONTRACTION[form_contraction(form)](
         form,
         prefix,
         dim,
         n_nodes,
+        array_inputs,
         quadrature_rule,
         shared,
         use_shared_weak_local=use_shared_weak_local,
@@ -1138,6 +1135,7 @@ def _sfem_soa_weak_form_block_function(
     prefix,
     dim,
     n_nodes,
+    array_inputs,
     quadrature_rule,
     shared,
     use_shared_weak_local=False,
@@ -1293,12 +1291,22 @@ def _sfem_soa_weak_form_block_function(
 
 def _sfem_soa_pointwise_block_function(
     form,
+    prefix,
     dim,
     n_nodes,
     array_inputs,
     quadrature_rule,
     shared,
+    use_shared_weak_local=False,
+    constant_p1_gradient_expansion=True,
 ):
+    """Emit the block kernel for a form whose contraction is already done.
+
+    Takes the same arguments as its deferred-flux counterpart and ignores the
+    ones it does not need, so the two can be selected from a table instead of
+    branched on.  That interchangeability is what "no distinction below the
+    form layer" means concretely for this emitter.
+    """
     """The per-point kernel: a form with no lowered weak form.
 
     Takes one quadrature index and one weight, gathers every input into a local
@@ -1446,6 +1454,15 @@ def _sfem_soa_pointwise_block_function(
             ),
         )
     )
+
+#: Which block emitter serves which contraction.  A table because the choice
+#: is a property of the form and not a decision emission makes; the two
+#: functions take the same arguments so either can be selected.
+_BLOCK_FUNCTION_BY_CONTRACTION = {
+    FormContraction.DEFERRED_FLUX: _sfem_soa_weak_form_block_function,
+    FormContraction.POINTWISE: _sfem_soa_pointwise_block_function,
+}
+
 
 
 def _sfem_soa_direct_hessian_matrix_assembly_available(
