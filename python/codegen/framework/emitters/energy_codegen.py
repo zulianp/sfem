@@ -3746,6 +3746,314 @@ def _append_mesh_operator_compact_buffers(
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
 
 
+def _append_mesh_operator_isoparametric_flux(
+    coordinate_streams_name,
+    dim,
+    element_inputs,
+    form,
+    geometry_mode,
+    lines,
+    local_prefix,
+    n_nodes,
+    quadrature_rule,
+    reference_inputs,
+    reference_prefix,
+    source_builder,
+    tensor_grad_name,
+    tensor_shape_name,
+    use_reference_gradient_vectors,
+    use_tensor_product_geometry,
+):
+    """The isoparametric geometry and deferred-flux staging.
+
+    The largest remaining block, and the one where the two axes this
+    function weaves together actually meet: it runs only for an
+    isoparametric element whose form defers its flux.  Sixteen inputs is a
+    lot, and it is the honest measure of how coupled this was.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.
+    """
+    if (
+        geometry_mode == "isoparametric"
+        and form.weak_form is not None
+        and use_tensor_product_geometry
+    ):
+        lines.append("")
+        lines.extend(
+            tensor_product_gradient_isoparametric_geometry_lines(
+                dim=dim,
+                n_shape=n_nodes,
+                n_qp=quadrature_rule.n_qp,
+                local_prefix=local_prefix,
+                coordinate_streams="block_coordinate_data",
+                contiguous_coordinate_streams=True,
+                adjugate_target=lambda component, index: (
+                    "block_jacobian_adjugate%d[%s]" % (component, index)
+                ),
+                determinant_target=lambda index: (
+                    "block_jacobian_determinant0[%s]" % index
+                ),
+                adjugate_streams=tuple(
+                    "block_jacobian_adjugate%d" % component
+                    for component in range(dim * dim)
+                ),
+                determinant_stream="block_jacobian_determinant0",
+                shape_name=tensor_shape_name,
+                grad_name=tensor_grad_name,
+            )
+        )
+    elif geometry_mode == "isoparametric" and form.weak_form is not None:
+        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
+        if use_tensor_product_geometry:
+            lines.extend(_tensor_product_q_index_lines(dim, "            "))
+        lines.extend(
+            _sfem_soa_isoparametric_geometry_lines(
+                dim,
+                n_nodes,
+                quadrature_rule,
+                use_tensor_product_geometry,
+                use_reference_gradient_vectors,
+                reference_inputs,
+                q_major=form.weak_form is not None,
+                reference_prefix=reference_prefix,
+                source_builder=source_builder,
+                coordinate_streams=coordinate_streams_name,
+            )
+        )
+        lines.append("        }")
+    elif geometry_mode == "isoparametric":
+        lines.extend(
+            _sfem_soa_isoparametric_geometry_lines(
+                dim,
+                n_nodes,
+                quadrature_rule,
+                use_tensor_product_geometry,
+                use_reference_gradient_vectors,
+                reference_inputs,
+                False,
+                reference_prefix=reference_prefix,
+                source_builder=source_builder,
+                coordinate_streams=coordinate_streams_name,
+            )
+        )
+    elif geometry_mode == "affine":
+        lines.extend(
+            _sfem_soa_affine_geometry_stream_lines(
+                source_builder,
+                element_inputs,
+                "        ",
+            )
+        )
+
+
+def _append_mesh_operator_compact_stream_buffers(
+    geometry_mode,
+    lines,
+    omit_reference_basis_inputs,
+    prefix,
+    quadrature_rule,
+    reference_inputs,
+    use_reference_gradient_vectors,
+    use_tensor_product_reference,
+):
+    """The compacted stream buffers a mesh operator stages into.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.
+    """
+    lines.extend(
+        _sfem_soa_mesh_reference_alias_lines(
+            prefix,
+            quadrature_rule,
+            reference_inputs,
+            use_tensor_product_reference,
+            use_reference_gradient_vectors,
+            geometry_mode,
+            emit_reference_basis=(
+                not omit_reference_basis_inputs or geometry_mode == "isoparametric"
+            ),
+        )
+    )
+
+
+def _append_mesh_operator_stream_buffer_views(
+    compact_stream_buffers,
+    dim,
+    form,
+    lines,
+    n_nodes,
+    source_builder,
+    uses_current,
+    uses_direction,
+    work_item,
+):
+    """The per-element views a compacted stream layout is read through.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.
+    """
+    if compact_stream_buffers:
+        if uses_current:
+            lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(dim)))
+        if uses_direction:
+            lines.append("        const scalar_t *const h_components[DIM] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(dim)))
+        lines.extend(
+            [
+                "",
+            ]
+        )
+        lines.extend(
+            [
+                "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                "            for (int d = 0; d < DIM; ++d) {",
+                *_work_item_loop_lines(source_builder, "                "),
+                "                    const idx_t node = ev[shape * VECTOR_SIZE + %s];" % work_item,
+            ]
+        )
+        if uses_current:
+            lines.append("                    block_u_data[shape * DIM + d][%s] = u_components[d][node * u_stride];" % work_item)
+        if uses_direction:
+            lines.append("                    block_h_data[shape * DIM + d][%s] = h_components[d][node * h_stride];" % work_item)
+        lines.extend(["                }", "            }", "        }"])
+        if not writes_per_shape(form):
+            lines.extend(_work_item_loop_lines(source_builder, "        "))
+            lines.extend(["            block_value[%s] = scalar_t(0);" % work_item, "        }"])
+        else:
+            lines.extend(
+                [
+                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
+                    *_work_item_loop_lines(source_builder, "            "),
+                    "                block_out_data[stream][%s] = scalar_t(0);" % work_item,
+                    "            }",
+                    "        }",
+                ]
+            )
+    else:
+        lines.extend([""])
+        lines.extend(_work_item_loop_lines(source_builder, "        "))
+        for shape in range(n_nodes):
+            for d in range(dim):
+                component = _component_name(d)
+                if uses_current:
+                    lines.append(
+                        "            block_u%s%d[%s] = u%s[ev[%d * VECTOR_SIZE + %s] * u_stride];"
+                        % (component, shape, work_item, component, shape, work_item)
+                    )
+                if uses_direction:
+                    lines.append(
+                        "            block_h%s%d[%s] = h%s[ev[%d * VECTOR_SIZE + %s] * h_stride];"
+                        % (component, shape, work_item, component, shape, work_item)
+                    )
+        for stream in _output_stream_names(form, dim, n_nodes):
+            lines.append("            block_%s[%s] = scalar_t(0);" % (stream, work_item))
+        lines.append("        }")
+
+
+def _append_mesh_operator_isoparametric_jacobian(
+    compact_coordinate_buffers,
+    dim,
+    geometry_mode,
+    identity_stream_shape_order,
+    lines,
+    n_nodes,
+    source_builder,
+    work_item,
+):
+    """The Jacobian an isoparametric element builds from its coordinates.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.
+    """
+    if geometry_mode == "isoparametric":
+        if compact_coordinate_buffers:
+            lines.append("        const geometry_t *const coordinate_components[DIM] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
+            lines.extend(
+                [
+                    "",
+                    "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
+                    *([] if identity_stream_shape_order else ["            const idx_t *const SFEM_RESTRICT coordinate_element_shape = coordinate_elements[shape];"]),
+                    "            for (int d = 0; d < DIM; ++d) {",
+                    *_work_item_loop_lines(source_builder, "                "),
+                    "                    block_coordinate_data[shape * DIM + d][%s] = coordinate_components[d][%s];"
+                    % (
+                        work_item,
+                        "ev[shape * VECTOR_SIZE + %s]" % work_item
+                        if identity_stream_shape_order
+                        else "coordinate_element_shape[evbegin + %s]" % work_item,
+                    ),
+                    "                }",
+                    "            }",
+                    "        }",
+                ]
+            )
+        else:
+            lines.extend([""])
+            lines.extend(_work_item_loop_lines(source_builder, "        "))
+            for shape in range(n_nodes):
+                for d in range(dim):
+                    stream = "%s%d" % (_component_name(d), shape)
+                    lines.append(
+                        "            block_%s[%s] = %s[ev[%d * VECTOR_SIZE + %s]];"
+                        % (stream, work_item, _component_name(d), shape, work_item)
+                    )
+            lines.append("        }")
+
+
+def _append_mesh_operator_packed_entry_points(
+    block_name,
+    dim,
+    effective_vector_size,
+    form,
+    function_name,
+    geometry_mode,
+    identity_stream_shape_order,
+    lines,
+    local_prefix,
+    material_parameter_names,
+    n_nodes,
+    n_qp,
+    omit_reference_basis_inputs,
+    prefix,
+    quadrature_rule,
+    reference_inputs,
+    source_builder,
+    stream_shape_order,
+    use_reference_gradient_vectors,
+    use_tensor_product_geometry,
+    use_tensor_product_reference,
+    uses_current,
+    uses_direction,
+):
+    """The packed entry points a 1- or 2-form additionally publishes.
+
+    Lifted out of `_sfem_soa_mesh_operator_function` unchanged.
+    """
+    if form.name in ("gradient", "apply"):
+        lines.extend(
+            _sfem_soa_packed_apply_public_wrappers(
+                function_name=function_name,
+                form_name=form.name,
+                dim=dim,
+                n_nodes=n_nodes,
+                n_qp=n_qp,
+                prefix=prefix,
+                local_prefix=local_prefix,
+                block_name=block_name,
+                quadrature_rule=quadrature_rule,
+                reference_inputs=reference_inputs,
+                use_tensor_product_reference=use_tensor_product_reference,
+                use_tensor_product_geometry=use_tensor_product_geometry,
+                use_reference_gradient_vectors=use_reference_gradient_vectors,
+                omit_reference_basis_inputs=omit_reference_basis_inputs,
+                stream_shape_order=stream_shape_order,
+                identity_stream_shape_order=identity_stream_shape_order,
+                vector_size=effective_vector_size,
+                geometry_mode=geometry_mode,
+                uses_current=uses_current,
+                uses_direction=uses_direction,
+                material_parameter_names=material_parameter_names,
+                source_builder=source_builder,
+            )
+        )
+
+
 def _sfem_soa_mesh_operator_function(
     form,
     prefix,
@@ -3868,18 +4176,15 @@ def _sfem_soa_mesh_operator_function(
     tensor_grad_name = "%sgrad_1d" % reference_prefix
     tensor_weight_name = "%sq_weight_1d" % reference_prefix
     scalar_weight_name = "%sq_weight" % reference_prefix
-    lines.extend(
-        _sfem_soa_mesh_reference_alias_lines(
-            prefix,
-            quadrature_rule,
-            reference_inputs,
-            use_tensor_product_reference,
-            use_reference_gradient_vectors,
-            geometry_mode,
-            emit_reference_basis=(
-                not omit_reference_basis_inputs or geometry_mode == "isoparametric"
-            ),
-        )
+    _append_mesh_operator_compact_stream_buffers(
+        geometry_mode,
+        lines,
+        omit_reference_basis_inputs,
+        prefix,
+        quadrature_rule,
+        reference_inputs,
+        use_reference_gradient_vectors,
+        use_tensor_product_reference,
     )
     if use_tensor_product_reference:
         lines.extend(
@@ -3934,95 +4239,28 @@ def _sfem_soa_mesh_operator_function(
         ]
     )
 
-    if geometry_mode == "isoparametric":
-        if compact_coordinate_buffers:
-            lines.append("        const geometry_t *const coordinate_components[DIM] = {%s};" % ", ".join(_component_name(d) for d in range(dim)))
-            lines.extend(
-                [
-                    "",
-                    "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
-                    *([] if identity_stream_shape_order else ["            const idx_t *const SFEM_RESTRICT coordinate_element_shape = coordinate_elements[shape];"]),
-                    "            for (int d = 0; d < DIM; ++d) {",
-                    *_work_item_loop_lines(source_builder, "                "),
-                    "                    block_coordinate_data[shape * DIM + d][%s] = coordinate_components[d][%s];"
-                    % (
-                        work_item,
-                        "ev[shape * VECTOR_SIZE + %s]" % work_item
-                        if identity_stream_shape_order
-                        else "coordinate_element_shape[evbegin + %s]" % work_item,
-                    ),
-                    "                }",
-                    "            }",
-                    "        }",
-                ]
-            )
-        else:
-            lines.extend([""])
-            lines.extend(_work_item_loop_lines(source_builder, "        "))
-            for shape in range(n_nodes):
-                for d in range(dim):
-                    stream = "%s%d" % (_component_name(d), shape)
-                    lines.append(
-                        "            block_%s[%s] = %s[ev[%d * VECTOR_SIZE + %s]];"
-                        % (stream, work_item, _component_name(d), shape, work_item)
-                    )
-            lines.append("        }")
+    _append_mesh_operator_isoparametric_jacobian(
+        compact_coordinate_buffers,
+        dim,
+        geometry_mode,
+        identity_stream_shape_order,
+        lines,
+        n_nodes,
+        source_builder,
+        work_item,
+    )
 
-    if compact_stream_buffers:
-        if uses_current:
-            lines.append("        const scalar_t *const u_components[DIM] = {%s};" % ", ".join("u%s" % _component_name(d) for d in range(dim)))
-        if uses_direction:
-            lines.append("        const scalar_t *const h_components[DIM] = {%s};" % ", ".join("h%s" % _component_name(d) for d in range(dim)))
-        lines.extend(
-            [
-                "",
-            ]
-        )
-        lines.extend(
-            [
-                "        for (int shape = 0; shape < N_SHAPE; ++shape) {",
-                "            for (int d = 0; d < DIM; ++d) {",
-                *_work_item_loop_lines(source_builder, "                "),
-                "                    const idx_t node = ev[shape * VECTOR_SIZE + %s];" % work_item,
-            ]
-        )
-        if uses_current:
-            lines.append("                    block_u_data[shape * DIM + d][%s] = u_components[d][node * u_stride];" % work_item)
-        if uses_direction:
-            lines.append("                    block_h_data[shape * DIM + d][%s] = h_components[d][node * h_stride];" % work_item)
-        lines.extend(["                }", "            }", "        }"])
-        if not writes_per_shape(form):
-            lines.extend(_work_item_loop_lines(source_builder, "        "))
-            lines.extend(["            block_value[%s] = scalar_t(0);" % work_item, "        }"])
-        else:
-            lines.extend(
-                [
-                    "        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {",
-                    *_work_item_loop_lines(source_builder, "            "),
-                    "                block_out_data[stream][%s] = scalar_t(0);" % work_item,
-                    "            }",
-                    "        }",
-                ]
-            )
-    else:
-        lines.extend([""])
-        lines.extend(_work_item_loop_lines(source_builder, "        "))
-        for shape in range(n_nodes):
-            for d in range(dim):
-                component = _component_name(d)
-                if uses_current:
-                    lines.append(
-                        "            block_u%s%d[%s] = u%s[ev[%d * VECTOR_SIZE + %s] * u_stride];"
-                        % (component, shape, work_item, component, shape, work_item)
-                    )
-                if uses_direction:
-                    lines.append(
-                        "            block_h%s%d[%s] = h%s[ev[%d * VECTOR_SIZE + %s] * h_stride];"
-                        % (component, shape, work_item, component, shape, work_item)
-                    )
-        for stream in _output_stream_names(form, dim, n_nodes):
-            lines.append("            block_%s[%s] = scalar_t(0);" % (stream, work_item))
-        lines.append("        }")
+    _append_mesh_operator_stream_buffer_views(
+        compact_stream_buffers,
+        dim,
+        form,
+        lines,
+        n_nodes,
+        source_builder,
+        uses_current,
+        uses_direction,
+        work_item,
+    )
 
     _append_mesh_operator_stream_arrays(
         lines,
@@ -4045,77 +4283,24 @@ def _sfem_soa_mesh_operator_function(
                 % _tensor_product_quadrature_weight_expr(dim, tensor_weight_name)
             )
 
-    if (
-        geometry_mode == "isoparametric"
-        and form.weak_form is not None
-        and use_tensor_product_geometry
-    ):
-        lines.append("")
-        lines.extend(
-            tensor_product_gradient_isoparametric_geometry_lines(
-                dim=dim,
-                n_shape=n_nodes,
-                n_qp=quadrature_rule.n_qp,
-                local_prefix=local_prefix,
-                coordinate_streams="block_coordinate_data",
-                contiguous_coordinate_streams=True,
-                adjugate_target=lambda component, index: (
-                    "block_jacobian_adjugate%d[%s]" % (component, index)
-                ),
-                determinant_target=lambda index: (
-                    "block_jacobian_determinant0[%s]" % index
-                ),
-                adjugate_streams=tuple(
-                    "block_jacobian_adjugate%d" % component
-                    for component in range(dim * dim)
-                ),
-                determinant_stream="block_jacobian_determinant0",
-                shape_name=tensor_shape_name,
-                grad_name=tensor_grad_name,
-            )
-        )
-    elif geometry_mode == "isoparametric" and form.weak_form is not None:
-        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "        ")])
-        if use_tensor_product_geometry:
-            lines.extend(_tensor_product_q_index_lines(dim, "            "))
-        lines.extend(
-            _sfem_soa_isoparametric_geometry_lines(
-                dim,
-                n_nodes,
-                quadrature_rule,
-                use_tensor_product_geometry,
-                use_reference_gradient_vectors,
-                reference_inputs,
-                q_major=form.weak_form is not None,
-                reference_prefix=reference_prefix,
-                source_builder=source_builder,
-                coordinate_streams=coordinate_streams_name,
-            )
-        )
-        lines.append("        }")
-    elif geometry_mode == "isoparametric":
-        lines.extend(
-            _sfem_soa_isoparametric_geometry_lines(
-                dim,
-                n_nodes,
-                quadrature_rule,
-                use_tensor_product_geometry,
-                use_reference_gradient_vectors,
-                reference_inputs,
-                False,
-                reference_prefix=reference_prefix,
-                source_builder=source_builder,
-                coordinate_streams=coordinate_streams_name,
-            )
-        )
-    elif geometry_mode == "affine":
-        lines.extend(
-            _sfem_soa_affine_geometry_stream_lines(
-                source_builder,
-                element_inputs,
-                "        ",
-            )
-        )
+    _append_mesh_operator_isoparametric_flux(
+        coordinate_streams_name,
+        dim,
+        element_inputs,
+        form,
+        geometry_mode,
+        lines,
+        local_prefix,
+        n_nodes,
+        quadrature_rule,
+        reference_inputs,
+        reference_prefix,
+        source_builder,
+        tensor_grad_name,
+        tensor_shape_name,
+        use_reference_gradient_vectors,
+        use_tensor_product_geometry,
+    )
 
     call_args = ["nelems"]
     if form.weak_form is not None:
@@ -4227,33 +4412,31 @@ def _sfem_soa_mesh_operator_function(
                 "",
             ]
         )
-    if form.name in ("gradient", "apply"):
-        lines.extend(
-            _sfem_soa_packed_apply_public_wrappers(
-                function_name=function_name,
-                form_name=form.name,
-                dim=dim,
-                n_nodes=n_nodes,
-                n_qp=n_qp,
-                prefix=prefix,
-                local_prefix=local_prefix,
-                block_name=block_name,
-                quadrature_rule=quadrature_rule,
-                reference_inputs=reference_inputs,
-                use_tensor_product_reference=use_tensor_product_reference,
-                use_tensor_product_geometry=use_tensor_product_geometry,
-                use_reference_gradient_vectors=use_reference_gradient_vectors,
-                omit_reference_basis_inputs=omit_reference_basis_inputs,
-                stream_shape_order=stream_shape_order,
-                identity_stream_shape_order=identity_stream_shape_order,
-                vector_size=effective_vector_size,
-                geometry_mode=geometry_mode,
-                uses_current=uses_current,
-                uses_direction=uses_direction,
-                material_parameter_names=material_parameter_names,
-                source_builder=source_builder,
-            )
-        )
+    _append_mesh_operator_packed_entry_points(
+        block_name,
+        dim,
+        effective_vector_size,
+        form,
+        function_name,
+        geometry_mode,
+        identity_stream_shape_order,
+        lines,
+        local_prefix,
+        material_parameter_names,
+        n_nodes,
+        n_qp,
+        omit_reference_basis_inputs,
+        prefix,
+        quadrature_rule,
+        reference_inputs,
+        source_builder,
+        stream_shape_order,
+        use_reference_gradient_vectors,
+        use_tensor_product_geometry,
+        use_tensor_product_reference,
+        uses_current,
+        uses_direction,
+    )
     return lines
 
 
