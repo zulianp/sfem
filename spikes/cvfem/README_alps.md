@@ -1854,3 +1854,52 @@ one:
 
 The gate should be re-run above the knee once Phase 1 lands, since Phase 1 changes the
 assembly cost that currently dominates this measurement.
+
+## Can the coarsest level be assembled directly instead of probed?
+
+`hessian_bsr` refuses on the semi-structured path but works on an unstructured level, so the
+coarsest level could be assembled outright and the last remaining probe dropped. That trades
+a Galerkin operator for a rediscretised one, and the proposal was that projecting the
+velocity and pressure properly -- an L2 projection rather than the partition-of-unity average
+used now -- would make the rediscretised operator good enough.
+
+The gap narrows as the coarse mesh resolves, which is the right trend:
+
+| coarsest | raw gap (ux) | best-fit scale | after-scale (ux) | after-scale (p) |
+|----------|--------------|----------------|------------------|-----------------|
+| 81 nodes   | 13.86 | -0.007 | 0.995 | 0.870 |
+| 425 nodes  |  3.49 |  0.074 | 0.964 | 0.634 |
+| 2673 nodes |  1.42 |  0.336 | 0.805 | 0.628 |
+
+At 81 nodes the two operators are nearly orthogonal, which is no surprise: a rediscretised
+Navier-Stokes operator on 81 nodes is a different problem, not a coarse version of the same
+one. By 2673 nodes the raw gap has fallen tenfold and the correlation has risen to a third.
+
+### The state is not what separates them
+
+`SFEM_GMG_CONST_STATE=1` gives every level the same constant field. Averaging and an L2
+projection reproduce a constant identically, so the two operators are then evaluated at
+genuinely the same state and the state is eliminated as a variable:
+
+| coarsest | after-scale ux (real state -> constant) | after-scale p (real -> constant) |
+|----------|------------------------------------------|----------------------------------|
+| 81 nodes   | 0.995 -> 0.955 | 0.870 -> 0.870 |
+| 425 nodes  | 0.964 -> 0.602 | 0.634 -> 0.634 |
+| 2673 nodes | 0.805 -> 0.735 | 0.628 -> 0.628 |
+
+**The pressure figures do not move at all.** They are identical to four digits, which is what
+they must be if the cause is the discretisation: Rhie-Chow's `Df = rc h^2 / (2 mu)`, the
+pressure Laplacian and the divergence block are all state-free, and only momentum convection
+depends on the state. That the numbers are bit-identical is also a check that the diagnostic
+is measuring what it claims.
+
+Velocity does improve -- 0.964 to 0.602 at 425 nodes -- so part of that gap really is the
+state, and a better projection would recover it. But even with a perfect, exactly
+representable state the velocity operators still differ by 60 to 90 percent after optimal
+per-component rescaling.
+
+So the answer is no, on this evidence. An L2 projection is worth having on its own merits,
+since it would sharpen the coarse operator's convective coefficients, but it cannot make
+direct assembly a substitute for Galerkin here: most of the disagreement, and all of the
+pressure disagreement, is in the discretisation rather than in the state. The probe at the
+first coarse level stays, and its cost is now 108 operator applications rather than 10,692.

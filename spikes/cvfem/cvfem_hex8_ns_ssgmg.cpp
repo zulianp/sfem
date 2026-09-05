@@ -1448,6 +1448,26 @@ namespace {
 
     void refresh_gmg(GmgLevels &g) {
         const int nlevels = (int)g.ops.size();
+
+        // SFEM_GMG_CONST_STATE=1: a diagnostic that removes the state transfer as a
+        // variable. Every level is given the *same* constant field, which averaging and an
+        // L2 projection reproduce identically, so a directly-assembled coarse operator and
+        // the Galerkin one are then evaluated at genuinely the same state. Whatever gap
+        // survives is the discretisation, not the state -- which is the thing an L2
+        // projection could and could not fix, respectively.
+        if (smesh::Env::read<int>("SFEM_GMG_CONST_STATE", 0)) {
+            const real_t cu = smesh::Env::read<real_t>("SFEM_GMG_CONST_U", real_t(1));
+            for (int i = 0; i < nlevels; ++i) {
+                const ptrdiff_t nd = g.data->functions[i]->space()->n_dofs();
+                real_t *const   xs = g.states[i]->data();
+                for (ptrdiff_t k = 0; k < nd; k += N_FIELDS) {
+                    xs[k + 0] = cu;
+                    xs[k + 1] = 0;
+                    xs[k + 2] = 0;
+                    xs[k + 3] = 0;
+                }
+            }
+        } else
         for (int i = 1; i < nlevels; ++i) {
             g.data->restrictions[i - 1]->apply(g.states[i - 1]->data(), g.states[i]->data());
 
