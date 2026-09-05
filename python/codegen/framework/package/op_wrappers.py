@@ -3529,6 +3529,7 @@ def _coupled_energy_residual_op(
 #include <algorithm>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 %(declaration_block)s
 
@@ -3801,50 +3802,6 @@ namespace sfem {
         });
     }
 
-    int %(op)s::value(const real_t *state, real_t *const out) {
-        SFEM_TRACE_SCOPE("%(op)s::value");
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        *out = 0;
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const ptrdiff_t nelements = domain.block->n_elements();
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
-                        domain.user_data);
-                if (!jacobian) {
-                    SFEM_ERROR("%(op)s affine objective requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
-            }
-            std::fill(impl_->element_values.get(),
-                      impl_->element_values.get() + nelements,
-                      0);
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters, storage);
-            int status = SFEM_FAILURE;
-            switch (domain.element_type) {
-%(objective_cases)s
-                default:
-                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
-            if (status != SFEM_SUCCESS) return status;
-            real_t sum = 0;
-#pragma omp simd reduction(+ : sum)
-            for (ptrdiff_t element = 0; element < nelements; ++element) {
-                sum += impl_->element_values[element];
-            }
-            *out += sum;
-            return SFEM_SUCCESS;
-        });
-    }
 %(value_steps_method)s
     void %(op)s::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
@@ -3990,9 +3947,7 @@ namespace sfem {
         "gradient_cases": "\n".join(cases["gradient"]),
         "apply_cases": "\n".join(cases["apply"]),
         "objective_cases": "\n".join(cases["objective"]),
-        "value_steps_method": _coupled_value_steps_method(
-            material.op_name, cases["objective_steps"]
-        ),
+        "value_steps_method": _coupled_value_steps_method(material.op_name, ()),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
             "gradient_uses_affine",
@@ -4009,14 +3964,10 @@ namespace sfem {
             owner="ret->impl_",
         ),
     }
-    return (
-        _header(
-            material,
-            True,
-            publishes_value_steps=bool(cases["objective_steps"]),
-        ),
-        source,
-    )
+    # A coupled Op always publishes the line-search 0-form: its merit is built
+    # from `gradient`, which every operator has, rather than from the energy
+    # block's objective kernels.
+    return _header(material, True, publishes_value_steps=True), source
 
 
 def _coupled_dependency_flags(systems_by_dim, energy_name, residual_name):
@@ -4069,21 +4020,28 @@ def _coupled_apply_state_check(op_name, uses_current, uses_previous):
 
 
 def _coupled_value_steps_method(op_name, objective_steps_cases):
-    """The line-search 0-form for a coupled Op, or nothing if it has no kernel.
+    """The 0-form of a mixed energy/residual system: one residual merit.
 
-    This is `value` with two changes.  The scratch buffer holds `nsteps` values
-    per element rather than one, so it is grown here rather than sized once at
-    initialize; and the reduction runs per step, because the kernel has laid
-    the steps out contiguously -- step-major, `nelements` apart -- so that the
-    element loop visits the mesh once for all of them.
+    A material that declares both an energy and a residual has, in general, no
+    potential: if the residual is not the gradient of anything -- a Kelvin-Voigt
+    viscous term is the case that matters -- then neither is the sum of it and
+    the energy's gradient.  So the system's 0-form is the merit over its
+    assembled residual, `1/2 * ||R||^2`.
 
-    That is the whole point of the pattern: a Newton line search asks for the
-    energy at several trial step lengths, and evaluating them together reuses
-    each element's geometry and coefficients instead of re-reading the mesh
-    once per candidate.
+    The part worth stating plainly is what happens to the energy.  It does not
+    contribute its potential to this, and a potential is never added to a norm:
+    those are different kinds of quantity and their sum means nothing.  The
+    energy contributes its *gradient*, which is already one of the two terms
+    this operator's `gradient` accumulates.  So the merit is computed for the
+    whole system including the part that would otherwise supply an energy, and
+    the elastic objective kernels play no role in it.
+
+    That is also why this needs no kernel of its own.  `gradient` already
+    computes `R = grad(E) + R_residual`; the merit is one dot product over the
+    degrees of freedom once it has.  A step of length alpha is evaluated by
+    forming `x + alpha * h` and asking for the gradient there, which is the
+    same traversal the Newton iteration performs anyway.
     """
-    if not objective_steps_cases:
-        return ""
     return """
     int %(op)s::value_steps(const real_t *state,
                             const real_t *h,
@@ -4091,61 +4049,43 @@ def _coupled_value_steps_method(op_name, objective_steps_cases):
                             const real_t *const steps,
                             real_t *const out) {
         SFEM_TRACE_SCOPE("%(op)s::value_steps");
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
         if (nsteps <= 0) {
             return SFEM_SUCCESS;
         }
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const ptrdiff_t nelements = domain.block->n_elements();
-            const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
-                        domain.user_data);
-                if (!jacobian) {
-                    SFEM_ERROR("%(op)s affine objective_steps requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
+        const ptrdiff_t ndofs = n_dofs_domain();
+        std::vector<real_t> stepped(ndofs);
+        std::vector<real_t> residual(ndofs);
+        for (int step = 0; step < nsteps; ++step) {
+            const real_t alpha = steps[step];
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                stepped[i] = state[i] + alpha * h[i];
             }
-            if (nvalues > impl_->element_capacity) {
-                impl_->element_values.reset(new real_t[nvalues]);
-                impl_->element_capacity = nvalues;
+            std::fill(residual.begin(), residual.end(), real_t(0));
+            const int status = gradient(stepped.data(), residual.data());
+            if (status != SFEM_SUCCESS) {
+                return status;
             }
-            std::fill(impl_->element_values.get(),
-                      impl_->element_values.get() + nvalues,
-                      real_t(0));
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters, storage);
-            int status = SFEM_FAILURE;
-            switch (domain.element_type) {
-%(objective_steps_cases)s
-                default:
-                    SFEM_ERROR("%(op)s does not support element type %%d\\n",
-                               domain.element_type);
-                    return SFEM_FAILURE;
-            }
-            if (status != SFEM_SUCCESS) return status;
-            for (int step = 0; step < nsteps; ++step) {
-                real_t sum = 0;
+            real_t sum = 0;
 #pragma omp simd reduction(+ : sum)
-                for (ptrdiff_t element = 0; element < nelements; ++element) {
-                    sum += impl_->element_values[(ptrdiff_t)step * nelements + element];
-                }
-                out[step] += sum;
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                sum += residual[i] * residual[i];
             }
-            return SFEM_SUCCESS;
-        });
+            out[step] += real_t(0.5) * sum;
+        }
+        return SFEM_SUCCESS;
     }
-""" % {
-        "op": op_name,
-        "objective_steps_cases": "\n".join(objective_steps_cases),
+
+    int %(op)s::value(const real_t *state, real_t *const out) {
+        SFEM_TRACE_SCOPE("%(op)s::value");
+        // One step of length zero: `state + 0 * h` is `state` exactly, so the
+        // increment is unused and `state` can stand in for it.  One
+        // implementation, so the two cannot disagree.
+        const real_t objective_step = 0;
+        *out = 0;
+        return value_steps(state, state, 1, &objective_step, out);
     }
+""" % {"op": op_name}
+
 
 def _coupled_cases(
     material,
