@@ -867,6 +867,90 @@ namespace {
         std::printf("\n");
     }
 
+    // Exact coarse solve by dense LU.
+    //
+    // The coarsest level is solved, not smoothed, so the cycle takes its answer at face
+    // value and an iterative method that fails there poisons everything above it. Measured
+    // at N=2, L=16: BiCGStab on the 81-node coarsest operator diverges outright, its
+    // residual going from 1.577 to 36066 over a hundred iterations, and it then returns
+    // that amplified vector as the coarse-grid correction. The V-cycle amplified by 1e6 to
+    // 1e9 per cycle, FGMRES could not converge, and Newton stepped from a badly solved
+    // system to an answer three orders of magnitude wrong.
+    //
+    // At this size the question should not be asked of an iterative solver at all. The
+    // coarsest level here is a few hundred unknowns and already stored dense, so a
+    // factorisation is both exact and cheap, and it cannot diverge. The matrix is recovered
+    // by applying the operator to unit vectors, which costs n small matrix-vector products
+    // once per Newton step.
+    class DenseLU final : public sfem::Operator<real_t> {
+    public:
+        DenseLU(const ptrdiff_t n, std::vector<real_t> a) : n_(n), a_(std::move(a)), piv_((size_t)n) {
+            for (ptrdiff_t i = 0; i < n_; ++i) piv_[(size_t)i] = i;
+            for (ptrdiff_t k = 0; k < n_; ++k) {
+                ptrdiff_t p = k;
+                real_t    m = std::fabs(a_[(size_t)k * n_ + k]);
+                for (ptrdiff_t i = k + 1; i < n_; ++i) {
+                    const real_t v = std::fabs(a_[(size_t)i * n_ + k]);
+                    if (v > m) { m = v; p = i; }
+                }
+                if (p != k) {
+                    for (ptrdiff_t j = 0; j < n_; ++j)
+                        std::swap(a_[(size_t)k * n_ + j], a_[(size_t)p * n_ + j]);
+                    std::swap(piv_[(size_t)k], piv_[(size_t)p]);
+                }
+                const real_t d = a_[(size_t)k * n_ + k];
+                if (std::fabs(d) < real_t(1e-300)) continue;  // singular column: leave it
+                for (ptrdiff_t i = k + 1; i < n_; ++i) {
+                    const real_t f = a_[(size_t)i * n_ + k] / d;
+                    a_[(size_t)i * n_ + k] = f;
+                    if (f == real_t(0)) continue;
+                    for (ptrdiff_t j = k + 1; j < n_; ++j)
+                        a_[(size_t)i * n_ + j] -= f * a_[(size_t)k * n_ + j];
+                }
+            }
+        }
+
+        int apply(const real_t *const b, real_t *const x) override {
+            std::vector<real_t> y((size_t)n_);
+            for (ptrdiff_t i = 0; i < n_; ++i) {
+                real_t s = b[piv_[(size_t)i]];
+                for (ptrdiff_t j = 0; j < i; ++j) s -= a_[(size_t)i * n_ + j] * y[(size_t)j];
+                y[(size_t)i] = s;
+            }
+            for (ptrdiff_t i = n_ - 1; i >= 0; --i) {
+                real_t s = y[(size_t)i];
+                for (ptrdiff_t j = i + 1; j < n_; ++j) s -= a_[(size_t)i * n_ + j] * y[(size_t)j];
+                const real_t d = a_[(size_t)i * n_ + i];
+                y[(size_t)i] = (std::fabs(d) > real_t(1e-300)) ? s / d : real_t(0);
+            }
+            for (ptrdiff_t i = 0; i < n_; ++i) x[i] += y[(size_t)i];
+            return SFEM_SUCCESS;
+        }
+
+        ptrdiff_t rows() const override { return n_; }
+        ptrdiff_t cols() const override { return n_; }
+        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+    private:
+        ptrdiff_t              n_;
+        std::vector<real_t>    a_;
+        std::vector<ptrdiff_t> piv_;
+    };
+
+    std::shared_ptr<DenseLU> make_dense_lu(const std::shared_ptr<sfem::Operator<real_t>> &op,
+                                           const ptrdiff_t                                n) {
+        std::vector<real_t> a((size_t)n * (size_t)n, real_t(0));
+        std::vector<real_t> e((size_t)n, real_t(0)), col((size_t)n, real_t(0));
+        for (ptrdiff_t j = 0; j < n; ++j) {
+            std::fill(e.begin(), e.end(), real_t(0));
+            std::fill(col.begin(), col.end(), real_t(0));
+            e[(size_t)j] = real_t(1);
+            op->apply(e.data(), col.data());
+            for (ptrdiff_t i = 0; i < n; ++i) a[(size_t)i * n + j] = col[(size_t)i];
+        }
+        return std::make_shared<DenseLU>(n, std::move(a));
+    }
+
     // Two-level coarse-grid correction, measured on one prescribed error mode.
     //
     // The cycle's rate decays to the smoother's own and the stalled residual is pressure,
@@ -1384,7 +1468,18 @@ namespace {
                                 timed("restrict", g.data->restrictions[i]));
             } else {
                 level_op_below = lop;
-                // Coarse solve. BiCGStab, not CG: the operator is not symmetric.
+                // Coarse solve. Dense LU when the level is small enough to factorise,
+                // which is exact and cannot diverge; BiCGStab otherwise, and not CG,
+                // because the operator is not symmetric.
+                const ptrdiff_t nd_coarse = fi->space()->n_dofs();
+                const ptrdiff_t lu_max    = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DENSE_LU_BELOW", 4096);
+                if (nd_coarse <= lu_max) {
+                    auto lu = make_dense_lu(lop, nd_coarse);
+                    g.mg->add_level(timed("op[coarsest]", lop), timed("coarse_solve", lu),
+                                    timed("prolong", wrap_p(i)), nullptr);
+                    continue;
+                }
+
                 auto cs = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
                 cs->set_max_it(smesh::Env::read<int>("SFEM_GMG_COARSE_MAX_IT", 200));
                 cs->set_rtol(1e-8);
