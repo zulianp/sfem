@@ -2618,8 +2618,9 @@ int main(int argc, char **argv) {
     // variable and restarts at each stage, so on its own it reports only the last stage --
     // which, after a good ramp, is the cheapest one. Printing it beside the cumulative
     // lin_it_total invited exactly the wrong reading: "3 Newton steps, 1346 linear iterations".
-    int  newton_total = 0;
-    int  stages_run   = 0;
+    int    newton_total = 0;
+    int    stages_run   = 0;
+    real_t rho_solved   = 0;  // highest rho whose stage actually converged
     bool converged    = false;
     // Set once from the first nonzero residual and kept across stages, as in the
     // standalone driver: the continuation stage and the physical stage are measured
@@ -2873,6 +2874,7 @@ int main(int argc, char **argv) {
         ++newton_total;
     }
     ++stages_run;
+    if (converged) rho_solved = std::max(rho_solved, rho_use);
     if (!converged) {
         // Roll back and halve the step in log space rather than giving up. The stage that
         // failed is retried from the last state known to be good, via an intermediate Re.
@@ -2899,11 +2901,17 @@ int main(int argc, char **argv) {
     // that stalled at Re=75 on the way to Re=200 reports the same u_linf as one that
     // arrived. Only this line distinguishes them.
     {
-        const real_t re_reached = op->rho * U * Ly / std::max(mu, real_t(1e-30));
-        const bool   at_target  = std::fabs(re_reached - Re_phys) <= real_t(1e-6) * Re_phys;
-        std::printf("continuation: reached Re = %g of %g target  %s\n",
-                    (double)re_reached, (double)Re_phys,
-                    at_target ? "(AT TARGET)" : "(STALLED SHORT OF TARGET)");
+        // Report the highest Re whose stage actually CONVERGED, not the last one attempted.
+        //
+        // The first version of this printed op->rho, i.e. wherever the ramp had got to, and so
+        // announced "reached Re = 1000 of 1000 (AT TARGET)" for a run that tried Re=1000 four
+        // times, failed every time, and whose solution had blown up to u_linf 3.4e+06. The
+        // highest Re it had actually solved was 843.
+        const real_t re_solved = rho_solved * U * Ly / std::max(mu, real_t(1e-30));
+        const bool   at_target = rho_solved > 0 && std::fabs(re_solved - Re_phys) <= real_t(1e-6) * Re_phys;
+        std::printf("continuation: highest Re SOLVED = %g of %g target  %s\n",
+                    (double)re_solved, (double)Re_phys,
+                    at_target ? "(AT TARGET)" : "(SHORT OF TARGET)");
         if (!at_target) converged = false;
     }
     std::printf("newton_converged: %d  newton_it: %d (last stage)  newton_total: %d over %d stage(s)  "
