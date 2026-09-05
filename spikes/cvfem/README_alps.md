@@ -1903,3 +1903,56 @@ since it would sharpen the coarse operator's convective coefficients, but it can
 direct assembly a substitute for Galerkin here: most of the disagreement, and all of the
 pressure disagreement, is in the discretisation rather than in the state. The probe at the
 first coarse level stays, and its cost is now 108 operator applications rather than 10,692.
+
+## Element-wise Galerkin: assembling the coarse operator inside the macro element
+
+The last probe survives only because the fine operator has no matrix form. It does not need
+one. The fine operator is a sum of macro-element contributions and the prolongation's support
+is local -- a fine node interpolates only from coarse nodes of the sub-cell containing it, and
+a face node gets the same contributors from either side -- so
+
+    R A P  =  sum_e  P_e^T A_e P_e
+
+element by element, with no global matrix ever formed and nothing reaching outside a macro
+element.
+
+**The enabling property is verified, not assumed.** Element-wise Galerkin is exact only if A
+really is a sum of element operators, and Rhie-Chow couples through a *nodal* pressure
+gradient, which is not element-local -- unless it is frozen from the state rather than
+recomputed from the direction. Putting a direction on one macro element's interior and
+measuring the response outside it gives exactly zero (max |out| inside 4.2480e-02, outside
+0.0000e+00 at L=8; likewise at L=4). The frozen gradient is what makes this work, and it is
+worth knowing that changing Rhie-Chow to differentiate the pressure gradient would silently
+invalidate the construction.
+
+### Cost
+
+Per macro element, in element-kernel evaluations:
+
+| L (hop) | fine nodes | coarse/elem | global probe | local probe | local matrix |
+|---------|-----------|-------------|--------------|-------------|--------------|
+| 2  |   27 |   8 | 108 |   32 | ~1-4 |
+| 4  |  125 |  27 | 176 |  108 | ~1-4 |
+| 8  |  729 | 125 | 176 |  500 | ~1-4 |
+| 16 | 4913 | 729 | 192 | 2916 | ~1-4 |
+
+Two variants. *Local probing* -- applying the element kernel to each local coarse basis
+function -- only beats global probing for shallow lattices, and is three times worse at L=8.
+*Local matrix* -- assembling the macro element's own sparse operator once on its lattice
+stencil and then doing a small triple product -- wins everywhere, and turns assembly from
+108-192 global operator applications into something comparable to a single one.
+
+The local matrix is transient, one per element or per thread: 729 blocks and 0.09 MiB at
+L=2, 19,683 and 2.40 MiB at L=8, 132,651 and 16.19 MiB at L=16.
+
+### What it would need
+
+Only one new kernel: a macro-element-local assembly for the semi-structured CVFEM operator.
+The per-micro-cell Jacobian entries already exist -- the unstructured path assembles them
+into a global BSR -- so the work is scattering them into a lattice-local structure instead of
+into the global matrix. Everything else is in place: the structured prolongation gives P_e
+directly, and the deterministic two-pass scatter already built for the operator kernels is
+exactly what accumulates the local contributions into the coarse BSR.
+
+It also removes the last of the machinery this section has been dismantling: no probing, no
+colouring, no sparsity pattern to derive or guess, and no global fine matrix.
