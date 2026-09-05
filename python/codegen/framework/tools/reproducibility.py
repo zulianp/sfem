@@ -947,7 +947,9 @@ def run_material(root, generated, material, refine, compiler, verbose=False, rep
     binary = os.path.join(workdir, "driver")
     optimisation = "-O3" if repeats else "-O2"
     command = (
-        [compiler, optimisation, "-std=c++17", "-o", binary, driver_path]
+        [compiler, optimisation, "-std=c++17"]
+        + (os.environ.get("SFEM_REPRODUCIBILITY_CXXFLAGS", "").split())
+        + ["-o", binary, driver_path]
         + operators
         + _include_flags(root, generated)
     )

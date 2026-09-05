@@ -1194,11 +1194,11 @@ def _sfem_soa_weak_form_block_function(
     if use_stream_arrays:
         if shared.uses_current:
             params.append(
-                "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % dim
+                "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % n_field_components
             )
         if shared.uses_direction:
             params.append(
-                "const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * %d]" % dim
+                "const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * %d]" % n_field_components
             )
         if not writes_per_shape(form):
             params.append("scalar_t *const SFEM_RESTRICT value")
@@ -1255,7 +1255,7 @@ def _sfem_soa_weak_form_block_function(
         lines.append(
             "    const scalar_t *const weak_u_streams[N_SHAPE * %d] = {%s};"
             % (
-                dim,
+                n_field_components,
                 ", ".join(
                     streams_in_shape_order(
                         _field_stream_names("u", n_field_components, n_nodes),
@@ -1269,7 +1269,7 @@ def _sfem_soa_weak_form_block_function(
         lines.append(
             "    const scalar_t *const weak_h_streams[N_SHAPE * %d] = {%s};"
             % (
-                dim,
+                n_field_components,
                 ", ".join(
                     streams_in_shape_order(
                         _field_stream_names("h", n_field_components, n_nodes),
@@ -1779,7 +1779,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
             stream_prefix,
             field,
             shape,
-            dim,
+            n_field_components,
             row,
             work_item,
         )
@@ -1984,7 +1984,7 @@ def _append_sfem_soa_weak_form_lines(
             stream_prefix,
             field,
             shape,
-            dim,
+            n_field_components,
             row,
             work_item,
         )
@@ -2131,7 +2131,7 @@ def _append_sfem_soa_weak_form_lines(
         lines.extend(_work_item_loop_lines(source_builder, "                "))
         lines.append(
             "                    %s[shape * %d + %d][%s] %s %s;"
-            % (output_streams, dim, row, work_item, op, " + ".join(terms))
+            % (output_streams, n_field_components, row, work_item, op, " + ".join(terms))
         )
         lines.append("                }")
     lines.extend(["            }", "        }"])
