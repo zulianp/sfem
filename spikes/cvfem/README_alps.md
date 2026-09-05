@@ -2181,8 +2181,8 @@ macro-element faces -- 3.38x at a level-2 coarse lattice, 1.95x at level 4, 1.42
 improving as the lattice deepens rather than worsening. What is bought is contiguous 4x4 blocks
 with no column indirection, and no global sparse structure above the coarsest level.
 
-**Measured on Grace, and it loses.** 108 macro-elements at L=8, 242,500 dofs, 72 threads, two
-Newton steps so all three arms do the same work:
+**Measured on Grace, and it loses.** 108 macro-elements at L=8 -- 60,625 nodes, **242,500
+dofs** -- on 72 Grace cores, two Newton steps so all three arms do the same work:
 
 | | probe | element-wise, assembled | element-wise, element matrices |
 |-----------------------|---------|---------|---------|
@@ -6048,10 +6048,10 @@ giving the coarse levels enough nodes to matter, changes the picture substantial
 | 2x2x2, 8 elements  | 66.6 ms | **0.56 ms** | 120x | 45.5% -> 0.2% |
 | 4x2x2, 16 elements | 72.0 ms | **0.79 ms** |  92x | 45.6% -> 0.8% |
 
-Both of those are still on 8 threads with 8 and 16 macro-elements. At saturation on Grace --
-108 macro-elements at L=8 on 72 threads -- the assembly total falls from 1.114 s to 0.030 s,
-a factor of 37, and its share of the solve from 2.9% to 0.1%, with the linear iteration count
-unchanged at 1040. The per-call figures are not comparable between the two paths any more,
+Both of those are still on 8 threads with 8 and 16 macro-elements -- 2,916 dofs -- so they are
+latencies on an under-filled machine. At saturation on Grace -- 108 macro-elements at L=8,
+**242,500 dofs**, 72 cores -- the assembly total falls from 1.114 s to 0.030 s, a factor of 37,
+and its share of the solve from 2.9% to 0.1%, with the linear iteration count unchanged at 1040. The per-call figures are not comparable between the two paths any more,
 since the element-wise path times one hierarchy build where the probe times one level.
 
 At these configurations probing is **45% of the measured phase time** and the element-wise
@@ -6089,3 +6089,39 @@ measure the object that is supposed to be equivalent -- here the cycle -- not an
 whose stopping test sits in its own noise. The block-diagonal defect above was real and is
 fixed on its own evidence (1.5e-17 now against 1.2e-2 before); attributing the Newton counts to
 it, as this note first did, was a conclusion drawn from the wrong instrument.
+
+
+### Converged solve, element-wise against the probe
+
+Full Newton to convergence on Grace: 108 macro-elements at L=4 -- 8,281 nodes, **33,124 dofs**
+-- on 72 cores. This is the first end-to-end comparison in a regime that actually converges;
+every earlier one either stagnated or was a fixed-work run stopped after two Newton steps.
+
+| | probe | element-wise |
+|---|---|---|
+| converged | yes | yes |
+| Newton steps | 27 | 32 |
+| linear iterations | 29340 | 32100 |
+| us per linear iteration | 23694 | 24239 |
+| `galerkin_assembly` | 5.008 s (0.7%) | **0.103 s (0.0%)** |
+| `t_solve` | 695.19 s | 778.07 s |
+| `u_linf` | 2.553635e-07 | 2.554991e-07 |
+| `p_linf` | 1.174712e-07 | 1.175410e-07 |
+
+Both reach the same solution, agreeing to four digits in both velocity and pressure. Assembly
+is 49x cheaper, consistent with the 37x measured at 242,500 dofs. The cost per linear iteration
+is unchanged within 2.3%, which is what the gates and the fixed-work run predicted: the
+preconditioners are equivalent, so the apply costs the same.
+
+The Newton counts differ, 32 against 27, making this solve 12% slower and swamping the 4.9 s
+the assembly saved. That is most likely trajectory divergence rather than a worse
+preconditioner -- the fixed-work run at 242,500 dofs gave *identical* iteration counts (1040
+for both), the operators agree to 2e-16 and their block diagonals to 4e-18, so a preconditioner
+difference would have shown there. Over 27-plus Newton steps at a tight tolerance two operators
+differing at round-off diverge in trajectory, and the step where the convergence test trips
+becomes somewhat arbitrary. But this is one run per arm and cannot establish that on its own;
+repeats would be needed to call the 12% noise rather than a regression.
+
+At 33,124 dofs the assembly is 0.7% of the solve, so 49x buys little end to end here. Its value
+is at the configurations where probing reached 45% of measured phases, together with the exact
+derived pattern and the bitwise reproducibility.
