@@ -14,6 +14,8 @@
 #include "cvfem_hex8_ns_op.hpp"
 #include "cvfem_fgmres.hpp"
 #include "cvfem_ss_transfer.hpp"
+
+#include "sfem_CRS_X_BSR.hpp"
 #include "cvfem_ns_channel_case.hpp"
 
 #include "sfem_API.hpp"
@@ -485,7 +487,87 @@ namespace {
         std::vector<std::shared_ptr<sfem::CVFEMNavierStokes>>  level_ops;
         std::shared_ptr<sfem::Multigrid<real_t>>               mg;
         int                                                    smoothing_steps{3};
+
+        // Transfer matrices, built once: they depend on the lattice, not the linearisation.
+        // Pmat[i] maps level i (coarse) to level i-1 (fine); Rmat[i] is its transpose.
+        using CRS_t = sfem::CRS<sfem::count_t, sfem::idx_t, real_t, real_t>;
+        using BSR_t = sfem::BSR<sfem::count_t, sfem::idx_t, real_t, real_t>;
+        std::vector<std::shared_ptr<CRS_t>> Pmat, Rmat;
+        // The assembled coarse operators, kept as matrices so the level below can be formed
+        // from the level above by a triple product instead of by probing.
+        std::vector<std::shared_ptr<BSR_t>> Amat;
     };
+
+    // Zero the source component of every block feeding a constrained dof.
+    //
+    // The grid transfers zero constrained dofs on their output, and they do it per
+    // *component* -- ux,uy,uz at a wall, not p. A scalar nodal transfer cannot express that,
+    // so R*A*P alone does not reproduce the composite the driver probes. Folding the mask
+    // into A's columns first does, exactly and in O(nnz): blocks are row-major
+    // values[a*16 + r*4 + c] with c the source component, so a constrained dof (j,c) means
+    // clearing column c of every block in block-column j.
+    std::shared_ptr<GmgLevels::BSR_t> mask_block_columns(const std::shared_ptr<GmgLevels::BSR_t> &a,
+                                                         const mask_t *const                      mask) {
+        const ptrdiff_t nbr = a->row_ptr->size() - 1;
+        auto            rp  = a->row_ptr;
+        auto            ci  = a->col_idx;
+        auto            va  = smesh::create_host_buffer<real_t>(a->values->size());
+        std::copy(a->values->data(), a->values->data() + a->values->size(), va->data());
+
+        const sfem::count_t *const rpd = rp->data();
+        const sfem::idx_t *const   cid = ci->data();
+        real_t *const              vd  = va->data();
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < nbr; ++i)
+            for (sfem::count_t k = rpd[i]; k < rpd[i + 1]; ++k) {
+                const ptrdiff_t j = cid[k];
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    if (!mask_get(j * N_FIELDS + c, mask)) continue;
+                    for (int r = 0; r < N_FIELDS; ++r) vd[(size_t)k * 16 + (size_t)r * N_FIELDS + c] = 0;
+                }
+            }
+
+        return sfem::h_bsr_spmv<sfem::count_t, sfem::idx_t, real_t, real_t>(
+                nbr, a->cols() / N_FIELDS, N_FIELDS, rp, ci, va, real_t(0));
+    }
+
+    // Apply a scalar nodal matrix to a block vector. The transfers are scalar because the
+    // interpolation is identical for all four fields; the CRS x BSR rap knows that (a scalar
+    // entry scales a whole block), but a hand composition has to spell it out.
+    void apply_scalar_to_blocks(const std::shared_ptr<GmgLevels::CRS_t> &m,
+                                const real_t *const                     in,
+                                real_t *const                           out) {
+        const ptrdiff_t nr = m->rows(), nc = m->cols();
+        std::vector<real_t> a((size_t)nc), b((size_t)nr);
+        for (int c = 0; c < N_FIELDS; ++c) {
+            for (ptrdiff_t k = 0; k < nc; ++k) a[(size_t)k] = in[k * N_FIELDS + c];
+            std::fill(b.begin(), b.end(), real_t(0));
+            m->apply(a.data(), b.data());
+            for (ptrdiff_t k = 0; k < nr; ++k) out[k * N_FIELDS + c] += b[(size_t)k];
+        }
+    }
+
+    // Identity rows for constrained dofs, searching for the diagonal rather than assuming
+    // its position -- mm emits unsorted column indices.
+    void patch_identity_rows(const std::shared_ptr<GmgLevels::BSR_t> &a, const mask_t *const mask) {
+        const ptrdiff_t            nbr = a->row_ptr->size() - 1;
+        const sfem::count_t *const rp  = a->row_ptr->data();
+        const sfem::idx_t *const   ci  = a->col_idx->data();
+        real_t *const              vd  = a->values->data();
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < nbr; ++i)
+            for (int r = 0; r < N_FIELDS; ++r) {
+                if (!mask_get(i * N_FIELDS + r, mask)) continue;
+                for (sfem::count_t k = rp[i]; k < rp[i + 1]; ++k) {
+                    const bool diag = (ci[k] == i);
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        vd[(size_t)k * 16 + (size_t)r * N_FIELDS + c] =
+                                (diag && c == r) ? real_t(1) : real_t(0);
+                }
+            }
+    }
 
     std::shared_ptr<GmgLevels> build_gmg(const std::shared_ptr<sfem::Function>       &f,
                                          const std::shared_ptr<sfem::CVFEMNavierStokes> &fine_op,
@@ -857,6 +939,49 @@ namespace {
     // linearised about a state that large is not an approximation of the fine operator at
     // all, so its correction is not a correction. Normalising by R applied to the constant
     // 1 recovers the average, which is exact for constants and leaves a smooth field alone.
+    // Transfer matrices, built once. They depend only on the lattice, so rebuilding them
+    // per Newton step -- as the probing path effectively did with its pattern and colouring
+    // -- is pure waste.
+    void build_transfer_matrices(GmgLevels &g) {
+        const int nlevels = (int)g.ops.size();
+        g.Pmat.assign((size_t)nlevels, nullptr);
+        g.Rmat.assign((size_t)nlevels, nullptr);
+        g.Amat.assign((size_t)nlevels, nullptr);
+        for (int i = 1; i < nlevels; ++i) {
+            cvfem_ss::ProlongationPattern pp;
+            cvfem_ss::build_from_spaces(g.data->functions[i]->space(), g.data->functions[i - 1]->space(), pp);
+            g.Pmat[(size_t)i] = cvfem_ss::to_crs(pp);
+            g.Rmat[(size_t)i] = g.Pmat[(size_t)i]->transpose();
+        }
+    }
+
+    // Exact probe pattern for the first coarse level, derived rather than guessed.
+    //
+    // Probing needs a sparsity pattern up front, and an entry falling outside it is folded
+    // into the wrong slot rather than dropped -- so a guess that is too narrow yields a
+    // wrong matrix, which is why the old code guessed, checked, and widened to dense. There
+    // is no need to guess: the fine operator's stencil is the fine node graph, so the
+    // pattern of R*G*P with G the graph carrying unit values is a guaranteed superset of the
+    // true Galerkin pattern (it can only over-estimate, under cancellation). Probing on a
+    // superset is correct by construction.
+    std::shared_ptr<GmgLevels::CRS_t> symbolic_rap_pattern(const std::shared_ptr<sfem::Function> &f_fine,
+                                                           const std::shared_ptr<GmgLevels::CRS_t> &R,
+                                                           const std::shared_ptr<GmgLevels::CRS_t> &P) {
+        auto            graph = f_fine->space()->node_to_node_graph();
+        const ptrdiff_t nn    = graph->rowptr()->size() - 1;
+        const ptrdiff_t nnz   = graph->rowptr()->data()[nn];
+
+        auto rp = smesh::create_host_buffer<sfem::count_t>((size_t)nn + 1);
+        auto ci = smesh::create_host_buffer<sfem::idx_t>((size_t)nnz);
+        auto va = smesh::create_host_buffer<real_t>((size_t)nnz);
+        std::copy(graph->rowptr()->data(), graph->rowptr()->data() + nn + 1, rp->data());
+        std::copy(graph->colidx()->data(), graph->colidx()->data() + nnz, ci->data());
+        std::fill(va->data(), va->data() + nnz, real_t(1));
+
+        auto G = sfem::h_crs_spmv<sfem::count_t, sfem::idx_t, real_t, real_t>(nn, nn, rp, ci, va, real_t(0));
+        return sfem::rap(R, G, P);
+    }
+
     void build_state_weights(GmgLevels &g) {
         const int nlevels = (int)g.ops.size();
         g.state_weights.assign((size_t)nlevels, {});
@@ -1115,12 +1240,15 @@ namespace {
     // graph, no node has two neighbours of the same colour, so one application per colour
     // and component reveals a whole set of blocks at once: colours x 4 applications rather
     // than one per coarse degree of freedom.
+    std::shared_ptr<GmgLevels::BSR_t> g_last_assembled;  // set by assemble_galerkin
+
     std::shared_ptr<sfem::Operator<real_t>> assemble_galerkin(const std::shared_ptr<sfem::Function>         &f_coarse,
                                                               const std::shared_ptr<sfem::Operator<real_t>> &A_above,
                                                               const std::shared_ptr<sfem::Operator<real_t>> &P,
                                                               const std::shared_ptr<sfem::Operator<real_t>> &R,
                                                               const ptrdiff_t                                n_fine,
-                                                              std::vector<real_t>                           *diag_out) {
+                                                              std::vector<real_t>                           *diag_out,
+                                                              const GmgLevels::CRS_t *const                  pattern = nullptr) {
         auto            graph = f_coarse->space()->node_to_node_graph();
         const ptrdiff_t nn    = f_coarse->space()->n_dofs() / N_FIELDS;
         const count_t *const g_rp = graph->rowptr()->data();
@@ -1156,7 +1284,15 @@ namespace {
 
         std::shared_ptr<sfem::Operator<real_t>> assembled;
         for (int attempt = 0; attempt < 3; ++attempt) {
-        build_pattern(attempt);
+        if (pattern) {
+            // Derived pattern: exact by construction, so there is nothing to retry.
+            const sfem::count_t *const prp = pattern->row_ptr->data();
+            const sfem::idx_t *const   pci = pattern->col_idx->data();
+            for (ptrdiff_t i = 0; i < nn; ++i)
+                adj[(size_t)i].assign(pci + prp[i], pci + prp[i + 1]);
+        } else {
+            build_pattern(attempt);
+        }
         std::vector<count_t> rpv((size_t)nn + 1, 0);
         for (ptrdiff_t i = 0; i < nn; ++i) rpv[(size_t)i + 1] = rpv[(size_t)i] + (count_t)adj[(size_t)i].size();
         std::vector<idx_t> civ;
@@ -1264,9 +1400,11 @@ namespace {
                                   diag_out->data() + (size_t)i * 16);
         }
 
-        assembled = sfem::h_bsr_spmv<count_t, idx_t, real_t, real_t>(nn, nn, N_FIELDS, rowptr, colidx,
-                                                                     values, real_t(0));
-        bool gate_ok = false;
+        auto assembled_bsr = sfem::h_bsr_spmv<count_t, idx_t, real_t, real_t>(nn, nn, N_FIELDS, rowptr,
+                                                                              colidx, values, real_t(0));
+        assembled          = assembled_bsr;
+        g_last_assembled   = assembled_bsr;
+        bool gate_ok       = false;
 
         // Gate: the assembled matrix must reproduce the composite R A P it was probed from.
         // Probing is only valid if every non-zero of R A P falls inside the pattern being
@@ -1296,10 +1434,11 @@ namespace {
                             gate_ok ? "OK" : "MISMATCH");
         }
 
-        if (gate_ok || attempt == 2) {
+        if (gate_ok || attempt == 2 || pattern) {
             std::printf("galerkin assembly: %td nodes, %td blocks, %d colours, %d applications%s\n",
                         nn, nnz, ncolors, ncolors * N_FIELDS,
-                        attempt == 0 ? "" : (attempt == 1 ? "  (widened pattern)" : "  (dense pattern)"));
+                        pattern ? "  (derived pattern)"
+                                : (attempt == 0 ? "" : (attempt == 1 ? "  (widened pattern)" : "  (dense pattern)")));
             return assembled;
         }
         }  // attempt
@@ -1414,9 +1553,89 @@ namespace {
 
             if (i > 0 && galerkin_mode == 2) {
                 const double t_asm = smesh::time_seconds();
-                lop                = assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
-                                                       g.data->restrictions[i - 1],
-                                                       g.data->functions[i - 1]->space()->n_dofs(), &galerkin_diag);
+
+                // Level 1 is the only level that must be probed: the operator above it is
+                // matrix-free and has no matrix form. Below that the level above IS a
+                // matrix, so the Galerkin operator is a sparse triple product -- exact
+                // sparsity, no colouring, no pattern guess, no dense fallback.
+                if (i == 1 || !g.Amat[(size_t)i - 1] || galerkin_mode != 2 ||
+                    smesh::Env::read<int>("SFEM_GMG_RAP", 1) == 0) {
+                    std::shared_ptr<GmgLevels::CRS_t> pat;
+                    if (i == 1 && g.Rmat[1] && g.Pmat[1] &&
+                        smesh::Env::read<int>("SFEM_GMG_SYMBOLIC_PATTERN", 1))
+                        pat = symbolic_rap_pattern(g.data->functions[0], g.Rmat[1], g.Pmat[1]);
+
+                    lop = assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
+                                            g.data->restrictions[i - 1],
+                                            g.data->functions[i - 1]->space()->n_dofs(), &galerkin_diag,
+                                            pat.get());
+                    g.Amat[(size_t)i] = g_last_assembled;
+                } else {
+                    const ptrdiff_t nd_up = g.data->functions[i - 1]->space()->n_dofs();
+                    std::vector<mask_t> mup(mask_count(nd_up), 0);
+                    g.data->functions[i - 1]->constraints_mask(mup.data());
+
+                    auto masked = mask_block_columns(g.Amat[(size_t)i - 1], mup.data());
+                    auto a_c    = sfem::rap(g.Rmat[(size_t)i], masked, g.Pmat[(size_t)i]);
+                    patch_identity_rows(a_c, mask.data());
+
+                    g.Amat[(size_t)i] = a_c;
+                    lop               = a_c;
+
+                    // Block diagonal for the smoother: search for the diagonal, since mm
+                    // emits unsorted column indices.
+                    galerkin_diag.assign((size_t)nn * 16, real_t(0));
+                    {
+                        const sfem::count_t *const rp = a_c->row_ptr->data();
+                        const sfem::idx_t *const   ci = a_c->col_idx->data();
+                        const real_t *const        vd = a_c->values->data();
+                        for (ptrdiff_t r = 0; r < nn; ++r)
+                            for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k)
+                                if (ci[k] == r)
+                                    std::copy(vd + (size_t)k * 16, vd + (size_t)k * 16 + 16,
+                                              galerkin_diag.data() + (size_t)r * 16);
+                    }
+
+                    if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
+                        // Same gate the probing path uses: the assembled level must
+                        // reproduce the matrix-free composite it stands for.
+                        const ptrdiff_t     ndc = nn * N_FIELDS;
+                        std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), t1((size_t)nd_up, 0),
+                                t2((size_t)nd_up, 0), yb((size_t)ndc, 0);
+                        unsigned st = 991u;
+                        for (auto &e : v) {
+                            st = st * 1103515245u + 12345u;
+                            e  = (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+                        }
+                        fi->apply_zero_constraints(v.data());
+                        a_c->apply(v.data(), ya.data());
+                        // Compose the SAME three matrices by hand. Comparing against the
+                        // matrix-free composite instead would be comparing Galerkin against
+                        // rediscretisation, which differ by construction -- that difference
+                        // is the reason this work exists. This isolates the triple product,
+                        // which is the untested part: rap has only ever been exercised at
+                        // block size 1 in this repo.
+                        apply_scalar_to_blocks(g.Pmat[(size_t)i], v.data(), t1.data());
+                        masked->apply(t1.data(), t2.data());
+                        apply_scalar_to_blocks(g.Rmat[(size_t)i], t2.data(), yb.data());
+                        // a_c carries identity rows where the coarse level is constrained,
+                        // while the raw product carries whatever R*A*P gives there. Those
+                        // rows are not part of what is being tested, so both sides are
+                        // zeroed on them. (Zeroing only the probe is not enough: the
+                        // identity reproduces the zero, the raw product does not.)
+                        fi->apply_zero_constraints(ya.data());
+                        fi->apply_zero_constraints(yb.data());
+                        real_t dn = 0, rn = 0;
+                        for (ptrdiff_t k = 0; k < ndc; ++k) {
+                            const real_t d = ya[(size_t)k] - yb[(size_t)k];
+                            dn += d * d;
+                            rn += yb[(size_t)k] * yb[(size_t)k];
+                        }
+                        const real_t rel = (rn > 0) ? std::sqrt(dn / rn) : 0.0;
+                        std::printf("rap level %d: %td blocks  vs R*(A*(P*v)) rel = %.4e  %s\n", i,
+                                    (ptrdiff_t)a_c->col_idx->size(), rel, (rel < 1e-10) ? "OK" : "MISMATCH");
+                    }
+                }
                 phase_add("galerkin_assembly", smesh::time_seconds() - t_asm);
             }
 
@@ -1801,6 +2020,7 @@ int main(int argc, char **argv) {
     if (use_gmg == 1) {  // 2 is the no-hierarchy control and must not build one
         gmg = build_gmg(f, op, xbuf, gmg_smooth);
         if (gmg) build_state_weights(*gmg);
+        if (gmg) build_transfer_matrices(*gmg);
         if (gmg && smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
             refresh_gmg(*gmg);
             if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 4) {
