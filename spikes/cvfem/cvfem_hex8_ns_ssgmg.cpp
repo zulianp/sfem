@@ -13,6 +13,7 @@
 
 #include "cvfem_hex8_ns_op.hpp"
 #include "cvfem_fgmres.hpp"
+#include "cvfem_ss_transfer.hpp"
 #include "cvfem_ns_channel_case.hpp"
 
 #include "sfem_API.hpp"
@@ -686,6 +687,50 @@ namespace {
 
             g.data->restrictions[i]->apply(fine.data(), coarse.data());
             if (g.data->prolongations[i + 1]) g.data->prolongations[i + 1]->apply(coarse.data(), back.data());
+
+            {
+                // Gate for the structured prolongation: it must reproduce the matrix-free
+                // transfer it is meant to replace. The structured form carries no values at
+                // all -- the weight is 1/nnz for a 2:1 hop -- so this also checks that the
+                // "weights are implied by row length" claim actually holds on the real
+                // numbering, not just on paper.
+                cvfem_ss::ProlongationPattern pp;
+                cvfem_ss::build_from_spaces(g.data->functions[i + 1]->space(),
+                                            g.data->functions[i]->space(), pp);
+
+                std::vector<real_t> cs((size_t)nc), ref((size_t)nf, 0), got((size_t)nf, 0);
+                unsigned            st = 4242u;
+                for (auto &v : cs) {
+                    st = st * 1103515245u + 12345u;
+                    v  = (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+                }
+
+                // The driver's prolongation is block-valued; compare one component by
+                // scattering the scalar field into that component and reading it back.
+                std::vector<real_t> cb((size_t)nc * 0 + (size_t)g.data->functions[i + 1]->space()->n_dofs(), 0);
+                std::vector<real_t> fb((size_t)g.data->functions[i]->space()->n_dofs(), 0);
+                for (ptrdiff_t k = 0; k < pp.n_coarse; ++k) cb[(size_t)k * N_FIELDS] = cs[(size_t)k];
+                if (g.data->prolongations[i + 1]) {
+                    auto praw = sfem::create_hierarchical_prolongation(g.data->functions[i + 1]->space(),
+                                                                       g.data->functions[i]->space(),
+                                                                       sfem::EXECUTION_SPACE_HOST);
+                    praw->apply(cb.data(), fb.data());
+                    for (ptrdiff_t k = 0; k < pp.n_fine; ++k) ref[(size_t)k] = fb[(size_t)k * N_FIELDS];
+
+                    cvfem_ss::apply_structured(pp, cs.data(), got.data());
+
+                    real_t dn = 0, rn = 0;
+                    for (ptrdiff_t k = 0; k < pp.n_fine; ++k) {
+                        const real_t d = got[(size_t)k] - ref[(size_t)k];
+                        dn += d * d;
+                        rn += ref[(size_t)k] * ref[(size_t)k];
+                    }
+                    const real_t rel = (rn > 0) ? std::sqrt(dn / rn) : 0.0;
+                    std::printf("  structured P %d->%d: nnz %td  uniform %d  vs matrix-free rel %.4e  %s\n",
+                                i + 1, i, (ptrdiff_t)pp.rowptr[(size_t)pp.n_fine], (int)pp.uniform, rel,
+                                (rel < 1e-12) ? "OK" : "MISMATCH");
+                }
+            }
 
             {
                 // Full-precision checksums of the transfers themselves. The restriction
