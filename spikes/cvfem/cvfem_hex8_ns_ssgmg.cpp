@@ -115,10 +115,27 @@ namespace {
     //
     // So each level runs with a thread count matched to its size rather than the machine's.
     // These calls happen between parallel regions, never inside one.
+    //
+    // The threshold was 20000 dofs per thread, and that was far too high: at 242,500 dofs on
+    // 72 Grace cores it gave the *fine* level 12 threads and level 1 exactly one, throttling
+    // the two phases that are 65% of the cycle. perf saw it three ways at once -- 4.21
+    // instructions per cycle and a 0.57% cache miss rate, so the code runs well when it runs;
+    // cores idle 83% of the wall time; and 12/72 = 16.7% matching the 17% of peak cycles
+    // actually retired. Lowering it to 1000 leaves the coarse protection intact, since a
+    // 324-dof level still gets one thread either way -- the threshold only governs when a
+    // level is allowed *more* threads, and 20000 was high enough that nothing on this machine
+    // ever got the full count.
+    //
+    // Measured at 242,500 dofs, 72 cores, fixed work, three repeats each: preconditioner
+    // phases 1.657 s against 0.681 s, a factor of 2.43; smooth[L0] 4327 us against 1723,
+    // smooth[L1] 2292 us against 161. Run-to-run spread was under 2%.
+    //
+    // This is also why the pathology never showed on a laptop: at 8 threads the clamp is
+    // nearly inert, and it only bites once the machine is wide enough for the ratio to matter.
     std::shared_ptr<sfem::Operator<real_t>> thread_clamped(const ptrdiff_t                                ndofs,
                                                            const std::shared_ptr<sfem::Operator<real_t>> &op) {
         if (!op) return op;
-        const ptrdiff_t per = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DOFS_PER_THREAD", 20000);
+        const ptrdiff_t per = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DOFS_PER_THREAD", 1000);
         const int       mx  = omp_get_max_threads();
         int             n   = (int)std::min<ptrdiff_t>(mx, std::max<ptrdiff_t>(1, ndofs / std::max<ptrdiff_t>(1, per)));
         if (n >= mx) return op;  // big enough to use the machine as configured

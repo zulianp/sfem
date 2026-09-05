@@ -6165,3 +6165,48 @@ The obvious next step is geometric ramping over several stages, each starting fr
 solution, rather than one bound. Re=200 additionally suggests the Newton cap and the residual
 tolerance want revisiting: a run that reaches discretisation accuracy and still reports failure
 is measuring the wrong thing.
+
+
+### perf on a V-cycle: the fine level was running on 12 of 72 cores
+
+Profiled at 108 macro-elements, L=8, **242,500 dofs** on 72 Grace cores, one Newton step with
+the Krylov solve capped so the run is a fixed number of V-cycles.
+
+Two things came out of it. The first was that `make_dense_lu` sat at 2.85% of self time,
+recovering the coarsest operator by applying it once per column -- 832 applies -- which is the
+probing anti-pattern this section removed everywhere else, still in the coarse solve. Reading
+the assembled blocks instead is O(nnz); the two densifications agree exactly.
+
+The second was larger. The hardware counters looked wrong in an interesting way:
+
+    instructions   360,304,546,467    4.21 insn per cycle
+    cache-misses       559,013,134    0.57% of all cache refs
+    cycles          85,517,344,787    over 2.065 s
+
+An IPC of 4.21 with a 0.57% miss rate says the code runs *well* when it runs -- neither
+memory-bound nor cache-limited. But 85.5e9 cycles across 72 cores in 2.065 s is about 17% of
+what the machine could retire, so the cores were idle most of the wall time.
+
+`thread_clamped` explains it exactly. It gives each level `ndofs / SFEM_GMG_DOFS_PER_THREAD`
+threads, and at the old default of 20000 with 242,500 dofs that is **12 threads for the fine
+level and one for level 1** -- the two phases that are 65% of the cycle. 12/72 is 16.7%,
+matching the counters.
+
+| dofs per thread | phases | smooth[L0] | smooth[L1] |
+|-----------------|--------|------------|------------|
+| 20000 (old default) | 1.657 s | 4327 us | 2292 us |
+| 1000 (new default)  | 0.681 s | 1723 us |  161 us |
+| speedup             | **2.43x** | 2.51x | **14.2x** |
+
+Three repeats each, spread under 2%, identical iteration counts, so this is pure cost.
+
+The clamp itself is right and stays: it exists because an 81-node level cost 156 us on one
+thread and 14.2 ms on eight. Lowering the threshold does not weaken that -- a 324-dof level
+still gets one thread either way. The threshold only governs when a level is allowed *more*
+threads, and 20000 was high enough that nothing on this machine ever got the full count. A
+heuristic calibrated on the coarse levels was gating every level.
+
+It also explains an earlier confusion in this section: at 8 threads the clamp is nearly inert,
+so the pathology is invisible on a laptop and only appears once the machine is wide enough for
+the ratio to bite. Every "under-filled machine" caveat written above was understated -- the
+machine was under-filled by construction, not only by problem size.
