@@ -6210,3 +6210,59 @@ It also explains an earlier confusion in this section: at 8 threads the clamp is
 so the pathology is invisible on a laptop and only appears once the machine is wide enough for
 the ratio to bite. Every "under-filled machine" caveat written above was understated -- the
 machine was under-filled by construction, not only by problem size.
+
+
+### Enabling OpenMP: the transfers were never parallel
+
+SFEM and smesh were configured with `SFEM_ENABLE_OPENMP=OFF` and `SMESH_ENABLE_OPENMP=OFF`.
+`libsmesh.a` contained zero `GOMP_parallel` symbols and the smesh compile line was
+`-O3 -DNDEBUG -std=gnu++17 -fPIC` -- no `-fopenmp` -- so every `#pragma omp` in smesh compiled
+to nothing. The grid transfers ran serially whatever their source said.
+
+A dedicated build with OpenMP on (separate prefix, shared install untouched) settles it.
+242,500 dofs on 72 Grace cores, fixed work, identical iteration counts:
+
+| | 1 thread | 72 threads | speedup |
+|---|----------|------------|---------|
+| `restrict[L0->1]` | 1781.7 us | **130.7 us** | 13.6x |
+| `prolong[L1->0]`  |  946.3 us |  **86.2 us** | 11.0x |
+
+and against the serial-smesh build at 72 threads, `restrict` goes 1456 us to 130.7 us, 11.1x.
+`perf` now shows `sshex8_restrict [clone ._omp_fn.0]` -- the outlined OpenMP form, which did
+not exist before.
+
+| | serial smesh | OpenMP | gain |
+|--------------------|----------|----------|-------|
+| phases total       | 0.678 s  | 0.397 s  | 1.71x |
+| `t_solve`          | 0.685 s  | 0.410 s  | 1.67x |
+| us per linear it   | 17133    | 10253    | 1.67x |
+| transfers' share   | 30.5%    | 4.5%     |       |
+
+All gates unchanged: levels 1.8e-16 / 1.9e-17 / 1.1e-16, block diagonals 4.1e-18 / 4.4e-18 / 0,
+coarse LU 0.0, transfer adjointness 1.000000 at every hop. Nothing raced when previously
+serial reductions became parallel.
+
+**Three wrong hypotheses preceded this**, and the pattern in them is worth naming. The
+transfers took the same wall time on 1 thread as on 72, and each explanation I reached for was
+about the *source*: allocation churn in the parallel region, atomic contention in the scatter,
+a missing `omp for`. Each was tested and died -- glibc tunables changed nothing and page faults
+were ~21k for the whole run; removing the atomics gave 1508.0 us against 1508.0 us, identical
+to four significant figures; every element loop was already under `#pragma omp for`. What none
+of them questioned was whether the pragmas were compiled at all. `nm` on the object file, or
+reading `flags.make`, would have answered it in seconds and before any of the three
+experiments. When code that looks parallel does not behave parallel, check that the
+parallelism is *in force* before explaining why it is slow.
+
+The probe that finally exposed it did so by accident: a call to `omp_get_num_threads()` failed
+to *link*, being the first code to reference the OpenMP API directly where the pragmas had been
+silently inert.
+
+**What this invalidates above.** Every measurement in this section before this point was taken
+against a partly serial library. The comparisons remain valid -- both arms of each A/B used the
+same binary -- but absolute times and phase shares do not carry over, and the profile ranking
+has changed: the fine matrix-free apply is now 46.6% of samples and the transfers 5.2%.
+
+**The new top target is the OpenMP runtime itself.** `libgomp` accounts for about 25% of
+samples across a dozen entries, which is barrier and scheduling overhead, and it fits the
+earlier observation that 36 threads beat 72 on `t_solve`. That is where the next look belongs,
+not in the transfer kernels.
