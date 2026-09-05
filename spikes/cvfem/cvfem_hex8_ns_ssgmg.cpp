@@ -647,6 +647,52 @@ namespace {
             return std::sqrt(s);
         };
 
+        // Is the Jacobian action element-local?
+        //
+        // Element-wise Galerkin (sum_e P_e^T A_e P_e) is only exact if A is a sum of
+        // macro-element contributions. Rhie-Chow couples through a *nodal* pressure
+        // gradient, which is not element-local -- unless it is frozen from the state rather
+        // than recomputed from the direction. Test it directly: put the direction on the
+        // interior of a single macro element and see whether the response stays inside that
+        // element's nodes. If it spreads, the operator is not a sum of element operators and
+        // the element-wise construction is wrong.
+        {
+            auto           &fop = *g.level_ops[0];
+            const ptrdiff_t nd  = g.data->functions[0]->space()->n_dofs();
+            const ptrdiff_t nn0 = nd / N_FIELDS;
+
+            auto     &m0   = g.data->functions[0]->space()->mesh();
+            auto      b0   = m0.block(0);
+            const int lvl  = smesh::semistructured_level(m0);
+            const int nxe0 = (lvl + 1) * (lvl + 1) * (lvl + 1);
+
+            std::vector<uint8_t> in_elem((size_t)nn0, 0);
+            for (int a = 0; a < nxe0; ++a) in_elem[(size_t)b0->elements()->data()[a][0]] = 1;
+
+            std::vector<real_t> dir((size_t)nd, 0), out((size_t)nd, 0);
+            // Interior lattice nodes of element 0 only, so nothing is shared with a neighbour.
+            for (int z = 1; z < lvl; ++z)
+                for (int y = 1; y < lvl; ++y)
+                    for (int x = 1; x < lvl; ++x) {
+                        const ptrdiff_t gnode = b0->elements()->data()[smesh::sshex8_lidx(lvl, x, y, z)][0];
+                        for (int c = 0; c < N_FIELDS; ++c) dir[(size_t)gnode * N_FIELDS + c] = 1;
+                    }
+
+            fop.apply(g.states[0]->data(), dir.data(), out.data());
+
+            real_t inside = 0, outside = 0;
+            for (ptrdiff_t k = 0; k < nn0; ++k)
+                for (int c = 0; c < N_FIELDS; ++c) {
+                    const real_t v = std::fabs(out[(size_t)k * N_FIELDS + c]);
+                    if (in_elem[(size_t)k]) inside = std::max(inside, v);
+                    else                    outside = std::max(outside, v);
+                }
+            std::printf("element-locality: max |out| inside elem 0 = %.4e, outside = %.4e  %s\n",
+                        inside, outside,
+                        (outside <= inside * 1e-12) ? "LOCAL (element-wise Galerkin is exact)"
+                                                    : "NON-LOCAL (element-wise Galerkin would be wrong)");
+        }
+
         // Block-split gate: the four blocks must sum to the full Jacobian action, and
         // each must be non-trivial. A smoother built on the block split is only as good as
         // this, and a block application that silently produced nothing would make SIMPLE
