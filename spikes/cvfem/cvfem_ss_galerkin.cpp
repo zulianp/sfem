@@ -71,4 +71,71 @@ namespace cvfem_ss {
                                                                             ci, va, real_t(0));
     }
 
+    std::shared_ptr<sfem::Operator<real_t>> make_element_matrix_level(
+            const sfem::CVFEMNavierStokes              &op,
+            const std::shared_ptr<sfem::FunctionSpace> &coarse,
+            const std::shared_ptr<sfem::FunctionSpace> &fine,
+            std::vector<real_t> *const                  diag_out,
+            const uint8_t *const                        fine_constrained,
+            const uint8_t *const                        coarse_constrained) {
+        const ::SSMeshData *const ss = op.semi_structured_data();
+        if (!ss) SFEM_ERROR("make_element_matrix_level: the operator is not semi-structured\n");
+
+        const int Lf = ss->level;
+        const int Lc = coarse->has_semi_structured_mesh() ? smesh::semistructured_level(coarse->mesh()) : 1;
+        if (Lc < 1 || Lf % Lc) SFEM_ERROR("make_element_matrix_level: level %d does not divide %d\n", Lc, Lf);
+
+        // Held for the operator's lifetime rather than chunked: this IS the level's storage,
+        // not a transient on the way to a matrix. The staging and temporary buffers are kept
+        // with it so an apply does not reallocate n_coarse * 4 on every call, which a Krylov
+        // smoother would pay hundreds of times per Newton step. That makes a single apply
+        // non-reentrant -- it is parallel inside, but two concurrent applies of the same
+        // level would share these buffers -- which matches how the cycle uses it.
+        struct State {
+            GalerkinLevel         gl;
+            GalerkinReduce        red;
+            std::vector<scalar_t> stage;
+            std::vector<scalar_t> tmp;
+            std::vector<uint8_t>  cmask;
+        };
+        auto st = std::make_shared<State>();
+
+        galerkin_init(*ss, Lf / Lc, st->gl);
+        galerkin_gid_from_spaces(coarse, fine, st->gl);
+        if (fine_constrained)
+            st->gl.fine_constrained.assign(fine_constrained, fine_constrained + fine->n_dofs());
+        galerkin_assemble(*ss, (scalar_t)op.rho, (scalar_t)op.mu, st->gl, 0, st->gl.nmacro);
+        galerkin_build_node_reduce(st->gl, st->red);
+
+        const ptrdiff_t ndc = st->gl.n_coarse * N_FIELDS;
+        st->tmp.assign((size_t)ndc, scalar_t(0));
+        st->cmask.assign((size_t)ndc, 0);
+        if (coarse_constrained) std::copy(coarse_constrained, coarse_constrained + ndc, st->cmask.begin());
+
+        if (diag_out) {
+            diag_out->assign((size_t)st->gl.n_coarse * 16, real_t(0));
+            std::vector<scalar_t> d((size_t)st->gl.n_coarse * 16, scalar_t(0));
+            galerkin_block_diag(st->gl, st->red, d.data());
+            // A constrained row's diagonal must be the identity the smoother expects, the
+            // same value patch_identity_rows leaves in the assembled form.
+            for (ptrdiff_t n = 0; n < st->gl.n_coarse; ++n)
+                for (int c = 0; c < N_FIELDS; ++c)
+                    if (st->cmask[(size_t)n * N_FIELDS + (size_t)c])
+                        for (int k = 0; k < N_FIELDS; ++k) {
+                            d[(size_t)n * 16 + (size_t)(c * 4 + k)] = (k == c) ? scalar_t(1) : scalar_t(0);
+                            d[(size_t)n * 16 + (size_t)(k * 4 + c)] = (k == c) ? scalar_t(1) : scalar_t(0);
+                        }
+            std::copy(d.begin(), d.end(), diag_out->data());
+        }
+
+        return sfem::make_op<real_t>(
+                ndc, ndc,
+                [st, ndc](const real_t *const x, real_t *const y) {
+                    galerkin_apply(st->gl, st->red, st->stage, x, st->tmp.data());
+                    for (ptrdiff_t k = 0; k < ndc; ++k)
+                        y[(size_t)k] += st->cmask[(size_t)k] ? x[(size_t)k] : st->tmp[(size_t)k];
+                },
+                sfem::EXECUTION_SPACE_HOST);
+    }
+
 }  // namespace cvfem_ss
