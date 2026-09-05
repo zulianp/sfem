@@ -87,3 +87,64 @@ class FormEmissionVocabularyTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FormContractionTest(unittest.TestCase):
+    """The contraction a form uses, and the table that selects on it."""
+
+    maxDiff = None
+
+    def test_a_weak_form_defers_its_flux(self):
+        from codegen.framework.plans.form_emission import (
+            FormContraction,
+            form_contraction,
+        )
+
+        class WithWeakForm:
+            weak_form = object()
+
+        class WithoutWeakForm:
+            weak_form = None
+
+        self.assertIs(
+            form_contraction(WithWeakForm()), FormContraction.DEFERRED_FLUX
+        )
+        self.assertIs(
+            form_contraction(WithoutWeakForm()), FormContraction.POINTWISE
+        )
+
+    def test_both_block_emitters_take_the_same_arguments(self):
+        """Interchangeability is the point; a table cannot select otherwise.
+
+        This is what "no distinction below the form layer" means concretely
+        here: the two paths differ in what they emit, not in how they are
+        called, so which one runs is a lookup rather than a branch.
+        """
+        import inspect
+
+        from codegen.framework.emitters import energy_codegen
+
+        signatures = {
+            name: inspect.signature(getattr(energy_codegen, name))
+            for name in (
+                "_sfem_soa_weak_form_block_function",
+                "_sfem_soa_pointwise_block_function",
+            )
+        }
+        parameters = {
+            name: list(signature.parameters) for name, signature in signatures.items()
+        }
+        self.assertEqual(
+            parameters["_sfem_soa_weak_form_block_function"],
+            parameters["_sfem_soa_pointwise_block_function"],
+        )
+
+    def test_the_table_covers_every_contraction(self):
+        from codegen.framework.emitters import energy_codegen
+        from codegen.framework.plans.form_emission import FormContraction
+
+        self.assertEqual(
+            set(energy_codegen._BLOCK_FUNCTION_BY_CONTRACTION),
+            set(FormContraction),
+            "a contraction with no entry would fail at generation, not here",
+        )
