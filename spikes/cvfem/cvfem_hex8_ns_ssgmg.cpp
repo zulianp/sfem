@@ -1260,6 +1260,34 @@ namespace {
         std::vector<ptrdiff_t> piv_;
     };
 
+    // Densify from the assembled matrix instead of applying it once per column.
+    //
+    // make_dense_lu below recovers the coarse operator by probing it with n unit vectors,
+    // which is the same anti-pattern the coarse operators themselves no longer use: n
+    // applications of an operator whose entries are already sitting in memory. It costs 832
+    // applies on a 208-node coarsest level and showed up at 2.85% of a profiled V-cycle run,
+    // and it grows as n * cost(apply) -- so it gets worse in exactly the regime where a
+    // larger terminal problem is wanted. Reading the blocks is O(nnz) and does not touch the
+    // operator at all.
+    std::shared_ptr<DenseLU> make_dense_lu_from_bsr(const std::shared_ptr<GmgLevels::BSR_t> &a,
+                                                    const ptrdiff_t                          n) {
+        std::vector<real_t>        dense((size_t)n * (size_t)n, real_t(0));
+        const sfem::count_t *const rp = a->row_ptr->data();
+        const sfem::idx_t *const   ci = a->col_idx->data();
+        const real_t *const        vd = a->values->data();
+        const ptrdiff_t            nb = n / N_FIELDS;
+
+        for (ptrdiff_t r = 0; r < nb; ++r)
+            for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k) {
+                const ptrdiff_t c = (ptrdiff_t)ci[k];
+                for (int i = 0; i < N_FIELDS; ++i)
+                    for (int j = 0; j < N_FIELDS; ++j)
+                        dense[(size_t)(r * N_FIELDS + i) * (size_t)n + (size_t)(c * N_FIELDS + j)] =
+                                vd[(size_t)k * 16 + (size_t)(i * N_FIELDS + j)];
+            }
+        return std::make_shared<DenseLU>(n, std::move(dense));
+    }
+
     std::shared_ptr<DenseLU> make_dense_lu(const std::shared_ptr<sfem::Operator<real_t>> &op,
                                            const ptrdiff_t                                n) {
         std::vector<real_t> a((size_t)n * (size_t)n, real_t(0));
@@ -2111,7 +2139,30 @@ namespace {
                 const ptrdiff_t nd_coarse = fi->space()->n_dofs();
                 const ptrdiff_t lu_max    = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DENSE_LU_BELOW", 4096);
                 if (nd_coarse <= lu_max) {
-                    auto lu = make_dense_lu(lop, nd_coarse);
+                    // Prefer the assembled matrix when there is one; fall back to probing
+                    // only for a level that has no matrix form.
+                    auto lu = g.Amat[(size_t)i] ? make_dense_lu_from_bsr(g.Amat[(size_t)i], nd_coarse)
+                                                : make_dense_lu(lop, nd_coarse);
+
+                    if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) && g.Amat[(size_t)i]) {
+                        // The two densifications must agree: same operator, read two ways.
+                        auto                ref = make_dense_lu(lop, nd_coarse);
+                        std::vector<real_t> b((size_t)nd_coarse), x1((size_t)nd_coarse, 0),
+                                x2((size_t)nd_coarse, 0);
+                        for (ptrdiff_t k = 0; k < nd_coarse; ++k)
+                            b[(size_t)k] = std::sin(real_t(0.61) * (real_t)k + real_t(0.2));
+                        lu->apply(b.data(), x1.data());
+                        ref->apply(b.data(), x2.data());
+                        real_t dn = 0, rn = 0;
+                        for (ptrdiff_t k = 0; k < nd_coarse; ++k) {
+                            const real_t d = x1[(size_t)k] - x2[(size_t)k];
+                            dn += d * d;
+                            rn += x2[(size_t)k] * x2[(size_t)k];
+                        }
+                        const real_t rel = rn > 0 ? std::sqrt(dn / rn) : std::sqrt(dn);
+                        std::printf("coarse LU: assembled vs probed, rel = %.4e over %td dofs  %s\n", rel,
+                                    nd_coarse, rel < 1e-10 ? "OK" : "MISMATCH");
+                    }
                     g.mg->add_level(timed("op[coarsest]", lop), timed("coarse_solve", lu),
                                     timed("prolong", wrap_p(i)), nullptr);
                     continue;
