@@ -66,13 +66,13 @@
       "material": "linear_elasticity"
     },
     "linear_elasticity_objective_steps_3d_affine_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 116.0573125765,
+      "l2": 15.10709097786,
       "material": "linear_elasticity"
     },
     "linear_elasticity_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 116.0573115357,
+      "l2": 15.10709085314,
       "material": "linear_elasticity"
     },
     "modified_mooney_rivlin_objective_steps_3d_affine_mesh_soa": {
@@ -201,13 +201,13 @@
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_objective_steps_3d_affine_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 1915.071002227,
+      "l2": 281.3643842012,
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 1915.071031532,
+      "l2": 281.3644021104,
       "material": "saint_venant_kirchhoff"
     },
     "scalar_potential_apply_3d_affine_mesh_soa": {
@@ -231,13 +231,13 @@
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_3d_affine_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 9.236061939866,
+      "l2": 1.204381276427,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 9.236061937419,
+      "l2": 1.204381280197,
       "material": "scalar_potential"
     },
     "stokes_form_1_p_residual_3d_affine_mesh_soa": {
