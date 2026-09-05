@@ -1690,7 +1690,12 @@ namespace {
                 for (ptrdiff_t k = 0; k < nd; ++k) b[(size_t)k] = mask_get(k, m.data()) ? 1 : 0;
                 masks.push_back(std::move(b));
             }
-            egal_hier = cvfem_ss::assemble_hierarchy(*g.level_ops[0], g.states[0]->data(), spaces, masks);
+                        // SFEM_GMG_EGAL_EM keeps every level but the coarsest as element matrices, so
+            // nothing above the level that is factorised is ever assembled. The hops coarsen
+            // element matrices to element matrices, so this costs no extra construction -- it
+            // stops at the element form instead of going on to a BSR.
+            egal_hier = cvfem_ss::assemble_hierarchy(*g.level_ops[0], g.states[0]->data(), spaces, masks,
+                                                     smesh::Env::read<int>("SFEM_GMG_EGAL_EM", 0) != 0);
             phase_add("galerkin_assembly", smesh::time_seconds() - t_h);
         }
         auto       wrap_p  = [&](const int i) -> std::shared_ptr<sfem::Operator<real_t>> {
@@ -1778,32 +1783,15 @@ namespace {
                 // compared -- they differed by 1.2e-2 at level 2 and 5.7e-2 at level 3, and a
                 // smoother given wrong diagonals cost the solve its convergence (40 Newton
                 // steps against 27) while every operator gate still passed.
-                const bool egal = egal_on && egal_hier.A[(size_t)i];
+                const bool egal = egal_on && egal_hier.op[(size_t)i];
 
                 if (egal) {
 
-                    // NOTE: keeping a level as element matrices (SFEM_GMG_EGAL_EM) is
-                    // wired out for now. It is newly *possible* -- the hop below coarsens
-                    // element matrices to element matrices without ever assembling -- but the
-                    // driver still takes each level's operator as a matrix, so exercising it
-                    // means changing that, not just this branch.
-                    auto a_c = egal_hier.A[(size_t)i];
-                    patch_identity_rows(a_c, mask.data());
-
-                    // The block diagonal is read after patching, so a constrained row's
-                    // diagonal is the identity the smoother must see rather than the
-                    // pre-patch value.
-                    galerkin_diag.assign((size_t)nn * 16, real_t(0));
-                    {
-                        const sfem::count_t *const rp = a_c->row_ptr->data();
-                        const sfem::idx_t *const   ci = a_c->col_idx->data();
-                        const real_t *const        vd = a_c->values->data();
-                        for (ptrdiff_t r = 0; r < nn; ++r)
-                            for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k)
-                                if (ci[k] == (sfem::idx_t)r)
-                                    std::copy(vd + (size_t)k * 16, vd + (size_t)k * 16 + 16,
-                                              galerkin_diag.data() + (size_t)r * 16);
-                    }
+                    // Identity rows and the block diagonal are already applied to whichever
+                    // form backs this level -- assembled BSR, or element matrices kept as they
+                    // are -- so from here the two are interchangeable.
+                    auto a_c      = egal_hier.op[(size_t)i];
+                    galerkin_diag = egal_hier.diag[(size_t)i];
 
                     // Cross-check against the construction it replaces (SFEM_GMG_CHECK).
                     //
@@ -1862,12 +1850,16 @@ namespace {
                             rn += yb[(size_t)k] * yb[(size_t)k];
                         }
                         const real_t rel = rn > 0 ? std::sqrt(dn / rn) : std::sqrt(dn);
-                        std::printf("egal level %d: %td blocks (probe %td)  vs probed composite rel = %.4e  %s\n",
-                                    i, (ptrdiff_t)a_c->col_idx->size(), (ptrdiff_t)probed->col_idx->size(), rel,
-                                    rel < 1e-10 ? "OK" : "MISMATCH");
+                        std::printf("egal level %d: %s (probe %td blocks)  vs probed composite rel = %.4e  %s\n", i,
+                                    egal_hier.A[(size_t)i]
+                                            ? (std::to_string((long long)egal_hier.A[(size_t)i]->col_idx->size()) +
+                                               " blocks")
+                                                      .c_str()
+                                            : "element matrices",
+                                    (ptrdiff_t)probed->col_idx->size(), rel, rel < 1e-10 ? "OK" : "MISMATCH");
                     }
 
-                    g.Amat[(size_t)i] = a_c;
+                    g.Amat[(size_t)i] = egal_hier.A[(size_t)i];  // null when kept as element matrices
                     lop               = a_c;
                 } else
                 // Level 1 is the only level that must be probed: the operator above it is
