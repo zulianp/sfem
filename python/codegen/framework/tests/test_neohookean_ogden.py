@@ -1229,7 +1229,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             1,
         )[0]
         self.assertIn(
-            "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+            "coordinate_grad_ref[SPATIAL_DIM * N_QP * SPATIAL_DIM * VECTOR_SIZE]",
             section,
         )
         self.assertIn(
@@ -1237,7 +1237,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             section,
         )
         self.assertNotIn("block_coordinate_streams", section)
-        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", section)
+        self.assertIn("block_coordinate_data[N_SHAPE * SPATIAL_DIM]", section)
 
     def test_generated_hex27_weak_form_uses_q2_tensor_product_api(self):
         compiler = shutil.which("c++")
@@ -1391,12 +1391,12 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];", operator_by_element["HEX8"])
         self.assertIn("const scalar_t *const block_u_streams[N_SHAPE * DIM]", operator_by_element["HEX8"])
         self.assertNotIn("block_coordinate_streams", operator_by_element["HEX8"])
-        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", operator_by_element["HEX8"])
+        self.assertIn("block_coordinate_data[N_SHAPE * SPATIAL_DIM]", operator_by_element["HEX8"])
         self.assertNotIn("scalar_t block_ux26[VECTOR_SIZE]", operator_by_element["HEX27"])
         self.assertIn("scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];", operator_by_element["HEX27"])
         self.assertIn("const scalar_t *const block_u_streams[N_SHAPE * DIM]", operator_by_element["HEX27"])
         self.assertNotIn("block_coordinate_streams", operator_by_element["HEX27"])
-        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", operator_by_element["HEX27"])
+        self.assertIn("block_coordinate_data[N_SHAPE * SPATIAL_DIM]", operator_by_element["HEX27"])
 
     def test_generated_neohookean_action_matches_python_reference(self):
         compiler = shutil.which("c++")
@@ -1519,7 +1519,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         )
         self.assertNotIn("const real_t *const SFEM_RESTRICT x0", operator_source)
         self.assertNotIn("block_coordinate_streams", operator_source)
-        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", operator_source)
+        self.assertIn("block_coordinate_data[N_SHAPE * SPATIAL_DIM]", operator_source)
         self.assertIn(
             '#include "geometry_kernels.hpp"',
             operator_source,
@@ -1612,7 +1612,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             1,
         )[0]
         self.assertIn(
-            "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+            "coordinate_grad_ref[SPATIAL_DIM * N_QP * SPATIAL_DIM * VECTOR_SIZE]",
             isoparametric_mesh_source,
         )
         self.assertIn(
@@ -1624,7 +1624,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             isoparametric_mesh_source,
         )
         self.assertNotIn("block_coordinate_streams", isoparametric_mesh_source)
-        self.assertIn("block_coordinate_data[N_SHAPE * DIM]", isoparametric_mesh_source)
+        self.assertIn("block_coordinate_data[N_SHAPE * SPATIAL_DIM]", isoparametric_mesh_source)
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             library = compile_generated_shared_library(
@@ -2208,7 +2208,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertIn("block_ux0[VECTOR_SIZE]", operator_source)
         self.assertIn("block_jacobian_adjugate0[VECTOR_SIZE]", operator_source)
         self.assertIn("block_jacobian_determinant0[VECTOR_SIZE]", operator_source)
-        self.assertIn("block_jacobian_adjugate_streams[DIM * DIM]", operator_source)
+        self.assertIn("block_jacobian_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM]", operator_source)
         self.assertIn("geometry_jacobian_adjugate_and_determinant_2<scalar_t>", operator_source)
         self.assertNotIn("block_jacobian_adjugate0[lane] = J11", operator_source)
         self.assertNotIn("const real_t *const SFEM_RESTRICT ux0", operator_source)
