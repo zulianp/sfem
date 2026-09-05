@@ -39,9 +39,10 @@
 // The acceptance test is SFEM_GMG_CHECK=3 run to its asymptote at the physical Reynolds
 // number, compared against block-Jacobi's 0.981.
 
+// sfem::count_t / sfem::idx_t come from cvfem_ss_galerkin_api.hpp, which the only
+// translation unit including this header includes first. sfem_base.h is not on the
+// include path of every install (it is not on alps).
 #include "cvfem_sshex8_ns.hpp"
-
-#include "sfem_base.h"
 
 #include <cmath>
 #include <vector>
