@@ -54,6 +54,7 @@ MATERIALS = (
     "poro_elasticity",
     "stokes",
     "two_phase_flow",
+    "scalar_potential",
 )
 
 # Byte-for-byte comparison would otherwise trip over editor and interpreter
