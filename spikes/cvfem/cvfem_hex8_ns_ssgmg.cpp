@@ -1596,6 +1596,71 @@ namespace {
                                               galerkin_diag.data() + (size_t)r * 16);
                     }
 
+                    if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) && !fi->space()->has_semi_structured_mesh()) {
+                        // How far is a directly-assembled (rediscretised) operator from the
+                        // Galerkin one at this level?
+                        //
+                        // hessian_bsr refuses on the semi-structured path but works on an
+                        // unstructured level, so the coarsest level could be assembled
+                        // outright and the probe dropped. That trades Galerkin for
+                        // rediscretisation, which measured badly higher up (5.52 against
+                        // 0.000 on a coarse-representable mode) -- but that was with a
+                        // partition-of-unity averaged state. This reports the gap on the
+                        // real coarse operator, per component, before any effort goes into a
+                        // better state transfer.
+                        auto direct = sfem::create_linear_operator(sfem::op_type::BSR, fi, g.states[i],
+                                                                   sfem::EXECUTION_SPACE_HOST);
+                        const ptrdiff_t     ndc = nn * N_FIELDS;
+                        std::vector<real_t> v((size_t)ndc), yg((size_t)ndc, 0), yd((size_t)ndc, 0);
+                        unsigned            st = 17u;
+                        for (auto &e : v) {
+                            st = st * 1103515245u + 12345u;
+                            e  = (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+                        }
+                        fi->apply_zero_constraints(v.data());
+                        a_c->apply(v.data(), yg.data());
+                        direct->apply(v.data(), yd.data());
+                        fi->apply_zero_constraints(yg.data());
+                        fi->apply_zero_constraints(yd.data());
+
+                        real_t dn[N_FIELDS] = {0}, rn[N_FIELDS] = {0};
+                        for (ptrdiff_t k = 0; k < ndc; ++k) {
+                            const int    c = (int)(k % N_FIELDS);
+                            const real_t d = yd[(size_t)k] - yg[(size_t)k];
+                            dn[c] += d * d;
+                            rn[c] += yg[(size_t)k] * yg[(size_t)k];
+                        }
+                        // Separate a scale mismatch from a structural one. If the direct
+                        // operator is close to a constant multiple of the Galerkin one, the
+                        // difference is the h-dependent stabilisation and no state transfer
+                        // can touch it. If a residual survives removing the best-fit scale,
+                        // the two operators genuinely differ.
+                        real_t ab[N_FIELDS] = {0}, aa[N_FIELDS] = {0};
+                        for (ptrdiff_t k = 0; k < ndc; ++k) {
+                            const int c = (int)(k % N_FIELDS);
+                            ab[c] += yd[(size_t)k] * yg[(size_t)k];
+                            aa[c] += yd[(size_t)k] * yd[(size_t)k];
+                        }
+                        const char *nm[N_FIELDS] = {"ux", "uy", "uz", "p"};
+                        std::printf("  direct vs galerkin, level %d   raw:", i);
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            std::printf("  %s %8.3f", nm[c], (rn[c] > 0) ? std::sqrt(dn[c] / rn[c]) : 0.0);
+                        std::printf("\n                                scale:");
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            std::printf("  %s %8.4f", nm[c], (aa[c] > 0) ? ab[c] / aa[c] : 0.0);
+                        std::printf("\n                          after-scale:");
+                        for (int c = 0; c < N_FIELDS; ++c) {
+                            const real_t sc = (aa[c] > 0) ? ab[c] / aa[c] : 0.0;
+                            real_t       rr = 0;
+                            for (ptrdiff_t k = c; k < ndc; k += N_FIELDS) {
+                                const real_t d = sc * yd[(size_t)k] - yg[(size_t)k];
+                                rr += d * d;
+                            }
+                            std::printf("  %s %8.4f", nm[c], (rn[c] > 0) ? std::sqrt(rr / rn[c]) : 0.0);
+                        }
+                        std::printf("\n");
+                    }
+
                     if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
                         // Same gate the probing path uses: the assembled level must
                         // reproduce the matrix-free composite it stands for.
