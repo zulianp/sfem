@@ -660,11 +660,22 @@ static double name_seed(const char *name) {
     return (double)(h % 1000u) / 1000.0;
 }
 
+// Fields are filled small.  The amplitude used to reach 1.25, which is a fine
+// state for a Laplacian and a ruinous one for a hyperelastic material: a
+// displacement that large turns elements inside out, `det(I + grad u)` goes
+// through zero, and every neohookean and Mooney-Rivlin kernel answered NaN.
+// Those materials had no digest at all as a result -- their only baseline
+// entries were two `objective_steps` numbers that were finite because the
+// kernel returned without computing.  A twentieth of that is a state every
+// material here can survive, and it is still large enough that a kernel
+// dropping a term shows up in the digest.
+static constexpr double FIELD_AMPLITUDE = 0.05;
+
 template <typename T>
 static void fill_field(std::vector<T> &v, const char *name) {
     const double s = name_seed(name);
     for (size_t i = 0; i < v.size(); ++i) {
-        v[i] = (T)(std::sin(0.5 + s + 0.125 * (double)i) * (0.25 + s));
+        v[i] = (T)(std::sin(0.5 + s + 0.125 * (double)i) * (0.25 + s) * FIELD_AMPLITUDE);
     }
 }
 
@@ -1045,6 +1056,26 @@ def run_material(root, generated, material, refine, compiler, verbose=False, rep
 #: whose spacing is 1/3, showed the difference at 1e-8 immediately.
 PARITY_TOLERANCE = {"double": 1e-5, "float": 1e-5}
 
+#: Materials whose two geometry modes integrate at different quadrature orders,
+#: and the tolerance that difference costs.
+#:
+#: The check asks whether the affine shortcut agrees with the general path on a
+#: mesh where it is valid.  It assumes both integrate the same way, which holds
+#: while the integrand is polynomial: a Laplacian or a linear elasticity is
+#: exact under either rule and the two agree to rounding.  A hyperelastic
+#: integrand is not polynomial, and poro's affine kernels use four quadrature
+#: points against the isoparametric eleven, so the paths differ by the
+#: quadrature error rather than by anything about geometry.  Holding them to
+#: 1e-5 measures the rule, not the claim.
+PARITY_QUADRATURE_EXCEPTIONS = {"poro_hyperelasticity_solid_": 1e-4}
+
+
+def _parity_tolerance(name):
+    for prefix, tolerance in PARITY_QUADRATURE_EXCEPTIONS.items():
+        if name.startswith(prefix):
+            return tolerance
+    return PARITY_TOLERANCE["float" if name.endswith("_float") else "double"]
+
 
 def _geometry_parity(measured):
     """Pairs that differ only in geometry mode and disagree anyway."""
@@ -1055,7 +1086,7 @@ def _geometry_parity(measured):
         twin = name.replace("_affine_", "_isoparametric_")
         if twin not in measured:
             continue
-        tolerance = PARITY_TOLERANCE["float" if name.endswith("_float") else "double"]
+        tolerance = _parity_tolerance(name)
         worst = 0.0
         for key in ("l1", "l2"):
             a, b = measured[name][key], measured[twin][key]

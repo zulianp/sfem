@@ -1,53 +1,53 @@
 {
   "refine=3": {
     "laplace_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 16.9172565221,
-      "l2": 2.648237369664,
+      "l1": 0.845862826105,
+      "l2": 0.1324118684832,
       "material": "laplace"
     },
     "laplace_jacobian_action_3d_isoparametric_mesh_aos": {
-      "l1": 9.744617444453,
-      "l2": 1.473214004187,
+      "l1": 0.02436154361113,
+      "l2": 0.003683035010468,
       "material": "laplace"
     },
     "laplace_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 16.91725622955,
-      "l2": 2.648237312895,
+      "l1": 0.8458628114777,
+      "l2": 0.1324118656447,
       "material": "laplace"
     },
     "laplace_residual_3d_affine_mesh_soa": {
-      "l1": 12.74523166434,
-      "l2": 1.959776730808,
+      "l1": 0.6372615832171,
+      "l2": 0.09798883654039,
       "material": "laplace"
     },
     "laplace_residual_3d_isoparametric_mesh_aos": {
-      "l1": 6.82816598383,
-      "l2": 1.029151221044,
+      "l1": 0.01707041495957,
+      "l2": 0.00257287805261,
       "material": "laplace"
     },
     "laplace_residual_3d_isoparametric_mesh_soa": {
-      "l1": 12.74523157807,
-      "l2": 1.959776712202,
+      "l1": 0.6372615789034,
+      "l2": 0.09798883561011,
       "material": "laplace"
     },
     "linear_elasticity_apply_3d_affine_mesh_soa": {
-      "l1": 55.89040110078,
-      "l2": 5.01372871289,
+      "l1": 2.794520055039,
+      "l2": 0.2506864356445,
       "material": "linear_elasticity"
     },
     "linear_elasticity_apply_3d_isoparametric_mesh_soa": {
-      "l1": 55.8904008885,
-      "l2": 5.013728718409,
+      "l1": 2.794520044425,
+      "l2": 0.2506864359205,
       "material": "linear_elasticity"
     },
     "linear_elasticity_gradient_3d_affine_mesh_soa": {
-      "l1": 92.98847963484,
-      "l2": 9.786626407606,
+      "l1": 4.649423981742,
+      "l2": 0.4893313203803,
       "material": "linear_elasticity"
     },
     "linear_elasticity_gradient_3d_isoparametric_mesh_soa": {
-      "l1": 92.98847877594,
-      "l2": 9.786626235644,
+      "l1": 4.649423938797,
+      "l2": 0.4893313117822,
       "material": "linear_elasticity"
     },
     "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa": {
@@ -66,128 +66,198 @@
       "material": "linear_elasticity"
     },
     "linear_elasticity_objective_steps_3d_affine_mesh_soa": {
-      "l1": 116.0573125765,
-      "l2": 15.10709097786,
+      "l1": 0.2358600597415,
+      "l2": 0.03068641717556,
       "material": "linear_elasticity"
     },
     "linear_elasticity_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 116.0573115357,
-      "l2": 15.10709085314,
+      "l1": 0.2358600573009,
+      "l2": 0.03068641686035,
       "material": "linear_elasticity"
     },
+    "modified_mooney_rivlin_apply_3d_affine_mesh_soa": {
+      "l1": 9.657164238398,
+      "l2": 0.9696029779827,
+      "material": "modified_mooney_rivlin"
+    },
+    "modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa": {
+      "l1": 9.657163886584,
+      "l2": 0.9696029317246,
+      "material": "modified_mooney_rivlin"
+    },
+    "modified_mooney_rivlin_gradient_3d_affine_mesh_soa": {
+      "l1": 10.33019359893,
+      "l2": 1.163442307837,
+      "material": "modified_mooney_rivlin"
+    },
+    "modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa": {
+      "l1": 10.33019330271,
+      "l2": 1.163442264094,
+      "material": "modified_mooney_rivlin"
+    },
+    "modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa": {
+      "l1": 1135.605754488,
+      "l2": 28.7910482879,
+      "material": "modified_mooney_rivlin"
+    },
     "modified_mooney_rivlin_objective_steps_3d_affine_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 0.5079391943798,
+      "l2": 0.06997569776425,
       "material": "modified_mooney_rivlin"
     },
     "modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 0.5079391829529,
+      "l2": 0.06997569577796,
       "material": "modified_mooney_rivlin"
     },
+    "neohookean_ogden_apply_3d_affine_mesh_soa": {
+      "l1": 3.228027488815,
+      "l2": 0.3137100750903,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_apply_3d_isoparametric_mesh_soa": {
+      "l1": 3.228027437319,
+      "l2": 0.3137100661302,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_gradient_3d_affine_mesh_soa": {
+      "l1": 5.032133947429,
+      "l2": 0.5617424907153,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_gradient_3d_isoparametric_mesh_soa": {
+      "l1": 5.03213385753,
+      "l2": 0.5617424748305,
+      "material": "neohookean_ogden"
+    },
+    "neohookean_ogden_hessian_bsr_3d_isoparametric_mesh_soa": {
+      "l1": 520.1991009191,
+      "l2": 12.00563649388,
+      "material": "neohookean_ogden"
+    },
     "neohookean_ogden_objective_steps_3d_affine_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 0.2491137684661,
+      "l2": 0.03345421841927,
       "material": "neohookean_ogden"
     },
     "neohookean_ogden_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 0.2491137643719,
+      "l2": 0.03345421777661,
       "material": "neohookean_ogden"
     },
     "poro_hyperelasticity_poro_form_1_p_residual_3d_affine_mesh_soa": {
-      "l1": 13.46417063156,
-      "l2": 2.248303331745,
+      "l1": 0.6732085315782,
+      "l2": 0.1124151665872,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_form_1_p_residual_3d_isoparametric_mesh_soa": {
-      "l1": 13.46417058124,
-      "l2": 2.248303281537,
+      "l1": 0.6732085290621,
+      "l2": 0.1124151640769,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_form_1_u_residual_3d_affine_mesh_soa": {
-      "l1": 2.882556410263,
-      "l2": 0.1577890362516,
+      "l1": 0.1441278205132,
+      "l2": 0.007889451812581,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_form_1_u_residual_3d_isoparametric_mesh_soa": {
-      "l1": 2.882556382364,
-      "l2": 0.1577890324015,
+      "l1": 0.1441278191182,
+      "l2": 0.007889451620075,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_form_2_p_u_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 1.455919730213,
-      "l2": 0.2441352565502,
+      "l1": 0.07279598651063,
+      "l2": 0.01220676282751,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 1.455919724495,
-      "l2": 0.2441352508277,
+      "l1": 0.07279598622474,
+      "l2": 0.01220676254139,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_form_2_u_p_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 2.079715005612,
-      "l2": 0.1142820407052,
+      "l1": 0.1039857502806,
+      "l2": 0.005714102035261,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 2.079714987533,
-      "l2": 0.1142820378401,
+      "l1": 0.1039857493767,
+      "l2": 0.005714101892006,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 11.5241545866,
-      "l2": 1.607146601689,
+      "l1": 0.5762077293302,
+      "l2": 0.08035733008445,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 11.5241544695,
-      "l2": 1.607146551065,
+      "l1": 0.5762077234751,
+      "l2": 0.08035732755326,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_residual_3d_affine_mesh_soa": {
-      "l1": 16.34672704183,
-      "l2": 2.253833456912,
+      "l1": 0.8173363520913,
+      "l2": 0.1126916728456,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_poro_residual_3d_isoparametric_mesh_soa": {
-      "l1": 16.34672696361,
-      "l2": 2.253833406558,
+      "l1": 0.8173363481803,
+      "l2": 0.1126916703279,
+      "material": "poro_elasticity"
+    },
+    "poro_hyperelasticity_solid_apply_3d_affine_mesh_soa": {
+      "l1": 5.267811321616,
+      "l2": 0.260366429045,
+      "material": "poro_elasticity"
+    },
+    "poro_hyperelasticity_solid_apply_3d_isoparametric_mesh_soa": {
+      "l1": 5.268006447784,
+      "l2": 0.2603802214945,
+      "material": "poro_elasticity"
+    },
+    "poro_hyperelasticity_solid_gradient_3d_affine_mesh_soa": {
+      "l1": 4.470199626313,
+      "l2": 0.2082476053026,
+      "material": "poro_elasticity"
+    },
+    "poro_hyperelasticity_solid_gradient_3d_isoparametric_mesh_soa": {
+      "l1": 4.470265474219,
+      "l2": 0.2082503837086,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_solid_objective_steps_3d_affine_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 0.1280946550362,
+      "l2": 0.01511502592496,
       "material": "poro_elasticity"
     },
     "poro_hyperelasticity_solid_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 0.0,
-      "l2": 0.0,
+      "l1": 0.128094943054,
+      "l2": 0.01511505623384,
       "material": "poro_elasticity"
     },
     "saint_venant_kirchhoff_apply_3d_affine_mesh_soa": {
-      "l1": 4774.10963183,
-      "l2": 427.0347801321,
+      "l1": 3.291621105684,
+      "l2": 0.3505431025659,
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_apply_3d_isoparametric_mesh_soa": {
-      "l1": 4774.109688059,
-      "l2": 427.034790082,
+      "l1": 3.291621265671,
+      "l2": 0.3505431271514,
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_gradient_3d_affine_mesh_soa": {
-      "l1": 2100.494735013,
-      "l2": 197.6771557043,
+      "l1": 4.681087568438,
+      "l2": 0.4910323355778,
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_gradient_3d_isoparametric_mesh_soa": {
-      "l1": 2100.494751003,
-      "l2": 197.6771587774,
+      "l1": 4.68108761571,
+      "l2": 0.491032338864,
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_hessian_bsr_3d_isoparametric_mesh_soa": {
-      "l1": 12191.9752529,
-      "l2": 305.0810418807,
+      "l1": 520.4630242373,
+      "l2": 12.62691785256,
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_objective_3d_affine_mesh_soa": {
@@ -201,113 +271,113 @@
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_objective_steps_3d_affine_mesh_soa": {
-      "l1": 1915.071002227,
-      "l2": 281.3643842012,
+      "l1": 0.2336993608302,
+      "l2": 0.03086210081921,
       "material": "saint_venant_kirchhoff"
     },
     "saint_venant_kirchhoff_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 1915.071031532,
-      "l2": 281.3644021104,
+      "l1": 0.2336993619749,
+      "l2": 0.03086210122048,
       "material": "saint_venant_kirchhoff"
     },
     "scalar_potential_apply_3d_affine_mesh_soa": {
-      "l1": 14.5920875631,
-      "l2": 2.262446620981,
+      "l1": 0.7296043781552,
+      "l2": 0.1131223310491,
       "material": "scalar_potential"
     },
     "scalar_potential_apply_3d_isoparametric_mesh_soa": {
-      "l1": 14.59208736802,
-      "l2": 2.262446586018,
+      "l1": 0.7296043684008,
+      "l2": 0.1131223293009,
       "material": "scalar_potential"
     },
     "scalar_potential_gradient_3d_affine_mesh_soa": {
-      "l1": 7.900152921582,
-      "l2": 1.188486306015,
+      "l1": 0.3950076460791,
+      "l2": 0.05942431530075,
       "material": "scalar_potential"
     },
     "scalar_potential_gradient_3d_isoparametric_mesh_soa": {
-      "l1": 7.900152959355,
-      "l2": 1.188486315521,
+      "l1": 0.3950076479677,
+      "l2": 0.05942431577605,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_3d_affine_mesh_soa": {
-      "l1": 9.236061939866,
-      "l2": 1.204381276427,
+      "l1": 0.01237805454905,
+      "l2": 0.001609955738767,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_3d_isoparametric_mesh_soa": {
-      "l1": 9.236061937419,
-      "l2": 1.204381280197,
+      "l1": 0.01237805458029,
+      "l2": 0.0016099557489,
       "material": "scalar_potential"
     },
     "stokes_form_1_p_residual_3d_affine_mesh_soa": {
-      "l1": 2.091808949675,
-      "l2": 0.3506003022402,
+      "l1": 0.1045904474837,
+      "l2": 0.01753001511201,
       "material": "stokes"
     },
     "stokes_form_1_p_residual_3d_isoparametric_mesh_soa": {
-      "l1": 2.091808930239,
-      "l2": 0.3506002926508,
+      "l1": 0.1045904465119,
+      "l2": 0.01753001463254,
       "material": "stokes"
     },
     "stokes_form_1_u_residual_3d_affine_mesh_soa": {
-      "l1": 81.25341075259,
-      "l2": 3.660348841277,
+      "l1": 4.06267053763,
+      "l2": 0.1830174420639,
       "material": "stokes"
     },
     "stokes_form_1_u_residual_3d_isoparametric_mesh_soa": {
-      "l1": 81.25340613445,
-      "l2": 3.660348568647,
+      "l1": 4.062670306722,
+      "l2": 0.1830174284324,
       "material": "stokes"
     },
     "stokes_form_2_p_u_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 2.426532883688,
-      "l2": 0.4068920942504,
+      "l1": 0.1213266441844,
+      "l2": 0.02034460471252,
       "material": "stokes"
     },
     "stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 2.426532874158,
-      "l2": 0.4068920847129,
+      "l1": 0.1213266437079,
+      "l2": 0.02034460423564,
       "material": "stokes"
     },
     "stokes_form_2_u_p_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 3.285489740304,
-      "l2": 0.1805403486654,
+      "l1": 0.1642744870152,
+      "l2": 0.009027017433272,
       "material": "stokes"
     },
     "stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 3.285489711743,
-      "l2": 0.1805403441392,
+      "l1": 0.1642744855871,
+      "l2": 0.009027017206961,
       "material": "stokes"
     },
     "stokes_form_2_u_u_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 62.22008798489,
-      "l2": 3.270377276704,
+      "l1": 3.111004399245,
+      "l2": 0.1635188638352,
       "material": "stokes"
     },
     "stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 62.22008451015,
-      "l2": 3.270377034532,
+      "l1": 3.111004225508,
+      "l2": 0.1635188517266,
       "material": "stokes"
     },
     "stokes_jacobian_action_3d_affine_mesh_soa": {
-      "l1": 65.70772137861,
-      "l2": 3.335729954043,
+      "l1": 3.28538606893,
+      "l2": 0.1667864977021,
       "material": "stokes"
     },
     "stokes_jacobian_action_3d_isoparametric_mesh_soa": {
-      "l1": 65.70771772678,
-      "l2": 3.335729721965,
+      "l1": 3.285385886339,
+      "l2": 0.1667864860982,
       "material": "stokes"
     },
     "stokes_residual_3d_affine_mesh_soa": {
-      "l1": 83.34521970227,
-      "l2": 3.677101332812,
+      "l1": 4.167260985113,
+      "l2": 0.1838550666406,
       "material": "stokes"
     },
     "stokes_residual_3d_isoparametric_mesh_soa": {
-      "l1": 83.34521506469,
-      "l2": 3.67710106051,
+      "l1": 4.167260753234,
+      "l2": 0.1838550530255,
       "material": "stokes"
     },
     "two_phase_flow_form_1_p_c_jacobian_action_3d_affine_mesh_soa": {
