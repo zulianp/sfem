@@ -1,5 +1,9 @@
 import sympy as sp
 
+from codegen.framework.plans.form_emission import (
+    form_order,
+    writes_per_shape,
+)
 from codegen.framework.plans.evaluation_strategy import (
     quadrature_scope_lines,
 )
@@ -1165,7 +1169,7 @@ def _sfem_soa_weak_form_block_function(
             params.append(
                 "const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * %d]" % dim
             )
-        if form.name == "objective":
+        if not writes_per_shape(form):
             params.append("scalar_t *const SFEM_RESTRICT value")
         else:
             params.append(
@@ -1244,7 +1248,7 @@ def _sfem_soa_weak_form_block_function(
                 ),
             )
         )
-    if not use_stream_arrays and form.name != "objective":
+    if not use_stream_arrays and writes_per_shape(form):
         lines.append(
             "    scalar_t *const weak_out_streams[N_SHAPE * %d] = {%s};"
             % (
@@ -1519,7 +1523,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
         lines.append("    scalar_t grad_u_ref_q[%s];" % block_extent)
     if uses_direction:
         lines.append("    scalar_t grad_h_ref_q[%s];" % block_extent)
-    if form.name != "objective":
+    if writes_per_shape(form):
         lines.append("    scalar_t loperand_q[%s];" % block_extent)
 
     for row in range(dim):
@@ -1620,7 +1624,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
         weak_form,
         "grad_u",
     )
-    if form.name == "objective":
+    if not writes_per_shape(form):
         _append_weak_objective_accumulation(
             lines,
             form,
@@ -1809,7 +1813,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     % (row * dim + col, " + ".join(terms))
                 )
 
-    if form.name == "objective":
+    if not writes_per_shape(form):
         _append_weak_objective_accumulation(
             lines,
             form,
@@ -1939,7 +1943,7 @@ def _append_sfem_soa_weak_form_lines(
                 lines.append("            scalar_t grad_u_ref%d_values[VECTOR_SIZE];" % idx)
             if uses_direction:
                 lines.append("            scalar_t grad_h_ref%d_values[VECTOR_SIZE];" % idx)
-    if form.name != "objective":
+    if writes_per_shape(form):
         for component in range(dim * dim):
             lines.append("            scalar_t loperand%d_values[VECTOR_SIZE];" % component)
     for row in range(dim):
@@ -2019,7 +2023,7 @@ def _append_sfem_soa_weak_form_lines(
                     % (row * dim + col, " + ".join(terms))
                 )
 
-    if form.name == "objective":
+    if not writes_per_shape(form):
         _append_weak_objective_accumulation(
             lines,
             form,
@@ -2796,7 +2800,7 @@ def _sfem_soa_operator_source(
             if fast_aos_unit_lines:
                 lines.append("")
                 lines.extend(fast_aos_unit_lines)
-            if form.name == "objective" and source_builder.emit_objective_steps:
+            if not writes_per_shape(form) and source_builder.emit_objective_steps:
                 lines.append("")
                 lines.extend(
                     _sfem_soa_mesh_objective_steps_function(
@@ -2836,7 +2840,7 @@ def _sfem_soa_operator_source(
                     source_builder=source_builder,
                 )
             )
-            if form.name == "objective" and source_builder.emit_objective_steps:
+            if not writes_per_shape(form) and source_builder.emit_objective_steps:
                 lines.append("")
                 lines.extend(
                     _sfem_soa_mesh_objective_steps_function(
@@ -3556,7 +3560,7 @@ def _sfem_soa_mesh_operator_function(
             "const scalar_t *const SFEM_RESTRICT h%s" % _component_name(d)
             for d in range(dim)
         )
-    if form.name == "objective":
+    if not writes_per_shape(form):
         output_params = ("scalar_t *const SFEM_RESTRICT value",)
     else:
         output_params = tuple(["const ptrdiff_t out_stride"]) + tuple(
@@ -3649,7 +3653,7 @@ def _sfem_soa_mesh_operator_function(
             lines.append("        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];")
         if uses_direction:
             lines.append("        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];")
-        if form.name != "objective":
+        if writes_per_shape(form):
             lines.append("        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];")
         else:
             lines.append("        scalar_t block_value[VECTOR_SIZE];")
@@ -3744,7 +3748,7 @@ def _sfem_soa_mesh_operator_function(
         if uses_direction:
             lines.append("                    block_h_data[shape * DIM + d][%s] = h_components[d][node * h_stride];" % work_item)
         lines.extend(["                }", "            }", "        }"])
-        if form.name == "objective":
+        if not writes_per_shape(form):
             lines.extend(_work_item_loop_lines(source_builder, "        "))
             lines.extend(["            block_value[%s] = scalar_t(0);" % work_item, "        }"])
         else:
@@ -3832,7 +3836,7 @@ def _sfem_soa_mesh_operator_function(
                         ),
                     )
                 )
-        if form.name != "objective":
+        if writes_per_shape(form):
             if compact_stream_buffers:
                 lines.extend(
                     _ordered_stream_pointer_array_lines(
@@ -3983,7 +3987,7 @@ def _sfem_soa_mesh_operator_function(
             call_args.append("block_u_streams")
         if uses_direction:
             call_args.append("block_h_streams")
-        if form.name == "objective":
+        if not writes_per_shape(form):
             call_args.append("block_value")
         else:
             call_args.append("block_out_streams")
@@ -4005,7 +4009,7 @@ def _sfem_soa_mesh_operator_function(
         lines.append("        }")
     lines.append("")
 
-    if form.name == "objective":
+    if not writes_per_shape(form):
         lines.extend(_work_item_loop_lines(source_builder, "        "))
         lines.append("            value[evbegin + %s] += block_value[%s];" % (work_item, work_item))
         lines.append("        }")
@@ -4684,7 +4688,7 @@ def _sfem_soa_mesh_objective_steps_function(
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
-    if form.name != "objective" or form.weak_form is None:
+    if writes_per_shape(form) or form.weak_form is None:
         return []
     if geometry_mode not in ("affine", "isoparametric"):
         raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
@@ -7876,7 +7880,7 @@ def _sfem_soa_diagnostics_lines(
             "diag_grad",
             scalar_temporaries=True,
         )
-        if form.name == "objective":
+        if not writes_per_shape(form):
             diagnostic_expressions = (
                 form.weak_form.energy_density.xreplace(
                     diagnostic_deformation_substitutions
@@ -8991,7 +8995,7 @@ def _cpp_scalar_literal(value, scalar_type="real_t"):
 
 def _output_stream_names(form, dim, n_nodes):
     if form.weak_form is not None:
-        if form.name == "objective":
+        if not writes_per_shape(form):
             return ("value",)
         return tuple(
             "out%s%d" % (_component_name(d), node)
