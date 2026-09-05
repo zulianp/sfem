@@ -2159,13 +2159,23 @@ derived pattern that cannot be too narrow, a tighter one than the probe's guess,
 reproducibility -- with the speed following at larger coarse levels, where probing costs
 colours and this costs one sweep.
 
-**What this measurement is not.** N=2x1x1 is two macro-elements, and the assembly's parallel
-loop is over macro-elements, so on 8 threads six of them are idle. The 0.78 ms per call is a
-latency, not a throughput, and it says nothing about how the kernel scales -- for that the
-macro-element count has to be large enough to fill the machine, which is the discipline the
-rest of this section already follows for the applies. Parallelising inside a macro-element
-instead would race on the element's local matrix, so the fix if this ever matters is more
-macro-elements, not a different loop.
+That first table is a latency and not a throughput: N=2x1x1 is two macro-elements and the
+assembly parallelises over macro-elements, so six of eight threads sit idle. Filling them, and
+giving the coarse levels enough nodes to matter, changes the picture substantially:
+
+| macro mesh, L=4 | probe, per call | element-wise, per call | speedup | probe share of measured phases |
+|-----------------|-----------------|------------------------|---------|-------------------------------|
+| 2x2x2, 8 elements  | 66.6 ms | **0.56 ms** | 120x | 45.5% -> 0.2% |
+| 4x2x2, 16 elements | 72.0 ms | **0.79 ms** |  92x | 45.6% -> 0.8% |
+
+At these configurations probing is **45% of the measured phase time** and the element-wise
+construction takes it under 1%. That is the scaling the two costs predict: probing pays a
+colouring plus an operator application per colour per component, so it grows with the coarse
+level; this pays one sweep over the macro-elements whatever the level looks like. The 4% share
+seen at N=2x1x1 L=8 was the small end of that, not the typical case.
+
+Parallelising inside a macro-element would race on its local matrix, so the answer if the
+per-element latency ever matters is more macro-elements, not a different loop.
 
 **The Newton step count is not the right measurement, and chasing it wasted a round.** The
 element arm first appeared not to converge at N=2 -- 40 Newton steps against the probe's 27 --
