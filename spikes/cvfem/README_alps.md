@@ -1956,3 +1956,49 @@ exactly what accumulates the local contributions into the coarse BSR.
 
 It also removes the last of the machinery this section has been dismantling: no probing, no
 colouring, no sparsity pattern to derive or guess, and no global fine matrix.
+
+### Element matrices all the way down, BSR only at the coarsest level
+
+Element-locality does more than remove the probe. If the coarse operator is built inside the
+macro element, it can also be *kept* there: each coarse level becomes a set of Galerkin
+element matrices applied with GEMM, and only the coarsest level needs a global sparse matrix,
+because that is the only level that is factorised.
+
+This is SFEM's existing idiom rather than a new one --
+`frontend/ops/sfem_SemiStructuredEMLinearElasticity.hpp` assembles the element matrix on the
+fly and applies it with GEMM -- and the pieces are already in this spike:
+`subpar/cvfem_sshex8_em.hpp`, the `em24`/`em32` bench columns, and
+`packed_elements_matmul_sym` / `_nonsym` in `operators/packed_elements.hpp`.
+
+| coarse lattice | nodes/elem | EM dofs | EM MiB/elem | assembled BSR, 32 elems |
+|----------------|-----------|---------|-------------|-------------------------|
+| level 4 | 125 | 500 | 1.91 | 8.81 |
+| level 2 |  27 | 108 | 0.09 | 1.40 |
+| level 1 |   8 |  32 | 0.01 | 0.27 |
+
+The last hop is a 32x32 element matrix, which is exactly the `em32` shape the bench already
+measures. Note the storage comparison runs the other way at the shallow end: a dense element
+matrix at level 4 costs about seven times the assembled BSR, because it is dense and
+duplicated across shared faces. That is the argument for assembling on the fly at the levels
+where it is large, which is what the linear elasticity path already does, rather than an
+argument against the approach.
+
+One property makes this cleaner than it first appears. The prolongation composed within a
+macro element is itself a trilinear interpolation, so any level's element matrix can be
+formed directly from the fine element operator as `(P_e^{L->l})^T A_e P_e^{L->l}` rather than
+by chaining level-to-level products. Each coarse level is then independent of the others: no
+error accumulates through repeated Galerkin products, and a level can be rebuilt without
+touching its neighbours.
+
+The resulting architecture drops nearly everything this section has been repairing:
+
+- fine level: matrix-free, unchanged
+- intermediate coarse levels: Galerkin element matrices, GEMM apply, assembled on the fly
+  where storage warrants it
+- coarsest level only: assembled BSR, for the dense LU that must stay exact
+
+No probing, no colouring, no sparsity pattern derived or guessed, no SpGEMM, and no global
+sparse matrix above the coarsest level -- so the unsorted-column hazard, the `mm` workspace
+sizing and the host-only serial transpose all stop applying. The coarse block diagonals the
+smoothers need come from summing element contributions, which the deterministic two-pass
+scatter already does.
