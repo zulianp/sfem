@@ -2477,7 +2477,50 @@ int main(int argc, char **argv) {
     // found rather than reasoned about.
     const real_t Re_phys = rho * U * Ly / std::max(mu, real_t(1e-30));
     const real_t rho_re1 = mu / std::max(U * Ly, real_t(1e-30));
-    const int    n_stages = (rho == real_t(0) || Re_phys <= real_t(1.5)) ? 1 : 2;
+
+    // The two-stage scheme above stops working between Re=200 and Re=400.
+    //
+    // Measured at 33,124 dofs: Re=100 converges in 32 Newton steps; Re=200 reaches the
+    // right answer (u_linf 2.90e-07 against the converged Re=100 run's 2.55e-07, both at
+    // discretisation accuracy) but does not satisfy the Newton test within 40 steps; Re=400,
+    // 800 and 3200 diverge outright, to 1e+13, 1e+112 and 1e+87. Every failing run reaches
+    // the navier-stokes stage, so the Re=1 solve always succeeds and the blow-up is always
+    // on the single jump to physical density. The linear solves stay healthy throughout --
+    // 663 to 1289 iterations per Newton step with no trend against Re -- so it is Newton
+    // diverging, not the preconditioner. The jump is what fails, so ramp it.
+    //
+    // Geometric in rho, which is geometric in Re since Re is linear in rho at fixed mu, U
+    // and Ly. SFEM_RE_STEP is the ratio per stage; 4 gives Re = 1, 4, 16, 64, ... and seven
+    // stages to reach 3200. Each stage starts from the previous stage's solution.
+    //
+    // A stage that fails is not fatal: the state is rolled back and a stage is inserted at
+    // the geometric mean of the last success and the failure, up to SFEM_RE_MAX_RETRY times.
+    // That is the cheap half of pseudo-transient continuation -- no timestep term in the
+    // operator, just a smaller step in the parameter -- and it costs nothing when the ramp
+    // is already fine enough, since no retry happens.
+    const real_t re_step   = std::max(real_t(1.5), smesh::Env::read<real_t>("SFEM_RE_STEP", real_t(4)));
+    const int    re_retry  = smesh::Env::read<int>("SFEM_RE_MAX_RETRY", 6);
+
+    std::vector<real_t> rho_schedule;
+    if (rho == real_t(0) || Re_phys <= real_t(1.5)) {
+        rho_schedule.push_back(rho);
+    } else {
+        real_t r = rho_re1;
+        rho_schedule.push_back(r);
+        while (r * re_step < rho) {
+            r *= re_step;
+            rho_schedule.push_back(r);
+        }
+        rho_schedule.push_back(rho);
+    }
+    {
+        std::printf("continuation: %d stages, Re =", (int)rho_schedule.size());
+        for (size_t k = 0; k < rho_schedule.size(); ++k)
+            std::printf(" %g", (double)(rho_schedule[k] * U * Ly / std::max(mu, real_t(1e-30))));
+        std::printf("\n");
+    }
+    std::vector<real_t> x_stage_start((size_t)ndof, real_t(0));
+    int                 re_retries = 0;
 
     double t_op    = 0;  // building the Jacobian operator (assembly, or nothing)
     double t_prec  = 0;  // building the block-Jacobi preconditioner
@@ -2525,13 +2568,15 @@ int main(int argc, char **argv) {
     // against the same reference.
     real_t r0 = 0;
 
-    for (int stage = 0; stage < n_stages; ++stage) {
-    const real_t rho_use = (n_stages == 1 || stage == 1) ? rho : rho_re1;
+    for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
+    const real_t rho_use = rho_schedule[stage];
     op->rho              = rho_use;
-    std::printf("stage: %s  rho: %g  Re: %g\n",
-                (n_stages == 1 || stage == 1) ? "navier-stokes" : "re1",
-                rho_use,
-                rho_use * U * Ly / std::max(mu, real_t(1e-30)));
+    std::copy(x, x + ndof, x_stage_start.begin());
+    std::printf("stage %d/%d: rho: %g  Re: %g\n",
+                (int)stage + 1,
+                (int)rho_schedule.size(),
+                (double)rho_use,
+                (double)(rho_use * U * Ly / std::max(mu, real_t(1e-30))));
 
     converged = false;
     for (newton_it = 0; newton_it <= max_newton; ++newton_it) {
@@ -2760,9 +2805,39 @@ int main(int argc, char **argv) {
         }
         std::printf("  lin_it: %d  |dx|_inf: %.6e\n", get_its(), dxinf);
     }
-    if (!converged) break;
+    if (!converged) {
+        // Roll back and halve the step in log space rather than giving up. The stage that
+        // failed is retried from the last state known to be good, via an intermediate Re.
+        if (stage > 0 && re_retries < re_retry) {
+            std::copy(x_stage_start.begin(), x_stage_start.end(), x);
+            const real_t prev = rho_schedule[stage - 1];
+            const real_t mid  = std::sqrt(prev * rho_use);
+            rho_schedule.insert(rho_schedule.begin() + (ptrdiff_t)stage, mid);
+            ++re_retries;
+            std::printf("  stage failed; retrying via Re = %g (retry %d/%d)\n",
+                        (double)(mid * U * Ly / std::max(mu, real_t(1e-30))), re_retries, re_retry);
+            --stage;  // the for-increment lands back on the inserted stage
+            continue;
+        }
+        break;
+    }
     }
 
+    // Report the Reynolds number actually reached, not just the one asked for.
+    //
+    // With continuation the run can stall partway up the ramp and still look healthy: for
+    // Poiseuille the exact solution is a parabolic profile *independent of Re*, so u_linf
+    // measures agreement with the same analytic answer whatever Re the state is at. A run
+    // that stalled at Re=75 on the way to Re=200 reports the same u_linf as one that
+    // arrived. Only this line distinguishes them.
+    {
+        const real_t re_reached = op->rho * U * Ly / std::max(mu, real_t(1e-30));
+        const bool   at_target  = std::fabs(re_reached - Re_phys) <= real_t(1e-6) * Re_phys;
+        std::printf("continuation: reached Re = %g of %g target  %s\n",
+                    (double)re_reached, (double)Re_phys,
+                    at_target ? "(AT TARGET)" : "(STALLED SHORT OF TARGET)");
+        if (!at_target) converged = false;
+    }
     std::printf("newton_converged: %d  newton_it: %d  lin_it_total: %d\n", converged ? 1 : 0, newton_it, lin_it_total);
     std::printf("matrix_free: %d  t_operator: %.4f s  t_precond: %.4f s  t_solve: %.4f s  us_per_lin_it: %.2f\n",
                 matrix_free,
