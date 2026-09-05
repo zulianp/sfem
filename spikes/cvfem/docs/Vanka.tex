@@ -250,6 +250,57 @@ and a rate near or above 1 must be treated as disqualifying however good it look
 first few sweeps, because the rate can fall for twenty sweeps and then climb through unity.
 \end{tcolorbox}
 
+\section{Is Vanka a Navier--Stokes smoother, or only a Stokes one?}
+
+It is a Navier--Stokes smoother by origin: Vanka's 1986 papers solve the primitive-variable
+Navier--Stokes equations on recirculating cavity flows, not Stokes, and Vanka-type smoothers
+are standard in finite-element Navier--Stokes multigrid. The ``Stokes smoother'' impression
+comes from the \emph{analysis}, not the method --- local Fourier analysis needs a linear,
+constant-coefficient operator, so published LFA rates are almost always Stokes rates.
+
+\begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=\bfseries What the 0.08 does and does not mean]
+The LFA rates quoted in this document measure how well the smoother handles the
+\textbf{saddle-point coupling}. They say nothing about \textbf{convection dominance}, which is
+a second and independent difficulty:
+\begin{itemize}[leftmargin=*,topsep=2pt]
+\item At low $\Rey$ the momentum block $F$ is essentially elliptic, and a local patch solve is
+a good local approximation --- the regime the LFA describes.
+\item As $\Rey$ rises, $F$ becomes convection-dominated and nearly hyperbolic. Information
+travels along streamlines, which is exactly what a \emph{local} smoother cannot follow. The
+classical remedies are flow-aligned (downstream) ordering of the multiplicative sweep, or line
+and plane smoothers, or semi-coarsening --- not a larger patch.
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Why it is still the right first step here}
+Our measured failure is at $\Rey = 1$: $\rho = 0.981$ in what is essentially the Stokes limit.
+That is a pure saddle-point-coupling failure, precisely the thing Vanka fixes, and it has to be
+fixed before Reynolds robustness is a meaningful question at all. Two separate problems are
+being conflated if we skip it:
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Symptom & Regime & Remedy \\
+\midrule
+$\rho = 0.981$ at $\Rey=1$ & Stokes limit & \textbf{Vanka} (this document) \\
+divergence at $\Rey \ge 400$ & convection-dominated & AL preconditioner, or ordering/semi-coarsening \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{What Vanka is unlikely to do}
+It should not be assumed that Vanka alone reaches $\Rey \ge 400$. For Reynolds robustness the
+reference result is the augmented-Lagrangian preconditioner of Farrell, Mitchell \& Wechsung
+(\href{https://arxiv.org/pdf/1810.03315}{arXiv:1810.03315}), which holds 4--8 Krylov iterations
+per Newton step to $\Rey = 10\,000$. That is not a drop-in replacement for a smoother: the
+augmented term $\gamma B^{\mathsf T}W^{-1}B$ makes the momentum block nearly singular, with a
+large kernel, and their multigrid uses a \emph{kernel-capturing subspace-correction} smoother
+built for that structure rather than Vanka.
+
+The realistic plan is therefore two-stage: Vanka to recover a working smoother in the
+Stokes-limit sense, then reassess Reynolds robustness on the evidence, with augmented
+Lagrangian as the expected second step if the Re sweep still degrades.
+
 \section{Risks and open questions}
 \begin{itemize}[leftmargin=*]
 \item \textbf{Colocated patches are not the classical construction.} Vanka's rates are
@@ -260,9 +311,8 @@ only evidence that will count.
 the stabilisation scale $D_f = \text{rc}\,h^2/(2\mu)$ grows as $\Rey$ rises and as the mesh
 coarsens; the patch conditioning should be checked across the hierarchy, not only on the fine
 level.
-\item \textbf{Convection dominance.} All published rates cited here are for Stokes. Our failure
-is at $\Rey \ge 200$, where the convective term dominates, and no Stokes rate speaks to that
-directly. Measuring the Reynolds dependence of whatever smoother we adopt is not optional.
+\item \textbf{Convection dominance} --- see the section above. No Stokes rate speaks to it,
+and measuring the Reynolds dependence of whatever smoother we adopt is not optional.
 \item \textbf{Coarse levels.} The coarse levels are assembled BSR, not matrix-free, so their
 patch operators must be extracted from the assembled matrix instead of from the cell kernel ---
 a second, simpler code path.
