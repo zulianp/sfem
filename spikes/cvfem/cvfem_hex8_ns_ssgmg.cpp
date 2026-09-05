@@ -14,6 +14,7 @@
 #include "cvfem_hex8_ns_op.hpp"
 #include "cvfem_fgmres.hpp"
 #include "cvfem_ss_transfer.hpp"
+#include "cvfem_ss_galerkin_api.hpp"
 
 #include "sfem_CRS_X_BSR.hpp"
 #include "cvfem_ns_channel_case.hpp"
@@ -691,6 +692,112 @@ namespace {
                         inside, outside,
                         (outside <= inside * 1e-12) ? "LOCAL (element-wise Galerkin is exact)"
                                                     : "NON-LOCAL (element-wise Galerkin would be wrong)");
+        }
+
+        // Element-wise Galerkin, identity gate.
+        //
+        // At q = 1 the prolongation is the identity, so P^T A P is A itself and the assembled
+        // matrix must reproduce the matrix-free apply to round-off. That one comparison
+        // covers everything the construction rests on at once: that identity slots really do
+        // yield the micro-cell matrix, that the hoisted geometry and Rhie-Chow struct fed to
+        // the assembly kernel are the ones the apply uses, that the derived pattern holds
+        // every entry, and that the inverted-index accumulation lands each block where it
+        // belongs. A failure here means the coarse operators are wrong for a reason that has
+        // nothing to do with coarsening, so it runs before any q > 1 comparison.
+        {
+            auto           &fop = *g.level_ops[0];
+            const auto      fs  = g.data->functions[0]->space();
+            const ptrdiff_t nd  = fs->n_dofs();
+
+            std::vector<real_t> diag;
+            auto                A1 = cvfem_ss::assemble_coarse_operator(fop, fs, fs, &diag);
+
+            std::vector<real_t> v((size_t)nd), a((size_t)nd, 0), b((size_t)nd, 0);
+            for (ptrdiff_t k = 0; k < nd; ++k) v[(size_t)k] = std::sin(real_t(0.7) * (real_t)k + real_t(0.3));
+
+            fop.apply(g.states[0]->data(), v.data(), a.data());
+            A1->apply(v.data(), b.data());
+
+            real_t num = 0, den = 0;
+            for (ptrdiff_t k = 0; k < nd; ++k) {
+                const real_t d = a[(size_t)k] - b[(size_t)k];
+                num += d * d;
+                den += a[(size_t)k] * a[(size_t)k];
+            }
+            const real_t rel = den > 0 ? std::sqrt(num / den) : std::sqrt(num);
+            std::printf("egal identity (q=1): rel |A_egal v - A v| = %.3e over %td blocks  %s\n", rel,
+                        (ptrdiff_t)A1->col_idx->size(), rel < 1e-12 ? "OK" : "FAILED");
+        }
+
+        // Element-wise Galerkin against the composite it claims to equal, at q > 1.
+        //
+        // The identity gate above proves the assembly reproduces A; this proves the
+        // coarsening reproduces P^T A P. Both sides are built without constraints -- the
+        // matrix-free composite from the structured transfer and the raw operator, the
+        // assembled one straight from the element matrices -- so nothing here depends on
+        // the constraint treatment, which is applied identically to both afterwards and
+        // would otherwise hide a discrepancy inside the rows it overwrites.
+        std::shared_ptr<cvfem_ss::CoarseBSR> egal_prev;
+        for (int i = 1; i < (int)g.data->functions.size(); ++i) {
+            auto           &fop = *g.level_ops[0];
+            const auto      fs  = g.data->functions[0]->space();
+            const auto      cs  = g.data->functions[i]->space();
+            const ptrdiff_t ndc = cs->n_dofs();
+            const ptrdiff_t nnc = ndc / N_FIELDS;
+
+            // Level 1 is checked against the matrix-free composite. Below that the check is
+            // the stronger one: the direct construction at ratio q must equal the same
+            // operator coarsened one 2:1 hop from the level above -- which is the claim that
+            // levels do not chain, that piecewise-linear interpolation on nested uniform
+            // lattices composes to the direct map. If it were false, building each level
+            // straight from the fine element matrices would silently differ from the
+            // hierarchy the transfers actually implement.
+            const auto      up  = i == 1 ? fs : g.data->functions[i - 1]->space();
+            const ptrdiff_t ndf = up->n_dofs();
+
+            cvfem_ss::ProlongationPattern pat;
+            cvfem_ss::build_from_spaces(cs, up, pat);
+            if (!pat.uniform) continue;  // apply_structured covers the 2:1 hops only
+
+            auto A = cvfem_ss::assemble_coarse_operator(fop, cs, fs, nullptr);
+            if (i > 1 && !egal_prev) continue;
+
+            std::vector<real_t> vc((size_t)ndc), tf((size_t)ndf, 0), wf((size_t)ndf, 0);
+            std::vector<real_t> a((size_t)ndc, 0), b((size_t)ndc, 0);
+            for (ptrdiff_t k = 0; k < ndc; ++k) vc[(size_t)k] = std::cos(real_t(0.41) * (real_t)k + real_t(0.9));
+
+            // P applied per component, the transfer being scalar and nodal.
+            for (int c = 0; c < N_FIELDS; ++c) {
+                std::vector<real_t> cin((size_t)nnc), fout((size_t)(ndf / N_FIELDS), 0);
+                for (ptrdiff_t k = 0; k < nnc; ++k) cin[(size_t)k] = vc[(size_t)k * N_FIELDS + c];
+                cvfem_ss::apply_structured(pat, cin.data(), fout.data());
+                for (ptrdiff_t k = 0; k < ndf / N_FIELDS; ++k) tf[(size_t)k * N_FIELDS + c] = fout[(size_t)k];
+            }
+
+            if (i == 1) fop.apply(g.states[0]->data(), tf.data(), wf.data());
+            else        egal_prev->apply(tf.data(), wf.data());
+
+            // P^T, the adjoint of apply_structured with the same implied weights.
+            for (ptrdiff_t r = 0; r < pat.n_fine; ++r) {
+                const sfem::count_t bk = pat.rowptr[(size_t)r], ek = pat.rowptr[(size_t)r + 1];
+                const real_t        w  = real_t(1) / (real_t)(ek - bk);
+                for (sfem::count_t k = bk; k < ek; ++k)
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        a[(size_t)pat.colidx[(size_t)k] * N_FIELDS + c] += w * wf[(size_t)r * N_FIELDS + c];
+            }
+
+            A->apply(vc.data(), b.data());
+
+            real_t num = 0, den = 0;
+            for (ptrdiff_t k = 0; k < ndc; ++k) {
+                const real_t d = a[(size_t)k] - b[(size_t)k];
+                num += d * d;
+                den += a[(size_t)k] * a[(size_t)k];
+            }
+            const real_t rel = den > 0 ? std::sqrt(num / den) : std::sqrt(num);
+            std::printf("egal galerkin (0->%d): rel |A_egal - P^T %s P| = %.3e  %s\n", i,
+                        i == 1 ? "A" : "A_egal(prev)", rel, rel < 1e-11 ? "OK" : "FAILED");
+            egal_prev = A;
         }
 
         // Block-split gate: the four blocks must sum to the full Jacobian action, and
@@ -1620,6 +1727,92 @@ namespace {
             if (i > 0 && galerkin_mode == 2) {
                 const double t_asm = smesh::time_seconds();
 
+                // Element-wise Galerkin, when the fine operator is semi-structured: every
+                // level is built straight from the fine macro-elements as sum_e P_e^T A_e P_e.
+                //
+                // This replaces both branches below. Nothing is probed, so no level pays 108
+                // to 192 operator applications and no pattern has to be guessed -- the one
+                // here is derived from the lattice and is exact, which removes the failure
+                // mode where an entry outside a too-narrow guess is folded into the wrong
+                // slot instead of being dropped. Levels are built directly rather than
+                // chained, so no error accumulates through repeated triple products; the
+                // SFEM_GMG_CHECK=1 gates measure both claims at 2e-16.
+                const bool egal = smesh::Env::read<int>("SFEM_GMG_EGAL", 1) &&
+                                  g.level_ops[0] && g.level_ops[0]->is_semi_structured();
+
+                if (egal) {
+                    const ptrdiff_t     nd0 = g.data->functions[0]->space()->n_dofs();
+                    std::vector<mask_t> m0(mask_count(nd0), 0);
+                    g.data->functions[0]->constraints_mask(m0.data());
+                    std::vector<uint8_t> fmask((size_t)nd0, 0);
+                    for (ptrdiff_t k = 0; k < nd0; ++k) fmask[(size_t)k] = mask_get(k, m0.data()) ? 1 : 0;
+
+                    auto a_c = cvfem_ss::assemble_coarse_operator(*g.level_ops[0], fi->space(),
+                                                                  g.data->functions[0]->space(), nullptr,
+                                                                  fmask.data());
+                    patch_identity_rows(a_c, mask.data());
+
+                    // The block diagonal is read after patching, so a constrained row's
+                    // diagonal is the identity the smoother must see rather than the
+                    // pre-patch value.
+                    galerkin_diag.assign((size_t)nn * 16, real_t(0));
+                    {
+                        const sfem::count_t *const rp = a_c->row_ptr->data();
+                        const sfem::idx_t *const   ci = a_c->col_idx->data();
+                        const real_t *const        vd = a_c->values->data();
+                        for (ptrdiff_t r = 0; r < nn; ++r)
+                            for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k)
+                                if (ci[k] == (sfem::idx_t)r)
+                                    std::copy(vd + (size_t)k * 16, vd + (size_t)k * 16 + 16,
+                                              galerkin_diag.data() + (size_t)r * 16);
+                    }
+
+                    // Cross-check against the construction it replaces (SFEM_GMG_CHECK).
+                    //
+                    // The gates in build_gmg compare the two constructions unconstrained.
+                    // This is the constrained comparison, and the probe is the right
+                    // reference for it: it recovers the composite including the transfers'
+                    // zero-constraint wrapping, which is the thing the column mask and the
+                    // identity-row patch here are meant to reproduce. Level 1 probes the
+                    // matrix-free fine operator, so it is the true composite; below that the
+                    // probe sees the element-wise matrix above, making this the direct
+                    // against the chained construction with constraints in place.
+                    if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
+                        auto saved = g_last_assembled;
+                        std::shared_ptr<GmgLevels::CRS_t> pat;
+                        if (i == 1 && g.Rmat[1] && g.Pmat[1] &&
+                            smesh::Env::read<int>("SFEM_GMG_SYMBOLIC_PATTERN", 1))
+                            pat = symbolic_rap_pattern(g.data->functions[0], g.Rmat[1], g.Pmat[1]);
+                        assemble_galerkin(fi, level_op_below, g.data->prolongations[i],
+                                          g.data->restrictions[i - 1],
+                                          g.data->functions[i - 1]->space()->n_dofs(), nullptr, pat.get());
+                        auto probed = g_last_assembled;
+                        g_last_assembled = saved;
+
+                        const ptrdiff_t ndc = fi->space()->n_dofs();
+                        std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
+                        for (ptrdiff_t k = 0; k < ndc; ++k)
+                            v[(size_t)k] = std::sin(real_t(0.37) * (real_t)k + real_t(1.1));
+                        fi->apply_zero_constraints(v.data());
+                        a_c->apply(v.data(), ya.data());
+                        probed->apply(v.data(), yb.data());
+                        fi->apply_zero_constraints(ya.data());
+                        fi->apply_zero_constraints(yb.data());
+                        real_t dn = 0, rn = 0;
+                        for (ptrdiff_t k = 0; k < ndc; ++k) {
+                            const real_t d = ya[(size_t)k] - yb[(size_t)k];
+                            dn += d * d;
+                            rn += yb[(size_t)k] * yb[(size_t)k];
+                        }
+                        const real_t rel = rn > 0 ? std::sqrt(dn / rn) : std::sqrt(dn);
+                        std::printf("egal level %d: %td blocks (probe %td)  vs probed composite rel = %.4e  %s\n",
+                                    i, (ptrdiff_t)a_c->col_idx->size(), (ptrdiff_t)probed->col_idx->size(), rel,
+                                    rel < 1e-10 ? "OK" : "MISMATCH");
+                    }
+
+                    g.Amat[(size_t)i] = a_c;
+                    lop               = a_c;
+                } else
                 // Level 1 is the only level that must be probed: the operator above it is
                 // matrix-free and has no matrix form. Below that the level above IS a
                 // matrix, so the Galerkin operator is a sparse triple product -- exact

@@ -27,6 +27,11 @@
 #include <string>
 #include <vector>
 
+// The semi-structured kernel's mesh view. Forward-declared so a driver that wants to build
+// element-wise Galerkin coarse operators can reach the lattice without this header pulling in
+// the whole sshex8 kernel; see semi_structured_data().
+struct SSMeshData;
+
 namespace sfem {
 
     // Mirrors the core's GeomKind, restated so a driver need not include the core to say
@@ -61,6 +66,13 @@ namespace sfem {
         // macro-element. It ignores `geom` for the same reason, and refuses hessian_bsr --
         // an assembled matrix per level is the memory a hierarchy exists to avoid.
         bool is_semi_structured() const;
+
+        // The macro-element lattice, or null when the flat path is running. Exposed for
+        // element-wise Galerkin coarsening, which needs the same gather, geometry and state
+        // the apply uses -- rebuilding them beside the operator would be a second copy of
+        // the arithmetic that could drift from this one. Valid only after initialize(), and
+        // its state fields only after update().
+        const ::SSMeshData *semi_structured_data() const;
 
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;
