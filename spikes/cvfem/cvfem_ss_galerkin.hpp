@@ -647,4 +647,134 @@ namespace cvfem_ss {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Coarsening a level's element matrices by one hop, entirely inside the macro-element.
+    //
+    // This is what makes the whole hierarchy element-wise rather than only level 1. The
+    // obstacle was never the algebra, it was that the transfers zero constrained dofs at each
+    // hop, so a level built straight from level 0 skips the intermediate Z's. SFEM already
+    // carries what is needed to not skip them: create_gmg_data derefines the Function at every
+    // level (`f_prev->derefine(fs_next, true)`), so each level has its own constraints, and the
+    // transfers apply them as R = Z_coarse Rhat and P = Z_fine Phat. The composite at a hop is
+    // therefore
+    //
+    //     Z_i Rhat A_{i-1} Z_{i-1} Phat
+    //
+    // -- mask the source level's columns with the source level's own mask, contract with the
+    // plain interpolation, and patch identity rows at the target. That is the same recipe the
+    // rap branch uses (mask_block_columns, rap, patch_identity_rows), and the same one the
+    // fine-level assembly above already applies to its micro-cell matrices. Because the mask
+    // acts on the *matrix* and not on the transfer, the interpolation stays scalar: no
+    // per-component prolongation is needed even though the constraints are per component.
+    //
+    // Both source and target lattices live in the same macro-element, so the hop is local and
+    // needs no global matrix.
+    //
+    // The coarse stencil stays 27-point. A source node and its 27-neighbour land on coarse
+    // nodes at most one lattice step apart: reaching two would need the two source nodes'
+    // coarse floors to differ while the upper one is off-lattice, and a differing floor forces
+    // it to be on-lattice. That holds for any ratio, not only 2:1.
+
+    struct HopSupp {
+        int      n{0};
+        int      col[8];
+        int      cc[8][3];
+        scalar_t w[8];
+    };
+
+    // Where a source-lattice node interpolates from on the target lattice.
+    inline void hop_support(const int Lout, const int q, const int x, const int y, const int z, HopSupp &h) {
+        int      cx[2], cy[2], cz[2];
+        scalar_t wx[2], wy[2], wz[2];
+        auto     axis = [q](const int v, int c[2], scalar_t w[2]) -> int {
+            const int a = v / q, r = v % q;
+            c[0] = a;
+            if (!r) {
+                w[0] = scalar_t(1);
+                return 1;
+            }
+            c[1] = a + 1;
+            w[0] = scalar_t(1) - (scalar_t)r / (scalar_t)q;
+            w[1] = (scalar_t)r / (scalar_t)q;
+            return 2;
+        };
+        const int nx = axis(x, cx, wx), ny = axis(y, cy, wy), nz = axis(z, cz, wz);
+
+        h.n = 0;
+        for (int k = 0; k < nz; ++k)
+            for (int j = 0; j < ny; ++j)
+                for (int i = 0; i < nx; ++i) {
+                    h.cc[h.n][0]  = cx[i];
+                    h.cc[h.n][1]  = cy[j];
+                    h.cc[h.n][2]  = cz[k];
+                    h.col[h.n]    = sscvfem_lidx(Lout, cx[i], cy[j], cz[k]);
+                    h.w[h.n]      = wx[i] * wy[j] * wz[k];
+                    ++h.n;
+                }
+    }
+
+    // out must already carry Lc, nc, nmacro, gid and n_coarse for the target level.
+    // mask_in is one byte per source-level dof (node * 4 + component).
+    inline SFEM_NOINLINE void galerkin_hop(const GalerkinLevel &in, const uint8_t *const mask_in,
+                                           GalerkinLevel &out) {
+        SFEM_TRACE_SCOPE("cvfem_ss::galerkin_hop");
+        const int Lin = in.Lc, Lout = out.Lc;
+        const int q = Lin / Lout;
+        if (q < 1 || Lin % Lout) SFEM_ERROR("galerkin_hop: level %d does not divide %d\n", Lout, Lin);
+
+        // Depends on lattice position alone, so it is shared by every macro-element.
+        std::vector<HopSupp> hs((size_t)in.nc);
+        for (int z = 0; z <= Lin; ++z)
+            for (int y = 0; y <= Lin; ++y)
+                for (int x = 0; x <= Lin; ++x)
+                    hop_support(Lout, q, x, y, z, hs[(size_t)sscvfem_lidx(Lin, x, y, z)]);
+
+        out.e0 = 0;
+        out.e1 = out.nmacro;
+        out.C.assign((size_t)out.nmacro * (size_t)out.nc * 27 * 16, scalar_t(0));
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t e = 0; e < out.nmacro; ++e) {
+            const scalar_t *const SFEM_RESTRICT Ci = in.C.data() + (size_t)(e - in.e0) * (size_t)in.nc * 27 * 16;
+            scalar_t *const SFEM_RESTRICT       Co = out.C.data() + (size_t)e * (size_t)out.nc * 27 * 16;
+
+            for (int i = 0; i < in.nc; ++i) {
+                const HopSupp &hi = hs[(size_t)i];
+                for (int s = 0; s < 27; ++s) {
+                    const int nb = gal_neighbour(Lin, i, s);
+                    if (nb < 0) continue;
+
+                    scalar_t m[16];
+                    const scalar_t *const SFEM_RESTRICT blk = Ci + ((size_t)i * 27 + (size_t)s) * 16;
+                    for (int t = 0; t < 16; ++t) m[t] = blk[t];
+
+                    // Z on the source level's columns: the block's column node is the
+                    // neighbour, so a constrained (node, component) kills that component's
+                    // column of this block.
+                    if (mask_in) {
+                        const size_t gn = (size_t)in.gid[(size_t)e * in.nc + nb];
+                        for (int c = 0; c < 4; ++c)
+                            if (mask_in[gn * 4 + (size_t)c])
+                                for (int r = 0; r < 4; ++r) m[r * 4 + c] = scalar_t(0);
+                    }
+
+                    const HopSupp &hj = hs[(size_t)nb];
+                    for (int ka = 0; ka < hi.n; ++ka) {
+                        const scalar_t wa = hi.w[ka];
+                        scalar_t *const SFEM_RESTRICT row = Co + ((size_t)hi.col[ka] * 27) * 16;
+                        for (int kb = 0; kb < hj.n; ++kb) {
+                            const int slot = (hj.cc[kb][2] - hi.cc[ka][2] + 1) * 9 +
+                                             (hj.cc[kb][1] - hi.cc[ka][1] + 1) * 3 +
+                                             (hj.cc[kb][0] - hi.cc[ka][0] + 1);
+                            const scalar_t                w   = wa * hj.w[kb];
+                            scalar_t *const SFEM_RESTRICT dst = row + (size_t)slot * 16;
+#pragma omp simd
+                            for (int t = 0; t < 16; ++t) dst[t] += w * m[t];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }  // namespace cvfem_ss

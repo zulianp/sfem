@@ -1664,6 +1664,35 @@ namespace {
         const bool galerkin      = galerkin_mode == 1;
         std::shared_ptr<sfem::Operator<real_t>> level_op_below;
         std::vector<real_t>                     galerkin_diag;
+
+        // The whole element-wise hierarchy, built in one pass before the level loop.
+        //
+        // Level 1 comes from the micro-cell matrices; every level below is one element-local
+        // coarsening hop from the level above, masking that level's columns with its own
+        // constraints. Those constraints already exist -- create_gmg_data derefines the
+        // Function at each level -- which is what makes the hops reproduce the composite the
+        // transfers define (Z_i Rhat A_{i-1} Z_{i-1} Phat) instead of skipping the
+        // intermediate Z's, the omission that gave wrong block diagonals when every level was
+        // built straight from level 0.
+        cvfem_ss::CoarseHierarchy egal_hier;
+        const bool                egal_on = smesh::Env::read<int>("SFEM_GMG_EGAL", 1) && galerkin_mode == 2 &&
+                                            g.level_ops[0] && g.level_ops[0]->is_semi_structured();
+        if (egal_on) {
+            const double t_h = smesh::time_seconds();
+            std::vector<std::shared_ptr<sfem::FunctionSpace>> spaces;
+            std::vector<std::vector<uint8_t>>                 masks;
+            for (int l = 0; l < nlevels; ++l) {
+                spaces.push_back(g.data->functions[l]->space());
+                const ptrdiff_t     nd = spaces.back()->n_dofs();
+                std::vector<mask_t> m(mask_count(nd), 0);
+                g.data->functions[l]->constraints_mask(m.data());
+                std::vector<uint8_t> b((size_t)nd, 0);
+                for (ptrdiff_t k = 0; k < nd; ++k) b[(size_t)k] = mask_get(k, m.data()) ? 1 : 0;
+                masks.push_back(std::move(b));
+            }
+            egal_hier = cvfem_ss::assemble_hierarchy(*g.level_ops[0], g.states[0]->data(), spaces, masks);
+            phase_add("galerkin_assembly", smesh::time_seconds() - t_h);
+        }
         auto       wrap_p  = [&](const int i) -> std::shared_ptr<sfem::Operator<real_t>> {
             auto P = g.data->prolongations[i];
             if (!P || (!pfilter && cgc == real_t(1))) return P;
@@ -1749,63 +1778,16 @@ namespace {
                 // compared -- they differed by 1.2e-2 at level 2 and 5.7e-2 at level 3, and a
                 // smoother given wrong diagonals cost the solve its convergence (40 Newton
                 // steps against 27) while every operator gate still passed.
-                const bool egal = smesh::Env::read<int>("SFEM_GMG_EGAL", 1) && i == 1 &&
-                                  g.level_ops[0] && g.level_ops[0]->is_semi_structured();
+                const bool egal = egal_on && egal_hier.A[(size_t)i];
 
                 if (egal) {
-                    const ptrdiff_t     nd0 = g.data->functions[0]->space()->n_dofs();
-                    std::vector<mask_t> m0(mask_count(nd0), 0);
-                    g.data->functions[0]->constraints_mask(m0.data());
-                    std::vector<uint8_t> fmask((size_t)nd0, 0);
-                    for (ptrdiff_t k = 0; k < nd0; ++k) fmask[(size_t)k] = mask_get(k, m0.data()) ? 1 : 0;
 
-                    // Element matrices instead of a matrix, on every level but the coarsest
-                    // -- which stays assembled because it is the one that gets factorised.
-                    // This is the "BSR only at the coarsest" form; it is off by default until
-                    // the two applies have been measured against each other, since it trades
-                    // about 1.4 to 2 times the block multiplies for contiguous blocks and no
-                    // column indirection.
-                    if (smesh::Env::read<int>("SFEM_GMG_EGAL_EM", 0) && i + 1 < nlevels) {
-                        const ptrdiff_t      ndc = fi->space()->n_dofs();
-                        std::vector<uint8_t> cmask((size_t)ndc, 0);
-                        for (ptrdiff_t k = 0; k < ndc; ++k)
-                            cmask[(size_t)k] = mask_get(k, mask.data()) ? 1 : 0;
-
-                        auto em = cvfem_ss::make_element_matrix_level(*g.level_ops[0], fi->space(),
-                                                                      g.data->functions[0]->space(),
-                                                                      &galerkin_diag, fmask.data(), cmask.data());
-
-                        if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0)) {
-                            // The element-matrix apply must equal the assembled one it
-                            // replaces. Same construction, same constraint treatment, so a
-                            // difference here is the apply itself.
-                            auto ref = cvfem_ss::assemble_coarse_operator(*g.level_ops[0], fi->space(),
-                                                                          g.data->functions[0]->space(), nullptr,
-                                                                          fmask.data());
-                            patch_identity_rows(ref, mask.data());
-                            std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
-                            for (ptrdiff_t k = 0; k < ndc; ++k)
-                                v[(size_t)k] = std::cos(real_t(0.23) * (real_t)k + real_t(0.5));
-                            em->apply(v.data(), ya.data());
-                            ref->apply(v.data(), yb.data());
-                            real_t dn = 0, rn = 0;
-                            for (ptrdiff_t k = 0; k < ndc; ++k) {
-                                const real_t d = ya[(size_t)k] - yb[(size_t)k];
-                                dn += d * d;
-                                rn += yb[(size_t)k] * yb[(size_t)k];
-                            }
-                            const real_t rel = rn > 0 ? std::sqrt(dn / rn) : std::sqrt(dn);
-                            std::printf("egal EM level %d: rel |A_em v - A_bsr v| = %.4e  %s\n", i, rel,
-                                        rel < 1e-12 ? "OK" : "MISMATCH");
-                        }
-
-                        g.Amat[(size_t)i] = nullptr;
-                        lop               = em;
-                    } else {
-
-                    auto a_c = cvfem_ss::assemble_coarse_operator(*g.level_ops[0], fi->space(),
-                                                                  g.data->functions[0]->space(), nullptr,
-                                                                  fmask.data());
+                    // NOTE: keeping a level as element matrices (SFEM_GMG_EGAL_EM) is
+                    // wired out for now. It is newly *possible* -- the hop below coarsens
+                    // element matrices to element matrices without ever assembling -- but the
+                    // driver still takes each level's operator as a matrix, so exercising it
+                    // means changing that, not just this branch.
+                    auto a_c = egal_hier.A[(size_t)i];
                     patch_identity_rows(a_c, mask.data());
 
                     // The block diagonal is read after patching, so a constrained row's
@@ -1887,7 +1869,6 @@ namespace {
 
                     g.Amat[(size_t)i] = a_c;
                     lop               = a_c;
-                    }
                 } else
                 // Level 1 is the only level that must be probed: the operator above it is
                 // matrix-free and has no matrix form. Below that the level above IS a
