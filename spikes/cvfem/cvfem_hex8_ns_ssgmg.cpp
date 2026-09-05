@@ -2621,6 +2621,26 @@ int main(int argc, char **argv) {
     int    newton_total = 0;
     int    stages_run   = 0;
     real_t rho_solved   = 0;  // highest rho whose stage actually converged
+
+    // Globalization. Two things the Newton loop was missing, both standard practice in the
+    // implicit CFD codes surveyed in docs/CVFEM_SotA.tex:
+    //
+    //   * a residual merit function controlling the step, so an update that does not reduce
+    //     ||R|| is backtracked rather than accepted. LAURA's Algorithm 1 does exactly this and
+    //     treats a line-search parameter below 0.1 as the signal to give up on the step;
+    //     HANIM discards any update failing its merit test and never re-linearises.
+    //   * early divergence detection, so a stage that is going to fail fails FAST. At Re=1000
+    //     the Re=1000 stage burned the full 40 Newton steps on each of four attempts while the
+    //     residual grew monotonically -- 344 Newton steps and 183 s to discover the ramp could
+    //     not get past 843.
+    //
+    // Both feed the continuation: a stage that reports failure early triggers the adaptive
+    // bisection that much sooner.
+    const bool   ls_on     = smesh::Env::read<int>("SFEM_NL_LINESEARCH", 1) != 0;
+    const int    ls_max    = smesh::Env::read<int>("SFEM_NL_MAX_LS", 8);
+    const real_t ls_armijo = smesh::Env::read<real_t>("SFEM_NL_ARMIJO", real_t(1e-4));
+    const real_t div_grow  = smesh::Env::read<real_t>("SFEM_NL_DIVERGE", real_t(1e3));
+    std::vector<real_t> x_try((size_t)ndof, 0), r_try((size_t)ndof, 0);
     bool converged    = false;
     // Set once from the first nonzero residual and kept across stages, as in the
     // standalone driver: the continuation stage and the physical stage are measured
@@ -2638,6 +2658,8 @@ int main(int argc, char **argv) {
                 (double)(rho_use * U * Ly / std::max(mu, real_t(1e-30))));
 
     converged = false;
+    real_t r_stage0 = 0;   // this stage's initial residual, the divergence reference
+    bool   diverged = false;
     for (newton_it = 0; newton_it <= max_newton; ++newton_it) {
         std::fill(r.begin(), r.end(), real_t(0));
         { const double t0 = smesh::time_seconds();
@@ -2659,6 +2681,15 @@ int main(int argc, char **argv) {
         std::printf("newton %d  ||R||: %.6e  rel: %.6e\n", newton_it, rnorm, rel);
         if (rnorm < nl_atol || rel < nl_rtol) {
             converged = true;
+            break;
+        }
+        if (r_stage0 == real_t(0)) r_stage0 = rnorm;
+        // Diverging: stop now and let the continuation bisect, instead of spending the rest of
+        // the iteration budget watching the residual grow.
+        if (rnorm > div_grow * r_stage0 || !std::isfinite((double)rnorm)) {
+            std::printf("  diverging (||R|| grew %.3gx over the stage) -- abandoning this stage\n",
+                        (double)(rnorm / std::max(r_stage0, real_t(1e-300))));
+            diverged = true;
             break;
         }
         if (newton_it == max_newton) break;
@@ -2866,13 +2897,44 @@ int main(int argc, char **argv) {
         lin_it_total += get_its();
 
         real_t dxinf = 0;
-        for (ptrdiff_t i = 0; i < ndof; ++i) {
-            x[(size_t)i] += dx[(size_t)i];
-            dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
+        for (ptrdiff_t i = 0; i < ndof; ++i) dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
+
+        // Backtracking line search on ||R||. Accept the first step that reduces the residual by
+        // the Armijo margin; halve otherwise. A step that cannot reduce it at all is not
+        // accepted -- the stage is abandoned so the continuation can bisect.
+        real_t alpha = 1;
+        if (ls_on) {
+            bool ok = false;
+            for (int ls = 0; ls < ls_max; ++ls) {
+                for (ptrdiff_t i = 0; i < ndof; ++i)
+                    x_try[(size_t)i] = x[(size_t)i] + alpha * dx[(size_t)i];
+                std::fill(r_try.begin(), r_try.end(), real_t(0));
+                f->gradient(x_try.data(), r_try.data());
+                f->apply_zero_constraints(r_try.data());
+                real_t rt = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i) rt += r_try[(size_t)i] * r_try[(size_t)i];
+                rt = std::sqrt(rt);
+                if (std::isfinite((double)rt) && rt < (real_t(1) - ls_armijo * alpha) * rnorm) {
+                    ok = true;
+                    break;
+                }
+                alpha *= real_t(0.5);
+            }
+            if (!ok) {
+                std::printf("  line search failed (no decrease down to alpha=%.3g) -- abandoning stage\n",
+                            (double)alpha);
+                diverged = true;
+                break;
+            }
+            for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] = x_try[(size_t)i];
+        } else {
+            for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] += dx[(size_t)i];
         }
-        std::printf("  lin_it: %d  |dx|_inf: %.6e\n", get_its(), dxinf);
+
+        std::printf("  lin_it: %d  |dx|_inf: %.6e  alpha: %.4g\n", get_its(), dxinf, (double)alpha);
         ++newton_total;
     }
+    (void)diverged;
     ++stages_run;
     if (converged) rho_solved = std::max(rho_solved, rho_use);
     if (!converged) {
