@@ -135,7 +135,44 @@ namespace {
     std::shared_ptr<sfem::Operator<real_t>> thread_clamped(const ptrdiff_t                                ndofs,
                                                            const std::shared_ptr<sfem::Operator<real_t>> &op) {
         if (!op) return op;
-        const ptrdiff_t per = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DOFS_PER_THREAD", 1000);
+        // SFEM_GMG_CLAMP_BELOW: engage the clamp only on levels smaller than this, and leave
+        // everything above it on the full team.
+        //
+        // The clamp changes the team size, and with schedule(static) over the element loops a
+        // different team size means a different partition of the same array. The grid
+        // transfers are *not* clamped, so restriction writes a coarse vector partitioned
+        // across 72 threads and the coarse smoother then reads it partitioned across 30 -- the
+        // mapping does not line up, and a V-cycle crosses that boundary at every level. Add
+        // the per-call omp_set_num_threads and there is team-resize churn on top. Clamping
+        // only where a level genuinely cannot fill the machine keeps one partition for
+        // everything large enough to care about locality.
+        //
+        // 0 keeps the pure dofs-per-thread rule.
+        //
+        // OFF BY DEFAULT, because measurement says the mechanism costs more than it saves.
+        // At 242,500 dofs on 72 Grace cores, three repeats, fixed work, t_solve:
+        //
+        //     dofs/thread 1000, no floor      1.394 s
+        //     dofs/thread 1000, floor 10000   1.163 s   (clamp only the coarse space)
+        //     no clamp at all                 0.642 s
+        //
+        // and the *phase totals are the same in all three*, ~0.69 s. The whole difference is
+        // outside the timed phases: omp_set_num_threads is called around every clamped apply,
+        // and resizing the team degrades the unclamped parallel regions that follow -- the
+        // outer Krylov vector operations. Clamping only the coarse levels halves the damage
+        // but does not remove it, because the churn is per clamped operator, not per dof.
+        //
+        // The coarse levels do not need it any more either: coarse_solve is 209 us unclamped
+        // against 318 us clamped. The pathology it was written for -- an 81-node level at 156
+        // us on one thread and 14.2 ms on eight -- was measured before the deterministic
+        // scatter and the assembled coarse operators existed, and no longer reproduces.
+        //
+        // Set SFEM_GMG_DOFS_PER_THREAD to a positive value to bring it back.
+        const ptrdiff_t per = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DOFS_PER_THREAD", 0);
+        if (per <= 0) return op;
+
+        const ptrdiff_t clamp_below = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_CLAMP_BELOW", 0);
+        if (clamp_below > 0 && ndofs >= clamp_below) return op;
         const int       mx  = omp_get_max_threads();
         int             n   = (int)std::min<ptrdiff_t>(mx, std::max<ptrdiff_t>(1, ndofs / std::max<ptrdiff_t>(1, per)));
         if (n >= mx) return op;  // big enough to use the machine as configured
