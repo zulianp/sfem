@@ -1758,3 +1758,49 @@ It was proposed on the strength of the retracted conclusion, so its justificatio
 rather than merely weakened. Coarsening below the macro mesh may still be worth doing -- at
 N=3 the margin is only 1.06x, and a deeper hierarchy is the obvious way to widen it -- but it
 should be argued from measurements taken with the coarse solve working, not from those above.
+
+## Phase 0: the gate says build Phase 1 and drop Phase 2
+
+Before building coarsening below the macro mesh, two measurements were taken to check that a
+deeper hierarchy would help at all. Neither supports it.
+
+### M1 — assembly is now the dominant cost
+
+With the coarse solve fixed by the dense LU, the probing assembly is the largest single term
+in the cycle: 32.7% of the run at N=3 L=8 (3.43 s of 10.49 s, 571 ms per call) and 67.4% at
+N=1 L=8. The coarse solve it used to hide behind is now 0.2%.
+
+### M2 — more levels is worse, not better
+
+The macro mesh is a cube refined to level L, so the same fine discretisation is reachable at
+several macro/lattice splits. At 64x16x16 (75,140 unknowns), varying only the split -- which
+is exactly what a macro-mesh coarsening would do, executed by hand:
+
+| macro / L | levels | iterations | t_solve | t_prec | total |
+|-----------|--------|-----------|---------|--------|-------|
+| 16x4x4 / L=4  | 3 | 51 | 1.66 | 4.88 | 6.55 |
+| 8x2x2 / L=8   | 4 | 54 | 1.83 | 1.60 | **3.43** |
+| 4x1x1 / L=16  | 5 | 80 | 3.83 | 1.44 | 5.27 |
+| baseline      | - | 1834 | 7.20 | 0.01 | 7.20 |
+
+Five levels is worse than three on iterations (80 against 51) and worse on total time. Adding
+levels below the macro mesh would extend the hierarchy in exactly the direction that measures
+worse. **The Phase 2 gate fails; the AMG should not be built for this problem.**
+
+A measurement error is worth recording, because it briefly pointed the other way. `t_solve`
+covers only the Krylov solve; `refresh_gmg`, and therefore the whole assembly, is counted in
+`t_precond`. Comparing arms on `t_solve` alone credited the shallow-lattice arm with 1.54 s
+while ignoring its 4.88 s of assembly. Only the total is meaningful when the arms have
+different level counts.
+
+### What the same numbers say about Phase 1
+
+The two effects run against each other. Iterations improve as the lattice gets shallower and
+the macro mesh finer (51, 54, 80), because the coarse levels are then better resolved. But
+the probing assembly gets sharply worse in that direction (4.88, 1.60, 1.44 s), because the
+coarsest level has more nodes and the pattern guess falls back to dense -- 425 nodes and 1700
+probe applications in the best-iteration arm, against 20 nodes and 80 in the worst.
+
+So the configuration that converges best is the one probing punishes hardest. Removing the
+probing does not merely save its own 30-70%; it unlocks the split that wins on iterations.
+That is the case for Phase 1, and it is stronger than the one the plan was written on.
