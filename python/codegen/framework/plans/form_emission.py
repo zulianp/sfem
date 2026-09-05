@@ -147,3 +147,31 @@ def form_reduction(form):
             "no reduction defined for 0-form role '%s'; the framework defines %s"
             % (role, ", ".join(sorted(FORM_REDUCTION_BY_ROLE)))
         )
+
+
+def objective_kernel_variants(form, emits_steps):
+    """Which mesh kernels a form needs: the plain one, the stepped one, or both.
+
+    A 0-form has two possible mesh kernels and only ever needs one of them.  The
+    stepped kernel evaluates the form at `x + alpha * h` for a list of alphas,
+    and the plain kernel evaluates it at `x`.  The second is the first with one
+    alpha of zero: `x + 0 * h` is `x` exactly in IEEE arithmetic for any finite
+    increment, and both then call the same block function.  So wherever the
+    stepped kernel is emitted, the plain one is a duplicate of it.
+
+    Emitting both is how `value` and `value_steps` came to disagree in the
+    generated Op -- one zeroed its accumulator and the other did not -- which is
+    the failure mode that having a single implementation removes.
+
+    A 1-form and a 2-form scatter per shape and have no stepped variant, so they
+    always take the plain kernel.
+    """
+    if writes_per_shape(form):
+        return ("plain",)
+    if emits_steps and getattr(form, "weak_form", None) is not None:
+        return ("steps",)
+    # A 0-form with no lowered weak form has no stepped kernel to be a
+    # duplicate of -- the stepped emitter cannot build one -- so the plain
+    # kernel is the only one and must still be emitted.  Getting this wrong
+    # deletes the kernel outright rather than replacing it.
+    return ("plain",)

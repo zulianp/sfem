@@ -276,8 +276,11 @@ class M9ReferenceRegressionTest(unittest.TestCase):
 
 class M9GeneratedArtifactRegressionTest(unittest.TestCase):
     MAINTAINED = (
-        ("neohookean_ogden", neohookean_ogden, ("TRI3",), ("objective", "gradient", "apply")),
-        ("mooney_rivlin", mooney_rivlin, ("TRI3",), ("objective", "gradient", "apply")),
+        # `objective_steps` rather than `objective`: the 0-form now has one
+        # mesh kernel, the stepped one, and the plain objective is that kernel
+        # called with a single step of length zero.
+        ("neohookean_ogden", neohookean_ogden, ("TRI3",), ("objective_steps", "gradient", "apply")),
+        ("mooney_rivlin", mooney_rivlin, ("TRI3",), ("objective_steps", "gradient", "apply")),
         ("two_phase_flow", two_phase_flow, ("TRI3",), ("residual", "jacobian_action")),
         ("stokes", stokes, ("TRI6_TRI3",), ("residual", "jacobian_action")),
         ("poro_hyperelasticity", poro_hyperelasticity, ("TRI6_TRI3",), ("gradient", "residual", "jacobian_action")),

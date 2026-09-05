@@ -1221,39 +1221,20 @@ namespace sfem {
 
     int %(op)s::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("%(op)s::value");
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        // The objective is the 0-form at one step of length zero.  `value_steps`
+        // evaluates at `x + alpha * h`, so alpha = 0 leaves the increment
+        // unused and `x` itself can stand in for it -- `x + 0 * x` is `x`
+        // exactly in IEEE arithmetic for any finite state, and the kernel then
+        // calls the same block function the objective kernel called.
+        //
+        // Writing it this way is what keeps the two from disagreeing.  They
+        // did: this method zeroed `*out` before accumulating while
+        // `value_steps` only accumulated, so the same Op answered the same
+        // question two ways depending on which entry point was used.  With one
+        // implementation there is nothing left to diverge.
+        const real_t objective_step = 0;
         *out = 0;
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const ptrdiff_t nelements = domain.block->n_elements();
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            if (impl_->objective_uses_affine) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        domain.user_data);
-                if (!cache || !cache->jacobian_soa) {
-                    SFEM_ERROR("%(op)s affine objective requires cached geometry\\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        cache->jacobian_soa->jacobian_determinant()->data());
-            }
-            std::fill(impl_->element_values.get(),
-                      impl_->element_values.get() + nelements,
-                      0);
-            int status = SFEM_FAILURE;
-%(objective_dispatch_body)s
-            if (status != SFEM_SUCCESS) return status;
-            real_t sum = 0;
-#pragma omp simd reduction(+ : sum)
-            for (ptrdiff_t element = 0; element < nelements; ++element) {
-                sum += impl_->element_values[element];
-            }
-            *out += sum;
-            return SFEM_SUCCESS;
-        });
+        return value_steps(x, x, 1, &objective_step, out);
     }
 
     int %(op)s::value_steps(const real_t *x,
