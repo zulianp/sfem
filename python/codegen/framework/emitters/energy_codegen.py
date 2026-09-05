@@ -1210,16 +1210,16 @@ def _sfem_soa_weak_form_block_function(
         if shared.uses_current:
             params.extend(
                 "const scalar_t *const SFEM_RESTRICT %s" % name
-                for name in _field_stream_names("u", dim, n_nodes)
+                for name in _field_stream_names("u", n_field_components, n_nodes)
             )
         if shared.uses_direction:
             params.extend(
                 "const scalar_t *const SFEM_RESTRICT %s" % name
-                for name in _field_stream_names("h", dim, n_nodes)
+                for name in _field_stream_names("h", n_field_components, n_nodes)
             )
         params.extend(
             "scalar_t *const SFEM_RESTRICT %s" % name
-            for name in _output_stream_names(form, dim, n_nodes)
+            for name in _output_stream_names(form, n_field_components, n_nodes)
         )
 
     lines = _sfem_soa_block_signature_lines(shared.name, params, source_builder)
@@ -1258,8 +1258,8 @@ def _sfem_soa_weak_form_block_function(
                 dim,
                 ", ".join(
                     streams_in_shape_order(
-                        _field_stream_names("u", dim, n_nodes),
-                        dim,
+                        _field_stream_names("u", n_field_components, n_nodes),
+                        n_field_components,
                         shared.stream_shape_order,
                     )
                 ),
@@ -1272,8 +1272,8 @@ def _sfem_soa_weak_form_block_function(
                 dim,
                 ", ".join(
                     streams_in_shape_order(
-                        _field_stream_names("h", dim, n_nodes),
-                        dim,
+                        _field_stream_names("h", n_field_components, n_nodes),
+                        n_field_components,
                         shared.stream_shape_order,
                     )
                 ),
@@ -1286,8 +1286,8 @@ def _sfem_soa_weak_form_block_function(
                 dim,
                 ", ".join(
                     streams_in_shape_order(
-                        _output_stream_names(form, dim, n_nodes),
-                        dim,
+                        _output_stream_names(form, n_field_components, n_nodes),
+                        n_field_components,
                         shared.stream_shape_order,
                     )
                 ),
@@ -1340,6 +1340,7 @@ def _sfem_soa_pointwise_block_function(
     branched on.  That interchangeability is what "no distinction below the
     form layer" means concretely for this emitter.
     """
+    n_field_components = form_n_field_components(form, dim)
     """The per-point kernel: a form with no lowered weak form.
 
     Takes one quadrature index and one weight, gathers every input into a local
@@ -1361,16 +1362,16 @@ def _sfem_soa_pointwise_block_function(
     if shared.uses_current:
         params.extend(
             "const scalar_t *const SFEM_RESTRICT %s" % name
-            for name in _field_stream_names("u", dim, n_nodes)
+            for name in _field_stream_names("u", n_field_components, n_nodes)
         )
     if shared.uses_direction:
         params.extend(
             "const scalar_t *const SFEM_RESTRICT %s" % name
-            for name in _field_stream_names("h", dim, n_nodes)
+            for name in _field_stream_names("h", n_field_components, n_nodes)
         )
     params.extend(
         "scalar_t *const SFEM_RESTRICT %s" % name
-        for name in _output_stream_names(form, dim, n_nodes)
+        for name in _output_stream_names(form, n_field_components, n_nodes)
     )
 
     lines = _sfem_soa_block_signature_lines(shared.name, params, source_builder)
@@ -3328,58 +3329,53 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "            const geom_t *const coordinate_components[SPATIAL_DIM] = {%s};"
                 % ", ".join(_component_name(d) for d in range(dim))
             )
+        # Two loops, because the counts differ: the mesh has SPATIAL_DIM
+        # coordinates per node and the field has N_FIELD_COMPONENTS values.  One
+        # loop served both for as long as every energy material was a
+        # displacement, where the two are equal.
+        if not is_affine:
+            lines.extend(
+                [
+                    "            for (int d = 0; d < SPATIAL_DIM; ++d) {",
+                    "                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;",
+                    "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
+                    "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
+                    "                    const idx_t node = owned_nodes_ptr[pack] + k;",
+                    "                    pack_coordinate[k] = scalar_t(coordinate_component[node]);",
+                    "                }",
+                    "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
+                    "                    const idx_t node = ghosts[k];",
+                    "                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);",
+                    "                }",
+                    "            }",
+                ]
+            )
         lines.extend(
             [
                 "            const scalar_t *const u_components[N_FIELD_COMPONENTS] = {%s};"
-                % ", ".join("u%s" % _component_name(d) for d in range(dim)),
+                % ", ".join("u%s" % _component_name(d) for d in range(n_field_components)),
                 "            const scalar_t *const h_components[N_FIELD_COMPONENTS] = {%s};"
-                % ", ".join("h%s" % _component_name(d) for d in range(dim)),
-                "            for (int d = 0; d < SPATIAL_DIM; ++d) {",
-            ]
-        )
-        if not is_affine:
-            lines.append(
-                "                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;"
-            )
-        lines.extend(
-            [
+                % ", ".join("h%s" % _component_name(d) for d in range(n_field_components)),
+                "            for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {",
                 "                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;",
                 "                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;",
-            ]
-        )
-        if not is_affine:
-            lines.append(
-                "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];"
-            )
-        lines.extend(
-            [
                 "                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];",
                 "                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];",
                 "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                    const idx_t node = owned_nodes_ptr[pack] + k;",
-            ]
-        )
-        if not is_affine:
-            lines.append("                    pack_coordinate[k] = scalar_t(coordinate_component[node]);")
-        lines.extend(
-            [
                 "                    pack_u_base_component[k] = u_component[node * u_stride];",
                 "                    pack_h_component[k] = h_component[node * h_stride];",
                 "                }",
                 "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
                 "                    const idx_t node = ghosts[k];",
-            ]
-        )
-        if not is_affine:
-            lines.append(
-                "                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);"
-            )
-        lines.extend(
-            [
                 "                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];",
                 "                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];",
                 "                }",
                 "            }",
+            ]
+        )
+        lines.extend(
+            [
                 "",
                 "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
                 "                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
@@ -3407,8 +3403,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 % ", ".join(
                     "block_u_data[%d]" % stream
                     for stream in streams_in_shape_order(
-                        tuple(range(dim * n_nodes)),
-                        dim,
+                        tuple(range(n_field_components * n_nodes)),
+                        n_field_components,
                         stream_shape_order,
                     )
                 ),
@@ -3656,8 +3652,8 @@ def _append_mesh_operator_stream_arrays(
                     ", ".join(
                         "block_%s" % stream
                         for stream in streams_in_shape_order(
-                            _field_stream_names("u", dim, n_nodes),
-                            dim,
+                            _field_stream_names("u", n_field_components, n_nodes),
+                            n_field_components,
                             stream_shape_order,
                         )
                     ),
@@ -3683,8 +3679,8 @@ def _append_mesh_operator_stream_arrays(
                         ", ".join(
                             "block_%s" % stream
                             for stream in streams_in_shape_order(
-                                _field_stream_names("h", dim, n_nodes),
-                                dim,
+                                _field_stream_names("h", n_field_components, n_nodes),
+                                n_field_components,
                                 stream_shape_order,
                             )
                         ),
@@ -3710,8 +3706,8 @@ def _append_mesh_operator_stream_arrays(
                         ", ".join(
                             "block_%s" % stream
                             for stream in streams_in_shape_order(
-                                _output_stream_names(form, dim, n_nodes),
-                                dim,
+                                _output_stream_names(form, n_field_components, n_nodes),
+                                n_field_components,
                                 stream_shape_order,
                             )
                         ),
@@ -4012,7 +4008,7 @@ def _append_mesh_operator_stream_buffer_views(
                         "            block_h%s%d[%s] = h%s[ev[%d * VECTOR_SIZE + %s] * h_stride];"
                         % (component, shape, work_item, component, shape, work_item)
                     )
-        for stream in _output_stream_names(form, dim, n_nodes):
+        for stream in _output_stream_names(form, n_field_components, n_nodes):
             lines.append("            block_%s[%s] = scalar_t(0);" % (stream, work_item))
         lines.append("        }")
 
@@ -4292,12 +4288,12 @@ def _sfem_soa_mesh_operator_function(
                 lines.append("        scalar_t block_%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
         if uses_current:
-            for stream in _field_stream_names("u", dim, n_nodes):
+            for stream in _field_stream_names("u", n_field_components, n_nodes):
                 lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
         if uses_direction:
-            for stream in _field_stream_names("h", dim, n_nodes):
+            for stream in _field_stream_names("h", n_field_components, n_nodes):
                 lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
-        for stream in _output_stream_names(form, dim, n_nodes):
+        for stream in _output_stream_names(form, n_field_components, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
 
     lines.extend(
@@ -4423,10 +4419,10 @@ def _sfem_soa_mesh_operator_function(
             call_args.append("block_out_streams")
     else:
         if uses_current:
-            call_args.extend("block_%s" % stream for stream in _field_stream_names("u", dim, n_nodes))
+            call_args.extend("block_%s" % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
         if uses_direction:
-            call_args.extend("block_%s" % stream for stream in _field_stream_names("h", dim, n_nodes))
-        call_args.extend("block_%s" % stream for stream in _output_stream_names(form, dim, n_nodes))
+            call_args.extend("block_%s" % stream for stream in _field_stream_names("h", n_field_components, n_nodes))
+        call_args.extend("block_%s" % stream for stream in _output_stream_names(form, n_field_components, n_nodes))
     call_indent = "        " if form.weak_form is not None else "            "
     lines.extend(
         [
@@ -4726,17 +4722,17 @@ def _sfem_soa_packed_apply_public_wrappers(
             if uses_current:
                 lines.append(
                     "            const scalar_t *const u_components[N_FIELD_COMPONENTS] = {%s};"
-                    % ", ".join("u%s" % _component_name(d) for d in range(dim))
+                    % ", ".join("u%s" % _component_name(d) for d in range(n_field_components))
                 )
             if uses_direction:
                 lines.append(
                     "            const scalar_t *const h_components[N_FIELD_COMPONENTS] = {%s};"
-                    % ", ".join("h%s" % _component_name(d) for d in range(dim))
+                    % ", ".join("h%s" % _component_name(d) for d in range(n_field_components))
                 )
             lines.extend(
                 [
                     "            scalar_t *const out_components[N_FIELD_COMPONENTS] = {%s};"
-                    % ", ".join("out%s" % _component_name(d) for d in range(dim)),
+                    % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)),
                     "            for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {",
                     "                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
                 ]
@@ -5037,7 +5033,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                         "    }",
                         "",
                         "    scalar_t *const out_components[N_FIELD_COMPONENTS] = {%s};"
-                        % ", ".join("out%s" % _component_name(d) for d in range(dim)),
+                        % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)),
                         *source_builder.parallel_for_lines(),
                         "    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
                         "        const idx_t dest = ghost_reduce_dest[row];",
@@ -5275,10 +5271,10 @@ def _sfem_soa_mesh_objective_steps_function(
                 extent = "N_QP * VECTOR_SIZE"
                 lines.append("        scalar_t block_%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
-        for stream in _field_stream_names("u", dim, n_nodes):
+        for stream in _field_stream_names("u", n_field_components, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
             lines.append("        scalar_t block_%s_base[VECTOR_SIZE];" % stream)
-        for stream in _field_stream_names("h", dim, n_nodes):
+        for stream in _field_stream_names("h", n_field_components, n_nodes):
             lines.append("        scalar_t block_%s[VECTOR_SIZE];" % stream)
         lines.append("        scalar_t block_value[VECTOR_SIZE];")
 
@@ -5366,8 +5362,8 @@ def _sfem_soa_mesh_objective_steps_function(
                 ", ".join(
                     "block_%s" % stream
                     for stream in streams_in_shape_order(
-                        _field_stream_names("u", dim, n_nodes),
-                        dim,
+                        _field_stream_names("u", n_field_components, n_nodes),
+                        n_field_components,
                         stream_shape_order,
                     )
                 ),
@@ -5471,7 +5467,7 @@ def _sfem_soa_mesh_objective_steps_function(
     if use_stream_arrays:
         call_args.append("block_u_streams")
     else:
-        call_args.extend("block_%s" % stream for stream in _field_stream_names("u", dim, n_nodes))
+        call_args.extend("block_%s" % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
     call_args.append("block_value")
 
     lines.extend(
@@ -5598,6 +5594,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     indent,
     emit_tensor_product_static_constants=True,
 ):
+    n_field_components = form_n_field_components(form, dim)
     if _form_uses_current(form, default=True):
         raise ValueError("direct hessian matrix assembly currently requires no current field")
     weak_form = form.weak_form
@@ -5998,7 +5995,7 @@ def _sfem_soa_hessian_packed_crs_passes(
         if uses_current:
             lines.append(
                 "            const scalar_t *const u_components[N_FIELD_COMPONENTS] = {%s};"
-                % ", ".join("u%s" % _component_name(d) for d in range(dim))
+                % ", ".join("u%s" % _component_name(d) for d in range(n_field_components))
             )
         lines.extend(
             [
@@ -6432,7 +6429,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
     if uses_current:
         lines.append(
             "    const scalar_t *const u_components[N_FIELD_COMPONENTS] = {%s};"
-            % ", ".join("u%s" % _component_name(d) for d in range(dim))
+            % ", ".join("u%s" % _component_name(d) for d in range(n_field_components))
         )
     for d in range(dim):
         lines.append(
@@ -7674,6 +7671,7 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
     uses_current,
     two_pass,
 ):
+    n_field_components = dim
     lines = []
     for scalar_type in ("double", "float"):
         suffix = "" if scalar_type == "double" else "_float"
@@ -7705,7 +7703,7 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
         ]
         if uses_current:
             fill_args.append("u_stride")
-            fill_args.extend("u%s" % _component_name(d) for d in range(dim))
+            fill_args.extend("u%s" % _component_name(d) for d in range(n_field_components))
         fill_args.extend(("packed_element_entries", "values"))
         lines.append(") {")
         if two_pass:
@@ -7890,6 +7888,7 @@ def _hessian_matrix_impl_args(
     material_parameter_names,
     uses_current,
 ):
+    n_field_components = dim
     args = [
         "nelements",
         "nnodes",
@@ -7899,7 +7898,7 @@ def _hessian_matrix_impl_args(
     ]
     if uses_current:
         args.append("u_stride")
-        args.extend("u%s" % _component_name(d) for d in range(dim))
+        args.extend("u%s" % _component_name(d) for d in range(n_field_components))
     if matrix_format in ("crs", "bsr"):
         args.extend(
             [
@@ -8389,6 +8388,7 @@ def _sfem_soa_diagnostics_lines(
     quadrature_rule,
     basis_family,
 ):
+    n_field_components = form_n_field_components(form, dim)
     public_name = _sfem_soa_public_function_name(prefix, form.name, quadrature_rule)
     struct_name = _sfem_soa_diagnostics_struct_name()
     variable_name = "%s_diagnostics_data" % public_name
@@ -8443,7 +8443,7 @@ def _sfem_soa_diagnostics_lines(
     else:
         reference_scalars = sum(array_input.size for array_input in reference_inputs)
         quadrature_weight_scalars = n_qp
-    output_streams = len(_output_stream_names(form, dim, n_nodes))
+    output_streams = len(_output_stream_names(form, n_field_components, n_nodes))
     output_reads = output_streams if form.output_mode == "accumulate" else 0
     output_writes = output_streams
     u_streams = dim * n_nodes if uses_current else 0
@@ -9523,14 +9523,14 @@ def _cpp_scalar_literal(value, scalar_type="real_t"):
     return "%s(%.17g)" % (scalar_type, value)
 
 
-def _output_stream_names(form, dim, n_nodes):
+def _output_stream_names(form, n_field_components, n_nodes):
     if form.weak_form is not None:
         if not writes_per_shape(form):
             return ("value",)
         return tuple(
             "out%s%d" % (_component_name(d), node)
             for node in range(n_nodes)
-            for d in range(dim)
+            for d in range(n_field_components)
         )
     output_count = len(form.expression_graph.evaluation_plan.outputs)
     if output_count == 1:
@@ -9538,5 +9538,5 @@ def _output_stream_names(form, dim, n_nodes):
     return tuple(
         "out%s%d" % (_component_name(d), node)
         for node in range(n_nodes)
-        for d in range(dim)
+        for d in range(n_field_components)
     )
