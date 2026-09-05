@@ -6125,3 +6125,43 @@ repeats would be needed to call the 12% noise rather than a regression.
 At 33,124 dofs the assembly is 0.7% of the solve, so 49x buys little end to end here. Its value
 is at the configurations where probing reached 45% of measured phases, together with the exact
 derived pattern and the bitwise reproducibility.
+
+
+### Reynolds robustness
+
+Element-wise Galerkin, 108 macro-elements at L=4 -- 8,281 nodes, **33,124 dofs** -- on 72 Grace
+cores, Poiseuille so the exact solution stays parabolic at every Re and `u_linf` remains a real
+correctness check.
+
+| Re | converged | Newton | linear its | per step | `u_linf` | verdict |
+|------|-----|----|-------|------|--------------|---------|
+| 100  | yes | 32 | 32100 | 1003 | 2.553635e-07 | correct |
+| 200  | no  | 40 | 51550 | 1289 | 2.900010e-07 | **correct solution, Newton test not met** |
+| 400  | no  | 40 | 39530 |  988 | 1.777071e+13 | diverged |
+| 800  | no  | 40 | 28832 |  721 | 5.218090e+112 | diverged |
+| 3200 | no  | 40 | 26514 |  663 | 2.637724e+87 | diverged |
+
+**The breakdown is between Re=200 and Re=400**, and the two failures are of different kinds.
+At Re=200 the solver reaches the right answer -- 2.90e-07 against the converged Re=100 run's
+2.55e-07, both at discretisation accuracy -- and only fails the Newton residual test within 40
+steps, at the highest linear cost of any run. At Re=400 and above the iteration diverges
+outright, to 1e+13 and beyond.
+
+**It is the continuation, not the preconditioner.** Every failing run reaches
+`stage: navier-stokes`, so the Re=1 stage always succeeds and the blow-up is always on the
+single jump to physical density. The linear solves stay healthy throughout: 663 to 1289
+iterations per Newton step across the whole range, with no upward trend as Re rises -- if the
+V-cycle were degrading under convection dominance that number would climb, and it does not. The
+blow-up magnitudes are non-monotonic (1e+13, 1e+112, 1e+87), the signature of unbounded
+divergence rather than graded degradation: the exponent is wherever the iteration happened to
+be when it hit the Newton cap.
+
+The driver ramps in exactly two stages, Re=1 then physical Re. That jump is a factor of 100 at
+Re=100 and survives; at 400 it does not. The two-stage scheme exists because Newton from a zero
+state diverged at Re=100, so the mechanism is already known to be load-bearing -- it is simply
+under-resolved above its original design point, which was the only Re ever tested.
+
+The obvious next step is geometric ramping over several stages, each starting from the previous
+solution, rather than one bound. Re=200 additionally suggests the Newton cap and the residual
+tolerance want revisiting: a run that reaches discretisation accuracy and still reports failure
+is measuring the wrong thing.
