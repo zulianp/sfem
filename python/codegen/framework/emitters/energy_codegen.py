@@ -2107,13 +2107,20 @@ def _append_transformed_loperand_lines(
     scalar_temporaries=False,
 ):
     material_exprs = tuple(material)
+    # The flux has one row per field component and one column per direction, so
+    # its own length says how many rows there are.  This counted `dim * dim`,
+    # which is right only when the field has as many components as the domain
+    # has dimensions -- and emitted `material3..8` for a scalar field, which
+    # nothing defined.
+    n_material = len(material_exprs)
+    n_components = n_material // dim
     if scalar_temporaries:
-        material_names = ["const scalar_t material%d =" % i for i in range(dim * dim)]
+        material_names = ["const scalar_t material%d =" % i for i in range(n_material)]
     else:
-        material_names = ["material[%d] =" % i for i in range(dim * dim)]
-        lines.append("        scalar_t material[%d];" % (dim * dim))
+        material_names = ["material[%d] =" % i for i in range(n_material)]
+        lines.append("        scalar_t material[%d];" % n_material)
     _append_cse_array_assignments(lines, material_exprs, material_names, temporary_prefix)
-    for row in range(dim):
+    for row in range(n_components):
         for col in range(dim):
             terms = [
                 "%s * %s"
