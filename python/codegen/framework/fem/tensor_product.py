@@ -170,11 +170,11 @@ def tensor_product_cartesian_shape_order(dim, n_shape):
     return tuple(range(n_shape))
 
 
-def streams_in_shape_order(streams, n_components, shape_order):
-    if len(streams) != n_components * len(shape_order):
+def streams_in_shape_order(streams, n_field_components, shape_order):
+    if len(streams) != n_field_components * len(shape_order):
         raise ValueError("stream count must be component count * number of shapes")
     return tuple(
-        streams[shape * n_components + component]
+        streams[shape * n_field_components + component]
         for shape in shape_order
-        for component in range(n_components)
+        for component in range(n_field_components)
     )

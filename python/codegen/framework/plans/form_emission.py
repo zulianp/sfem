@@ -177,7 +177,7 @@ def objective_kernel_variants(form, emits_steps):
     return ("plain",)
 
 
-def form_n_components(form, dim):
+def form_n_field_components(form, dim):
     """How many components the field this form acts on has.
 
     The generated kernels call this `DIM`, because for a displacement it equals
@@ -191,5 +191,5 @@ def form_n_components(form, dim):
     unconditionally before.
     """
     weak_form = getattr(form, "weak_form", None)
-    n_components = getattr(weak_form, "n_components", None)
-    return dim if n_components is None else int(n_components)
+    n_field_components = getattr(weak_form, "n_field_components", None)
+    return dim if n_field_components is None else int(n_field_components)

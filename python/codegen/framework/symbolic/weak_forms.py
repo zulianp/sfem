@@ -50,7 +50,7 @@ def sfem_soa_kernel_form(
 class SfemSoAWeakForm:
     """An energy density and the field gradient it is differentiated against.
 
-    The gradient is ``n_components x dim``: one row per component of the field,
+    The gradient is ``n_field_components x dim``: one row per component of the field,
     one column per spatial direction.  A displacement in `dim` dimensions makes
     that square and it is the deformation gradient, which is the only shape this
     held for a long time.  A scalar field makes it ``1 x dim`` -- the gradient of
@@ -66,23 +66,23 @@ class SfemSoAWeakForm:
     energy_density: sp.Expr
     deformation_gradient: Tuple[sp.Expr, ...]
     dim: int
-    n_components: Optional[int] = None
+    n_field_components: Optional[int] = None
 
     def __post_init__(self):
         dim = int(self.dim)
         deformation_gradient = tuple(self.deformation_gradient)
-        n_components = dim if self.n_components is None else int(self.n_components)
+        n_field_components = dim if self.n_field_components is None else int(self.n_field_components)
         object.__setattr__(self, "dim", dim)
-        object.__setattr__(self, "n_components", n_components)
+        object.__setattr__(self, "n_field_components", n_field_components)
         object.__setattr__(self, "energy_density", sp.sympify(self.energy_density))
         object.__setattr__(self, "deformation_gradient", deformation_gradient)
         if dim <= 0:
             raise ValueError("weak form dim must be positive")
-        if n_components <= 0:
-            raise ValueError("weak form n_components must be positive")
-        if len(deformation_gradient) != n_components * dim:
+        if n_field_components <= 0:
+            raise ValueError("weak form n_field_components must be positive")
+        if len(deformation_gradient) != n_field_components * dim:
             raise ValueError(
-                "deformation_gradient must have n_components * dim entries"
+                "deformation_gradient must have n_field_components * dim entries"
             )
 
     @property
@@ -100,33 +100,33 @@ class SfemSoAWeakForm:
         variable is a plain gradient would be the case that breaks it, and the
         fix then is to carry the qualifier down rather than to guess better.
         """
-        return self.n_components == self.dim
+        return self.n_field_components == self.dim
 
     def deformation_gradient_matrix(self):
-        return sp.Matrix(self.n_components, self.dim, self.deformation_gradient)
+        return sp.Matrix(self.n_field_components, self.dim, self.deformation_gradient)
 
     def first_piola(self):
         variables = self.deformation_gradient
         return sp.Matrix(
-            self.n_components,
+            self.n_field_components,
             self.dim,
             [sp.diff(self.energy_density, variable) for variable in variables],
         )
 
     def linearized_first_piola(self, trial_gradient):
         trial_gradient = tuple(trial_gradient)
-        if len(trial_gradient) != self.n_components * self.dim:
+        if len(trial_gradient) != self.n_field_components * self.dim:
             raise ValueError(
-                "trial_gradient must have n_components * dim entries"
+                "trial_gradient must have n_field_components * dim entries"
             )
         P = self.first_piola()
         variables = self.deformation_gradient
         return sp.Matrix(
-            self.n_components,
+            self.n_field_components,
             self.dim,
             [
                 directional_derivative(P[i, j], variables, trial_gradient)
-                for i in range(self.n_components)
+                for i in range(self.n_field_components)
                 for j in range(self.dim)
             ],
         )
@@ -137,7 +137,7 @@ class SfemSoAWeakForm:
         if has_direction:
             trial_gradient = tuple(
                 sp.symbols("trial_grad[%d]" % i)
-                for i in range(self.n_components * self.dim)
+                for i in range(self.n_field_components * self.dim)
             )
             expressions.extend(tuple(self.linearized_first_piola(trial_gradient)))
         return tuple(expressions)
@@ -157,5 +157,5 @@ def sfem_soa_weak_form(energy_density, deformation_gradient):
         energy_density,
         tuple(deformation_gradient),
         cols,
-        n_components=rows,
+        n_field_components=rows,
     )

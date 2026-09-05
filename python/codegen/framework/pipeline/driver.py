@@ -1817,7 +1817,7 @@ def _equation_form_orders(equation):
 
 
 def _energy_data_symbols(dim, variables):
-    """The energy's variables as `n_components x dim`.
+    """The energy's variables as `n_field_components x dim`.
 
     An energy differentiates against a field gradient, which has one row per
     field component and one column per spatial direction.  The count of

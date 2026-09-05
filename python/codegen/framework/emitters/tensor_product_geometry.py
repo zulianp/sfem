@@ -372,13 +372,13 @@ def tensor_product_isoparametric_geometry_lines(
     return lines
 
 
-def tensor_product_ordered_streams(streams, n_components, dim, n_shape, shape_order=None):
+def tensor_product_ordered_streams(streams, n_field_components, dim, n_shape, shape_order=None):
     shape_order = (
         tensor_product_cartesian_shape_order(dim, n_shape)
         if shape_order is None
         else tuple(shape_order)
     )
-    return streams_in_shape_order(tuple(streams), n_components, shape_order)
+    return streams_in_shape_order(tuple(streams), n_field_components, shape_order)
 
 
 def tensor_product_ordered_coordinate_streams(

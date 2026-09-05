@@ -359,9 +359,9 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                     assembly_base = "%s_tet4_hessian_isoparametric_mesh_soa" % material_name
                     public_name = "%s_hessian_block_diag_sym_3d_isoparametric_mesh_soa" % material_name
                     self.assertIn("%s_scatter_block_diag_sym" % assembly_base, source)
-                    self.assertIn("static constexpr int SYM_DIM = (DIM * (DIM + 1)) / 2;", source)
+                    self.assertIn("static constexpr int SYM_DIM = (N_FIELD_COMPONENTS * (N_FIELD_COMPONENTS + 1)) / 2;", source)
                     self.assertIn("values[(ptrdiff_t)ev[i] * SYM_DIM]", source)
-                    self.assertIn("for (int bj = bi; bj < DIM; ++bj)", source)
+                    self.assertIn("for (int bj = bi; bj < N_FIELD_COMPONENTS; ++bj)", source)
                     self.assertIn("block[sym++] += element_matrix[row * NDOFS + col];", source)
                     self.assertNotIn("%s_scatter_bsr" % assembly_base, source)
                     self.assertIn(public_name, c_abi_header)
