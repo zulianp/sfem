@@ -86,12 +86,7 @@ MATERIALS = (
     "poro_elasticity",
     "stokes",
     "two_phase_flow",
-    # `scalar_potential` is generated and compile-checked but not driven here
-    # yet: its tensor-product kernels instantiate
-    # `TensorProductWeakOps<..., DIM>` where that parameter is both the
-    # tensor-product dimension and the stream stride, so a scalar field reads
-    # `streams[shape * 3 + component]` out of a stride-one array.  Driving it
-    # is the point of adding it; it goes in this list when that is separated.
+    "scalar_potential",
 )
 
 #: Element the grid is built from, and the elements that must be generated with

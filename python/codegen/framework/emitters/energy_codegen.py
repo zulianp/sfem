@@ -1582,13 +1582,13 @@ def _append_sfem_soa_tensor_weak_form_lines(
         output_offset = "%d * N_QP * %d * VECTOR_SIZE" % (row, dim)
         if uses_current:
             lines.append(
-                "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_u_ref_q[%s]);"
-                % (dim, u_streams, row, output_offset)
+                "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_u_ref_q[%s]);"
+                % (dim, n_field_components, u_streams, row, output_offset)
             )
         if uses_direction:
             lines.append(
-                "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
-                % (dim, h_streams, row, output_offset)
+                "    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d, %d>(nelems, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
+                % (dim, n_field_components, h_streams, row, output_offset)
             )
 
     lines.append("    for (int q = 0; q < N_QP; ++q) {")
@@ -1718,8 +1718,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
     lines.extend(["        }", "    }"])
     for row in range(n_field_components):
         lines.append(
-            "    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d>(nelems, shape_1d, grad_1d, &loperand_q[%d * N_QP * %d * VECTOR_SIZE], %s, %d);"
-            % (dim, row, dim, out_streams, row)
+            "    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, %d, %d>(nelems, shape_1d, grad_1d, &loperand_q[%d * N_QP * %d * VECTOR_SIZE], %s, %d);"
+            % (dim, n_field_components, row, dim, out_streams, row)
         )
 
 

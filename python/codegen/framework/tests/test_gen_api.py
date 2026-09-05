@@ -2418,7 +2418,7 @@ int main() {
                 determinant_target=lambda index: "det[%s]" % index,
             )
         )
-        self.assertIn("tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>", hyper_lines)
+        self.assertIn("tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>", hyper_lines)
         self.assertIn("coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE", hyper_lines)
         self.assertNotIn("coordinate_value", hyper_lines)
 

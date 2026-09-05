@@ -210,6 +210,36 @@
       "l2": 0.0,
       "material": "saint_venant_kirchhoff"
     },
+    "scalar_potential_apply_3d_affine_mesh_soa": {
+      "l1": 14.5920875631,
+      "l2": 2.262446620981,
+      "material": "scalar_potential"
+    },
+    "scalar_potential_apply_3d_isoparametric_mesh_soa": {
+      "l1": 14.59208736802,
+      "l2": 2.262446586018,
+      "material": "scalar_potential"
+    },
+    "scalar_potential_gradient_3d_affine_mesh_soa": {
+      "l1": 7.900152921582,
+      "l2": 1.188486306015,
+      "material": "scalar_potential"
+    },
+    "scalar_potential_gradient_3d_isoparametric_mesh_soa": {
+      "l1": 7.900152959355,
+      "l2": 1.188486315521,
+      "material": "scalar_potential"
+    },
+    "scalar_potential_objective_steps_3d_affine_mesh_soa": {
+      "l1": 0.0,
+      "l2": 0.0,
+      "material": "scalar_potential"
+    },
+    "scalar_potential_objective_steps_3d_isoparametric_mesh_soa": {
+      "l1": 0.0,
+      "l2": 0.0,
+      "material": "scalar_potential"
+    },
     "stokes_form_1_p_residual_3d_affine_mesh_soa": {
       "l1": 2.091808949675,
       "l2": 0.3506003022402,
