@@ -12,7 +12,6 @@
 
 #include "sfem_BSR.hpp"
 #include "sfem_Function.hpp"
-#include "sfem_base.h"
 
 #include <memory>
 #include <vector>

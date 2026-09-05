@@ -2181,6 +2181,11 @@ macro-element faces -- 3.38x at a level-2 coarse lattice, 1.95x at level 4, 1.42
 improving as the lattice deepens rather than worsening. What is bought is contiguous 4x4 blocks
 with no column indirection, and no global sparse structure above the coarsest level.
 
+**Verified on Grace.** The gates hold on aarch64 under the alps toolchain at the same machine
+precision they reach on the development machine -- level 1 at 2.7e-16 with its block diagonal
+at 4.1e-18, level 2 at 1.6e-16 and 5.2e-18, the coarsest at 1.1e-16 and exactly zero -- with
+levels 1 and 2 kept as element matrices and only the coarsest assembled.
+
 **A mistake worth recording, because it was made twice.** Patching the constrained rows of the
 block diagonal by writing identity into both the row *and* the column of the 4x4 block gives a
 7.3e-3 disagreement with the reference diagonal, at every level. `patch_identity_rows` replaces
