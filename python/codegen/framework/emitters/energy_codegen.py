@@ -4301,6 +4301,7 @@ def _append_mesh_operator_packed_entry_points(
     n_field_components=None,
     metric=None,
     metric_block_name=None,
+    expanded_plan=None,
 ):
     """The packed entry points a 1- or 2-form additionally publishes.
 
@@ -4339,6 +4340,7 @@ def _append_mesh_operator_packed_entry_points(
                 source_builder=source_builder,
                 n_field_components=n_field_components,
                 metric=metric,
+                expanded_plan=expanded_plan,
             )
         )
 
@@ -4874,10 +4876,77 @@ def _sfem_soa_mesh_operator_function(
         n_field_components=n_field_components,
         metric=metric,
         metric_block_name=block_name,
+        expanded_plan=expanded_plan,
     )
     return lines
 
 
+
+
+def _expanded_simplex_metric_packed_body(plan, uses_current, uses_direction):
+    """The pack's element loop, evaluated in closed form.
+
+    The pack gather and the pack scatter are the packed traversal's reason for
+    existing and are untouched; what this replaces is the block staging between
+    them.  The general body walks the pack in ``VECTOR_SIZE`` slices, declaring
+    two ``[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE]`` arrays and two arrays of
+    pointers into them per slice, gathering, zeroing, calling through the
+    pointers and scattering back.  On a TET4 carrying one scalar per node that
+    staging is the whole cost, exactly as it was on the unpacked path.
+
+    Writing straight into ``pack_out`` needs no atomic: the pack's scratch is
+    thread-private, which is what the packed traversal buys.  The reduction to
+    the global vector happens once per pack afterwards, and that code is shared.
+
+    Returns ``None`` when the shape does not call for it; the table below routes
+    the other case.
+    """
+    from codegen.framework.plans.form_transformations import (
+        symmetric_metric_component_count,
+    )
+
+    scale = _sfem_ccode(plan.scale)
+    prefix = plan.input_prefix
+    if (prefix == "u") != bool(uses_current) or (prefix == "h") != bool(uses_direction):
+        return None
+    lines = [
+        "            for (ptrdiff_t element = e_start; element < e_end; ++element) {",
+    ]
+    lines.extend(
+        "                const uint16_t ev%d = elements[%d][element];" % (shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    lines.extend(
+        "                const scalar_t u%d = pack_%s[ev%d];" % (shape, prefix, shape)
+        for shape in range(plan.n_shape)
+    )
+    for component in range(symmetric_metric_component_count(plan.dim)):
+        value = "scalar_t(g_geom_metric%d[element])" % component
+        if scale != "1":
+            value = "%s * %s" % (scale, value)
+        lines.append("                const scalar_t fff%d = %s;" % (component, value))
+    lines.extend(
+        "                const scalar_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        for symbol, expression in plan.kernel.temporaries
+    )
+    for shape, expression in enumerate(plan.kernel.outputs):
+        lines.append(
+            "                const scalar_t e%d = %s;" % (shape, _sfem_ccode(expression))
+        )
+        lines.append("                pack_out[ev%d] += e%d;" % (shape, shape))
+    lines.extend(["            }", ""])
+    return lines
+
+
+#: Whether the element's strategy produced a closed-form pack loop decides
+#: which body is spelled, the same way `_MESH_OPERATOR_BODY_BY_EXPANDED` does
+#: for the unpacked traversal.
+_PACKED_BODY_BY_EXPANDED = {
+    True: lambda plan, uses_current, uses_direction: (
+        _expanded_simplex_metric_packed_body(plan, uses_current, uses_direction)
+    ),
+    False: lambda plan, uses_current, uses_direction: None,
+}
 
 def _packed_affine_geometry_inputs(dim, metric):
     """The geometry a packed affine kernel reads, in ABI order.
@@ -4923,6 +4992,7 @@ def _sfem_soa_packed_apply_public_wrappers(
     source_builder,
     n_field_components=None,
     metric=None,
+    expanded_plan=None,
 ):
     n_field_components = dim if n_field_components is None else n_field_components
     if geometry_mode not in ("affine", "isoparametric"):
@@ -5191,6 +5261,11 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "                }",
                     "            }",
                     "",
+                ]
+            )
+            element_loop_start = len(lines)
+            lines.extend(
+                [
                     "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
                     "                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
                 ]
@@ -5408,6 +5483,15 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "",
                 ]
             )
+            expanded_lines = _PACKED_BODY_BY_EXPANDED[expanded_plan is not None](
+                expanded_plan, uses_current, uses_direction
+            )
+            if expanded_lines is not None:
+                # The element's own strategy, reaching the pack loop.  Built and
+                # dropped rather than skipped, for the reason the unpacked
+                # traversal states: the general body is straight-line emission
+                # that would have to be extracted whole to be made conditional.
+                lines[element_loop_start:] = expanded_lines
             if two_pass:
                 lines.extend(
                     [
