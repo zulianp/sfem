@@ -53,6 +53,10 @@ struct SSMeshData {
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> pgx, pgy, pgz;
     std::vector<scalar_t> qgx, qgy, qgz;
+    // Body force per node and the control volume it is weighted by; empty unless a case sets
+    // one, in which case the residual is unchanged. See apply_body_force in the flat core.
+    std::vector<scalar_t> fx, fy, fz;
+    std::vector<scalar_t> node_vol;
 
     // Deterministic scatter tables, built once. Null means the atomic path.
     std::shared_ptr<struct SSScatter> scatter;
@@ -1372,6 +1376,56 @@ inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar
 // Same two layouts as everything else, for the same reason: the naive one keeps the flat
 // gather and exists to check the macro-local one against.
 
+// Control volume per node, the semi-structured twin of build_node_volume.
+//
+// A micro-element's eight sub-control volumes partition it evenly, so each of its corners
+// collects |det|/8. The macro geometry is affine, so one determinant serves every micro
+// element of a macro element and the inner loops are pure index arithmetic.
+inline void sscvfem_node_volume(SSMeshData &d, std::vector<scalar_t> &node_vol) {
+    node_vol.assign((size_t)d.nnodes, scalar_t(0));
+    const int L = d.level;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        scalar_t ex[8], ey[8], ez[8];
+        for (int a = 0; a < 8; ++a) {
+            const smesh::idx_t g = d.elems[off[a]][e];
+            ex[a] = (scalar_t)d.points[0][g];
+            ey[a] = (scalar_t)d.points[1][g];
+            ez[a] = (scalar_t)d.points[2][g];
+        }
+        scalar_t adj[9], det;
+        sscvfem_micro_geom(ex, ey, ez, adj, &det);
+        const scalar_t v = std::fabs(det) / scalar_t(8);
+
+        for (int zi = 0; zi < L; ++zi)
+            for (int yi = 0; yi < L; ++yi)
+                for (int xi = 0; xi < L; ++xi) {
+                    const int base = sscvfem_lidx(L, xi, yi, zi);
+                    for (int a = 0; a < 8; ++a) {
+                        const smesh::idx_t g = d.elems[base + off[a]][e];
+                        atomic_add(node_vol.data(), g, v);
+                    }
+                }
+    }
+}
+
+// Subtract the body force from the momentum rows of an interleaved residual. Mirrors
+// apply_body_force in cvfem_hex8_ns_core.hpp; see the sign argument there.
+inline void sscvfem_apply_body_force(SSMeshData &d, scalar_t *const SFEM_RESTRICT res) {
+    if (d.fx.empty()) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t v = d.node_vol[(size_t)i];
+        res[i * N_FIELDS + 0] -= d.fx[(size_t)i] * v;
+        res[i * N_FIELDS + 1] -= d.fy[(size_t)i] * v;
+        res[i * N_FIELDS + 2] -= d.fz[(size_t)i] * v;
+    }
+}
+
 inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                                  scalar_t *const SFEM_RESTRICT res) {
     SFEM_TRACE_SCOPE("sscvfem::residual_naive");
@@ -1416,6 +1470,7 @@ inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t r
             }
         }
     }
+    sscvfem_apply_body_force(d, res);
 }
 
 // zero_first=false accumulates, which is what sfem::Op::gradient needs: Function runs
@@ -1515,6 +1570,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     }
 
     if (sc) sscvfem_reduce_shared(*sc, res);
+    sscvfem_apply_body_force(d, res);
 }
 
 // ---------------------------------------------------------------------------

@@ -63,6 +63,25 @@ namespace {
 }  // namespace
 
 int main(int argc, char **argv) {
+    // asm_vs_mf below compares the assembled Jacobian's SpMV against the matrix-free action,
+    // and that invariant now needs a qualifier. The matrix-free action differentiates the
+    // Rhie-Chow pressure-gradient reconstruction; the assembled Jacobian deliberately does
+    // not, because the exact term couples pressures beyond nearest neighbours and would widen
+    // the BSR pattern, and the assembled operator exists only to build the preconditioner.
+    // With the exact term on, the two are *meant* to differ -- by up to a factor of one on
+    // individual continuity entries, which is what this gate was reporting as a failure.
+    //
+    // So compare like for like: run the whole gate in the frozen form. What this no longer
+    // checks -- that the matrix-free action really is the derivative of the residual -- is
+    // checked properly by SFEM_FD_CHECK in cvfem_hex8_ns_ssgmg, against a finite difference
+    // of the residual rather than against another hand-written Jacobian. A self-consistency
+    // check could never have caught the missing term in the first place; that is how it went
+    // unnoticed.
+    //
+    // Not overwritten if already set, so `SFEM_RC_EXACT_JAC=1 ./cvfem_ns_op_gate` still shows
+    // the divergence.
+    setenv("SFEM_RC_EXACT_JAC", "0", 0);
+
     auto ctx = sfem::initialize(argc, argv);
 
     const int      nx = 8, ny = 4, nz = 4;
