@@ -40,6 +40,7 @@
 #include <omp.h>
 
 #include <map>
+#include <limits>
 #include <random>
 #include <vector>
 
@@ -2295,6 +2296,65 @@ namespace {
 
 }  // namespace
 
+// Exact Jacobian action by forward differencing of the residual:
+//
+//     J v  ~  ( R(x + eps v) - R(x) ) / eps
+//
+// The assembled Jacobian here is not the exact derivative: the Rhie-Chow term freezes the
+// reconstructed nodal pressure gradient pg, dropping its dependence on p. SFEM_FD_CHECK
+// measures 3.9e-2 relative error in the continuity rows against 1.3e-4 in the momentum rows,
+// flat in eps and identical at L=8 and L=16. Differencing the residual has no such omission
+// by construction, so it isolates that defect from everything else.
+//
+// eps follows Knoll & Keyes: sqrt(machine eps) * (1 + ||x||) / ||v||, balancing truncation
+// against cancellation.
+//
+// Constrained rows must stay identity. The difference is exactly zero there -- v is zeroed at
+// constraints, so x + eps v equals x and the two residuals cancel -- which would leave a zero
+// row and a singular operator. The mask restores v on those rows.
+class JFNKOperator final : public sfem::Operator<real_t> {
+public:
+    JFNKOperator(std::shared_ptr<sfem::Function> f, const ptrdiff_t n, const mask_t *const cmask)
+        : f_(std::move(f)), n_(n), cmask_(cmask), xt_((size_t)n), rt_((size_t)n), r0_((size_t)n) {}
+
+    void set_base(const real_t *const x) {
+        base_.assign(x, x + n_);
+        std::fill(r0_.begin(), r0_.end(), real_t(0));
+        f_->gradient(base_.data(), r0_.data());
+        f_->apply_zero_constraints(r0_.data());
+        xnorm_ = 0;
+        for (ptrdiff_t i = 0; i < n_; ++i) xnorm_ += base_[(size_t)i] * base_[(size_t)i];
+        xnorm_ = std::sqrt(xnorm_);
+    }
+
+    int apply(const real_t *const v, real_t *const y) override {
+        real_t vn = 0;
+        for (ptrdiff_t i = 0; i < n_; ++i) vn += v[i] * v[i];
+        vn = std::sqrt(vn);
+        if (vn == real_t(0)) return SFEM_SUCCESS;
+        const real_t eps =
+                std::sqrt(std::numeric_limits<real_t>::epsilon()) * (real_t(1) + xnorm_) / vn;
+        for (ptrdiff_t i = 0; i < n_; ++i) xt_[(size_t)i] = base_[(size_t)i] + eps * v[i];
+        std::fill(rt_.begin(), rt_.end(), real_t(0));
+        f_->gradient(xt_.data(), rt_.data());
+        f_->apply_zero_constraints(rt_.data());
+        for (ptrdiff_t i = 0; i < n_; ++i)  // Operator::apply accumulates into y
+            y[i] += mask_get(i, cmask_) ? v[i] : (rt_[(size_t)i] - r0_[(size_t)i]) / eps;
+        return SFEM_SUCCESS;
+    }
+
+    std::ptrdiff_t       rows() const override { return n_; }
+    std::ptrdiff_t       cols() const override { return n_; }
+    sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+private:
+    std::shared_ptr<sfem::Function> f_;
+    ptrdiff_t                       n_;
+    const mask_t                   *cmask_;
+    std::vector<real_t>             base_, xt_, rt_, r0_;
+    real_t                          xnorm_{0};
+};
+
 int main(int argc, char **argv) {
     auto ctx = sfem::initialize(argc, argv);
 
@@ -2604,6 +2664,16 @@ int main(int argc, char **argv) {
     // perpendicular to the flow -- exactly where the upwind switch sgn(mdot) is not
     // differentiable. If the Jacobian is exact in mode 2 and inexact in mode 1, the upwind
     // kink is the cause of the linear Newton tail, and no solver tuning will remove it.
+    // Fine-level Rhie-Chow scale. Setting this to 0 removes the stabilisation -- and with it
+    // the only Jacobian term that is not exact -- which is how the missing pg derivative is
+    // shown to be what caps Newton at a linear rate, rather than merely being inexact.
+    if (const real_t rc_override = smesh::Env::read<real_t>("SFEM_RC_SCALE", real_t(-1));
+        rc_override >= real_t(0)) {
+        op->rhie_chow_scale = rc_override;
+        op->update(x);
+        std::printf("rhie_chow_scale overridden to %g\n", (double)rc_override);
+    }
+
     if (const int fd_mode = smesh::Env::read<int>("SFEM_FD_CHECK", 0)) {
         std::vector<real_t> v((size_t)ndof), jv((size_t)ndof), rp((size_t)ndof),
                             rm((size_t)ndof), xt((size_t)ndof), xb(x, x + ndof);
@@ -2852,6 +2922,17 @@ int main(int argc, char **argv) {
             phase_add("fine_assembly", smesh::time_seconds() - t0);
             linop = fine_bsr;
         }
+        // SFEM_JFNK=1: replace the OUTER operator with the exact Jacobian action, obtained by
+        // differencing the residual, while the preconditioner keeps using the assembled
+        // (inexact) Jacobian. This is the decisive test of whether the frozen Rhie-Chow pg
+        // derivative is what caps Newton at a linear rate: if the tail disappears, it is.
+        // It is also the cheap remedy -- one extra residual evaluation per Krylov iteration,
+        // no new kernel and no change to the assembled sparsity pattern.
+        if (smesh::Env::read<int>("SFEM_JFNK", 0)) {
+            auto jfnk = std::make_shared<JFNKOperator>(f, ndof, cmask.data());
+            jfnk->set_base(x);   // linearise about the current Newton iterate
+            linop = jfnk;
+        }
         auto linop_timed = timed("outer_op", linop);
         if (use_fgmres) {
             fsolver = std::make_shared<sfem::FGMRES<real_t>>(linop_timed);
@@ -3021,7 +3102,10 @@ int main(int argc, char **argv) {
         {
             real_t xinf = 0;
             for (ptrdiff_t i = 0; i < ndof; ++i) xinf = std::max(xinf, std::fabs(x[(size_t)i]));
-            if (dxinf <= nl_stol * std::max(xinf, real_t(1))) {
+            // nl_stol > 0 guards the disabled case: with nl_stol == 0 the comparison reduces
+            // to dxinf <= 0, which is *true* for an exactly-zero correction -- so a linear
+            // solve that returned nothing would be reported as a converged Newton step.
+            if (nl_stol > real_t(0) && dxinf <= nl_stol * std::max(xinf, real_t(1))) {
                 for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] += dx[(size_t)i];
                 std::printf("  lin_it: %d  |dx|_inf: %.6e  converged on step size\n",
                             get_its(), dxinf);
