@@ -252,3 +252,47 @@ def energy_gradient_metric_scale(weak_form):
         elif sp.simplify(scale - ratio) != 0:
             return None
     return scale
+
+
+@dataclass(frozen=True)
+class CachedMetricGeometry:
+    """The geometry a form takes when its contraction factors through `FFF`.
+
+    `scale` multiplies the metric: for `kappa/2 * ||grad u||^2` it is `kappa`.
+    `metric_components` is how many symmetric entries the ABI carries, which is
+    what makes this six streams where the adjugate is nine and a determinant.
+    """
+
+    dim: int
+    scale: object
+
+    @property
+    def metric_components(self):
+        return symmetric_metric_component_count(self.dim)
+
+
+def cached_metric_geometry(weak_form, rule):
+    """Whether this form reads a cached metric rather than the adjugate.
+
+    The geometry a kernel takes follows what its contraction needs, not which
+    `add_*` call the material used.  Two conditions, and both are properties of
+    the lowered form: the element must be a constant-P1 simplex, so the metric
+    can be cached per element; and the flux must be a uniform scalar multiple of
+    the field gradient, so that `grad(v) . flux` factors as `B^T (kappa*FFF) B`.
+
+    The residual path asks the same question through
+    `simplex_gradient_metric_transformation`, from its lowered field records.
+    This asks it of the flux, which is what an energy has.  Both must answer the
+    same way for the same operator, which is what makes the choice a property of
+    the form rather than of the formulation.
+
+    Only the affine variant can use the answer.  An isoparametric kernel builds
+    its geometry from coordinates and holds an adjugate, not a cached metric, so
+    the two modes need different kernels rather than different arguments.
+    """
+    if rule is None or not _is_constant_p1_simplex_rule(rule):
+        return None
+    scale = energy_gradient_metric_scale(weak_form)
+    if scale is None:
+        return None
+    return CachedMetricGeometry(dim=int(rule.dim), scale=scale)
