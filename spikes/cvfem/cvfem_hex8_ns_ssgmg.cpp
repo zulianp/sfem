@@ -47,6 +47,54 @@
 
 using cvfem_case::FlowCase;
 
+// Relative floor for a scalar about to be inverted.
+//
+// Guards of the form `fabs(d) > 1e-30 ? 1/d : fallback` put an absolute threshold on a
+// quantity that only means anything relative to its matrix. A 3x3 determinant of 1e-25, or a
+// pressure diagonal of 1e-20, passes such a test and yields an inverse of 1e25 or 1e20, which
+// a smoother or preconditioner then applies to the residual on every application. That is
+// exactly how the Vanka smoother came to amplify one degree of freedom by 2.8e16 per sweep.
+//
+// The floor is deliberately far below anything legitimate: it guards against catastrophe and
+// is not a conditioning heuristic. Placed anywhere near a plausible value it zeroes healthy
+// entries and cripples the smoother -- measured, at 1e-11 it took Poiseuille from 178 linear
+// iterations to 1119.
+static inline bool cvfem_invertible(const real_t d, const real_t scale) {
+    return std::fabs(d) > scale * real_t(1e-14) && std::fabs(d) > real_t(1e-300);
+}
+
+// The damping the smoother is actually run with.
+//
+// This was two parameters describing one thing. SFEM_GMG_OMEGA (0.35) drove the point-block
+// smoother and the standalone smoother check; SFEM_VANKA_OMEGA (1) drove the Vanka smoother
+// that replaces it inside the cycle. Vanka is the default, so the cycle ran undamped while
+// every diagnostic reported 0.35 -- the check that exists to certify the smoother was
+// measuring a different operator than the one being certified, and duly certified it.
+//
+// On the closed box that was survivable: additive Vanka at omega = 1 is still just
+// convergent there, so the V-cycle worked and nothing pointed at the damping. With the
+// do-nothing outflow the same smoother crosses one, and then more smoothing makes the cycle
+// diverge faster rather than slower -- measured at 59x per cycle for two sweeps, 1000x for
+// three, 1.5e4 for four and 9e8 for eight. That monotonicity is the signature, and it is
+// what distinguishes a divergent smoother from a bad coarse space, which does not care how
+// often the smoother runs.
+//
+// One function now, so the cycle and the check cannot disagree again.
+//
+// The default stays at 1, which is the measured-best value and not the thing that was wrong.
+// On the closed-box Poiseuille regression at Re = 3200, omega = 1 reaches the target in 178
+// linear iterations against 509 at 0.35 and 1711 at 0.5 (which does not even reach Re = 3200),
+// so damping the smoother globally would cost a factor of three on every case that already
+// works, to help one that needs more than damping anyway. What was wrong was that the check
+// said 0.35 while the cycle ran 1; the value itself was chosen on evidence.
+//
+// A case with an open outflow needs damping to make the cycle converge at all -- set
+// SFEM_VANKA_OMEGA explicitly there. It is a per-problem property, not a default.
+static real_t smoother_omega() {
+    return smesh::Env::read<real_t>("SFEM_VANKA_OMEGA", real_t(1));
+}
+
+
 namespace {
 
     constexpr int N_FIELDS = 4;
@@ -399,7 +447,10 @@ namespace {
             const real_t det = a[0] * (a[4] * a[8] - a[5] * a[7]) - a[1] * (a[3] * a[8] - a[5] * a[6]) +
                                a[2] * (a[3] * a[7] - a[4] * a[6]);
             real_t *const m = du.data() + (size_t)i * 9;
-            if (std::fabs(det) > real_t(1e-30)) {
+            // A determinant scales as the cube of the entries, so its floor must too.
+            real_t ascale = 0;
+            for (int k = 0; k < 9; ++k) ascale = std::max(ascale, std::fabs(a[k]));
+            if (cvfem_invertible(det, ascale * ascale * ascale)) {
                 const real_t id = real_t(1) / det;
                 m[0] = (a[4] * a[8] - a[5] * a[7]) * id;
                 m[1] = (a[2] * a[7] - a[1] * a[8]) * id;
@@ -414,8 +465,16 @@ namespace {
                 m[0] = m[4] = m[8] = real_t(1);
             }
 
+            // Scale the pressure diagonal against the pressure row, not against the whole
+            // block. In a colocated scheme the pressure diagonal is the Rhie-Chow term,
+            // h^2/(2 mu) times an area, and it is legitimately orders of magnitude below the
+            // momentum entries beside it. Flooring it relative to the block maximum therefore
+            // rejects perfectly healthy entries -- measured, it stopped the backward-facing
+            // step converging at all under the block-Jacobi preconditioner.
             const real_t pp = b[15];
-            dp[(size_t)i]   = (std::fabs(pp) > real_t(1e-30)) ? ds_scale / pp : real_t(0);
+            real_t       prow = 0;
+            for (int k = 12; k < 16; ++k) prow = std::max(prow, std::fabs(b[k]));
+            dp[(size_t)i] = cvfem_invertible(pp, prow) ? ds_scale / pp : real_t(0);
 
             for (int c = 0; c < 4; ++c) {
                 const ptrdiff_t k = i * 4 + c;
@@ -461,7 +520,10 @@ namespace {
             const real_t c02 = a01 * a12 - a02 * a11;
             const real_t det = a00 * c00 + a10 * c01 + a20 * c02;
 
-            if (std::fabs(det) > real_t(1e-30)) {
+            real_t vscale = 0;
+            for (const real_t q : {a00, a01, a02, a10, a11, a12, a20, a21, a22})
+                vscale = std::max(vscale, std::fabs(q));
+            if (cvfem_invertible(det, vscale * vscale * vscale)) {
                 const real_t d = real_t(1) / det;
                 m[0] = c00 * d;
                 m[1] = c01 * d;
@@ -476,8 +538,11 @@ namespace {
                 m[0] = m[5] = m[10] = real_t(1);
             }
 
+            // Same reasoning as above: the pressure row sets the scale for its own diagonal.
             const real_t pp = b[15];
-            m[15]           = (std::fabs(pp) > real_t(1e-30)) ? real_t(1) / pp : real_t(1);
+            real_t       prow2 = 0;
+            for (int k = 12; k < 16; ++k) prow2 = std::max(prow2, std::fabs(b[k]));
+            m[15] = cvfem_invertible(pp, prow2) ? real_t(1) / pp : real_t(1);
 
             // Damping. Undamped block-Jacobi is fine as a Krylov preconditioner, where it
             // is applied once, and is not a smoother: as a stationary iteration on this
@@ -1021,6 +1086,36 @@ namespace {
                     std::printf("  structured P %d->%d: nnz %td  uniform %d  vs matrix-free rel %.4e  %s\n",
                                 i + 1, i, (ptrdiff_t)pp.rowptr[(size_t)pp.n_fine], (int)pp.uniform, rel,
                                 (rel < 1e-12) ? "OK" : "MISMATCH");
+
+                    // Does P reproduce a constant?
+                    //
+                    // Neither test above asks this. The structured-vs-matrix-free comparison
+                    // checks two implementations of the same P against each other, and the
+                    // adjoint check verifies R = P^T; both pass whatever P is. A prolongation
+                    // whose rows do not sum to one interpolates a constant field into
+                    // something else, and the multigrid correction is then wrong by an amount
+                    // proportional to the solution itself rather than to the error.
+                    //
+                    // This goes unnoticed on every case in this file but one. Where the whole
+                    // skin is Dirichlet, the correction at boundary nodes is zeroed after the
+                    // prolongation, so a defect confined to boundary rows is masked exactly.
+                    // The do-nothing outflow leaves those nodes free, and it is the only
+                    // configuration here that exposes them -- which is why it is also the only
+                    // one whose V-cycle diverges.
+                    std::vector<real_t> one((size_t)g.data->functions[i + 1]->space()->n_dofs(), 0),
+                            pone((size_t)g.data->functions[i]->space()->n_dofs(), 0);
+                    for (ptrdiff_t k = 0; k < pp.n_coarse; ++k) one[(size_t)k * N_FIELDS] = 1;
+                    praw->apply(one.data(), pone.data());
+                    real_t    worst = 0;
+                    ptrdiff_t worst_k = -1, n_bad = 0;
+                    for (ptrdiff_t k = 0; k < pp.n_fine; ++k) {
+                        const real_t d = std::fabs(pone[(size_t)k * N_FIELDS] - real_t(1));
+                        if (d > 1e-10) ++n_bad;
+                        if (d > worst) { worst = d; worst_k = k; }
+                    }
+                    std::printf("  P %d->%d reproduces constants: worst |P1-1| = %.4e at node %td, %td of %td nodes off  %s\n",
+                                i + 1, i, (double)worst, worst_k, n_bad, (ptrdiff_t)pp.n_fine,
+                                (worst < 1e-10) ? "OK" : "BROKEN");
                 }
             }
 
@@ -1262,10 +1357,27 @@ namespace {
     // factorisation is both exact and cheap, and it cannot diverge. The matrix is recovered
     // by applying the operator to unit vectors, which costs n small matrix-vector products
     // once per Newton step.
+    // The coarse solve is rank-revealing, because the coarse operator need not have full rank.
+    //
+    // A pivot is small or large only relative to the matrix it came from, so the old absolute
+    // `1e-300` test let a pivot of 1e-18 through in a matrix of scale one and back-substituted
+    // an inverse of 1e18. On the backward-facing step that produced a coarse correction of
+    // norm 1.6e12 from a fine residual of 5e-3, which the prolongation then added to the
+    // solution -- the cycle's divergence at 1e19 per iteration was this and nothing else.
+    //
+    // Treating such a pivot as a null direction (y = 0 there) makes the solve a truncated
+    // least-squares one: the coarse space's null components are simply not corrected, which is
+    // the right thing for a multigrid coarse solve, since a null direction of A_H carries no
+    // information about the fine residual. The dropped count is printed rather than swallowed;
+    // a coarse operator that suddenly loses rank is a defect worth seeing.
     class DenseLU final : public sfem::Operator<real_t> {
     public:
         DenseLU(const ptrdiff_t n, std::vector<real_t> a) : n_(n), a_(std::move(a)), piv_((size_t)n) {
             for (ptrdiff_t i = 0; i < n_; ++i) piv_[(size_t)i] = i;
+            real_t amax = 0;
+            for (const real_t v : a_) amax = std::max(amax, std::fabs(v));
+            const real_t ptol =
+                    amax * (real_t)smesh::Env::read<double>("SFEM_COARSE_LU_TOL", 1e-14);
             for (ptrdiff_t k = 0; k < n_; ++k) {
                 ptrdiff_t p = k;
                 real_t    m = std::fabs(a_[(size_t)k * n_ + k]);
@@ -1278,8 +1390,15 @@ namespace {
                         std::swap(a_[(size_t)k * n_ + j], a_[(size_t)p * n_ + j]);
                     std::swap(piv_[(size_t)k], piv_[(size_t)p]);
                 }
-                const real_t d = a_[(size_t)k * n_ + k];
-                if (std::fabs(d) < real_t(1e-300)) continue;  // singular column: leave it
+                real_t d = a_[(size_t)k * n_ + k];
+                if (std::fabs(d) <= ptol) {
+                    // Rank-deficient column: record it, zero the pivot so back-substitution
+                    // takes y = 0 here, and leave the rest of the column alone.
+                    a_[(size_t)k * n_ + k] = 0;
+                    if (dropped_.size() < 32) dropped_.push_back(piv_[(size_t)k]);
+                    ++n_dropped_;
+                    continue;
+                }
                 for (ptrdiff_t i = k + 1; i < n_; ++i) {
                     const real_t f = a_[(size_t)i * n_ + k] / d;
                     a_[(size_t)i * n_ + k] = f;
@@ -1301,7 +1420,7 @@ namespace {
                 real_t s = y[(size_t)i];
                 for (ptrdiff_t j = i + 1; j < n_; ++j) s -= a_[(size_t)i * n_ + j] * y[(size_t)j];
                 const real_t d = a_[(size_t)i * n_ + i];
-                y[(size_t)i] = (std::fabs(d) > real_t(1e-300)) ? s / d : real_t(0);
+                y[(size_t)i] = (d != real_t(0)) ? s / d : real_t(0);
             }
             for (ptrdiff_t i = 0; i < n_; ++i) x[i] += y[(size_t)i];
             return SFEM_SUCCESS;
@@ -1311,10 +1430,16 @@ namespace {
         ptrdiff_t cols() const override { return n_; }
         sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
 
+        // Number of coarse directions the factorisation could not resolve.
+        ptrdiff_t                     n_dropped() const { return n_dropped_; }
+        const std::vector<ptrdiff_t> &dropped() const { return dropped_; }
+
     private:
         ptrdiff_t              n_;
         std::vector<real_t>    a_;
         std::vector<ptrdiff_t> piv_;
+        ptrdiff_t              n_dropped_{0};
+        std::vector<ptrdiff_t> dropped_;
     };
 
     // Densify from the assembled matrix instead of applying it once per column.
@@ -1343,6 +1468,26 @@ namespace {
                                 vd[(size_t)k * 16 + (size_t)(i * N_FIELDS + j)];
             }
         return std::make_shared<DenseLU>(n, std::move(dense));
+    }
+
+    // Write a densified operator out so its spectrum can be examined offline.
+    //
+    // Component structure is what matters here -- which field a near-null mode lives in, and
+    // whether it is smooth or oscillatory -- and that is far easier to read from an SVD than
+    // to infer from residual norms. Gated on SFEM_GMG_DUMP_COARSE and off by default.
+    static void dump_dense(const char *path, const ptrdiff_t n, const std::vector<real_t> &a) {
+        FILE *f = std::fopen(path, "w");
+        if (!f) {
+            std::fprintf(stderr, "dump_dense: cannot open %s\n", path);
+            return;
+        }
+        std::fprintf(f, "%td\n", n);
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            for (ptrdiff_t j = 0; j < n; ++j)
+                std::fprintf(f, "%.17g%c", (double)a[(size_t)i * n + j], (j + 1 == n) ? '\n' : ' ');
+        }
+        std::fclose(f);
+        std::printf("dump_dense: wrote %td x %td to %s\n", n, n, path);
     }
 
     std::shared_ptr<DenseLU> make_dense_lu(const std::shared_ptr<sfem::Operator<real_t>> &op,
@@ -2201,7 +2346,7 @@ namespace {
                         cb[(size_t)k] = mask_get(k, mask.data()) ? 1 : 0;
                     auto vk = cvfem_ss::make_diagonal_vanka_from_bsr(
                             *g.level_ops[(size_t)i], g.Amat[(size_t)i], cb.data(),
-                            smesh::Env::read<real_t>("SFEM_VANKA_OMEGA", real_t(1)));
+                            smoother_omega());
                     if (vk) prec_op = vk;
                 }
                 if (i == 0 && smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka") == "vanka" &&
@@ -2214,8 +2359,7 @@ namespace {
                     const double t_v = smesh::time_seconds();
                     prec_op = cvfem_ss::make_diagonal_vanka(*g.level_ops[0], g.data->functions[0]->space(),
                                                             g.states[0]->data(), cb.data(),
-                                                            smesh::Env::read<real_t>("SFEM_VANKA_OMEGA",
-                                                                                     real_t(1)));
+                                                            smoother_omega());
                     phase_add("vanka_setup", smesh::time_seconds() - t_v);
                 }
 
@@ -2252,6 +2396,37 @@ namespace {
                     // only for a level that has no matrix form.
                     auto lu = g.Amat[(size_t)i] ? make_dense_lu_from_bsr(g.Amat[(size_t)i], nd_coarse)
                                                 : make_dense_lu(lop, nd_coarse);
+                    {
+                        const std::string dpath =
+                                smesh::Env::read_string("SFEM_GMG_DUMP_COARSE", std::string());
+                        if (!dpath.empty()) {
+                            std::vector<real_t> dn((size_t)nd_coarse * (size_t)nd_coarse, 0);
+                            std::vector<real_t> e((size_t)nd_coarse), c((size_t)nd_coarse);
+                            for (ptrdiff_t j = 0; j < nd_coarse; ++j) {
+                                std::fill(e.begin(), e.end(), real_t(0));
+                                std::fill(c.begin(), c.end(), real_t(0));
+                                e[(size_t)j] = 1;
+                                lop->apply(e.data(), c.data());
+                                for (ptrdiff_t r = 0; r < nd_coarse; ++r)
+                                    dn[(size_t)r * nd_coarse + j] = c[(size_t)r];
+                            }
+                            dump_dense(dpath.c_str(), nd_coarse, dn);
+                        }
+                    }
+
+                    // A rank-deficient coarse operator is reported by component, because which
+                    // component loses rank says what is missing: pressure alone is a gauge
+                    // (no Dirichlet pressure and an outflow that does not fix the level),
+                    // velocity means the coarse boundary treatment itself is wrong.
+                    if (lu->n_dropped()) {
+                        int by_comp[4] = {0, 0, 0, 0};
+                        for (const ptrdiff_t d : lu->dropped()) by_comp[(int)(d % 4)]++;
+                        std::printf(
+                                "coarse LU: %td of %td directions dropped as null  "
+                                "(first %zu by component: ux %d  uy %d  uz %d  p %d)\n",
+                                lu->n_dropped(), (ptrdiff_t)nd_coarse, lu->dropped().size(),
+                                by_comp[0], by_comp[1], by_comp[2], by_comp[3]);
+                    }
 
                     if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) && g.Amat[(size_t)i]) {
                         // The two densifications must agree: same operator, read two ways.
@@ -2479,16 +2654,31 @@ int main(int argc, char **argv) {
     // a semi-structured level change leaves untouched, so every multigrid level compiles its
     // mask from these same sidesets instead of re-deriving the skin -- which cost an
     // element-adjacency pass per level.
+    //
+    // SFEM_OUTLET=natural puts the same do-nothing outflow on a plain box. The step is an
+    // L-shape with an open outlet; when its multigrid cycle misbehaves, those two properties
+    // are confounded, and every clean diagnostic in this file was obtained on a box. This
+    // knob supplies the missing control -- a box that differs from the working Poiseuille
+    // case in the outlet treatment and nothing else -- and it is off by default, so no
+    // existing run changes.
+    const bool want_natural_outlet =
+            want_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet"
+                      : smesh::Env::read_string("SFEM_OUTLET", "dirichlet") == "natural";
     std::shared_ptr<smesh::Sideset> step_skin, step_outlet;
-    if (want_step) {
+    if (want_step || want_natural_outlet) {
         step_skin = smesh::skin_sideset(mesh);
         auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)Lx, 1e-6);
         if (!step_skin || outs.empty()) {
-            std::fprintf(stderr, "step: could not build the boundary sidesets\n");
+            std::fprintf(stderr, "could not build the boundary sidesets\n");
             return EXIT_FAILURE;
         }
         step_outlet = outs.front();
-        std::printf("step: sidesets  skin %td faces, outlet %td faces\n",
+        // Register them on the flat mesh as well, so a run at refine_level 1 -- which never
+        // reaches the re-attachment below, because it does not rebuild the mesh -- still has
+        // the named sidesets the operator asks for.
+        mesh->add_sideset("skin", step_skin);
+        mesh->add_sideset("outlet", step_outlet);
+        std::printf("sidesets: skin %td faces, outlet %td faces\n",
                     (ptrdiff_t)step_skin->parent()->size(), (ptrdiff_t)step_outlet->parent()->size());
         setenv("SFEM_BOUNDARY_MASK", "1", 0);
     }
@@ -2520,7 +2710,7 @@ int main(int argc, char **argv) {
     op->mu   = mu;
     op->geom = (geom_name == "isoparam") ? sfem::CVFEMGeometry::Isoparam : sfem::CVFEMGeometry::Affine;
     op->pack_size = pack_size;
-    if (want_step && smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet") {
+    if (want_natural_outlet) {
         // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
         // the pressure gauge -- so the pin must come off with it, or the system is
         // over-determined.
@@ -2666,7 +2856,7 @@ int main(int argc, char **argv) {
                     uvw_uy.push_back(uy);
                     uvw_uz.push_back(uz);
                 }
-            } else if (wall_y || inlet || outlet) {
+            } else if (wall_y || inlet || (outlet && !want_natural_outlet)) {
                 uvw_nodes.push_back((idx_t)i);
                 uvw_ux.push_back(ux);
                 uvw_uy.push_back(uy);
@@ -2708,9 +2898,7 @@ int main(int argc, char **argv) {
         // step: if the outflow condition determines the pressure level, pinning as well
         // over-determines the system, and the symptom would be exactly what an under-
         // determined one gives -- a large, useless Newton step.
-        const bool step_natural = want_step &&
-                smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet";
-        if (smesh::Env::read<int>("SFEM_PIN_PRESSURE", step_natural ? 0 : 1))
+        if (smesh::Env::read<int>("SFEM_PIN_PRESSURE", want_natural_outlet ? 0 : 1))
             conds.push_back(make_cond({(idx_t)pin}, {pp}, 3));
         else
             std::printf("pressure pin: DISABLED\n");
@@ -3179,8 +3367,11 @@ int main(int argc, char **argv) {
                 // divergent smoother makes the cycle diverge regardless of what the coarse
                 // levels do -- and no coarse-grid fix can repair that.
                 if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 3 && newton_it == 0) {
-                    const real_t om = smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
                     const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
+                    // Same source as the cycle's, or this check measures something else.
+                    const real_t om = (kind == "vanka")
+                                              ? smoother_omega()
+                                              : smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
                     std::shared_ptr<sfem::Operator<real_t>> prec;
                     if (kind == "vanka") {
                         // Diagonal Vanka: a coupled solve over each micro-element patch,
