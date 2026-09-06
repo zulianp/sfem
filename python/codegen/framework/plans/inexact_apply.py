@@ -444,6 +444,12 @@ def emittable_inexact_apply_plan(element_type, dim, n_nodes, flux_form, rule):
     if flux_form is None or flux_form.n_field_components != int(dim):
         return None
     values = tuple(getattr(rule, "reference_gradients", ()) or ())
-    if len(values) != int(n_nodes) * int(dim):
+    points = int(getattr(rule, "n_qp", 1) or 1)
+    # The reference gradients arrive as one block per quadrature point.  A
+    # linear simplex has a single point and constant gradients, which is the
+    # same layout with one block; nothing here needs the two cases separated.
+    if len(values) != points * int(n_nodes) * int(dim):
+        return None
+    if not tuple(getattr(rule, "weights", ()) or ()):
         return None
     return plan
