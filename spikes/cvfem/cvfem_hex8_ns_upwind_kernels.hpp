@@ -82,6 +82,15 @@ struct Hex8RhieChowT {
     const T *pgy{};
     const T *pgz{};
     T        scale{0};
+    // Reconstructed nodal gradient of the *perturbation* q, for the Jacobian action only.
+    // The residual's Rhie-Chow correction subtracts avg(pg_i,pg_j).d, and pg is itself a
+    // (linear, geometry-weighted) function of p, so its derivative is the same operator
+    // applied to q. Leaving these null reproduces the previous, frozen-pg behaviour --
+    // which the assembled Jacobian still relies on, since including the term there would
+    // widen the pressure coupling beyond nearest neighbours.
+    const T *qgx{};
+    const T *qgy{};
+    const T *qgz{};
 };
 
 // Every existing host call site names `Hex8RhieChow`, so keep that spelling bound
@@ -558,7 +567,17 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_dmdotc(const s
     const scalar_t dy    = rc.y[j] - rc.y[i];
     const scalar_t dz    = rc.z[j] - rc.z[i];
     const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az);
-    return coeff * (q_i - q_j);
+    // Mirror mdotc exactly: corr = (q_j - q_i) - avg(qg_i, qg_j) . d. Dropping the second
+    // term -- as this did -- leaves the continuity rows of the Jacobian wrong by ~4%, which
+    // caps Newton at a linear rate (contraction 0.675, independent of mesh) instead of
+    // quadratic. See SFEM_FD_CHECK.
+    scalar_t corr = q_j - q_i;
+    if (rc.qgx) {
+        const scalar_t half = scalar_t(0.5);
+        corr -= half * (rc.qgx[i] + rc.qgx[j]) * dx + half * (rc.qgy[i] + rc.qgy[j]) * dy +
+                half * (rc.qgz[i] + rc.qgz[j]) * dz;
+    }
+    return -coeff * corr;
 }
 
 template <typename scalar_t>

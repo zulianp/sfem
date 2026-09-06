@@ -52,6 +52,7 @@ struct SSMeshData {
 
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> pgx, pgy, pgz;
+    std::vector<scalar_t> qgx, qgy, qgz;
 
     // Deterministic scatter tables, built once. Null means the atomic path.
     std::shared_ptr<struct SSScatter> scatter;
@@ -274,10 +275,15 @@ static SFEM_INLINE void sscvfem_micro_geom(const scalar_t x[8], const scalar_t y
 // Nodal pressure gradient, the pre-pass Rhie-Chow interpolation needs. Mirrors
 // assemble_nodal_p_grad: a volume-weighted average of the element gradients.
 
-inline void sscvfem_nodal_p_grad(SSMeshData &d) {
-    d.pgx.assign((size_t)d.nnodes, 0);
-    d.pgy.assign((size_t)d.nnodes, 0);
-    d.pgz.assign((size_t)d.nnodes, 0);
+// The reconstruction over an arbitrary strided nodal scalar. It is linear in that scalar
+// with geometry-only weights, so applying it to a Jacobian direction q gives exactly the
+// derivative of applying it to p -- the term the Rhie-Chow Jacobian was missing.
+inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
+                                       const int stride, std::vector<scalar_t> &ogx,
+                                       std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz) {
+    ogx.assign((size_t)d.nnodes, 0);
+    ogy.assign((size_t)d.nnodes, 0);
+    ogz.assign((size_t)d.nnodes, 0);
     std::vector<scalar_t> w((size_t)d.nnodes, 0);
 
     const int L = d.level;
@@ -301,7 +307,7 @@ inline void sscvfem_nodal_p_grad(SSMeshData &d) {
                 lx[(size_t)a]        = (scalar_t)d.points[0][g];
                 ly[(size_t)a]        = (scalar_t)d.points[1][g];
                 lz[(size_t)a]        = (scalar_t)d.points[2][g];
-                lp[(size_t)a]        = d.p[(size_t)g];
+                lp[(size_t)a]        = src[(ptrdiff_t)g * stride];
             }
 
             for (int zi = 0; zi < L; ++zi) {
@@ -332,9 +338,9 @@ inline void sscvfem_nodal_p_grad(SSMeshData &d) {
                                 acc[3] += vol;
                             } else {
                                 const smesh::idx_t id = lg[(size_t)l];
-                                atomic_add(d.pgx.data(), id, vol * gx);
-                                atomic_add(d.pgy.data(), id, vol * gy);
-                                atomic_add(d.pgz.data(), id, vol * gz);
+                                atomic_add(ogx.data(), id, vol * gx);
+                                atomic_add(ogy.data(), id, vol * gy);
+                                atomic_add(ogz.data(), id, vol * gz);
                                 atomic_add(w.data(), id, vol);
                             }
                         }
@@ -343,14 +349,14 @@ inline void sscvfem_nodal_p_grad(SSMeshData &d) {
             }
 
             if (sc) {
-                scalar_t *dst[N_FIELDS] = {d.pgx.data(), d.pgy.data(), d.pgz.data(), w.data()};
+                scalar_t *dst[N_FIELDS] = {ogx.data(), ogy.data(), ogz.data(), w.data()};
                 sscvfem_scatter_element_soa(*sc, d.nxe, e, lg.data(), lacc.data(), dst);
             }
         }
     }
 
     if (sc) {
-        scalar_t *dst[N_FIELDS] = {d.pgx.data(), d.pgy.data(), d.pgz.data(), w.data()};
+        scalar_t *dst[N_FIELDS] = {ogx.data(), ogy.data(), ogz.data(), w.data()};
         sscvfem_reduce_shared_soa(*sc, dst);
     }
 
@@ -358,11 +364,23 @@ inline void sscvfem_nodal_p_grad(SSMeshData &d) {
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
         if (w[(size_t)i] <= scalar_t(0)) continue;
         const scalar_t inv = scalar_t(1) / w[(size_t)i];
-        d.pgx[(size_t)i] *= inv;
-        d.pgy[(size_t)i] *= inv;
-        d.pgz[(size_t)i] *= inv;
+        ogx[(size_t)i] *= inv;
+        ogy[(size_t)i] *= inv;
+        ogz[(size_t)i] *= inv;
     }
 }
+
+inline void sscvfem_nodal_p_grad(SSMeshData &d) {
+    SFEM_TRACE_SCOPE("sscvfem::nodal_p_grad");
+    sscvfem_nodal_grad_strided(d, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
+}
+
+// The same reconstruction applied to the Jacobian direction's pressure component.
+inline void sscvfem_nodal_q_grad(SSMeshData &d, const scalar_t *const SFEM_RESTRICT dir) {
+    SFEM_TRACE_SCOPE("sscvfem::nodal_q_grad");
+    sscvfem_nodal_grad_strided(d, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+}
+
 
 // ---------------------------------------------------------------------------
 // Control: the flat gather, on the semi-structured mesh. Every micro-element reads its
@@ -697,6 +715,9 @@ static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_
                                                const scalar_t *const SFEM_RESTRICT pgx,
                                                const scalar_t *const SFEM_RESTRICT pgy,
                                                const scalar_t *const SFEM_RESTRICT pgz,
+                                               const scalar_t *const SFEM_RESTRICT qgx,
+                                               const scalar_t *const SFEM_RESTRICT qgy,
+                                               const scalar_t *const SFEM_RESTRICT qgz,
                                                scalar_t *const SFEM_RESTRICT       r) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
@@ -745,8 +766,16 @@ static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_
         const scalar_t d_pos = half * (one + sgn);
         const scalar_t d_neg = half * (one - sgn);
 
+        // Mirror the residual's corr above: corr_q = (q_j - q_i) - avg(qg_i, qg_j) . d, which
+        // contributes -c * corr_q. Keeping only c*(q_i - q_j) freezes the pressure-gradient
+        // reconstruction, leaving the continuity rows ~4% wrong and capping Newton at a linear
+        // rate. qgx == nullptr restores that old behaviour. See SFEM_FD_CHECK.
+        const scalar_t dcorr = qgx ? (half * (qgx[i] + qgx[j]) * g.dvec[s][0] +
+                                      half * (qgy[i] + qgy[j]) * g.dvec[s][1] +
+                                      half * (qgz[i] + qgz[j]) * g.dvec[s][2])
+                                   : scalar_t(0);
         const scalar_t dmdot = rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay + (vz[i] + vz[j]) * az) +
-                               c * (q[i] - q[j]);
+                               c * (q[i] - q[j]) + c * dcorr;
         const scalar_t dpos = d_pos * dmdot;
         const scalar_t dneg = d_neg * dmdot;
         const scalar_t qmid = half * (q[i] + q[j]);
@@ -782,6 +811,10 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
         std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
         std::vector<scalar_t>     lvx((size_t)nxe), lvy((size_t)nxe), lvz((size_t)nxe), lq((size_t)nxe);
         std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
+        // Direction gradient, gathered the same way. Empty when Rhie-Chow is off.
+        const bool                has_qg = !d.qgx.empty();
+        std::vector<scalar_t>     lqgx((size_t)(has_qg ? nxe : 0)), lqgy((size_t)(has_qg ? nxe : 0)),
+                                  lqgz((size_t)(has_qg ? nxe : 0));
         std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
 
 #pragma omp for schedule(static)
@@ -803,6 +836,11 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
                 lpgx[(size_t)a]      = d.pgx[(size_t)g];
                 lpgy[(size_t)a]      = d.pgy[(size_t)g];
                 lpgz[(size_t)a]      = d.pgz[(size_t)g];
+                if (has_qg) {
+                    lqgx[(size_t)a] = d.qgx[(size_t)g];
+                    lqgy[(size_t)a] = d.qgy[(size_t)g];
+                    lqgz[(size_t)a] = d.qgz[(size_t)g];
+                }
             }
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
@@ -825,6 +863,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
 
                         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
                         scalar_t vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
+                        scalar_t qgx[8], qgy[8], qgz[8];
                         scalar_t r[CVFEM_HEX8_N_DOF];
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
@@ -842,9 +881,16 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
                             pgx[a]      = lpgx[(size_t)l];
                             pgy[a]      = lpgy[(size_t)l];
                             pgz[a]      = lpgz[(size_t)l];
+                            if (has_qg) {
+                                qgx[a] = lqgx[(size_t)l];
+                                qgy[a] = lqgy[(size_t)l];
+                                qgz[a] = lqgz[(size_t)l];
+                            }
                         }
 
-                        sscvfem_action_hoisted(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz, r);
+                        sscvfem_action_hoisted(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz,
+                                               has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
+                                               has_qg ? qgz : nullptr, r);
                         boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                          ux, uy, uz, vx, vy, vz, q, r);
 
@@ -1663,5 +1709,19 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
 inline void sscvfem_apply(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                           const scalar_t *const SFEM_RESTRICT dir,
                           scalar_t *const SFEM_RESTRICT       jv) {
+    // Rhie-Chow differentiates through the nodal pressure-gradient reconstruction, so the
+    // direction's own reconstructed gradient is needed for the Jacobian action to be exact.
+    // One extra pass per apply, the same shape as the one already done for p.
+    // SFEM_RC_EXACT_JAC=0 restores the frozen-pg Jacobian, for A/B against this fix. The
+    // preconditioner is still built from the assembled Jacobian, which keeps the frozen form,
+    // so making the action exact also makes the two disagree -- that is what the A/B measures.
+    static const int rc_exact = smesh::Env::read<int>("SFEM_RC_EXACT_JAC", 1);
+    if (rc_exact && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
+        sscvfem_nodal_q_grad(d, dir);
+    } else {
+        d.qgx.clear();
+        d.qgy.clear();
+        d.qgz.clear();
+    }
     sscvfem_apply_macro_local_hoisted(d, rho, mu, dir, jv);
 }

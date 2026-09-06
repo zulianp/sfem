@@ -87,6 +87,7 @@ struct MeshData {
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> rx, ry, rz, rc;
     std::vector<scalar_t> pgx, pgy, pgz;
+    std::vector<scalar_t> qgx, qgy, qgz;  // same reconstruction applied to the Jacobian direction
     std::vector<scalar_t> jacobian_adjugate[9];
     std::vector<scalar_t> jacobian_determinant;
     PackedData           *packed{nullptr};
@@ -301,17 +302,23 @@ SFEM_INLINE void gather_element_coords(const MeshData               &d,
    (p_j-p_i)-∇p_el·Δx vanish for any field that is linear on a HEX8, including the
    axis-aligned odd-even mode p=(-1)^i. Averaging neighboring elements restores
    the standard Rhie–Chow term 0.5(∇p_i+∇p_j) and still annihilates globally linear p. */
-inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_p_grad");
-    d.pgx.assign((size_t)d.nnodes, scalar_t(0));
-    d.pgy.assign((size_t)d.nnodes, scalar_t(0));
-    d.pgz.assign((size_t)d.nnodes, scalar_t(0));
+// The reconstruction, over an arbitrary strided nodal scalar. It is linear in that scalar
+// and its weights depend only on geometry, so applying it to a perturbation q yields exactly
+// the derivative of applying it to p -- which is the term the Jacobian was missing.
+inline void assemble_nodal_grad_strided(MeshData &d, const GeomKind geom_kind,
+                                        const scalar_t *const SFEM_RESTRICT src, const int stride,
+                                        std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
+                                        std::vector<scalar_t> &ogz) {
+    ogx.assign((size_t)d.nnodes, scalar_t(0));
+    ogy.assign((size_t)d.nnodes, scalar_t(0));
+    ogz.assign((size_t)d.nnodes, scalar_t(0));
     std::vector<scalar_t> w((size_t)d.nnodes, scalar_t(0));
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t p[8], gx, gy, gz, vol;
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) p[a] = d.p[d.elems[a][e]];
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+            p[a] = src[(ptrdiff_t)d.elems[a][e] * stride];
         if (geom_kind == GeomKind::Isoparam) {
             scalar_t x[8], y[8], z[8], dN[CVFEM_HEX8_N_NODES][3];
             gather_element_coords(d, e, x, y, z);
@@ -336,9 +343,9 @@ inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t id = d.elems[a][e];
-            atomic_add(d.pgx.data(), id, vol * gx);
-            atomic_add(d.pgy.data(), id, vol * gy);
-            atomic_add(d.pgz.data(), id, vol * gz);
+            atomic_add(ogx.data(), id, vol * gx);
+            atomic_add(ogy.data(), id, vol * gy);
+            atomic_add(ogz.data(), id, vol * gz);
             atomic_add(w.data(), id, vol);
         }
     }
@@ -347,10 +354,15 @@ inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
         if (w[(size_t)i] <= scalar_t(0)) continue;
         const scalar_t inv = scalar_t(1) / w[(size_t)i];
-        d.pgx[(size_t)i] *= inv;
-        d.pgy[(size_t)i] *= inv;
-        d.pgz[(size_t)i] *= inv;
+        ogx[(size_t)i] *= inv;
+        ogy[(size_t)i] *= inv;
+        ogz[(size_t)i] *= inv;
     }
+}
+
+inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_p_grad");
+    assemble_nodal_grad_strided(d, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
 }
 
 SFEM_INLINE void gather_element_pgrad(const MeshData               &d,
@@ -366,6 +378,19 @@ SFEM_INLINE void gather_element_pgrad(const MeshData               &d,
     }
 }
 
+
+SFEM_INLINE void gather_element_qgrad(const MeshData               &d,
+                                      const ptrdiff_t               e,
+                                      scalar_t *const SFEM_RESTRICT gx,
+                                      scalar_t *const SFEM_RESTRICT gy,
+                                      scalar_t *const SFEM_RESTRICT gz) {
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const smesh::idx_t id = d.elems[a][e];
+        gx[a]                 = d.qgx[id];
+        gy[a]                 = d.qgy[id];
+        gz[a]                 = d.qgz[id];
+    }
+}
 
 SFEM_INLINE void gather_element_dir(const MeshData &d, const ptrdiff_t e, const scalar_t *const SFEM_RESTRICT dir,
                                            scalar_t *const SFEM_RESTRICT vx, scalar_t *const SFEM_RESTRICT vy,
@@ -693,9 +718,13 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, cons
         gather_element_coords(d, e, x, y, z);
         gather_element_fields(d, e, ux, uy, uz, p);
         gather_element_dir(d, e, dir, vx, vy, vz, q);
-        scalar_t pgx[8], pgy[8], pgz[8];
+        scalar_t pgx[8], pgy[8], pgz[8], qgx[8], qgy[8], qgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+        const bool has_qg = !d.qgx.empty();
+        if (has_qg) gather_element_qgrad(d, e, qgx, qgy, qgz);
+        const Hex8RhieChow rc{x,   y,   z,   pgx, pgy, pgz, d.rhie_chow_scale,
+                              has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
+                              has_qg ? qgz : nullptr};
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
@@ -720,9 +749,13 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
         gather_element_coords(d, e, x, y, z);
         gather_element_fields(d, e, ux, uy, uz, p);
         gather_element_dir(d, e, dir, vx, vy, vz, q);
-        scalar_t pgx[8], pgy[8], pgz[8];
+        scalar_t pgx[8], pgy[8], pgz[8], qgx[8], qgy[8], qgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
-        const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
+        const bool has_qg = !d.qgx.empty();
+        if (has_qg) gather_element_qgrad(d, e, qgx, qgy, qgz);
+        const Hex8RhieChow rc{x,   y,   z,   pgx, pgy, pgz, d.rhie_chow_scale,
+                              has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
+                              has_qg ? qgz : nullptr};
         cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, x, y, z, ux, uy, uz, vx, vy, vz, q, r, rc, p);
         boundary_scs_add_jacobian_action(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -742,6 +775,15 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
 inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
                                              const scalar_t *const SFEM_RESTRICT dir,
                                              scalar_t *const SFEM_RESTRICT       jv) {
+    // The Rhie-Chow correction differentiates through the nodal pressure-gradient
+    // reconstruction, so the direction's own reconstructed gradient is needed. One extra
+    // pass per Jacobian apply, the same shape as the one update() already does for p.
+    if (d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_q_grad");
+        assemble_nodal_grad_strided(d, geom, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+    } else {
+        d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
+    }
     if (geom == GeomKind::Isoparam) {
         apply_jacobian_action_atomic_isoparam(d, rho, mu, dir, jv);
     } else if (d.packed) {
