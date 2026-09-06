@@ -3089,6 +3089,19 @@ int main(int argc, char **argv) {
         // trusted, and continuing would only spend a line search discovering that. Abandoning
         // here lets the continuation shrink its step while the failure is still cheap.
         if (lin_failed && lin_failed()) {
+            // A Krylov solve handed a right-hand side that is already round-off cannot do
+            // anything sensible with it, and its "divergence" says nothing about the state.
+            // This is the normal case once the Jacobian is exact: the first stage converges to
+            // ~1e-15 and, for a solution that barely changes with the continuation parameter,
+            // every later stage starts solved. Abandoning here discards converged stages --
+            // the same floor the line search already respects applies.
+            if (rel < nl_ls_floor) {
+                std::printf("  linear solve gave up on a rel=%.3e right-hand side -- residual"
+                            " floor, accepting as converged\n", (double)rel);
+                converged = true;
+                ++newton_total;
+                break;
+            }
             std::printf("  linear solve diverged after %d iterations -- abandoning stage\n",
                         get_its());
             ++lin_diverged_count;
