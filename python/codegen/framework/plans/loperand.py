@@ -29,6 +29,26 @@ So whether to cache is a cost question this makes answerable, not a capability
 question to be decided in advance: six components against the nine adjugate
 entries and a determinant is a win, forty-five is not.  The matcher reports the
 shape and the count; the caller chooses.
+
+A note for later, about the parameters
+--------------------------------------
+
+The isolated matrix carries the material parameters, and laplace's is
+`kappa * FFF` exactly.  So the cache *could* hold `kappa * FFF` rather than
+`FFF`, which would take six multiplies per element out of every kernel that
+reads it.  That is not done, and the reason is not performance:
+
+  * today the cached geometry depends on the mesh alone, so it survives any
+    change to a material parameter and is built once per domain;
+  * a cache holding `kappa * FFF` depends on the mesh *and* on `kappa`, so it
+    has to be rebuilt whenever a parameter changes, and something has to know
+    that it does.
+
+For a parameter that genuinely varies per element the trade is different again:
+there the coefficient has to be read per element whatever happens, so folding it
+into the cached object costs nothing extra and saves the multiply. The decision
+therefore belongs with whoever owns the cache's lifetime -- `Op::initialize` and
+the `AffineGeometryCache` -- and wants stating there before it is taken.
 """
 
 from dataclasses import dataclass
@@ -52,14 +72,42 @@ class IsolatedLoperand:
     matrix: tuple
     symmetric: bool
     carries: tuple
+    #: Whether the map couples the field components at all.  It is a four-index
+    #: object -- component, direction, component, direction -- and major
+    #: symmetry only pairs the two (component, direction) halves.  Block
+    #: structure across the component index is a separate and much larger
+    #: saving where it holds.
+    block_diagonal: bool = False
+    #: Whether every diagonal block is the same matrix, so one serves all of
+    #: them.  This is what makes a decoupled vector operator cost the same as
+    #: the scalar one it repeats.
+    shared_block: bool = False
 
     @property
     def order(self):
         return self.n_field_components * self.dim
 
     @property
+    def block_components(self):
+        """Numbers in one diagonal block, using its own symmetry."""
+        return (
+            self.dim * (self.dim + 1) // 2 if self.symmetric else self.dim * self.dim
+        )
+
+    @property
     def components(self):
-        """How many numbers a cache would have to hold per element."""
+        """How many numbers a cache would have to hold per element.
+
+        Major symmetry alone would say `n(n+1)/2` for an `n`-square map.  Block
+        structure says much less where it holds: a decoupled vector operator in
+        three dimensions needs the six of one block rather than forty-five,
+        independent of how many components it has, because the same block
+        serves all of them.
+        """
+        if self.block_diagonal:
+            if self.shared_block:
+                return self.block_components
+            return self.n_field_components * self.block_components
         order = self.order
         return order * (order + 1) // 2 if self.symmetric else order * order
 
@@ -140,12 +188,30 @@ def loperand_matrix(flux_form):
             if str(symbol) not in geometry
         }
     )
+    block_diagonal = all(
+        matrix[row, column] == 0
+        for row in range(matrix.rows)
+        for column in range(matrix.cols)
+        if row // dim != column // dim
+    )
+    shared_block = block_diagonal and all(
+        sp.expand(
+            matrix[component * dim + row, component * dim + column]
+            - matrix[row, column]
+        )
+        == 0
+        for component in range(n_field_components)
+        for row in range(dim)
+        for column in range(dim)
+    )
     return IsolatedLoperand(
         dim=dim,
         n_field_components=n_field_components,
         matrix=tuple(matrix),
         symmetric=symmetric,
         carries=tuple(carries),
+        block_diagonal=block_diagonal,
+        shared_block=shared_block,
     )
 
 
