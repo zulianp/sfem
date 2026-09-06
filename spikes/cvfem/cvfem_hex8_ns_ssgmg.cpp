@@ -4067,6 +4067,36 @@ int main(int argc, char **argv) {
                             net, absnet, absnet > 0 ? std::fabs(net) / absnet : 0.0L);
             }
 
+            // Is the backflow guard active, and is anything sitting on its kink?
+            //
+            // The do-nothing outflow convects with max(mdot, 0), which is piecewise linear
+            // with a corner at mdot = 0. Newton has no quadratic rate across such a corner and
+            // a differenced Jacobian action is meaningless there, so whether any outflow face
+            // is near it decides whether the non-smoothness is a real problem on this case or
+            // a theoretical one. mdot = rho u.a and a points along +x on the outlet, so the
+            // nodal u_x carries the sign.
+            {
+                ptrdiff_t n_out = 0, n_back = 0, n_near = 0;
+                real_t    umin = 1e300, umax = -1e300, amin = 1e300;
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    if (!cvfem_case::on_plane((real_t)px[i], Lx, Lx)) continue;
+                    const real_t u = x[(size_t)i * 4 + 0];
+                    ++n_out;
+                    if (u <= 0) ++n_back;
+                    umin = std::min(umin, u);
+                    umax = std::max(umax, u);
+                    amin = std::min(amin, std::fabs(u));
+                }
+                // "Near" measured against the outlet's own scale, not an absolute number.
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    if (!cvfem_case::on_plane((real_t)px[i], Lx, Lx)) continue;
+                    if (std::fabs(x[(size_t)i * 4 + 0]) < real_t(1e-3) * std::fabs(umax)) ++n_near;
+                }
+                std::printf("step: outlet nodes %td   backflow (u_x<=0) %td   within 1e-3 of the "
+                            "kink %td   u_x in [%.6e, %.6e]  min|u_x| %.3e\n",
+                            n_out, n_back, n_near, (double)umin, (double)umax, (double)amin);
+            }
+
             const long double exact_in = 1.0L / 9.0L;
             std::printf("step: inflow flux %.9Lf  (exact %.9Lf, err %.3Le)\n",
                         q_in, exact_in, std::fabs(q_in - exact_in));
