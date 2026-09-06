@@ -25,13 +25,24 @@ from codegen.framework.targets import current_target
 
 
 def _reference_gradients(rule, n_nodes, dim):
-    """The element's constant reference gradients, from the specialization."""
+    """The reference gradients per quadrature point, from the specialization.
+
+    Indexed ``[point][node][direction]``.  A linear simplex has one point and
+    constant gradients, which is this shape with a single block, so the caller
+    does not branch on the two cases.
+    """
     values = tuple(rule.reference_gradients)
-    if len(values) != n_nodes * dim:
-        return None
+    points = int(getattr(rule, "n_qp", 1) or 1)
+    stride = n_nodes * dim
     return tuple(
-        tuple(sp.nsimplify(values[node * dim + direction]) for direction in range(dim))
-        for node in range(n_nodes)
+        tuple(
+            tuple(
+                sp.nsimplify(values[point * stride + node * dim + direction])
+                for direction in range(dim)
+            )
+            for node in range(n_nodes)
+        )
+        for point in range(points)
     )
 
 
@@ -95,40 +106,50 @@ def _inexact_apply_kernel_source(
         for c in range(dim)
     ]
 
-    # The field gradient this element implies, in physical coordinates.
-    physical = sp.zeros(dim, dim)
-    for c in range(dim):
-        for axis in range(dim):
-            physical[c, axis] = sum(
-                state[c][j]
-                * sum(gradients[j][m] * inverse[m, axis] for m in range(dim))
-                for j in range(n_nodes)
-            )
-    # `is_deformation_gradient` says whether the form's variable is `I + grad u`.
     variables = list(flux_form.gradient)
-    substitution = {}
-    for c in range(dim):
-        for axis in range(dim):
-            value = physical[c, axis]
-            if is_deformation_gradient and c == axis:
-                value = value + 1
-            substitution[variables[c * dim + axis]] = value
-
     flux = list(flux_form.flux)
-    tangent = {}
-    for i, j, k, l in itertools.product(range(dim), repeat=4):
-        tangent[(i, j, k, l)] = sp.diff(flux[i * dim + j], variables[k * dim + l])
+    tangent = {
+        (i, j, k, l): sp.diff(flux[i * dim + j], variables[k * dim + l])
+        for i, j, k, l in itertools.product(range(dim), repeat=4)
+    }
 
-    # Pull back and pack, by the symmetry `S[i,k,m,n] == S[k,i,n,m]`.
-    packed = [None] * plan.tangent_components
-    for i, k, m, n in itertools.product(range(dim), repeat=4):
-        slot = plan.tangent_index(i, k, m, n)
-        if packed[slot] is not None:
-            continue
-        packed[slot] = sum(
-            tangent[(i, j, k, l)] * adjugate[n, j] * adjugate[m, l]
-            for j, l in itertools.product(range(dim), repeat=2)
-        ) / determinant
+    # The projection onto the constants: the tangent averaged over the element,
+    # which for a quadrature rule is its weighted average over the points.  On
+    # an element whose state does not vary -- a linear simplex, or any element
+    # under a state-independent material -- every point gives the same value
+    # and the average is that value, which is why the kernel is exact there.
+    weights = tuple(sp.nsimplify(weight) for weight in rule.weights)
+    measure = sum(weights, sp.Integer(0))
+    packed = [sp.Integer(0)] * plan.tangent_components
+    seen = set()
+    for point, weight in enumerate(weights):
+        # The field gradient at this point, in physical coordinates.
+        physical = sp.zeros(dim, dim)
+        for c in range(dim):
+            for axis in range(dim):
+                physical[c, axis] = sum(
+                    state[c][j]
+                    * sum(gradients[point][j][m] * inverse[m, axis] for m in range(dim))
+                    for j in range(n_nodes)
+                )
+        # `is_deformation_gradient` says whether the variable is `I + grad u`.
+        substitution = {}
+        for c in range(dim):
+            for axis in range(dim):
+                value = physical[c, axis]
+                if is_deformation_gradient and c == axis:
+                    value = value + 1
+                substitution[variables[c * dim + axis]] = value
+        for i, k, m, n in itertools.product(range(dim), repeat=4):
+            slot = plan.tangent_index(i, k, m, n)
+            if (slot, point) in seen:
+                continue
+            seen.add((slot, point))
+            pulled = sum(
+                tangent[(i, j, k, l)] * adjugate[n, j] * adjugate[m, l]
+                for j, l in itertools.product(range(dim), repeat=2)
+            ) / determinant
+            packed[slot] += weight * pulled.subs(substitution) / measure
 
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
@@ -140,10 +161,7 @@ def _inexact_apply_kernel_source(
     stages = staged_action(plan, tangent_symbols, increment, output)
 
     body = []
-    tangent_defs = [
-        (symbol, expression.subs(substitution))
-        for symbol, expression in zip(tangent_symbols, packed)
-    ]
+    tangent_defs = list(zip(tangent_symbols, packed))
     body.extend(_assignment_lines(tangent_defs, "tangent"))
     for stage in stages:
         body.extend(_assignment_lines(stage.assignments, stage.name))

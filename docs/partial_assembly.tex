@@ -360,41 +360,67 @@ Not yet done, in order:
 The numbers in Tables~\ref{tab:cost} and~\ref{tab:stages} are symbolic operation
 and register counts, not timings.
 
-\subsection*{The one throughput measurement so far, and what it does not show}
+\subsection*{Measured throughput, and what it refutes}
 
-With the opt-in wiring in place the kernel can be timed, and on the element it
-currently reaches it is \emph{slower} than the exact apply.  Linear elasticity
-on TET4, single-threaded, best of seven, at saturation:
+With the opt-in wiring in place the kernel can be timed.  Single-threaded,
+\texttt{-O3 -march=native}, best of five, at and above the saturation point of
+roughly 47k degrees of freedom:
 
 \begin{table}[ht]
 \centering
-\begin{tabular}{rrrrr}
+\begin{tabular}{llrrrrl}
 \toprule
-elements & ndof & exact MDOF/s & projected MDOF/s & ratio \\
+material & element & ndof & exact & projected & ratio & rel.\ difference \\
 \midrule
- 82944 &  46875 & 18.65 & 16.61 & 0.89$\times$ \\
-196608 & 107811 & 17.97 & 16.41 & 0.91$\times$ \\
-384000 & 206763 & 17.79 & 15.24 & 0.86$\times$ \\
+linear elasticity & TET4 &  46875 & 18.65 & 16.61 & 0.89$\times$ & 1.5e-16 \\
+linear elasticity & TET4 & 206763 & 17.79 & 15.24 & 0.86$\times$ & 1.7e-16 \\
+linear elasticity & HEX8 &  46875 & 26.11 & 17.01 & 0.65$\times$ & 4.8e-15 \\
+linear elasticity & HEX8 & 206763 & 23.24 & 14.98 & 0.64$\times$ & 1.1e-14 \\
+neohookean Ogden  & TET4 &  46875 &  5.26 &  4.83 & 0.92$\times$ & 1.8e-15 \\
+neohookean Ogden  & TET4 & 206763 &  4.91 &  4.44 & 0.90$\times$ & 3.8e-15 \\
+neohookean Ogden  & HEX8 &  46875 &  7.60 &  3.41 & 0.45$\times$ & 1.0e-04 \\
+neohookean Ogden  & HEX8 & 206763 &  6.97 &  3.27 & 0.47$\times$ & 3.6e-05 \\
 \bottomrule
 \end{tabular}
-\caption{Exact against projected apply, linear elasticity on TET4.  Agreement
-is $1.6\times10^{-16}$ throughout.}
+\caption{MDOF/s for the exact and projected apply.  The projection is exact
+wherever the tangent does not vary over the element, and the only genuinely
+inexact row -- neohookean on HEX8 -- converges under refinement, from 8.9e-4 to
+3.6e-5 across five levels.}
 \end{table}
 
-That is expected rather than a defect, and it is worth stating plainly.  Linear
-elasticity on TET4 is the case with nothing to remove: the material is linear,
-so the exact kernel already carries a constant tangent, and TET4 has one
-quadrature point, so there is no loop to collapse.  The projected kernel does
-strictly more work to reach the same answer.  The combination was chosen for the
-correctness gate, where a state-independent tangent makes agreement a clean
-pass, and it is the wrong one for a speed claim.
+Two claims of Section~2 hold: the projection is exact at round-off wherever the
+tangent is constant over the element, including on HEX8 where the kernel really
+does average over eight points; and where it is an approximation, it converges.
 
-The gain the technique offers is where the exact kernel re-evaluates the tangent
-at every quadrature point and this one evaluates it once --- eight against one
-on HEX8.  The emitter cannot reach that case yet: it requires the element's
-reference gradients to be constant, which only the linear simplices are.  So the
-wiring covers exactly the elements on which the projection is exact, and none of
-those on which it could be faster.  No speed-up should be quoted for this
-technique until that gap is closed.
+The claim of Section~4 does not.  \textbf{The projected apply is slower
+everywhere}, from $0.90\times$ on TET4 to $0.45\times$ on HEX8, and worst
+exactly where it was supposed to pay.
+
+Table~\ref{tab:cost} is not wrong, but it counts only the contraction.  It does
+not count forming the tangent, and the projected kernel must \emph{materialise}
+$\Sbar$ --- forty-five independent components --- at every quadrature point in
+order to average it.  The exact kernel never forms the tangent at all: it
+computes the directional linearisation $P'(F)[\nabla h]$ at each point, a
+vector-sized quantity rather than a rank-four one.  On HEX8 that trades eight
+cheap linearisations for eight full tangent evaluations, and the saved
+contraction does not come close to paying for it.
+
+So the fused kernel --- the one wired here, which rebuilds the tangent on every
+apply --- cannot win, and tuning the contraction will not change that.
+
+\subsection*{Where the technique can still pay}
+
+Partial assembly pays when the tangent is formed once and \emph{reused}.  In a
+Newton step the tangent is fixed while the Krylov solve applies the operator
+tens or hundreds of times.  Writing $\Sbar$ into storage once per Newton
+iteration and applying it thereafter costs, per apply, only the staged
+contraction --- which is the quantity Table~\ref{tab:cost} does measure.
+
+That is the measurement worth taking next, and it needs the split kernels: one
+writing $\Sbar$ per element, one reading it.  Its break-even is the number of
+applies per tangent, which the fused form fixes at one and a Krylov solve makes
+large.  Until it is measured, the honest summary of this note is that the
+mathematics is verified, the compression is real, and the fused kernel is a
+demonstration rather than an optimisation.
 
 \end{document}

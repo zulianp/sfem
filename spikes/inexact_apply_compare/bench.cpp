@@ -15,15 +15,18 @@
 #endif
 
 #include "kernel_math.hpp"
-#include "linear_elasticity_tet4_inexact_apply_inline.hpp"
+#include MATERIAL_INEXACT_HEADER
 
-extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa(
+extern "C" int EXACT_APPLY(
         const ptrdiff_t, const ptrdiff_t, idx_t **const,
         const geom_t *const, const geom_t *const, const geom_t *const,
         const geom_t *const, const geom_t *const, const geom_t *const,
         const geom_t *const, const geom_t *const, const geom_t *const,
         const geom_t *const,
         const double, const double,
+#ifdef EXACT_TAKES_STATE
+        const ptrdiff_t, const double *const, const double *const, const double *const,
+#endif
         const ptrdiff_t, const double *const, const double *const, const double *const,
         const ptrdiff_t, double *const, double *const, double *const);
 
@@ -83,34 +86,48 @@ int main(int argc, char **argv) {
     threads = omp_get_max_threads();
 #endif
     const double mu = 2.3333333333333335, lmbda = 2.2;
-    std::printf("threads %d, best of %d, linear elasticity TET4\n\n", threads, repeats);
+    std::printf("threads %d, best of %d, TET4\n\n", threads, repeats);
     std::printf("%10s %12s %12s %14s %14s %9s %12s\n",
                 "elements", "nodes", "ndof", "exact MDOF/s", "proj. MDOF/s", "ratio", "rel. diff");
     for (int n : {8, 16, 24, 32, 40}) {
         Mesh m = build(n);
         const ptrdiff_t ndof = 3 * m.nnodes;
-        std::vector<double> hx(m.nnodes), hy(m.nnodes), hz(m.nnodes), zero(m.nnodes, 0.0);
-        for (ptrdiff_t i = 0; i < m.nnodes; ++i) {
-            hx[i] = std::sin(0.5 + 0.125*i)*0.05;
-            hy[i] = std::sin(1.5 + 0.125*i)*0.05;
-            hz[i] = std::sin(2.5 + 0.125*i)*0.05;
+        std::vector<double> hx(m.nnodes), hy(m.nnodes), hz(m.nnodes);
+        std::vector<double> ux(m.nnodes), uy(m.nnodes), uz(m.nnodes);
+        {
+            const int nn2 = n + 1;
+            const double hh = 1.0 / n;
+            for (int k = 0; k < nn2; ++k) for (int j = 0; j < nn2; ++j) for (int i = 0; i < nn2; ++i) {
+                const ptrdiff_t v = (ptrdiff_t)((k * nn2 + j) * nn2 + i);
+                const double x = i*hh, y = j*hh, z = k*hh;
+                ux[v] = 0.02*std::sin(3.0*x + 1.0*y + 0.5*z);
+                uy[v] = 0.02*std::sin(1.0*x + 3.0*y + 1.5*z);
+                uz[v] = 0.02*std::sin(0.5*x + 1.5*y + 3.0*z);
+                hx[v] = 0.05*std::sin(2.0*x + 0.7*y + 1.1*z);
+                hy[v] = 0.05*std::sin(0.7*x + 2.0*y + 1.3*z);
+                hz[v] = 0.05*std::sin(1.1*x + 1.3*y + 2.0*z);
+            }
         }
         std::vector<double> ax(m.nnodes,0), ay(m.nnodes,0), az(m.nnodes,0);
         std::vector<double> bx(m.nnodes,0), by(m.nnodes,0), bz(m.nnodes,0);
         auto run_exact = [&] {
             std::fill(ax.begin(),ax.end(),0.0); std::fill(ay.begin(),ay.end(),0.0); std::fill(az.begin(),az.end(),0.0);
-            linear_elasticity_tet4_apply_affine_mesh_soa(m.nelements, m.nnodes, m.evp.data(),
+            EXACT_APPLY(m.nelements, m.nnodes, m.evp.data(),
                 m.adj[0].data(),m.adj[1].data(),m.adj[2].data(),m.adj[3].data(),m.adj[4].data(),
                 m.adj[5].data(),m.adj[6].data(),m.adj[7].data(),m.adj[8].data(), m.det.data(),
-                lmbda, mu, 1, hx.data(), hy.data(), hz.data(), 1, ax.data(), ay.data(), az.data());
+                lmbda, mu,
+#ifdef EXACT_TAKES_STATE
+                1, ux.data(), uy.data(), uz.data(),
+#endif
+                1, hx.data(), hy.data(), hz.data(), 1, ax.data(), ay.data(), az.data());
         };
         auto run_proj = [&] {
             std::fill(bx.begin(),bx.end(),0.0); std::fill(by.begin(),by.end(),0.0); std::fill(bz.begin(),bz.end(),0.0);
-            sfem::codegen::linear_elasticity_tet4_apply_inexact_affine_mesh_soa_impl<double, geom_t>(
+            sfem::codegen::PROJECTED_APPLY<double, geom_t>(
                 m.nelements, m.nnodes, m.evp.data(),
                 m.adj[0].data(),m.adj[1].data(),m.adj[2].data(),m.adj[3].data(),m.adj[4].data(),
                 m.adj[5].data(),m.adj[6].data(),m.adj[7].data(),m.adj[8].data(), m.det.data(),
-                lmbda, mu, 1, zero.data(), zero.data(), zero.data(),
+                lmbda, mu, 1, ux.data(), uy.data(), uz.data(),
                 1, hx.data(), hy.data(), hz.data(), 1, bx.data(), by.data(), bz.data());
         };
         run_exact(); run_proj();
