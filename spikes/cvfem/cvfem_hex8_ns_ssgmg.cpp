@@ -2812,9 +2812,23 @@ int main(int argc, char **argv) {
                                         Lz / (real_t)(nz * Lref_u)});
         const real_t rel_u  = smesh::Env::read<real_t>("SFEM_UPWIND_EPS_REL", real_t(0));
         const real_t abs_u  = smesh::Env::read<real_t>("SFEM_UPWIND_EPS", real_t(-1));
-        upwind_eps_ref = (abs_u >= 0) ? abs_u : rel_u * rho * U * h_u * h_u;
+        // One power of h below the physical flux scale, which is what makes the band a
+        // discriminator rather than a perturbation.
+        //
+        // A sub-control-surface flux in a real flow is of order rho * U * h^2. Sizing the
+        // band at that order -- which is what rho*U*h^2 did -- swamps genuine fluxes instead
+        // of separating them from noise, and it does not vanish under refinement relative to
+        // the thing it is being compared against. Venkatakrishnan's eps^2 = (K dx)^3 is the
+        // same idea for a limiter: in smooth regions the differences are O(dx) so eps^2 is
+        // an order smaller and the limiter stays active, while in the near-constant regions
+        // -- where the quantity has collapsed to noise -- eps^2 dominates and the switch
+        // turns off. Here that means eps / (rho U h^2) = K h / L, going to zero with the
+        // mesh, so the band separates a flux that is physically small from one that is
+        // merely round-off.
+        const real_t L_ref = std::max({Lx, Ly, Lz});
+        upwind_eps_ref = (abs_u >= 0) ? abs_u : rel_u * rho * U * h_u * h_u * h_u / L_ref;
         if (upwind_eps_ref > 0)
-            std::printf("upwind switch: Harten band eps = %.6e (rel %g, rho %g, U %g, h %g)%s\n",
+            std::printf("upwind switch: band eps = %.6e (K %g, rho %g, U %g, h %g)%s\n",
                         (double)upwind_eps_ref, (double)rel_u, (double)rho, (double)U, (double)h_u,
                         smesh::Env::read<int>("SFEM_UPWIND_ADAPT", 0) ? "  [adaptive]" : "");
         if (!smesh::Env::read<int>("SFEM_UPWIND_ADAPT", 0)) op->upwind_eps = upwind_eps_ref;

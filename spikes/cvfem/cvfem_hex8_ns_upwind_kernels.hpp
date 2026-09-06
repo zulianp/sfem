@@ -581,36 +581,55 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_dmdotc(const s
 }
 
 
-// Harten's entropy fix applied to the upwind switch.
+// Smoothing the upwind switch, following Venkatakrishnan (JCP 118, 120-130, 1995).
 //
 // The upwind flux is m*(phi_i+phi_j)/2 + |m|*(phi_i-phi_j)/2, and |m| has a corner at m = 0.
 // Where the flow stagnates -- inside a recirculation bubble, or across a reversed outlet --
 // sub-control surfaces sit arbitrarily close to that corner while the upwinded values across
-// them still differ by O(1), so the flux is not differentiable in any neighbourhood of the
-// iterate and Newton loses its rate. Measured on the backward-facing step, the finite
-// difference check never reaches its round-off floor at the stalled iterate (7.11e-07 at
-// eps 1e-7, against 2.24e-12 for a case that converges quadratically), and the floor rises
-// as Newton proceeds because the corners get closer.
+// them still differ by O(1), so the flux is not differentiable near the iterate and Newton
+// loses its rate. Measured on the backward-facing step, the finite-difference check never
+// reaches its round-off floor at the stalled iterate (7.11e-07 at eps 1e-7, against 2.24e-12
+// for a case that converges quadratically), and the floor rises as Newton proceeds.
 //
-// Harten's fix replaces |m| inside a band by a parabola that matches it in value and slope
-// at the band edge:
+// Venkatakrishnan diagnoses exactly this for MUSCL limiters: the limiter "does not settle
+// down", is "reacting to machine-level noise" in the near-constant regions where it is not
+// needed, and "while this has almost no impact on the solution, it inhibits convergence to
+// steady state". His requirement is a switch that is *not active* where it does not matter,
+// with a *smooth* transition into that state, and he notes explicitly that "if a Newton's
+// method is used to solve the nonlinear system of equations, a differentiable limiter is
+// required".
 //
-//     |m|_e = |m|                for |m| >= e
-//           = (m^2 + e^2)/(2 e)  for |m| <  e
+// The direction of the perturbation is the part that is easy to get backwards, and it decides
+// whether the fix works. Harten's entropy fix sets |m| to eps/2 at m = 0, which *adds* upwind
+// dissipation (eps/4)(phi_i - phi_j) on every face carrying no flux. In a unidirectional flow
+// that is most of the mesh: measured, a Harten band of 1e-3 took the Poiseuille regression
+// from 25 linear iterations to no convergence at all, while curing the step. Venkatakrishnan's
+// modification does the opposite -- in the near-constant regions "we recover the scheme
+// without limiting" -- so the smoothing must send |m| to *zero*, blending to central
+// differencing, not saturate it at a floor.
 //
-// so the flux becomes C1 while staying *exactly* the upwind flux outside the band. Only
-// faces that are actually near stagnation are altered, which is what keeps the change from
-// being a global smearing of the scheme.
+// Hence, exactly |m| outside the band and vanishing quadratically inside it:
 //
-// e = 0 reproduces the hard switch bit for bit, which is what every default call site gets.
+//     |m|_e = |m|                     for |m| >= e
+//           = m^2 (2e - |m|) / e^2    for |m| <  e
+//
+// which matches |m| in value and slope at |m| = e, is zero with zero slope at m = 0, and is
+// never larger than |m|. Faces carrying real flux are bit-for-bit untouched; faces carrying
+// none lose their upwinding rather than gaining diffusion.
+//
+// e = 0 reproduces the hard switch exactly, which is what every default call site gets.
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_upwind_abs(const scalar_t m, const scalar_t eps,
                                                           scalar_t &absm, scalar_t &dabs) {
-    if (eps > scalar_t(0) && m < eps && m > -eps) {
-        absm = (m * m + eps * eps) / (scalar_t(2) * eps);
-        dabs = m / eps;
+    const scalar_t am = m > scalar_t(0) ? m : -m;
+    if (eps > scalar_t(0) && am < eps) {
+        const scalar_t ie2 = scalar_t(1) / (eps * eps);
+        absm = m * m * (scalar_t(2) * eps - am) * ie2;
+        // d|m|_e/dm, odd in m and zero at the origin.
+        const scalar_t d = (scalar_t(4) * eps * am - scalar_t(3) * m * m) * ie2;
+        dabs = m > scalar_t(0) ? d : -d;
     } else {
-        absm = m > scalar_t(0) ? m : -m;
+        absm = am;
         dabs = m > scalar_t(0) ? scalar_t(1) : (m < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
     }
 }
