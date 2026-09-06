@@ -427,6 +427,16 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_block_jacobi_block(
     const int c2 = constrained ? constrained[2] : 0;
     const int c3 = constrained ? constrained[3] : 0;
 
+    // Scale of the block, for relative floors below. An absolute threshold cannot express
+    // "small compared with this block": a diagonal of 1e-20 passes |d| > 1e-30 and yields an
+    // inverse of 1e20, which the smoother then applies to the residual every sweep.
+    scalar_t blk_scale = scalar_t(0);
+    for (int k = 0; k < 16; ++k) {
+        const scalar_t a = blk[k] < scalar_t(0) ? -blk[k] : blk[k];
+        if (a > blk_scale) blk_scale = a;
+    }
+    const scalar_t blk_floor = blk_scale * scalar_t(1e-14);
+
     if (!(c0 | c1 | c2) && cvfem_hex8_invert3_vel(blk, inv)) {
         // velocity 3x3 inverse written above
     } else {
@@ -436,7 +446,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_block_jacobi_block(
             } else {
                 const scalar_t d  = blk[f * 4 + f];
                 const scalar_t ad = d < scalar_t(0) ? -d : d;
-                inv[f * 4 + f] = (ad > scalar_t(1e-30)) ? scalar_t(1) / d : scalar_t(1);
+                // Falls back to 1, not to a huge inverse: a degenerate diagonal means this
+                // dof gets an unscaled (weak) update rather than an explosive one.
+                inv[f * 4 + f] =
+                        (ad > blk_floor && ad > scalar_t(1e-30)) ? scalar_t(1) / d : scalar_t(1);
             }
         }
     }
@@ -445,7 +458,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_block_jacobi_block(
     } else {
         const scalar_t d  = blk[15];
         const scalar_t ad = d < scalar_t(0) ? -d : d;
-        inv[15] = (ad > scalar_t(1e-30)) ? scalar_t(1) / d : scalar_t(1);
+        inv[15] = (ad > blk_floor && ad > scalar_t(1e-30)) ? scalar_t(1) / d : scalar_t(1);
     }
 }
 

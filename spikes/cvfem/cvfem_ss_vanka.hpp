@@ -44,6 +44,8 @@
 // include path of every install (it is not on alps).
 #include "cvfem_sshex8_ns.hpp"
 
+#include "smesh_env.hpp"
+
 #include <cmath>
 #include <vector>
 
@@ -208,11 +210,42 @@ namespace cvfem_ss {
                             }
                         }
 
+                        // Inverse velocity diagonal, floored RELATIVE to the patch's own
+                        // scale rather than against an absolute 1e-300.
+                        //
+                        // 1e-300 rejects only an exactly zero diagonal. A diagonal of 3.6e-17
+                        // passed it and produced invdF = 2.8e16 -- and 2.8e16 was precisely
+                        // the constant per-sweep amplification this smoother showed once it
+                        // went unstable, so one dof was multiplying the error by that factor
+                        // every sweep. Being a scaling failure rather than an instability, it
+                        // was untouched by damping: the divergence was bit-identical at
+                        // omega = 1, 0.5 and 0.25.
+                        //
+                        // Such a diagonal arises at a do-nothing outflow node. The boundary
+                        // term contributes mdot*I to the momentum diagonal, so where mdot is
+                        // zero the outflow face adds nothing and the wall-normal component is
+                        // left to interior viscous terms that can very nearly cancel. Zeroing
+                        // invdF there withholds this patch's update for that dof, which is a
+                        // weaker smoother rather than an explosive one.
+                        //
+                        // The floor is deliberately far below anything legitimate. It is a
+                        // guard against catastrophe, not a conditioning heuristic: at 1e-11 it
+                        // also zeroed thousands of healthy diagonals on a box and took
+                        // Poiseuille from 178 linear iterations to 1119.
+                        scalar_t dscale = scalar_t(0);
+                        for (int a = 0; a < 8; ++a)
+                            for (int t = 0; t < 3; ++t)
+                                dscale = std::max(dscale, std::fabs(A[a][a][t * 4 + t]));
+                        static const double dtol =
+                                smesh::Env::read<double>("SFEM_VANKA_DIAG_TOL", 1e-14);
+                        const scalar_t dfloor = dscale * (scalar_t)dtol;
                         for (int a = 0; a < 8; ++a)
                             for (int t = 0; t < 3; ++t) {
                                 const scalar_t dd = A[a][a][t * 4 + t];
-                                c.invdF[a * 3 + t] =
-                                        std::fabs(dd) > scalar_t(1e-300) ? scalar_t(1) / dd : scalar_t(0);
+                                c.invdF[a * 3 + t] = (std::fabs(dd) > dfloor &&
+                                                      std::fabs(dd) > scalar_t(1e-300))
+                                                             ? scalar_t(1) / dd
+                                                             : scalar_t(0);
                             }
 
                         for (int a = 0; a < 8; ++a)
