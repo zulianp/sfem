@@ -2797,6 +2797,7 @@ int main(int argc, char **argv) {
     auto f    = sfem::Function::create(fs);
 
     auto op  = std::make_shared<sfem::CVFEMNavierStokes>(fs);
+    real_t upwind_eps_ref = 0;
     // Harten band for the upwind switch, expressed relatively so it does not depend on the
     // mesh or the units.
     //
@@ -2811,10 +2812,12 @@ int main(int argc, char **argv) {
                                         Lz / (real_t)(nz * Lref_u)});
         const real_t rel_u  = smesh::Env::read<real_t>("SFEM_UPWIND_EPS_REL", real_t(0));
         const real_t abs_u  = smesh::Env::read<real_t>("SFEM_UPWIND_EPS", real_t(-1));
-        op->upwind_eps = (abs_u >= 0) ? abs_u : rel_u * rho * U * h_u * h_u;
-        if (op->upwind_eps > 0)
-            std::printf("upwind switch: Harten band eps = %.6e (rel %g, rho %g, U %g, h %g)\n",
-                        (double)op->upwind_eps, (double)rel_u, (double)rho, (double)U, (double)h_u);
+        upwind_eps_ref = (abs_u >= 0) ? abs_u : rel_u * rho * U * h_u * h_u;
+        if (upwind_eps_ref > 0)
+            std::printf("upwind switch: Harten band eps = %.6e (rel %g, rho %g, U %g, h %g)%s\n",
+                        (double)upwind_eps_ref, (double)rel_u, (double)rho, (double)U, (double)h_u,
+                        smesh::Env::read<int>("SFEM_UPWIND_ADAPT", 0) ? "  [adaptive]" : "");
+        if (!smesh::Env::read<int>("SFEM_UPWIND_ADAPT", 0)) op->upwind_eps = upwind_eps_ref;
     }
     op->rho  = rho;
     op->mu   = mu;
@@ -3378,6 +3381,7 @@ int main(int argc, char **argv) {
                 (double)(rho_use * U * Ly / std::max(mu, real_t(1e-30))));
 
     converged = false;
+    real_t prev_rnorm = 0; // previous Newton residual, for the adaptive band's rate test
     real_t r_stage0 = 0;   // this stage's initial residual, the divergence reference
     bool   diverged = false;
     int    lin_diverged_count = 0;
@@ -3467,6 +3471,41 @@ int main(int argc, char **argv) {
 
         const real_t rel = (r0 > 0) ? rnorm / r0 : rnorm;
         std::printf("newton %d  ||R||: %.6e  rel: %.6e\n", newton_it, rnorm, rel);
+
+        // Adaptive Harten band: smooth the upwind switch only while Newton is stalling.
+        //
+        // A band keyed on the flux magnitude cannot work, and the reason is worth stating
+        // because it is not obvious. At mdot = 0 the smoothed |mdot| is eps/2, so the flux
+        // picks up an artificial diffusion (eps/4)(u_i - u_j) on every face carrying no
+        // flux. In a unidirectional flow that is most of the mesh -- which is why a global
+        // band of 1e-3 takes Poiseuille from 25 linear iterations to no convergence at all,
+        // while the same band restores quadratic convergence on the step. Both cases have
+        // faces with mdot ~ 0 and an O(1) jump across them; no local flux measure separates
+        // them.
+        //
+        // What separates them is stability, not magnitude. Poiseuille's near-zero fluxes sit
+        // there stably -- the switch never flips, the assembled Jacobian is a perfectly good
+        // subdifferential element, and Newton converges quadratically. The step's flip, and
+        // that is what costs the rate. Newton's own convergence rate is therefore the honest
+        // detector, and it needs no per-face state: engage the band only after the rate has
+        // been poor for a step, and scale it by the current relative residual so it shrinks
+        // to nothing as the iteration converges. A case that never stalls never sees it,
+        // and a case that does converges to the unsmoothed equations rather than to the
+        // smoothed ones.
+        if (upwind_eps_ref > 0 && smesh::Env::read<int>("SFEM_UPWIND_ADAPT", 0)) {
+            static const real_t bad_rate =
+                    smesh::Env::read<real_t>("SFEM_UPWIND_ADAPT_RATE", real_t(0.5));
+            const real_t rate = (prev_rnorm > 0) ? rnorm / prev_rnorm : real_t(0);
+            const bool   stalling = newton_it >= 2 && rate > bad_rate;
+            const real_t want = stalling ? upwind_eps_ref * std::min(real_t(1), rel) : real_t(0);
+            if (want != op->upwind_eps) {
+                op->upwind_eps = want;
+                op->update(x);
+                std::printf("  upwind band %s: eps = %.3e (rate %.3f, rel %.3e)\n",
+                            want > 0 ? "ON" : "off", (double)want, (double)rate, (double)rel);
+            }
+        }
+        prev_rnorm = rnorm;
         if (rnorm < nl_atol || rel < nl_rtol) {
             converged = true;
             break;
