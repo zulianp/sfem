@@ -2801,7 +2801,26 @@ int main(int argc, char **argv) {
     op->mu   = mu;
     op->geom = (geom_name == "isoparam") ? sfem::CVFEMGeometry::Isoparam : sfem::CVFEMGeometry::Affine;
     op->pack_size = pack_size;
-    if (want_natural_outlet) {
+    // Two ways to leave an outlet open, and they are different boundary conditions.
+    //
+    //   donothing   (default) drop (p I - tau).n on the outlet face. This imposes a
+    //               traction-free condition, which is the natural condition the weak form
+    //               produces, and it is what the Farrell/Mitchell/Wechsung step is specified
+    //               with. Dropping p_i*a is also what fixes the pressure level, so no gauge
+    //               is applied.
+    //   extrapolate keep the face as an ordinary closed boundary face evaluated from the
+    //               interior state, while leaving the velocity unconstrained -- a
+    //               zero-gradient outflow. It imposes nothing on the traction, so the
+    //               constant-pressure mode returns and the zero-mean gauge takes over.
+    //
+    // The two are not related by a pressure shift: the retained term carries the local p_i,
+    // not a constant, so the velocity fields genuinely differ near the outlet. The reason to
+    // have both is that the extrapolation form gives the outflow momentum diagonal a viscous
+    // contribution that the do-nothing form has no source for, and it is the absence of that
+    // contribution that the Vanka patch solve degenerates on.
+    const std::string outflow_mode =
+            smesh::Env::read_string("SFEM_OUTFLOW_MODE", std::string("donothing"));
+    if (want_natural_outlet && outflow_mode == "donothing") {
         // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
         // the pressure gauge -- so the pin must come off with it, or the system is
         // over-determined.
