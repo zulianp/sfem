@@ -275,15 +275,19 @@ class StagedActionTest(unittest.TestCase):
                         sp.simplify(sp.expand(staged.subs(substitution)) - dense), 0
                     )
 
-    def test_staging_is_cheaper_than_the_dense_form_everywhere(self):
-        """And by how much, which is the reason to carry the stages at all.
+    #: element -> (dense operations, staged operations).  Recorded, because
+    #: the staging is worth carrying only where the rank is small against the
+    #: order, and these are the numbers that say where that is.
+    COST = {
+        "TET4": (486, 207),
+        "TRI3": (96, 52),
+        "QUAD4": (238, 238),
+        "HEX8": (4059, 2610),
+        "TET10": (4018, 1380),
+    }
 
-        Expanding the stages into one expression per output and letting
-        common-subexpression elimination re-discover the structure gives the
-        dense count back exactly, so the saving is in keeping them.
-        """
-        measured = {}
-        for element in sorted(RANK):
+    def test_the_staged_cost_is_what_was_measured(self):
+        for element, (dense_expected, staged_expected) in sorted(self.COST.items()):
             plan = inexact_hessian_plan(element)
             tangent, increment, names = _symbols(plan)
             dense = _operations(plan.action(tangent, increment))
@@ -291,12 +295,27 @@ class StagedActionTest(unittest.TestCase):
                 _operations([expression for _symbol, expression in stage.assignments])
                 for stage in staged_action(plan, tangent, increment, names)
             )
-            measured[element] = (dense, staged)
             with self.subTest(element=element):
-                self.assertLess(staged, dense)
-        # The two elements where it matters most, pinned so a regression shows.
-        self.assertLess(measured["TET10"][1] * 2, measured["TET10"][0])
-        self.assertLess(measured["HEX8"][1] * 3, measured["HEX8"][0] * 2)
+                self.assertEqual((dense, staged), (dense_expected, staged_expected))
+
+    def test_staging_never_costs_more_and_pays_where_the_rank_is_small(self):
+        """Where it pays, and the one element where it does not.
+
+        The saving is the rank against the order.  A linear simplex is rank one
+        of twelve and a tet10 rank four of thirty, and both roughly a third of
+        the dense count.  QUAD4 is rank three of eight, which is not enough
+        structure to beat common-subexpression elimination on the dense form:
+        it comes out exactly even, and is recorded that way rather than
+        presented as a win.
+        """
+        for element, (dense, staged) in sorted(self.COST.items()):
+            with self.subTest(element=element):
+                self.assertLessEqual(staged, dense)
+        for element in ("TET4", "TRI3", "TET10", "HEX8"):
+            dense, staged = self.COST[element]
+            with self.subTest(element=element):
+                self.assertLess(staged * 3, dense * 2)
+        self.assertEqual(self.COST["QUAD4"][0], self.COST["QUAD4"][1])
 
 
 def _symbols(plan):
@@ -310,6 +329,165 @@ def _symbols(plan):
         for component in range(plan.dim)
     ]
     return tangent, increment, names
+
+
+class AgainstTheExactActionTest(unittest.TestCase):
+    """The only test that can catch an index convention being wrong.
+
+    Everything else here compares the construction against itself: the staged
+    form against the dense form, the factorisation against the tensor.  Those
+    all pass with the tangent packed on the wrong symmetry, because both sides
+    share it.  This integrates the element action directly on a concrete
+    tetrahedron and compares, which is what found `S[i,k,m,n] == S[k,i,n,m]`
+    after `(i,k)` against `(m,n)` had looked plausible and been wrong.
+
+    It also settles the claim the whole design rests on: on an affine simplex
+    the projection loses nothing *even for a nonlinear material*, because the
+    deformation gradient does not vary over the cell.
+    """
+
+    MATERIALS = (
+        # (material, whether its tangent depends on the state)
+        ("linear_elasticity", False),
+        ("neohookean_ogden", True),
+    )
+
+    def test_the_projected_action_is_the_exact_one_on_a_tetrahedron(self):
+        for material, nonlinear in self.MATERIALS:
+            with self.subTest(material=material):
+                dense, staged = self._compare(material, nonlinear)
+                self.assertEqual(dense, 0)
+                self.assertEqual(staged, 0)
+
+    def _compare(self, material, nonlinear):
+        flux_form, dim = self._flux_form(material)
+        gradient, flux = list(flux_form.gradient), list(flux_form.flux)
+        parameters = {
+            sp.Symbol("mu"): sp.Rational(7, 3),
+            sp.Symbol("lmbda"): sp.Rational(11, 5),
+        }
+        # A deformation gradient near the identity: a hyperelastic tangent is
+        # only defined where its determinant is positive.
+        state = {}
+        for index, symbol in enumerate(gradient):
+            row, column = divmod(index, dim)
+            state[symbol] = (sp.Integer(1) if row == column else sp.Integer(0)) + (
+                sp.Rational(index + 1, 53) if nonlinear else sp.Integer(0)
+            )
+        tangent = {
+            (i, j, k, l): sp.nsimplify(
+                sp.diff(flux[i * dim + j], gradient[k * dim + l])
+                .subs(parameters)
+                .subs(state)
+            )
+            for i, j, k, l in itertools.product(range(dim), repeat=4)
+        }
+
+        vertices = [
+            sp.Matrix([0, 0, 0]),
+            sp.Matrix([sp.Rational(3, 2), 0, 0]),
+            sp.Matrix([sp.Rational(1, 4), sp.Rational(5, 4), 0]),
+            sp.Matrix([sp.Rational(1, 3), sp.Rational(1, 5), sp.Rational(7, 6)]),
+        ]
+        jacobian = sp.Matrix(
+            3, 3, lambda r, c: vertices[c + 1][r] - vertices[0][r]
+        )
+        determinant = jacobian.det()
+        inverse = jacobian.inv()
+        basis = reference_basis("TET4")
+        gradients = basis.gradients()
+        volume = determinant * basis.measure
+        increment = [
+            [sp.Rational((k + 1) * (j + 2), 7 + k + j) for j in range(4)]
+            for k in range(dim)
+        ]
+
+        physical = sp.zeros(dim, dim)
+        for component in range(dim):
+            for axis in range(dim):
+                physical[component, axis] = sum(
+                    increment[component][node]
+                    * sum(gradients[node][m] * inverse[m, axis] for m in range(dim))
+                    for node in range(4)
+                )
+        exact = sp.zeros(dim, 4)
+        for i in range(dim):
+            for p in range(4):
+                test = [
+                    sum(gradients[p][m] * inverse[m, axis] for m in range(dim))
+                    for axis in range(dim)
+                ]
+                exact[i, p] = (
+                    sum(
+                        tangent[(i, j, k, l)] * physical[k, l] * test[j]
+                        for j, k, l in itertools.product(range(dim), repeat=3)
+                    )
+                    * volume
+                )
+
+        plan = inexact_hessian_plan("TET4")
+        packed = [0] * plan.tangent_components
+        for i, k, m, n in itertools.product(range(dim), repeat=4):
+            packed[plan.tangent_index(i, k, m, n)] = (
+                sum(
+                    tangent[(i, j, k, l)] * inverse[n, j] * inverse[m, l]
+                    for j, l in itertools.product(range(dim), repeat=2)
+                )
+                * determinant
+            )
+
+        dense = plan.action(packed, increment)
+        names = [
+            [sp.Symbol("o%d_%d" % (i, p)) for p in range(4)] for i in range(dim)
+        ]
+        stages = staged_action(plan, packed, increment, names)
+        substitution = {}
+        for stage in stages[:-1]:
+            for symbol, expression in stage.assignments:
+                substitution[symbol] = expression.subs(substitution)
+        staged = [
+            expression.subs(substitution) for _name, expression in stages[-1].assignments
+        ]
+        worst_dense = max(
+            abs(sp.nsimplify(dense[i * 4 + p] - exact[i, p]))
+            for i in range(dim)
+            for p in range(4)
+        )
+        worst_staged = max(
+            abs(sp.nsimplify(staged[i * 4 + p] - exact[i, p]))
+            for i in range(dim)
+            for p in range(4)
+        )
+        return worst_dense, worst_staged
+
+    @staticmethod
+    def _flux_form(name):
+        import sys, os
+
+        materials = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "materials"
+        )
+        if materials not in sys.path:
+            sys.path.insert(0, materials)
+        import importlib
+
+        from codegen.framework.symbolic.weak_forms import (
+            flux_form_from_energy,
+            sfem_soa_weak_form,
+        )
+
+        module = importlib.import_module(name)
+        system = list(module.systems.systems)[-1]
+        collection = system.form_collection(list(system.equations)[0])
+        weak_form = sfem_soa_weak_form(
+            collection.forms[0].expression,
+            sp.Matrix(
+                len(collection.variables) // system.dim,
+                system.dim,
+                list(collection.variables),
+            ),
+        )
+        return flux_form_from_energy(weak_form), system.dim
 
 
 def _gauss_legendre(n):
