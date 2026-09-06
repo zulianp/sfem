@@ -87,7 +87,22 @@ namespace cvfem_ss {
     // Dense LU with partial pivoting, n = 8. Small enough that the pivoting cost is noise and
     // large enough that skipping it is a real risk: the Schur complement of a convection
     // dominated block is not diagonally dominant.
-    static SFEM_INLINE bool vanka_lu8(scalar_t A[8][8], int piv[8]) {
+    // `tol` is relative to the patch's own largest entry, for the same reason the velocity
+    // diagonal above is: a pivot is small or large only with respect to the matrix it came
+    // from. The absolute 1e-300 this used rejected an exactly zero pivot and nothing else, so
+    // a pivot of 1e-20 in a Schur complement of scale 1e-3 factorised happily and the back
+    // substitution then divided by it, returning ~1e17 from the preconditioner. BiCGStab's
+    // non-finite guard sees that and reports "diverged after 0 iterations" -- the silent
+    // zero-iteration failure on the backward-facing step was this.
+    //
+    // Failing the factorisation is the safe outcome: the caller substitutes the identity for
+    // this patch, which withholds its pressure update and makes the smoother weaker rather
+    // than explosive.
+    static SFEM_INLINE bool vanka_lu8(scalar_t A[8][8], int piv[8], const scalar_t tol) {
+        scalar_t smax = scalar_t(0);
+        for (int i = 0; i < 8; ++i)
+            for (int j = 0; j < 8; ++j) smax = std::max(smax, std::fabs(A[i][j]));
+        const scalar_t pfloor = smax * tol;
         for (int k = 0; k < 8; ++k) {
             int      p = k;
             scalar_t m = std::fabs(A[k][k]);
@@ -95,7 +110,7 @@ namespace cvfem_ss {
                 const scalar_t v = std::fabs(A[i][k]);
                 if (v > m) { m = v; p = i; }
             }
-            if (m < scalar_t(1e-300)) return false;
+            if (m <= pfloor || m < scalar_t(1e-300)) return false;
             piv[k] = p;
             if (p != k)
                 for (int j = 0; j < 8; ++j) std::swap(A[k][j], A[p][j]);
@@ -238,6 +253,8 @@ namespace cvfem_ss {
                                 dscale = std::max(dscale, std::fabs(A[a][a][t * 4 + t]));
                         static const double dtol =
                                 smesh::Env::read<double>("SFEM_VANKA_DIAG_TOL", 1e-14);
+                        static const double schur_tol =
+                                smesh::Env::read<double>("SFEM_VANKA_SCHUR_TOL", 1e-14);
                         const scalar_t dfloor = dscale * (scalar_t)dtol;
                         for (int a = 0; a < 8; ++a)
                             for (int t = 0; t < 3; ++t) {
@@ -266,7 +283,7 @@ namespace cvfem_ss {
                                 c.S[a][b] = sv;
                             }
 
-                        if (!vanka_lu8(c.S, c.piv)) {
+                        if (!vanka_lu8(c.S, c.piv, (scalar_t)schur_tol)) {
                             for (int a = 0; a < 8; ++a) {
                                 for (int b = 0; b < 8; ++b) c.S[a][b] = (a == b) ? scalar_t(1) : scalar_t(0);
                                 c.piv[a] = a;
