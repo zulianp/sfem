@@ -20,7 +20,9 @@ from codegen.framework.fem.reference_basis import (
 from codegen.framework.plans.inexact_hessian import (
     inexact_hessian_plan,
     projection_is_exact,
+    rank_factored_gradient_product,
     reference_gradient_product,
+    staged_action,
 )
 
 
@@ -189,6 +191,125 @@ class CompressionTest(unittest.TestCase):
                     )
                 tabulated.append(sp.expand(total))
         self.assertLess(folded, _operations(tabulated) / 3)
+
+
+#: element -> rank of the reference tensor.  It is the dimension of the span of
+#: the element's gradient functions, and it is where the compression is: a
+#: linear simplex is rank one, which is the loperand.
+RANK = {"TRI3": 1, "TET4": 1, "QUAD4": 3, "HEX8": 7, "TET10": 4}
+
+
+class RankFactorisationTest(unittest.TestCase):
+    def test_the_rank_is_the_span_of_the_gradient_functions(self):
+        for element, rank in sorted(RANK.items()):
+            factored = rank_factored_gradient_product(element)
+            with self.subTest(element=element):
+                self.assertEqual(factored.rank, rank)
+                # Not a coincidence: Wbar is the Gram matrix of those gradients.
+                basis = reference_basis(element)
+                gradients = [g for row in basis.gradients() for g in row]
+                monomials = sorted(
+                    {
+                        monomial
+                        for gradient in gradients
+                        for monomial in sp.Poly(
+                            sp.expand(gradient), *basis.coordinates
+                        ).monoms()
+                    }
+                )
+                span = sp.Matrix(
+                    [
+                        [
+                            sp.Poly(
+                                sp.expand(gradient), *basis.coordinates
+                            ).coeff_monomial(monomial)
+                            for monomial in monomials
+                        ]
+                        for gradient in gradients
+                    ]
+                ).rank()
+                self.assertEqual(rank, span)
+
+    def test_the_factorisation_reproduces_the_tensor_exactly(self):
+        for element in sorted(RANK):
+            reference = reference_gradient_product(element)
+            factored = rank_factored_gradient_product(element)
+            order = factored.order
+            with self.subTest(element=element):
+                for row in range(order):
+                    for column in range(order):
+                        rebuilt = sum(
+                            factored.factor_entry(a, row)
+                            * factored.middle_entry(a, b)
+                            * factored.factor_entry(b, column)
+                            for a in range(factored.rank)
+                            for b in range(factored.rank)
+                        )
+                        self.assertEqual(
+                            sp.nsimplify(rebuilt - reference.entries[row * order + column]),
+                            0,
+                        )
+
+
+class StagedActionTest(unittest.TestCase):
+    def test_the_stages_compute_the_same_action(self):
+        """Substituting the stages back must give the dense expression.
+
+        This is the whole correctness argument for the factorisation: the
+        staged form exists to keep the structure out of the emitted code, and
+        it is only allowed to do that if it computes the same thing.
+        """
+        for element in ("TRI3", "TET4", "QUAD4"):
+            plan = inexact_hessian_plan(element)
+            tangent, increment, names = _symbols(plan)
+            stages = staged_action(plan, tangent, increment, names)
+            substitution = {}
+            for stage in stages[:-1]:
+                for symbol, expression in stage.assignments:
+                    substitution[symbol] = expression.subs(substitution)
+            with self.subTest(element=element):
+                for (_name, staged), dense in zip(
+                    stages[-1].assignments, plan.action(tangent, increment)
+                ):
+                    self.assertEqual(
+                        sp.simplify(sp.expand(staged.subs(substitution)) - dense), 0
+                    )
+
+    def test_staging_is_cheaper_than_the_dense_form_everywhere(self):
+        """And by how much, which is the reason to carry the stages at all.
+
+        Expanding the stages into one expression per output and letting
+        common-subexpression elimination re-discover the structure gives the
+        dense count back exactly, so the saving is in keeping them.
+        """
+        measured = {}
+        for element in sorted(RANK):
+            plan = inexact_hessian_plan(element)
+            tangent, increment, names = _symbols(plan)
+            dense = _operations(plan.action(tangent, increment))
+            staged = sum(
+                _operations([expression for _symbol, expression in stage.assignments])
+                for stage in staged_action(plan, tangent, increment, names)
+            )
+            measured[element] = (dense, staged)
+            with self.subTest(element=element):
+                self.assertLess(staged, dense)
+        # The two elements where it matters most, pinned so a regression shows.
+        self.assertLess(measured["TET10"][1] * 2, measured["TET10"][0])
+        self.assertLess(measured["HEX8"][1] * 3, measured["HEX8"][0] * 2)
+
+
+def _symbols(plan):
+    tangent = sp.symbols("S0:%d" % plan.tangent_components)
+    increment = [
+        [sp.Symbol("h%d_%d" % (component, node)) for node in range(plan.n_nodes)]
+        for component in range(plan.dim)
+    ]
+    names = [
+        [sp.Symbol("out%d_%d" % (component, node)) for node in range(plan.n_nodes)]
+        for component in range(plan.dim)
+    ]
+    return tangent, increment, names
 
 
 def _gauss_legendre(n):

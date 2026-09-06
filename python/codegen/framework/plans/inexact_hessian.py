@@ -228,3 +228,179 @@ def inexact_hessian_plan(element_type):
         reference=reference,
         exact=projection_is_exact(reference.element_type),
     )
+
+
+@dataclass(frozen=True)
+class RankFactoredGradientProduct:
+    """`Wbar` as `C^T X C`, exactly, over the rationals.
+
+    `Wbar` is the Gram matrix of the element's gradient functions, so its rank
+    is the dimension of the span of those functions and nothing more.  That is
+    a much stronger statement than "many entries are zero", and it is where the
+    compression actually lives:
+
+        TET4    12x12   rank 1        TRI3    6x6    rank 1
+        QUAD4    8x8    rank 3        HEX8   24x24   rank 7
+        TET10   30x30   rank 4
+
+    A linear simplex is rank one because its gradients are constants spanning a
+    one-dimensional space -- and rank one is precisely the loperand: the flux
+    contracted with the geometry, one object per element.  So this is not a new
+    trick beside the loperand, it is the same structure carried to elements
+    whose gradients are not constant.
+
+    `factor` is `C`, shape `(rank, n_nodes * dim)`, and `middle` is `X`, shape
+    `(rank, rank)`.  Both are exact rationals and both are sparse; every zero is
+    dropped where the action is built rather than multiplied by.
+    """
+
+    factor: tuple
+    middle: tuple
+    rank: int
+    order: int
+
+    def factor_entry(self, row, column):
+        return self.factor[row * self.order + column]
+
+    def middle_entry(self, row, column):
+        return self.middle[row * self.rank + column]
+
+
+@lru_cache(maxsize=None)
+def rank_factored_gradient_product(element_type):
+    """That factorisation, checked against the tensor it factors."""
+    reference = reference_gradient_product(element_type)
+    if reference is None:
+        return None
+    order = reference.n_nodes * reference.dim
+    matrix = sp.Matrix(order, order, lambda r, c: reference.entries[r * order + c])
+    _reduced, pivots = matrix.rref()
+    factor = sp.Matrix([matrix.row(pivot) for pivot in pivots])
+    gram = factor * factor.T
+    inverse = gram.inv()
+    middle = inverse * (factor * matrix * factor.T) * inverse
+    # Checked here rather than trusted: a wrong factorisation is a wrong kernel
+    # everywhere downstream, and this costs one matrix product once per element
+    # type per process.
+    if sp.simplify(factor.T * middle * factor - matrix) != sp.zeros(order, order):
+        raise ValueError(
+            "the rank factorisation of the reference tensor for %s is not exact"
+            % reference.element_type
+        )
+    return RankFactoredGradientProduct(
+        factor=tuple(factor),
+        middle=tuple(middle),
+        rank=factor.rows,
+        order=order,
+    )
+
+
+@dataclass(frozen=True)
+class ActionStage:
+    """One named intermediate of the staged action, and what defines it."""
+
+    name: str
+    assignments: tuple
+
+
+def staged_action(plan, tangent, increment, output_names):
+    """The action through the rank factorisation, as stages to print.
+
+    Four of them, each reading the previous by name so the factorisation
+    survives into the emitted code instead of being expanded back out:
+
+        P[k,a,m] = sum_j  C[a,(j,m)] h[k,j]        the increment, compressed
+        Y[i,a,n] = sum_km Sbar[i,k,m,n] P[k,a,m]   the tangent applied
+        Q[i,b,n] = sum_a  X[a,b] Y[i,a,n]          the middle factor
+        out[i,p] = sum_bn C[b,(p,n)] Q[i,b,n]      expanded back to nodes
+
+    Every sum skips its zero coefficients, which is what the sparsity of `C`
+    and `X` is for.  Expanding these into one expression per output and letting
+    common-subexpression elimination re-discover the structure gives the dense
+    count back, so the stages are the point rather than an implementation
+    detail.
+    """
+    factored = rank_factored_gradient_product(plan.element_type)
+    dim, n_nodes, rank = plan.dim, plan.n_nodes, factored.rank
+
+    compressed, compressed_defs = {}, []
+    for component in range(dim):
+        for mode in range(rank):
+            for direction in range(dim):
+                expression = sum(
+                    (
+                        increment[component][node]
+                        * factored.factor_entry(mode, node * dim + direction)
+                        for node in range(n_nodes)
+                        if factored.factor_entry(mode, node * dim + direction) != 0
+                    ),
+                    sp.Integer(0),
+                )
+                if expression == 0:
+                    continue
+                symbol = sp.Symbol("pa_p%d_%d_%d" % (component, mode, direction))
+                compressed[(component, mode, direction)] = symbol
+                compressed_defs.append((symbol, expression))
+
+    applied, applied_defs = {}, []
+    for row in range(dim):
+        for mode in range(rank):
+            for direction in range(dim):
+                expression = sum(
+                    (
+                        tangent[plan.tangent_index(row, component, other, direction)]
+                        * compressed[(component, mode, other)]
+                        for component in range(dim)
+                        for other in range(dim)
+                        if (component, mode, other) in compressed
+                    ),
+                    sp.Integer(0),
+                )
+                if expression == 0:
+                    continue
+                symbol = sp.Symbol("pa_y%d_%d_%d" % (row, mode, direction))
+                applied[(row, mode, direction)] = symbol
+                applied_defs.append((symbol, expression))
+
+    mixed, mixed_defs = {}, []
+    for row in range(dim):
+        for mode in range(rank):
+            for direction in range(dim):
+                expression = sum(
+                    (
+                        factored.middle_entry(other, mode)
+                        * applied[(row, other, direction)]
+                        for other in range(rank)
+                        if factored.middle_entry(other, mode) != 0
+                        and (row, other, direction) in applied
+                    ),
+                    sp.Integer(0),
+                )
+                if expression == 0:
+                    continue
+                symbol = sp.Symbol("pa_q%d_%d_%d" % (row, mode, direction))
+                mixed[(row, mode, direction)] = symbol
+                mixed_defs.append((symbol, expression))
+
+    output_defs = []
+    for row in range(dim):
+        for node in range(n_nodes):
+            expression = sum(
+                (
+                    factored.factor_entry(mode, node * dim + direction)
+                    * mixed[(row, mode, direction)]
+                    for mode in range(rank)
+                    for direction in range(dim)
+                    if (row, mode, direction) in mixed
+                    and factored.factor_entry(mode, node * dim + direction) != 0
+                ),
+                sp.Integer(0),
+            )
+            output_defs.append((output_names[row][node], expression))
+
+    return (
+        ActionStage("compressed_increment", tuple(compressed_defs)),
+        ActionStage("applied_tangent", tuple(applied_defs)),
+        ActionStage("mixed", tuple(mixed_defs)),
+        ActionStage("output", tuple(output_defs)),
+    )
