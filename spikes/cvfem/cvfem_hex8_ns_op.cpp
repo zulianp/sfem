@@ -1,5 +1,7 @@
 #include "cvfem_hex8_ns_op.hpp"
 
+#include "smesh_sideset.hpp"
+
 // The core is included here and nowhere a driver can see it. See the note in the header.
 #include "cvfem_hex8_ns_core.hpp"
 #include "cvfem_sshex8_ns.hpp"
@@ -77,6 +79,37 @@ namespace sfem {
     ptrdiff_t CVFEMNavierStokes::n_dofs_domain() const { return impl_->space->n_dofs(); }
     ptrdiff_t CVFEMNavierStokes::n_dofs_image() const { return impl_->space->n_dofs(); }
 
+    // Per-element boundary-face bitmask from the mesh skin.
+    //
+    // smesh::skin_sideset is topological -- it finds exterior faces from element adjacency,
+    // not from coordinates -- so it picks up re-entrant faces such as the step of a
+    // backward-facing step, which the six-plane coordinate test in hex8_face_on_domain
+    // cannot see. Its (parent, lfi) pairs are also invariant under semi-structured level
+    // changes, so a mask built on the macro mesh is valid at every multigrid level.
+    //
+    // smesh numbers HEX8 faces differently from CVFEM_HEX8_BFACE_NODES. The permutation was
+    // established by comparing the two node lists as sets, face by face:
+    //   smesh 0:{0,1,5,4}=CVFEM 2   1:{1,2,6,5}=1   2:{2,3,7,6}=3
+    //   smesh 3:{3,0,4,7}=CVFEM 0   4:{3,2,1,0}=4   5:{4,5,6,7}=5
+    static bool build_face_mask(const std::shared_ptr<smesh::Mesh> &mesh, const ptrdiff_t n_elements,
+                                std::vector<uint8_t> &mask) {
+        static const int lfi_to_cvfem[6] = {2, 1, 3, 0, 4, 5};
+        auto             skin            = smesh::skin_sideset(mesh);
+        if (!skin) return false;
+        auto            par = skin->parent();
+        auto            lfi = skin->lfi();
+        if (!par || !lfi) return false;
+        mask.assign((size_t)n_elements, 0);
+        const ptrdiff_t nf = par->size();
+        for (ptrdiff_t k = 0; k < nf; ++k) {
+            const ptrdiff_t e = (ptrdiff_t)par->data()[k];
+            const int       l = (int)lfi->data()[k];
+            if (e < 0 || e >= n_elements || l < 0 || l >= 6) return false;
+            mask[(size_t)e] |= (uint8_t)(1u << lfi_to_cvfem[l]);
+        }
+        return true;
+    }
+
     int CVFEMNavierStokes::initialize(const std::vector<std::string> & /*block_names*/) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::initialize");
 
@@ -152,6 +185,38 @@ namespace sfem {
         }
 
         d.rhie_chow_scale = rhie_chow_scale;
+
+        // SFEM_BOUNDARY_MASK_CHECK=1 compares the topological mask against the coordinate
+        // test, element by element and face by face.
+        //
+        // This is the gate that makes replacing one with the other safe. On a box both are
+        // valid and must agree exactly; if they do, the switch provably cannot change any box
+        // result, and a disagreement means the smesh-to-CVFEM face permutation or the corner
+        // convention is wrong. Catching that here is the difference between a failed assert
+        // and a three-percent error in a step solution several stages later.
+        if (smesh::Env::read<int>("SFEM_BOUNDARY_MASK_CHECK", 0)) {
+            std::vector<uint8_t> topo;
+            if (!build_face_mask(mesh, d.nelements, topo)) {
+                std::fprintf(stderr, "boundary_mask_check: skin_sideset failed\n");
+            } else {
+                ptrdiff_t disagree = 0, n_topo = 0, n_coord = 0;
+                for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+                    scalar_t ex[8], ey[8], ez[8];
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        const smesh::idx_t g = d.elems[a][e];
+                        ex[a] = d.points[0][g]; ey[a] = d.points[1][g]; ez[a] = d.points[2][g];
+                    }
+                    for (int f = 0; f < 6; ++f) {
+                        const int bt = hex8_face_on_domain(f, ex, ey, ez, d.Lx, d.Ly, d.Lz) ? 1 : 0;
+                        const int bm = (topo[(size_t)e] >> f) & 1;
+                        n_coord += bt; n_topo += bm;
+                        disagree += (bt != bm);
+                    }
+                }
+                std::printf("boundary_mask_check: coord_faces %td  topo_faces %td  disagreements %td  %s\n",
+                            n_coord, n_topo, disagree, disagree == 0 ? "MATCH" : "MISMATCH");
+            }
+        }
 
         d.ux.assign((size_t)d.nnodes, scalar_t(0));
         d.uy.assign((size_t)d.nnodes, scalar_t(0));
