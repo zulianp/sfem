@@ -1,0 +1,364 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\title{Partial Assembly by Projection:\\
+       an inexact matrix-free apply for the SFEM code generator}
+\author{}
+\date{}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\refcell}{\widehat{K}}
+\newcommand{\Wbar}{\overline{W}}
+\newcommand{\Sbar}{\overline{S}}
+\newcommand{\xhat}{\boldsymbol{\xi}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The matrix-free apply of a nonlinear elasticity operator carries a quadrature
+loop because the material tangent varies across each element.  Projecting that
+tangent onto the constants separates the loop into a small per-element object
+and a tensor that belongs to the reference element alone.  The reference tensor
+can then be integrated symbolically once, at generation time, and it turns out
+to be far smaller than its size suggests: it is a Gram matrix, so its rank is
+the dimension of the span of the element's gradient functions.  For a linear
+simplex that rank is one, and the construction reduces exactly to the loperand.
+This note states the technique, the compression, what the code generator emits,
+how it vectorises, and the measurements taken so far.
+\end{abstract}
+
+\section{The exact apply, and why it has a loop}
+
+Let $K$ be an element with reference cell $\refcell$ and affine or isoparametric
+map $\boldsymbol{x}(\xhat)$, Jacobian $J$, and $\mathrm{d}V = \det J \,
+\mathrm{d}\xhat$.  For a hyperelastic energy with first Piola stress $P(F)$, the
+matrix-free action of the second form on an increment $h$ is
+\begin{equation}
+  (\mathcal{H} h)_{i,p}
+  = \int_K S_{ijkl}\bigl(F(\boldsymbol{x})\bigr)\,
+    \frac{\partial h_k}{\partial x_l}\,
+    \frac{\partial \varphi_p}{\partial x_j}\;\mathrm{d}V ,
+  \qquad
+  S_{ijkl} = \frac{\partial P_{ij}}{\partial F_{kl}} ,
+  \label{eq:exact}
+\end{equation}
+with $i$ the output component, $p$ the test function, and $\varphi_p$ the basis.
+
+Pull the derivatives back to the reference cell with
+$\partial/\partial x_j = \sum_n J^{-1}_{nj}\, \partial/\partial \xi_n$ and
+collect the geometry into the tangent:
+\begin{equation}
+  \Sbar_{ikmn}
+  = \sum_{j,l} S_{ijkl}\, J^{-1}_{nj}\, J^{-1}_{ml}\, \det J ,
+  \label{eq:pullback}
+\end{equation}
+so that \eqref{eq:exact} becomes
+\begin{equation}
+  (\mathcal{H} h)_{i,p}
+  = \int_{\refcell} \Sbar_{ikmn}(\xhat)\,
+    \frac{\partial h_k}{\partial \xi_m}\,
+    \frac{\partial \varphi_p}{\partial \xi_n}\;\mathrm{d}\xhat .
+  \label{eq:reference}
+\end{equation}
+This $\Sbar$ is the \emph{loperand}: the flux differentiated once and already
+contracted with the geometry, so that the element vector is nothing but
+differences of its contractions.  It is the same object SFEM's hand-written
+kernels build, and the same one \texttt{plans/loperand.py} isolates from a
+material's flux.
+
+Everything under the integral except $\Sbar$ is a property of the reference
+element.  What forces a quadrature loop is that $\Sbar$ depends on $\xhat$,
+because $F$ does.
+
+\section{The projection}
+
+Replace $\Sbar$ by its $L^2$ projection onto the constants on $K$, that is by
+its element average $\Sbar^0 = |\refcell|^{-1}\int_{\refcell}\Sbar$.  It leaves
+the integral and the sum separates:
+\begin{equation}
+  (\mathcal{H} h)_{i,p}
+  \;\approx\;
+  \Sbar^0_{ikmn}\, \sum_j h_{k,j}\, \Wbar_{jmpn} ,
+  \qquad
+  \Wbar_{jmpn}
+  = \int_{\refcell}
+    \frac{\partial \varphi_j}{\partial \xi_m}\,
+    \frac{\partial \varphi_p}{\partial \xi_n}\;\mathrm{d}\xhat .
+  \label{eq:projected}
+\end{equation}
+$\Sbar^0$ is one small object per element, computed once from the state.
+$\Wbar$ belongs to the element and is integrated exactly, symbolically, at
+generation time.  \emph{The quadrature loop leaves the kernel entirely.}
+
+\subsection*{Where the approximation is, and where there is none}
+
+On an affine simplex the deformation gradient is constant over the cell, so
+$\Sbar$ is constant, so projecting it onto the constants returns it unchanged
+and \eqref{eq:projected} is an identity rather than an approximation.  This
+holds for a nonlinear material as much as a linear one: it is a statement about
+the geometry, not about $P$.
+
+That is the load-bearing fact of the whole construction, because it gives an
+exact reference to test against.  On TRI3 and TET4 the projected kernel must
+reproduce the exact one; only on curved or higher-order elements is there an
+error, and there it must be measured rather than assumed.
+
+\subsection*{Symmetry}
+
+The element matrix entry implied by \eqref{eq:projected} is
+$\Sbar^0_{ikmn}\Wbar_{jmpn}$.  Requiring it to be symmetric under exchanging the
+two (component, node) pairs, and using $\Wbar_{jmpn} = \Wbar_{pnjm}$, forces
+\begin{equation}
+  \Sbar^0_{ikmn} = \Sbar^0_{kinm} .
+  \label{eq:tangentsym}
+\end{equation}
+The pair that exchanges is $(i,n)$ against $(k,m)$: the output component with
+the \emph{test} direction, and the increment component with the \emph{increment}
+direction.  Packing on $(i,k)$ against $(m,n)$ instead is the plausible-looking
+error, and it is invisible to any test that compares the construction against
+itself.  Under \eqref{eq:tangentsym}, $\Sbar^0$ has $45$ independent components
+in three dimensions and $10$ in two.
+
+\section{Compression of the reference tensor}
+
+\subsection{What it contains}
+
+$\Wbar$ is integrated exactly, so its entries are rationals.  There are very few
+of them, and on the simplices most are zero.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+element & entries & distinct values & zeros & projection \\
+\midrule
+TRI3  &  36 &  3 &  20 & exact \\
+TET4  & 144 &  3 & 108 & exact \\
+QUAD4 &  64 &  6 &   0 & inexact \\
+HEX8  & 576 & 10 &   0 & inexact \\
+TET10 & 900 &  9 & 519 & inexact \\
+\bottomrule
+\end{tabular}
+\caption{The symbolically integrated reference tensor.  At most ten distinct
+rationals for any element.}
+\label{tab:reference}
+\end{table}
+
+\subsection{Rank, which is where the structure really is}
+
+The zeros are a symptom.  $\Wbar$, read as a matrix on the pair index $(j,m)$,
+is the Gram matrix of the element's gradient functions
+$\{\partial\varphi_j/\partial\xi_m\}$ in $L^2(\refcell)$.  Its rank is therefore
+the dimension of the span of those functions and nothing more.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrl}
+\toprule
+element & order & rank & span of the gradient functions \\
+\midrule
+TRI3  &  6 & 1 & constants \\
+TET4  & 12 & 1 & constants \\
+QUAD4 &  8 & 3 & $1,\ \xi_0,\ \xi_1$ \\
+HEX8  & 24 & 7 & $1$ and the six bilinear monomials \\
+TET10 & 30 & 4 & $1,\ \xi_0,\ \xi_1,\ \xi_2$ \\
+\bottomrule
+\end{tabular}
+\caption{Rank of the reference tensor, which equals the dimension of the span
+of the element's gradient functions exactly.}
+\label{tab:rank}
+\end{table}
+
+A linear simplex is rank one because its gradients are constants.  Rank one is
+precisely the loperand of Section~1: one object per element, contracted once.
+So the rank factorisation is not a second idea beside the loperand; it is the
+same structure carried to elements whose gradients are not constant.
+
+Factor exactly over the rationals,
+\begin{equation}
+  \Wbar = C^{\mathsf T} X C ,
+  \qquad C \in \mathbb{Q}^{r \times N d},
+  \qquad X \in \mathbb{Q}^{r \times r},
+\end{equation}
+with $r$ the rank, $N$ the node count and $d$ the dimension.  The factorisation
+is checked against the tensor it factors when it is built.
+
+\section{The generated kernel}
+
+\subsection{Staging}
+
+Substituting the factorisation into \eqref{eq:projected} and naming each
+intermediate gives four stages:
+\begin{align}
+  P_{kam} &= \sum_j C_{a,(j,m)}\, h_{k,j}
+            && \text{the increment, compressed} \\
+  Y_{ian} &= \sum_{k,m} \Sbar^0_{ikmn}\, P_{kam}
+            && \text{the tangent applied} \\
+  Q_{ibn} &= \sum_a X_{ab}\, Y_{ian}
+            && \text{the middle factor} \\
+  \text{out}_{ip} &= \sum_{b,n} C_{b,(p,n)}\, Q_{ibn}
+            && \text{expanded back to nodes}
+\end{align}
+Every sum skips its zero coefficients, so a zero of $C$ or $X$ never enters an
+expression rather than being cancelled out of one later.
+
+The staging is the point and not an implementation detail.  Expanding the four
+stages into one expression per output and letting common-subexpression
+elimination rediscover the structure returns the dense operation count exactly;
+the saving lives in keeping the intermediates named.
+
+\subsection{Fold the constants, do not tabulate them}
+
+The entries of $\Wbar$ are known at generation time, so they are emitted as
+literals.  The tempting alternative --- store the distinct values in a runtime
+table and index it --- compresses the memory and destroys the arithmetic: the
+constants stop being constants, the compiler can no longer fold them, and every
+multiply by a zero entry survives into the emitted code.
+
+This is not hypothetical.  The existing prototype
+(\texttt{python/codegen/neohookean\_partial\_assembly.py}) emits, for TET4, a
+table holding exactly $1$, $-1$ and $0$, and its kernels then multiply by the
+zero entry twelve times each; the reported ``$97.9\%$ memory saving'' buys
+$141$ stored numbers that were $0$ and $\pm 1$ at a cost of several hundred
+floating-point operations.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+element & rank/order & dense, folded & staged, folded & runtime table \\
+\midrule
+TRI3  & 1/6  &   96 &  \textbf{52} &  244 \\
+TET4  & 1/12 &  486 & \textbf{207} & 1467 \\
+QUAD4 & 3/8  &  238 &          238 &  431 \\
+HEX8  & 7/24 & 4059 & \textbf{2610} & 6330 \\
+TET10 & 4/30 & 4018 & \textbf{1380} & 8349 \\
+\bottomrule
+\end{tabular}
+\caption{Operations in the element apply, counted after
+common-subexpression elimination.  Preliminary: these are symbolic operation
+counts, not measured run times.}
+\label{tab:cost}
+\end{table}
+
+Table~\ref{tab:cost} says where the staging pays.  The saving tracks the rank
+against the order: TET10 at $4/30$ gains $2.9\times$ and TET4 at $1/12$ gains
+$2.4\times$, while QUAD4 at $3/8$ comes out exactly even --- not enough
+structure to beat common-subexpression elimination on the dense form.  Against
+the runtime-table form the improvement is $7.1\times$ on TET4 and $6.1\times$ on
+TET10.
+
+\section{Vectorisation}
+
+The generated kernels process a block of \texttt{VECTOR\_SIZE} elements at a
+time, with the lane loop innermost and marked \verb|#pragma omp simd|.  The
+staged form suits that layout well, and for reasons worth stating separately.
+
+\begin{description}[leftmargin=1.5em]
+\item[The reference tensor is lane-invariant.]  $C$ and $X$ are compile-time
+  rationals, identical for every element and therefore for every lane.  Folded,
+  they appear as immediates: no load, no broadcast, and a multiply by $\pm 1$ or
+  by a power of two is folded away entirely.  Behind a runtime table the same
+  values become a memory reference whose address does not depend on the lane ---
+  a broadcast load rather than an immediate --- and, worse, an opaque value that
+  no longer permits folding.  This is the arithmetic half of the cost in
+  Table~\ref{tab:cost}.
+
+\item[The tangent is a per-element stream.]  $\Sbar^0$ is $45$ numbers per
+  element in three dimensions, stored one component-array per index in the
+  structure-of-arrays layout the framework already uses for geometry.  Each
+  component is then a unit-stride read across the lane loop, which vectorises
+  without gather.
+
+\item[The intermediates are lane-width vectors.]  $P$, $Y$ and $Q$ are
+  per-element scalars, so in a blocked kernel each becomes one vector register.
+  Their counts are the stage sizes in Table~\ref{tab:stages}, and they are the
+  binding constraint: on HEX8, $63 + 63 + 63$ live intermediates at a lane width
+  of eight doubles will not stay in registers, and the kernel will spill.  Rank
+  is what controls this, since all three stage sizes are $d^2 r$.
+
+\item[The output scatter is unchanged.]  The last stage writes one value per
+  node per component, exactly as the existing apply kernels do, so it reuses the
+  same scatter --- atomic on the plain traversal, and plain accumulation into
+  thread-private scratch on the packed one.
+\end{description}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+element & rank & $|P|$ & $|Y|$ & $|Q|$ & outputs \\
+\midrule
+TRI3  & 1 &  4 &  4 &  4 &  6 \\
+TET4  & 1 &  9 &  9 &  9 & 12 \\
+QUAD4 & 3 & 12 & 12 & 12 &  8 \\
+HEX8  & 7 & 63 & 63 & 63 & 24 \\
+TET10 & 4 & 36 & 36 & 36 & 30 \\
+\bottomrule
+\end{tabular}
+\caption{Live intermediates per element in each stage.  In a blocked kernel each
+is one vector register, so these are the register-pressure figures.}
+\label{tab:stages}
+\end{table}
+
+A consequence worth drawing out: on the elements where the projection is exact
+the register pressure is also lowest, and on HEX8 --- where the projection is an
+approximation whose error is not yet measured --- it is highest.  The two
+difficulties arrive together, and a rank-truncated factorisation (keeping
+$r' < r$ modes) is the natural knob for both, at the price of a second and
+larger approximation.
+
+\section{Verification}
+
+The construction is checked at three independent points, since each stage can
+be wrong in a way the next cannot see.
+
+\begin{enumerate}[leftmargin=1.5em]
+\item \textbf{The symbolic integration}, against four-point Gauss--Legendre
+  quadrature on QUAD4 and HEX8, entry by entry: agreement to $10^{-16}$.
+\item \textbf{The factorisation}, against the tensor it factors:
+  $C^{\mathsf T} X C = \Wbar$ exactly, over the rationals.
+\item \textbf{The action itself}, against \eqref{eq:exact} integrated directly
+  on a concrete tetrahedron, for linear elasticity and for neohookean Ogden:
+  agreement is exact, a rational zero rather than round-off, for the dense and
+  the staged form alike.  The second material also demonstrates the claim of
+  Section~2, that on an affine simplex the projection is lossless even when the
+  material is nonlinear.
+\end{enumerate}
+
+Only the third of these can catch a wrong index convention, and it did: the
+symmetry \eqref{eq:tangentsym} had been implemented as $(i,k)$ against $(m,n)$,
+which the first two checks and a comparison of the staged form against the dense
+form all pass, because they share the error.
+
+\section{Status}
+
+Implemented in the code generator's planning layer as
+\texttt{plans/inexact\_apply.py}, with the reference bases in
+\texttt{fem/reference\_basis.py}.  The plan is consulted by nothing: generated
+output is byte-identical, and generation of the kernel is intended to be opt-in
+when it is wired.
+
+Not yet done, in order:
+\begin{enumerate}[leftmargin=1.5em]
+\item the opt-in flag, threaded from the material through the pipeline;
+\item a kernel computing $\Sbar^0$ per element from the state --- for an affine
+  simplex this is \eqref{eq:pullback} evaluated once, and for a curved element
+  it is the average, which is where the projection is actually taken;
+\item the staged apply as its own entry point;
+\item a gate that compares against the exact apply: bit-parity on TRI3 and TET4,
+  where the projection is exact, and a \emph{measured relative error} on HEX8
+  and TET10, where a digest comparison is meaningless because the kernel is
+  deliberately a different operator.
+\end{enumerate}
+
+The numbers in Tables~\ref{tab:cost} and~\ref{tab:stages} are symbolic operation
+and register counts, not timings.  No throughput has been measured, and none
+should be quoted until the kernels exist and run.
+
+\end{document}
