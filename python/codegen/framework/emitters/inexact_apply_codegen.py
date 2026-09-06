@@ -1,49 +1,56 @@
-"""The opt-in inexact apply, emitted as one self-contained kernel per element.
+"""The opt-in inexact apply, emitted as one header per element.
 
-The plan is `plans/inexact_apply.py`; this prints it.  What it prints is fused
-rather than split: the kernel takes the same arguments the exact apply takes,
-builds the projected tangent from the state itself, and applies it, so the two
-can be driven side by side by anything that can already drive the exact one.
+The plan is `plans/inexact_apply.py`; this prints it.  It prints the operator
+in two forms, because they answer different questions.
 
-Splitting the tangent into its own kernel and storing it per element is the
-form that pays in a Krylov solve, where one tangent serves many applies.  It is
-a different entry point with a different ABI and its own cache, and it is not
-this.  Fusing first is what makes the comparison cheap: identical arguments,
-identical driver, and on an affine simplex an answer that must agree.
+**Fused.**  `<material>_<element>_apply_inexact_affine_mesh_soa` takes the same
+arguments the exact apply takes, builds the projected tangent from the state
+itself, and applies it.  Identical arguments, identical driver, and on an
+affine simplex an answer that must agree with the exact kernel -- which is what
+makes it the correctness gate on the whole construction.  It cannot be faster
+than the exact apply, because it does the exact apply's material work and then
+the projection on top.
+
+**Split.**  The form that pays.  `Sbar` depends on the state, not on the vector
+being applied, so in a Krylov solve one tangent serves every apply of that
+Newton step:
+
+    <material>_<element>_inexact_apply_tangent_affine_mesh_soa
+        once per tangent: state, geometry and material in, `Sbar` out
+
+    <material>_<element>_inexact_apply_stored_affine_mesh_soa
+    <material>_<element>_inexact_apply_compressed_affine_mesh_soa
+        once per apply: `Sbar` and the vector in, nothing else
+
+The apply kernels take no geometry, no state and no material parameters at all
+-- the material has been evaluated away into `Sbar`, and what is left is a
+contraction that is the same for every material.  That is the whole point of
+storing it, and it is why the split can beat an exact apply that the fused form
+cannot.
+
+`Sbar` is 45 numbers per element in three dimensions, whatever the element, so
+the store is small and its precision is a free parameter: the kernels are
+templated on the stored type.  The compressed apply adds one scale per element
+and applies it to the *outputs*, of which there are `dim * n_nodes`, rather
+than to the tangent's 45 components -- the action is linear in `Sbar`, so this
+is the same number, arrived at with fewer multiplies and without a decompressed
+copy of the tangent in registers.
 """
-
-import itertools
 
 import sympy as sp
 
 from codegen.framework.emitters.cprinter import _sfem_ccode
 from codegen.framework.plans.inexact_apply import (
     emittable_inexact_apply_plan,
+    projected_tangent,
     staged_action,
 )
 from codegen.framework.targets import current_target
 
-
-def _reference_gradients(rule, n_nodes, dim):
-    """The reference gradients per quadrature point, from the specialization.
-
-    Indexed ``[point][node][direction]``.  A linear simplex has one point and
-    constant gradients, which is this shape with a single block, so the caller
-    does not branch on the two cases.
-    """
-    values = tuple(rule.reference_gradients)
-    points = int(getattr(rule, "n_qp", 1) or 1)
-    stride = n_nodes * dim
-    return tuple(
-        tuple(
-            tuple(
-                sp.nsimplify(values[point * stride + node * dim + direction])
-                for direction in range(dim)
-            )
-            for node in range(n_nodes)
-        )
-        for point in range(points)
-    )
+#: How the stored tangent is addressed.  Two strides rather than one so that
+#: both layouts are expressible by the caller without a second kernel: element
+#: major is `(components, 1)`, component major is `(1, nelements)`.
+_TANGENT_ADDRESS = "element * tangent_element_stride + %d * tangent_component_stride"
 
 
 def inexact_apply_kernel_source(
@@ -56,11 +63,12 @@ def inexact_apply_kernel_source(
     parameter_names,
     is_deformation_gradient,
 ):
-    """One header defining `<material>_<element>_apply_inexact_affine_mesh_soa`.
+    """The header's source, or ``None`` when this path does not cover the case.
 
-    Returns ``None`` when the element or the form is not one this path covers:
-    an element with no symbolic basis, a rule whose reference gradients are not
-    constant, or a form whose flux is not differentiable into a tangent here.
+    Not covered: an element with no symbolic basis, a rule whose reference
+    gradients are not the constants an affine simplex has, or a form whose flux
+    does not differentiate into a tangent here.  The plan layer decides;
+    emission looks the answer up.
     """
     plan = emittable_inexact_apply_plan(element_type, dim, n_nodes, flux_form, rule)
     return _KERNEL_BY_APPLICABILITY[plan is not None](
@@ -87,16 +95,10 @@ def _inexact_apply_kernel_source(
     parameter_names,
     is_deformation_gradient,
 ):
-    """The kernel itself, reached only when the plan layer said it applies."""
-    gradients = _reference_gradients(rule, n_nodes, dim)
-
+    """The three kernels, reached only when the plan layer said they apply."""
     component = ["x", "y", "z"][:dim]
-    adjugate = sp.Matrix(
-        dim, dim, lambda r, c: sp.Symbol("adjugate[%d]" % (r * dim + c))
-    )
+    adjugate = sp.Matrix(dim, dim, lambda r, c: sp.Symbol("adjugate%d" % (r * dim + c)))
     determinant = sp.Symbol("determinant")
-    inverse = adjugate / determinant
-
     state = [
         [sp.Symbol("u%s_%d" % (component[c], j)) for j in range(n_nodes)]
         for c in range(dim)
@@ -105,75 +107,60 @@ def _inexact_apply_kernel_source(
         [sp.Symbol("h%s_%d" % (component[c], j)) for j in range(n_nodes)]
         for c in range(dim)
     ]
-
-    variables = list(flux_form.gradient)
-    flux = list(flux_form.flux)
-    tangent = {
-        (i, j, k, l): sp.diff(flux[i * dim + j], variables[k * dim + l])
-        for i, j, k, l in itertools.product(range(dim), repeat=4)
-    }
-
-    # The projection onto the constants: the tangent averaged over the element,
-    # which for a quadrature rule is its weighted average over the points.  On
-    # an element whose state does not vary -- a linear simplex, or any element
-    # under a state-independent material -- every point gives the same value
-    # and the average is that value, which is why the kernel is exact there.
-    weights = tuple(sp.nsimplify(weight) for weight in rule.weights)
-    measure = sum(weights, sp.Integer(0))
-    packed = [sp.Integer(0)] * plan.tangent_components
-    seen = set()
-    for point, weight in enumerate(weights):
-        # The field gradient at this point, in physical coordinates.
-        physical = sp.zeros(dim, dim)
-        for c in range(dim):
-            for axis in range(dim):
-                physical[c, axis] = sum(
-                    state[c][j]
-                    * sum(gradients[point][j][m] * inverse[m, axis] for m in range(dim))
-                    for j in range(n_nodes)
-                )
-        # `is_deformation_gradient` says whether the variable is `I + grad u`.
-        substitution = {}
-        for c in range(dim):
-            for axis in range(dim):
-                value = physical[c, axis]
-                if is_deformation_gradient and c == axis:
-                    value = value + 1
-                substitution[variables[c * dim + axis]] = value
-        for i, k, m, n in itertools.product(range(dim), repeat=4):
-            slot = plan.tangent_index(i, k, m, n)
-            if (slot, point) in seen:
-                continue
-            seen.add((slot, point))
-            pulled = sum(
-                tangent[(i, j, k, l)] * adjugate[n, j] * adjugate[m, l]
-                for j, l in itertools.product(range(dim), repeat=2)
-            ) / determinant
-            packed[slot] += weight * pulled.subs(substitution) / measure
-
-    tangent_symbols = [
-        sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
-    ]
     output = [
         [sp.Symbol("element_out%d_%d" % (c, p)) for p in range(n_nodes)]
         for c in range(dim)
     ]
-    stages = staged_action(plan, tangent_symbols, increment, output)
 
-    body = []
-    tangent_defs = list(zip(tangent_symbols, packed))
-    body.extend(_assignment_lines(tangent_defs, "tangent"))
+    packed = projected_tangent(
+        plan,
+        flux_form,
+        rule,
+        adjugate,
+        determinant,
+        state,
+        is_deformation_gradient,
+    )
+    # Which state values the tangent actually reads.  A state-independent
+    # material -- linear elasticity, whose tangent is constant -- reads none,
+    # and then the kernel must not gather a state it will not use.  The plan
+    # answers this; emission spells the answer.
+    used_state = plan.state_dependence(packed, state)
+
+    tangent_symbols = [
+        sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
+    ]
+    stages = staged_action(plan, tangent_symbols, increment, output)
+    action_body = []
     for stage in stages:
-        body.extend(_assignment_lines(stage.assignments, stage.name))
+        action_body.extend(_assignment_lines(stage.assignments, stage.name))
 
     parameters = tuple(str(name) for name in parameter_names)
-    function = "%s_%s_apply_inexact_affine_mesh_soa" % (
-        material_name,
-        str(element_type).lower(),
+    prefix = "%s_%s" % (material_name, str(element_type).lower())
+    lines = [
+        '#include "kernel_math.hpp"',
+        "",
+        "namespace sfem {",
+        "namespace codegen {",
+        "",
+    ]
+    lines.extend(
+        _fused_lines(
+            prefix, dim, n_nodes, component, parameters, used_state, packed,
+            tangent_symbols, action_body, output,
+        )
     )
-    return function, "\n".join(
-        _kernel_lines(function, dim, n_nodes, component, parameters, body, output)
+    lines.extend(
+        _tangent_lines(
+            prefix, dim, n_nodes, component, parameters, used_state, packed, plan,
+        )
     )
+    lines.extend(_stored_lines(prefix, dim, n_nodes, component, plan, action_body, output))
+    lines.extend(
+        _compressed_lines(prefix, dim, n_nodes, component, plan, action_body, output)
+    )
+    lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
+    return "%s_apply_inexact_affine_mesh_soa" % prefix, "\n".join(lines)
 
 
 #: Whether the plan layer produced a plan decides whether there is a kernel.
@@ -201,7 +188,7 @@ def _scatter_lines(lhs, rhs, indent):
     return list(target.scatter_add_lines(lhs, rhs, indent))
 
 
-def _assignment_lines(assignments, prefix):
+def _assignment_lines(assignments, prefix, indent="        "):
     """Common subexpressions first, then the named values, as C declarations."""
     if not assignments:
         return []
@@ -211,109 +198,234 @@ def _assignment_lines(assignments, prefix):
         expressions, symbols=sp.numbered_symbols("%s_t" % prefix)
     )
     lines = [
-        "            const scalar_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        "%sconst scalar_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
         for symbol, expression in temporaries
     ]
     lines.extend(
-        "            const scalar_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        "%sconst scalar_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
         for symbol, expression in zip(symbols, reduced)
     )
     return lines
 
 
-def _kernel_lines(function, dim, n_nodes, component, parameters, body, output):
-    lines = [
-        '#include "kernel_math.hpp"',
-        "",
-        "namespace sfem {",
-        "namespace codegen {",
-        "",
-        "template <typename scalar_t, typename jacobian_t>",
-        "static SFEM_INLINE int %s_impl(" % function,
-        "        const ptrdiff_t nelements,",
-        "        const ptrdiff_t nnodes,",
-        "        idx_t **const SFEM_RESTRICT elements,",
+def _element_lines(n_nodes, indent="        "):
+    return [
+        "%sconst idx_t ev%d = elements[%d][element];" % (indent, node, node)
+        for node in range(n_nodes)
     ]
-    lines.extend(
+
+
+def _gather_lines(role, component, n_nodes, wanted, indent="        "):
+    """Element gathers for one role, restricted to the values that are read."""
+    return [
+        "%sconst scalar_t %s%s_%d = %s%s[ev%d * %s_stride];"
+        % (indent, role, name, node, role, name, node, role)
+        for name in component
+        for node in range(n_nodes)
+        if sp.Symbol("%s%s_%d" % (role, name, node)) in wanted
+    ]
+
+
+def _geometry_lines(dim, indent="        "):
+    lines = [
+        "%sconst scalar_t adjugate%d = scalar_t(g_jacobian_adjugate%d[element]);"
+        % (indent, index, index)
+        for index in range(dim * dim)
+    ]
+    lines.append(
+        "%sconst scalar_t determinant = scalar_t(g_jacobian_determinant0[element]);"
+        % indent
+    )
+    return lines
+
+
+def _geometry_arguments(dim):
+    lines = [
         "        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate%d," % index
         for index in range(dim * dim)
+    ]
+    lines.append("        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,")
+    return lines
+
+
+def _stream_arguments(role, component):
+    lines = ["        const ptrdiff_t %s_stride," % role]
+    lines.extend(
+        "        const scalar_t *const SFEM_RESTRICT %s%s," % (role, name)
+        for name in component
     )
-    lines.append(
-        "        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,"
-    )
-    lines.extend("        const scalar_t %s," % name for name in parameters)
-    for role in ("u", "h"):
-        lines.append("        const ptrdiff_t %s_stride," % role)
-        lines.extend(
-            "        const scalar_t *const SFEM_RESTRICT %s%s," % (role, name)
-            for name in component
-        )
-    lines.append("        const ptrdiff_t out_stride,")
+    return lines
+
+
+def _output_arguments(component):
+    lines = ["        const ptrdiff_t out_stride,"]
     lines.extend(
         "        scalar_t *const SFEM_RESTRICT out%s%s"
-        % (name, "," if index + 1 < dim else "")
+        % (name, "," if index + 1 < len(component) else "")
         for index, name in enumerate(component)
     )
-    lines.extend(
-        [
-            ") {",
-            "    (void)nnodes;",
-            "",
-            *_parallel_loop_lines(),
-            "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
-            "        {",
-        ]
-    )
-    lines.extend(
-        "            const idx_t ev%d = elements[%d][element];" % (node, node)
-        for node in range(n_nodes)
-    )
-    for name in component:
-        for node in range(n_nodes):
-            lines.append(
-                "            const scalar_t u%s_%d = u%s[ev%d * u_stride];"
-                % (name, node, name, node)
-            )
-            lines.append(
-                "            const scalar_t h%s_%d = h%s[ev%d * h_stride];"
-                % (name, node, name, node)
-            )
-    lines.append(
-        "            const scalar_t adjugate[%d] = {%s};"
-        % (
-            dim * dim,
-            ", ".join(
-                "scalar_t(g_jacobian_adjugate%d[element])" % index
-                for index in range(dim * dim)
-            ),
-        )
-    )
-    lines.append(
-        "            const scalar_t determinant = scalar_t(g_jacobian_determinant0[element]);"
-    )
-    lines.extend(body)
+    return lines
+
+
+def _scatter_body(component, n_nodes, scale=""):
+    lines = []
     for index, name in enumerate(component):
         for node in range(n_nodes):
             lines.extend(
                 _scatter_lines(
                     "out%s[ev%d * out_stride]" % (name, node),
-                    "element_out%d_%d" % (index, node),
-                    "            ",
+                    "%selement_out%d_%d" % (scale, index, node),
+                    "        ",
                 )
             )
-    lines.extend(
+    return lines
+
+
+def _fused_lines(
+    prefix, dim, n_nodes, component, parameters, used_state, packed,
+    tangent_symbols, action_body, output,
+):
+    """The reference kernel: tangent built and consumed in the same pass."""
+    body = _element_lines(n_nodes)
+    body.extend(_gather_lines("u", component, n_nodes, used_state))
+    body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
+    body.extend(_geometry_lines(dim))
+    body.extend(_assignment_lines(list(zip(tangent_symbols, packed)), "tangent"))
+    body.extend(action_body)
+    body.extend(_scatter_body(component, n_nodes))
+
+    signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
+    signature.extend(_geometry_arguments(dim))
+    signature.extend("        const scalar_t %s," % name for name in parameters)
+    signature.extend(_stream_arguments("u", component))
+    signature.extend(_stream_arguments("h", component))
+    signature.extend(_output_arguments(component))
+    return _function_lines(
+        "%s_apply_inexact_affine_mesh_soa" % prefix,
+        "template <typename scalar_t, typename jacobian_t>",
+        signature,
+        body,
+    )
+
+
+def _tangent_lines(
+    prefix, dim, n_nodes, component, parameters, used_state, packed, plan
+):
+    """The partial assembly: `Sbar` computed once and stored."""
+    tangent_symbols = [
+        sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
+    ]
+    body = _element_lines(n_nodes)
+    body.extend(_gather_lines("u", component, n_nodes, used_state))
+    body.extend(_geometry_lines(dim))
+    body.extend(_assignment_lines(list(zip(tangent_symbols, packed)), "tangent"))
+    body.extend(
+        "        tangent[%s] = tangent_t(tangent%d);" % (_TANGENT_ADDRESS % slot, slot)
+        for slot in range(plan.tangent_components)
+    )
+
+    signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
+    signature.extend(_geometry_arguments(dim))
+    signature.extend("        const scalar_t %s," % name for name in parameters)
+    signature.extend(_stream_arguments("u", component))
+    signature.extend(
         [
-            "        }",
-            "    }",
-            "",
-            "    return SFEM_SUCCESS;",
-            "}",
-            "",
-            "} // namespace codegen",
-            "} // namespace sfem",
-            "",
+            "        const ptrdiff_t tangent_element_stride,",
+            "        const ptrdiff_t tangent_component_stride,",
+            "        tangent_t *const SFEM_RESTRICT tangent",
         ]
     )
+    return _function_lines(
+        "%s_inexact_apply_tangent_affine_mesh_soa" % prefix,
+        "template <typename scalar_t, typename jacobian_t, typename tangent_t>",
+        signature,
+        body,
+    )
+
+
+def _stored_lines(prefix, dim, n_nodes, component, plan, action_body, output):
+    """The apply: stored tangent and the vector, and nothing else."""
+    body = _element_lines(n_nodes)
+    body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
+    body.extend(
+        "        const scalar_t tangent%d = scalar_t(tangent[%s]);"
+        % (slot, _TANGENT_ADDRESS % slot)
+        for slot in range(plan.tangent_components)
+    )
+    body.extend(action_body)
+    body.extend(_scatter_body(component, n_nodes))
+
+    signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
+    signature.extend(
+        [
+            "        const ptrdiff_t tangent_element_stride,",
+            "        const ptrdiff_t tangent_component_stride,",
+            "        const tangent_t *const SFEM_RESTRICT tangent,",
+        ]
+    )
+    signature.extend(_stream_arguments("h", component))
+    signature.extend(_output_arguments(component))
+    return _function_lines(
+        "%s_inexact_apply_stored_affine_mesh_soa" % prefix,
+        "template <typename scalar_t, typename tangent_t>",
+        signature,
+        body,
+    )
+
+
+def _compressed_lines(prefix, dim, n_nodes, component, plan, action_body, output):
+    """The same apply from a scaled low-precision store.
+
+    The scale multiplies the outputs, not the tangent: the action is linear in
+    `Sbar`, so it is the same number either way, and there are `dim * n_nodes`
+    outputs against the tangent's 45 components.
+    """
+    body = _element_lines(n_nodes)
+    body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
+    body.append("        const scalar_t scale = scalar_t(scaling[element]);")
+    body.extend(
+        "        const scalar_t tangent%d = scalar_t(tangent[%s]);"
+        % (slot, _TANGENT_ADDRESS % slot)
+        for slot in range(plan.tangent_components)
+    )
+    body.extend(action_body)
+    body.extend(_scatter_body(component, n_nodes, scale="scale * "))
+
+    signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
+    signature.extend(
+        [
+            "        const ptrdiff_t tangent_element_stride,",
+            "        const ptrdiff_t tangent_component_stride,",
+            "        const tangent_t *const SFEM_RESTRICT tangent,",
+            "        const scale_t *const SFEM_RESTRICT scaling,",
+        ]
+    )
+    signature.extend(_stream_arguments("h", component))
+    signature.extend(_output_arguments(component))
+    return _function_lines(
+        "%s_inexact_apply_compressed_affine_mesh_soa" % prefix,
+        "template <typename scalar_t, typename tangent_t, typename scale_t>",
+        signature,
+        body,
+    )
+
+
+def _all_names(role, component, n_nodes):
+    return frozenset(
+        sp.Symbol("%s%s_%d" % (role, name, node))
+        for name in component
+        for node in range(n_nodes)
+    )
+
+
+def _function_lines(name, template, signature, body):
+    lines = [template, "static SFEM_INLINE int %s_impl(" % name]
+    lines.extend(signature)
+    lines.append(") {")
+    lines.extend(_parallel_loop_lines())
+    lines.append("    for (ptrdiff_t element = 0; element < nelements; ++element) {")
+    lines.extend(body)
+    lines.extend(["    }", "", "    return SFEM_SUCCESS;", "}", ""])
     return lines
 
 
