@@ -358,7 +358,43 @@ Not yet done, in order:
 \end{enumerate}
 
 The numbers in Tables~\ref{tab:cost} and~\ref{tab:stages} are symbolic operation
-and register counts, not timings.  No throughput has been measured, and none
-should be quoted until the kernels exist and run.
+and register counts, not timings.
+
+\subsection*{The one throughput measurement so far, and what it does not show}
+
+With the opt-in wiring in place the kernel can be timed, and on the element it
+currently reaches it is \emph{slower} than the exact apply.  Linear elasticity
+on TET4, single-threaded, best of seven, at saturation:
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{rrrrr}
+\toprule
+elements & ndof & exact MDOF/s & projected MDOF/s & ratio \\
+\midrule
+ 82944 &  46875 & 18.65 & 16.61 & 0.89$\times$ \\
+196608 & 107811 & 17.97 & 16.41 & 0.91$\times$ \\
+384000 & 206763 & 17.79 & 15.24 & 0.86$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Exact against projected apply, linear elasticity on TET4.  Agreement
+is $1.6\times10^{-16}$ throughout.}
+\end{table}
+
+That is expected rather than a defect, and it is worth stating plainly.  Linear
+elasticity on TET4 is the case with nothing to remove: the material is linear,
+so the exact kernel already carries a constant tangent, and TET4 has one
+quadrature point, so there is no loop to collapse.  The projected kernel does
+strictly more work to reach the same answer.  The combination was chosen for the
+correctness gate, where a state-independent tangent makes agreement a clean
+pass, and it is the wrong one for a speed claim.
+
+The gain the technique offers is where the exact kernel re-evaluates the tangent
+at every quadrature point and this one evaluates it once --- eight against one
+on HEX8.  The emitter cannot reach that case yet: it requires the element's
+reference gradients to be constant, which only the linear simplices are.  So the
+wiring covers exactly the elements on which the projection is exact, and none of
+those on which it could be faster.  No speed-up should be quoted for this
+technique until that gap is closed.
 
 \end{document}
