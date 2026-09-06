@@ -104,3 +104,66 @@ def p1_simplex_metric_apply_plan(
         temporaries=tuple(temporaries),
         outputs=tuple(reduced),
     )
+
+
+@dataclass(frozen=True)
+class ExpandedSimplexMetricPlan:
+    """The closed-form mesh loop a lowest-order simplex calls for.
+
+    Carries the element algebra together with the two facts the loop around it
+    needs: which field role it reads, and the scale the metric is multiplied
+    by.  Both were being decided in emission, which is emission choosing what
+    to emit rather than how to spell it.
+    """
+
+    kernel: AffineElementKernelPlan
+    #: "u" when the form reads the current state, "h" when it reads a
+    #: direction.  A form whose flux factors through the metric is linear, so
+    #: it is one or the other and never both.
+    input_prefix: str
+    scale: object
+
+    @property
+    def dim(self):
+        return self.kernel.dim
+
+    @property
+    def n_shape(self):
+        return self.kernel.n_shape
+
+
+def expanded_simplex_metric_plan(
+    metric,
+    dim,
+    n_nodes,
+    n_qp,
+    n_field_components,
+    writes_per_shape,
+    reads_current,
+    reads_direction,
+):
+    """That plan, or ``None`` when the shape does not call for it.
+
+    The conditions are the ones the element and the lowered form already
+    settle: a cached metric, so the geometry is one symmetric tensor per
+    element; a single quadrature point on a simplex of ``dim + 1`` nodes, so
+    the basis gradients are constant; one field component, because the compact
+    contraction below is written for a scalar; a form that writes per shape,
+    so there is an element vector to scatter; and exactly one live field role.
+
+    Asked here rather than in the emitter so that emission has one question to
+    ask and no answer to derive.
+    """
+    if metric is None or n_qp != 1:
+        return None
+    if dim not in (2, 3) or n_nodes != dim + 1:
+        return None
+    if int(n_field_components) != 1 or not writes_per_shape:
+        return None
+    if bool(reads_current) == bool(reads_direction):
+        return None
+    return ExpandedSimplexMetricPlan(
+        kernel=p1_simplex_metric_apply_plan(dim),
+        input_prefix="u" if reads_current else "h",
+        scale=metric.scale,
+    )

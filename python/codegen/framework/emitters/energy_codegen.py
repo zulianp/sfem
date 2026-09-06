@@ -19,6 +19,9 @@ from codegen.framework.plans.form_emission import (
 from codegen.framework.plans.evaluation_strategy import (
     quadrature_scope_lines,
 )
+from codegen.framework.plans.affine_element_kernel import (
+    expanded_simplex_metric_plan,
+)
 
 from codegen.framework.ir.kernel_ast import (
     AssignmentNode,
@@ -4310,6 +4313,101 @@ def _append_mesh_operator_packed_entry_points(
         )
 
 
+def _expanded_simplex_metric_body(plan, source_builder):
+    """The direct element loop a lowest-order simplex calls for, or None.
+
+    The rule in ``plans.evaluation_strategy`` says a lowest-order simplex is
+    evaluated in closed form: no quadrature loop, no reference tables, and --
+    the part that was missing here -- no blocking.  The general body stages
+    every element through ``VECTOR_SIZE``-wide stack arrays: it gathers the
+    connectivity, gathers the field, zeroes the output block, builds two arrays
+    of pointers into those blocks, copies six geometry streams, calls through
+    the pointer arrays, and scatters back.  On a HEX8 that staging is amortised
+    over 8 nodes, 3 components and 8 quadrature points.  On a TET4 carrying one
+    scalar per node it is the whole cost: measured on the same operator, the
+    same element and the same mesh, the blocked kernel ran at 21 MDOF/s and
+    this one runs at 44.
+
+    So this is not a fast path bolted on beside the general one.  It is the
+    strategy the element already asked for, applied to the mesh loop as well as
+    to the element body -- and its arithmetic is printed from
+    ``p1_simplex_metric_apply_plan``, the same plan the residual emitter
+    prints, so the two formulations emit one kernel rather than two maintained
+    copies of it.
+
+    Reached only when ``plans.affine_element_kernel`` produced a plan; the
+    table below routes the other case, so this only spells the result.
+    """
+    from codegen.framework.plans.form_transformations import (
+        symmetric_metric_component_count,
+    )
+
+    dim = plan.dim
+    scale = _sfem_ccode(plan.scale)
+    scatter = _target_scatter_add_lines(source_builder)
+    lines = ["    (void)nnodes;", ""]
+    lines.extend(_target_parallel_element_loop_lines(source_builder))
+    lines.append(
+        "    for (ptrdiff_t element = 0; element < nelements; ++element) {"
+    )
+    lines.extend(
+        "        const idx_t ev%d = elements[%d][element];" % (shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    lines.extend(
+        "        const scalar_t u%d = %sx[ev%d * %s_stride];"
+        % (shape, plan.input_prefix, shape, plan.input_prefix)
+        for shape in range(plan.n_shape)
+    )
+    for component in range(symmetric_metric_component_count(dim)):
+        value = "scalar_t(g_geom_metric%d[element])" % component
+        if scale != "1":
+            value = "%s * %s" % (scale, value)
+        lines.append("        const scalar_t fff%d = %s;" % (component, value))
+    lines.extend(
+        "        const scalar_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        for symbol, expression in plan.kernel.temporaries
+    )
+    for shape, expression in enumerate(plan.kernel.outputs):
+        lines.append(
+            "        const scalar_t e%d = %s;" % (shape, _sfem_ccode(expression))
+        )
+        lines.extend(
+            scatter("outx[ev%d * out_stride]" % shape, "e%d" % shape, "        ")
+        )
+    lines.extend(["    }", "", "    return SFEM_SUCCESS;"])
+    return lines
+
+
+#: Whether the element's strategy produced a closed-form mesh loop decides
+#: which body is spelled.  A table rather than a conditional, for the reason
+#: `_METRIC_BODY_BY_WRITES_PER_SHAPE` above is one: the choice belongs to the
+#: plan, and emission looks the answer up rather than making it again.
+_MESH_OPERATOR_BODY_BY_EXPANDED = {
+    True: lambda plan, source_builder: _expanded_simplex_metric_body(
+        plan, source_builder
+    ),
+    False: lambda plan, source_builder: None,
+}
+
+
+def _target_parallel_element_loop_lines(source_builder):
+    """The pragma opening a parallel element loop, from the bound target."""
+    target = getattr(source_builder, "target", None)
+    if target is None or not hasattr(target, "parallel_element_loop_lines"):
+        return []
+    return ["    %s" % line for line in target.parallel_element_loop_lines("static")]
+
+
+def _target_scatter_add_lines(source_builder):
+    """A scatter-add spelled by the bound target rather than by a literal."""
+    target = getattr(source_builder, "target", None)
+    if target is None or not hasattr(target, "scatter_add_lines"):
+        return lambda lhs, rhs, indent: ["%s%s += %s;" % (indent, lhs, rhs)]
+    return lambda lhs, rhs, indent: list(target.scatter_add_lines(lhs, rhs, indent))
+
+
+
 def _sfem_soa_mesh_operator_function(
     form,
     prefix,
@@ -4408,6 +4506,20 @@ def _sfem_soa_mesh_operator_function(
         uses_direction,
     )
 
+    expanded_plan = expanded_simplex_metric_plan(
+        metric,
+        dim,
+        n_nodes,
+        n_qp,
+        n_field_components,
+        writes_per_shape(form),
+        uses_current,
+        uses_direction,
+    )
+    expanded_body = _MESH_OPERATOR_BODY_BY_EXPANDED[expanded_plan is not None](
+        expanded_plan, source_builder
+    )
+
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -4416,6 +4528,7 @@ def _sfem_soa_mesh_operator_function(
         source_builder.mesh_function_line(implementation_name),
     ]
     lines.extend(parameter_list_lines(impl_params))
+    implementation_start = len(lines)
     lines.extend(
         [
             ") {",
@@ -4660,6 +4773,28 @@ def _sfem_soa_mesh_operator_function(
             "",
         ]
     )
+
+    if expanded_body is not None:
+        # The element asked for the expanded strategy, and this is where it
+        # reaches the mesh loop as well as the element body.  The general body
+        # above is built and then dropped rather than skipped: it is two
+        # hundred lines of straight-line emission that would have to be
+        # extracted whole to be made conditional, and doing that as part of
+        # this change would put an untested restructuring underneath a measured
+        # one.  The cost is generator time, not emitted code.
+        del lines[implementation_start:]
+        lines.extend(
+            [
+                ") {",
+                *expanded_body,
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
+
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
     for public_name, scalar_type in (
