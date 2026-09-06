@@ -99,6 +99,83 @@ namespace {
 
     constexpr int N_FIELDS = 4;
 
+// Pressure gauge by zero mean, for the cases where nothing constrains the pressure.
+//
+// Pinning one pressure node nominally removes the constant mode, but it leaves a nearly
+// constant one that costs the operator almost nothing, and it acts like a point source in
+// the pressure. Measured on the 3D cavity at Re=100 with Vanka preconditioning, the pin puts
+// a single isolated eigenvalue 51x (h=1/2) to 71x (h=1/4) below the rest of the spectrum,
+// whose eigenvector is 96 percent pressure energy with no sign changes -- a smooth pressure
+// mode, not a checkerboard. It takes cond(M^-1 A) from 9.1 to 447 at h=1/2 and from 27.4 to
+// 1946 at h=1/4, so its damage grows like h^-2 and gets worse the finer the mesh.
+//
+// The remedy is to leave the system singular and work in the complement of its null space,
+// which is what a zero-mean constraint or a Lagrange multiplier does. Two projections are
+// needed and both are the same index set here, the pressure component:
+//
+//   null(A)   is the constant pressure: pressure enters the momentum equations only through
+//             differences, so a uniform shift produces no force. Projecting the *solution*
+//             fixes the gauge.
+//   null(A^T) is the constant on the continuity rows: summing continuity over every node
+//             cancels the interior fluxes and leaves the net boundary flux, which is zero
+//             for a closed domain. Projecting the *residual* makes the right-hand side
+//             compatible, which is what lets a Krylov method solve a consistent singular
+//             system at all.
+//
+// The projection is unweighted because both null vectors are unweighted constants -- the
+// same quantity the "sum of continuity residual" conservation check already reports.
+class PressureGauge {
+public:
+    PressureGauge(const ptrdiff_t ndof, const mask_t *const cmask) {
+        for (ptrdiff_t k = 3; k < ndof; k += N_FIELDS)
+            if (!mask_get(k, cmask)) idx_.push_back(k);
+    }
+
+    // Off when something already constrains the pressure -- a pin, or a Dirichlet value.
+    // Adding a gauge on top of one would over-determine the system.
+    bool active() const { return active_ && !idx_.empty(); }
+    void set_active(const bool a) { active_ = a; }
+    size_t size() const { return idx_.size(); }
+
+    void project(real_t *const v) const {
+        if (!active()) return;
+        long double s = 0;
+        for (const ptrdiff_t k : idx_) s += (long double)v[(size_t)k];
+        const real_t m = (real_t)(s / (long double)idx_.size());
+        for (const ptrdiff_t k : idx_) v[(size_t)k] -= m;
+    }
+
+private:
+    std::vector<ptrdiff_t> idx_;
+    bool                   active_{true};
+};
+
+// A preconditioner whose output carries no constant-pressure component.
+//
+// Without this the preconditioner reintroduces the null direction the residual projection
+// just removed, and the Krylov space drifts out of the complement it is supposed to stay in.
+// Projection is linear and idempotent, so applying it to an accumulated result is correct
+// whether or not the incoming vector was already projected.
+class GaugedPreconditioner final : public sfem::Operator<real_t> {
+public:
+    GaugedPreconditioner(std::shared_ptr<sfem::Operator<real_t>> p, const PressureGauge *g)
+        : p_(std::move(p)), g_(g) {}
+
+    int apply(const real_t *const b, real_t *const x) override {
+        const int ret = p_->apply(b, x);
+        g_->project(x);
+        return ret;
+    }
+
+    ptrdiff_t rows() const override { return p_->rows(); }
+    ptrdiff_t cols() const override { return p_->cols(); }
+    sfem::ExecutionSpace execution_space() const override { return p_->execution_space(); }
+
+private:
+    std::shared_ptr<sfem::Operator<real_t>> p_;
+    const PressureGauge                    *g_;
+};
+
     void usage(const char *argv0) {
         std::fprintf(stderr,
                      "usage: %s <output_folder>\n"
@@ -2390,7 +2467,21 @@ namespace {
                 // which is exact and cannot diverge; BiCGStab otherwise, and not CG,
                 // because the operator is not symmetric.
                 const ptrdiff_t nd_coarse = fi->space()->n_dofs();
-                const ptrdiff_t lu_max    = (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DENSE_LU_BELOW", 4096);
+                // The coarsest level is solved directly.
+                //
+                // A cycle takes its coarse answer at face value, so an iterative coarse solve
+                // that stagnates hands up a correction that is noise while reporting success.
+                // The direct solve cannot do that. It is also the second place a varying
+                // preconditioner came from, since an iterative coarse solve inherits every
+                // nondeterminism below it.
+                //
+                // The cost is real and cubic: this is a dense LU, so a coarse level of n dofs
+                // costs O(n^3) to factor and O(n^2) to store, once per Jacobian. Where that
+                // bites, the answer is a deeper hierarchy so the coarsest level is genuinely
+                // small, not a return to an iterative coarse solve. SFEM_GMG_DENSE_LU_BELOW
+                // caps it for the cases where that is not yet possible.
+                const ptrdiff_t lu_max =
+                        (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DENSE_LU_BELOW", 1 << 30);
                 if (nd_coarse <= lu_max) {
                     // Prefer the assembled matrix when there is one; fall back to probing
                     // only for a level that has no matrix form.
@@ -2894,11 +2985,14 @@ int main(int argc, char **argv) {
         conds.push_back(make_cond(uvw_nodes, uvw_uy, 1));
         conds.push_back(make_cond(uvw_nodes, uvw_uz, 2));
         if (!uz_nodes.empty()) conds.push_back(make_cond(uz_nodes, uz_vals, 2));
-        // SFEM_PIN_PRESSURE=0 drops the pin. Needed as an experiment for the open-outflow
-        // step: if the outflow condition determines the pressure level, pinning as well
-        // over-determines the system, and the symptom would be exactly what an under-
-        // determined one gives -- a large, useless Newton step.
-        if (smesh::Env::read<int>("SFEM_PIN_PRESSURE", want_natural_outlet ? 0 : 1))
+        // The pressure is left unconstrained and its gauge is fixed by a zero-mean
+        // projection instead (see PressureGauge). Pinning a node is the cheaper-looking
+        // option and the more expensive one: it leaves a near-constant mode that puts an
+        // isolated eigenvalue far below the rest of the spectrum and degrades like h^-2.
+        //
+        // SFEM_PIN_PRESSURE=1 restores the pin, which is worth having to reproduce older
+        // numbers and to compare the two treatments directly.
+        if (smesh::Env::read<int>("SFEM_PIN_PRESSURE", 0))
             conds.push_back(make_cond({(idx_t)pin}, {pp}, 3));
         else
             std::printf("pressure pin: DISABLED\n");
@@ -2960,6 +3054,22 @@ int main(int argc, char **argv) {
 
     std::vector<mask_t> cmask(mask_count(ndof), 0);
     f->constraints_mask(cmask.data());
+
+    // The gauge applies exactly when nothing else fixes the pressure. If any pressure dof is
+    // constrained -- a pin, or a Dirichlet value -- the level is already determined and a
+    // zero-mean condition on top of it would over-determine the system.
+    PressureGauge gauge(ndof, cmask.data());
+    {
+        ptrdiff_t n_p_free = 0, n_p = 0;
+        for (ptrdiff_t k = 3; k < ndof; k += N_FIELDS) {
+            ++n_p;
+            if (!mask_get(k, cmask.data())) ++n_p_free;
+        }
+        gauge.set_active(n_p_free == n_p);
+        std::printf("pressure gauge: %s  (%td of %td pressure dofs free)\n",
+                    gauge.active() ? "zero mean" : "constrained elsewhere (pin or Dirichlet)",
+                    n_p_free, n_p);
+    }
 
     // Reynolds continuation, matching the standalone driver. Newton from a zero state
     // does not converge at Re=100: the first stage solves the same geometry at Re=1 by
@@ -3221,6 +3331,8 @@ int main(int argc, char **argv) {
         // the Newton test expects -- it stalls the relative criterion near the solution.
         // The standalone driver zeroes them for the same reason.
         f->apply_zero_constraints(r.data());
+        // Make the right-hand side compatible: remove the component along null(A^T).
+        gauge.project(r.data());
 
         real_t rnorm = 0;
         for (ptrdiff_t i = 0; i < ndof; ++i) rnorm += r[(size_t)i] * r[(size_t)i];
@@ -3280,8 +3392,22 @@ int main(int argc, char **argv) {
         // preconditioner is not a fixed operator.
         // Still flexible: a Krylov smoother on any level makes the cycle vary.
         const int  ksmooth_outer = smesh::Env::read<int>("SFEM_GMG_KSMOOTH", 0);
-        const bool use_fgmres =
-                smesh::Env::read<int>("SFEM_FGMRES", (gmg && ksmooth_outer > 0) ? 1 : 0) != 0;
+        // Multigrid preconditions FGMRES, not BiCGStab.
+        //
+        // BiCGStab's short recurrence assumes the preconditioner is a fixed linear operator.
+        // A multigrid cycle is not: its semi-structured restriction accumulates with
+        // #pragma omp atomic update, so the cycle differs in the last bits between runs, and
+        // BiCGStab has no theory for that. Flexible GMRES is built for a preconditioner that
+        // varies between applications, and the difference is not subtle. On the 3D cavity at
+        // 19,652 dof on 4 threads, over repeated identical runs:
+        //
+        //     BiCGStab   680 / 1662 / 748 / 2519 linear iterations, t_solve 40.1 s
+        //     FGMRES     115 / 115 / 115         linear iterations, t_solve  1.78 s
+        //
+        // Reproducible, and 22x faster on the same 10 Newton steps. A model of the same
+        // effect -- redrawing the preconditioner with relative noise on every application --
+        // gives BiCGStab a spread and leaves FGMRES exactly invariant up to 1e-10 noise.
+        const bool use_fgmres = smesh::Env::read<int>("SFEM_FGMRES", gmg ? 1 : 0) != 0;
 
         std::shared_ptr<sfem::FGMRES<real_t>>    fsolver;
         std::shared_ptr<sfem::BiCGStab<real_t>>  bsolver;
@@ -3321,8 +3447,11 @@ int main(int argc, char **argv) {
             fsolver->set_atol(lin_atol);
             fsolver->set_restart(smesh::Env::read<int>("SFEM_FGMRES_RESTART", 30));
             fsolver->set_dtol(smesh::Env::read<real_t>("SFEM_LSOLVE_DTOL", real_t(1e4)));
-            set_prec = [fsolver](const std::shared_ptr<sfem::Operator<real_t>> &p) {
-                fsolver->set_preconditioner_op(p);
+            set_prec = [fsolver, &gauge](const std::shared_ptr<sfem::Operator<real_t>> &p) {
+                fsolver->set_preconditioner_op(
+                        gauge.active() ? std::static_pointer_cast<sfem::Operator<real_t>>(
+                                                 std::make_shared<GaugedPreconditioner>(p, &gauge))
+                                       : p);
             };
             get_its  = [fsolver]() { return fsolver->iterations(); };
             do_solve = [fsolver](const real_t *b, real_t *x) { fsolver->apply(b, x); };
@@ -3336,8 +3465,11 @@ int main(int argc, char **argv) {
             bsolver->set_dtol(smesh::Env::read<real_t>("SFEM_LSOLVE_DTOL", real_t(1e4)));
             bsolver->set_rtol(lin_rtol);
             bsolver->set_atol(lin_atol);
-            set_prec = [bsolver](const std::shared_ptr<sfem::Operator<real_t>> &p) {
-                bsolver->set_preconditioner_op(p);
+            set_prec = [bsolver, &gauge](const std::shared_ptr<sfem::Operator<real_t>> &p) {
+                bsolver->set_preconditioner_op(
+                        gauge.active() ? std::static_pointer_cast<sfem::Operator<real_t>>(
+                                                 std::make_shared<GaugedPreconditioner>(p, &gauge))
+                                       : p);
             };
             get_its  = [bsolver]() { return bsolver->iterations(); };
             do_solve = [bsolver](const real_t *b, real_t *x) { bsolver->apply(b, x); };
@@ -3522,6 +3654,9 @@ int main(int argc, char **argv) {
             do_solve(rhs.data(), dx.data());
             t_solve += smesh::time_seconds() - t0;
         }
+        // The correction carries no constant-pressure component; the gauge is fixed, so
+        // whatever multiple of the null vector the solve happened to leave in is noise.
+        gauge.project(dx.data());
         lin_it_total += get_its();
 
         // React to a divergent linear solve immediately. The correction it returns cannot be
@@ -3559,6 +3694,7 @@ int main(int argc, char **argv) {
             // solve that returned nothing would be reported as a converged Newton step.
             if (nl_stol > real_t(0) && dxinf <= nl_stol * std::max(xinf, real_t(1))) {
                 for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] += dx[(size_t)i];
+                gauge.project(x);
                 std::printf("  lin_it: %d  |dx|_inf: %.6e  converged on step size\n",
                             get_its(), dxinf);
                 converged = true;
@@ -3579,6 +3715,7 @@ int main(int argc, char **argv) {
                 std::fill(r_try.begin(), r_try.end(), real_t(0));
                 f->gradient(x_try.data(), r_try.data());
                 f->apply_zero_constraints(r_try.data());
+                gauge.project(r_try.data());   // same measure as the residual it is compared to
                 real_t rt = 0;
                 for (ptrdiff_t i = 0; i < ndof; ++i) rt += r_try[(size_t)i] * r_try[(size_t)i];
                 rt = std::sqrt(rt);
@@ -3605,8 +3742,10 @@ int main(int argc, char **argv) {
                 break;
             }
             for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] = x_try[(size_t)i];
+            gauge.project(x);
         } else {
             for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] += dx[(size_t)i];
+            gauge.project(x);
         }
 
         std::printf("  lin_it: %d  |dx|_inf: %.6e  alpha: %.4g\n", get_its(), dxinf, (double)alpha);
