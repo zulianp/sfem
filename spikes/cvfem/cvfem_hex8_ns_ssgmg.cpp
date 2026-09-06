@@ -3074,6 +3074,17 @@ int main(int argc, char **argv) {
     std::vector<mask_t> cmask(mask_count(ndof), 0);
     f->constraints_mask(cmask.data());
 
+    // Outlet nodes, for the active-set trace in the Newton loop. Empty for every case that
+    // has no outlet, which is what switches the trace off for them.
+    std::vector<ptrdiff_t> outlet_nodes;
+    std::vector<uint8_t>   outlet_active;
+    if (flow == cvfem_case::FlowCase::Step) {
+        const auto *const pxo = mesh->points()->data()[0];
+        for (ptrdiff_t i = 0; i < nnodes; ++i)
+            if (cvfem_case::on_plane((real_t)pxo[i], Lx, Lx)) outlet_nodes.push_back(i);
+        outlet_active.assign(outlet_nodes.size(), 0);
+    }
+
     // The gauge applies exactly when nothing else determines the pressure level, and there
     // are two ways it can be determined -- one obvious, one not.
     //
@@ -3364,6 +3375,71 @@ int main(int argc, char **argv) {
         f->apply_zero_constraints(r.data());
         // Make the right-hand side compatible: remove the component along null(A^T).
         gauge.project(r.data());
+
+        // SFEM_FD_AT_IT: run the finite-difference Jacobian check at *this* iterate.
+        //
+        // The check above the Newton loop can only ever evaluate the initial state, where
+        // almost every sub-control surface has mdot near zero and the upwind switch sits on
+        // its corner, so it cannot say whether the Jacobian is wrong where Newton actually
+        // stalls. Evaluating it at a chosen iteration can. A central difference of a smooth
+        // function has O(eps^2) truncation error; O(eps) is the signature of a corner being
+        // crossed, and a plateau is the signature of a genuinely wrong derivative. The three
+        // are distinguishable only by watching the error as eps shrinks.
+        if (smesh::Env::read<int>("SFEM_FD_AT_IT", -1) == newton_it) {
+            std::vector<real_t> v((size_t)ndof), jv((size_t)ndof), rp((size_t)ndof),
+                    rm((size_t)ndof), xt((size_t)ndof);
+            std::mt19937                           g2(12345u);
+            std::uniform_real_distribution<real_t> d2(real_t(-1), real_t(1));
+            for (ptrdiff_t i = 0; i < ndof; ++i) v[(size_t)i] = d2(g2);
+            f->apply_zero_constraints(v.data());
+            std::fill(jv.begin(), jv.end(), real_t(0));
+            f->apply(x, v.data(), jv.data());
+            f->apply_zero_constraints(jv.data());
+            std::printf("fd_at_it %d: ndof %ld\n", newton_it, (long)ndof);
+            for (const real_t eps : {real_t(1e-4), real_t(1e-5), real_t(1e-6), real_t(1e-7)}) {
+                for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = x[(size_t)i] + eps * v[(size_t)i];
+                std::fill(rp.begin(), rp.end(), real_t(0));
+                f->gradient(xt.data(), rp.data());
+                f->apply_zero_constraints(rp.data());
+                for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = x[(size_t)i] - eps * v[(size_t)i];
+                std::fill(rm.begin(), rm.end(), real_t(0));
+                f->gradient(xt.data(), rm.data());
+                f->apply_zero_constraints(rm.data());
+                real_t nmom = 0, dmom = 0, ncon = 0, dcon = 0;
+                for (ptrdiff_t i = 0; i < ndof; ++i) {
+                    const real_t fd = (rp[(size_t)i] - rm[(size_t)i]) / (real_t(2) * eps);
+                    const real_t d  = fd - jv[(size_t)i];
+                    if (i % 4 == 3) { ncon += d * d; dcon += fd * fd; }
+                    else            { nmom += d * d; dmom += fd * fd; }
+                }
+                std::printf("  eps %.1e  momentum %.4e  continuity %.4e\n", (double)eps,
+                            (double)std::sqrt(nmom / std::max(dmom, real_t(1e-300))),
+                            (double)std::sqrt(ncon / std::max(dcon, real_t(1e-300))));
+            }
+        }
+
+        // Track the backflow guard's active set across Newton iterations.
+        //
+        // max(mdot, 0) is semismooth, and the Jacobian assembled for it is a genuine element
+        // of the Clarke generalized Jacobian -- the mdot > 0 branch differentiated, zero
+        // elsewhere -- so this is already a semismooth Newton method and should converge
+        // superlinearly. When it does not, the usual cause is the active set failing to
+        // settle: the iterates cycle between branch assignments and each linearisation solves
+        // for a different problem. Counting the set and its changes per iteration is what
+        // separates that from a merely inaccurate Jacobian, and the two want different
+        // remedies -- an active-set or smoothing treatment for the first, a better derivative
+        // for the second.
+        if (smesh::Env::read<int>("SFEM_ACTIVE_SET_TRACE", 0) && !outlet_nodes.empty()) {
+            ptrdiff_t n_pos = 0, n_flip = 0;
+            for (size_t k = 0; k < outlet_nodes.size(); ++k) {
+                const bool pos = x[(size_t)outlet_nodes[k] * 4 + 0] > real_t(0);
+                if (pos) ++n_pos;
+                if (newton_it > 0 && pos != (bool)outlet_active[k]) ++n_flip;
+                outlet_active[k] = pos ? 1 : 0;
+            }
+            std::printf("  active set: %td of %zu outlet nodes have mdot>0, %td flipped\n",
+                        n_pos, outlet_nodes.size(), n_flip);
+        }
 
         real_t rnorm = 0;
         for (ptrdiff_t i = 0; i < ndof; ++i) rnorm += r[(size_t)i] * r[(size_t)i];
