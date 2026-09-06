@@ -3055,9 +3055,18 @@ int main(int argc, char **argv) {
     std::vector<mask_t> cmask(mask_count(ndof), 0);
     f->constraints_mask(cmask.data());
 
-    // The gauge applies exactly when nothing else fixes the pressure. If any pressure dof is
-    // constrained -- a pin, or a Dirichlet value -- the level is already determined and a
-    // zero-mean condition on top of it would over-determine the system.
+    // The gauge applies exactly when nothing else determines the pressure level, and there
+    // are two ways it can be determined -- one obvious, one not.
+    //
+    // The obvious one is a constrained pressure dof: a pin, or a Dirichlet value.
+    //
+    // The other is a do-nothing outflow. That boundary drops the p_i*a term, and dropping it
+    // is exactly what removes the constant-pressure null mode: with p_i*a retained a uniform
+    // pressure shift integrates to zero over every closed control volume and the level stays
+    // free, whereas without it the shift leaves a net force on the outflow control volumes.
+    // So an open outlet is a pressure condition even though it constrains no dof, and adding
+    // a zero-mean condition on top over-determines the system. Measured, doing so took the
+    // backward-facing step's continuity residual from 6.8e-09 to 5.4e-03.
     PressureGauge gauge(ndof, cmask.data());
     {
         ptrdiff_t n_p_free = 0, n_p = 0;
@@ -3065,9 +3074,12 @@ int main(int argc, char **argv) {
             ++n_p;
             if (!mask_get(k, cmask.data())) ++n_p_free;
         }
-        gauge.set_active(n_p_free == n_p);
+        const bool outflow_fixes_it = !op->natural_outflow_sideset.empty();
+        gauge.set_active(n_p_free == n_p && !outflow_fixes_it);
         std::printf("pressure gauge: %s  (%td of %td pressure dofs free)\n",
-                    gauge.active() ? "zero mean" : "constrained elsewhere (pin or Dirichlet)",
+                    gauge.active()      ? "zero mean"
+                    : outflow_fixes_it  ? "determined by the do-nothing outflow"
+                                        : "constrained (pin or Dirichlet)",
                     n_p_free, n_p);
     }
 
