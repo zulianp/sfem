@@ -17,7 +17,7 @@
 
 namespace cvfem_case {
 
-    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS };
+    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS, Step };
 
     inline bool parse_case(const std::string &name, FlowCase &out) {
         if (name == "poiseuille") {
@@ -34,6 +34,10 @@ namespace cvfem_case {
         }
         if (name == "cavity_reg" || name == "regularized_cavity" || name == "cavity_regularized") {
             out = FlowCase::CavityRegularized;
+            return true;
+        }
+        if (name == "step" || name == "backward_facing_step" || name == "bfs") {
+            out = FlowCase::Step;
             return true;
         }
         if (name == "mms" || name == "manufactured") {
@@ -89,6 +93,25 @@ namespace cvfem_case {
             const T Re = T(1) / mu;
             cvfem_mms::velocity(x, y, z, ux, uy, uz);
             cvfem_mms::pressure(x, y, z, Re, p);
+            return;
+        }
+        if (flow == FlowCase::Step) {
+            // Farrell, Mitchell & Wechsung section 5.5. Inflow on {x = 0}:
+            //     u = ( 4(2-y)(y-1) z(1-z), 0, 0 )
+            // supported on y in [1,2], which is the whole inlet face. No-slip everywhere
+            // else, including the two step faces; natural outflow at x = xmax, imposed by
+            // leaving those nodes unconstrained rather than by any value here.
+            //
+            // Peak is 1/4, not 1: 4(2-y)(y-1) peaks at 1 and z(1-z) at 1/4. The exact
+            // volumetric flux is 1/9, which is the oracle the mass-balance check uses.
+            if (on_plane(x, T(0), Lx)) {
+                const T sy = T(4) * (T(2) - y) * (y - T(1));
+                const T sz = z * (T(1) - z);
+                ux = U * ((sy > T(0)) ? sy * sz : T(0));
+            } else {
+                ux = T(0);
+            }
+            p = T(0);
             return;
         }
         if (flow == FlowCase::CavityRegularized) {
