@@ -4299,6 +4299,8 @@ def _append_mesh_operator_packed_entry_points(
     uses_current,
     uses_direction,
     n_field_components=None,
+    metric=None,
+    metric_block_name=None,
 ):
     """The packed entry points a 1- or 2-form additionally publishes.
 
@@ -4315,13 +4317,18 @@ def _append_mesh_operator_packed_entry_points(
                 n_qp=n_qp,
                 prefix=prefix,
                 local_prefix=local_prefix,
-                block_name=block_name,
+                # The metric block when the contraction factors through it; its
+                # reference gradients are folded into the plan, so it takes no
+                # reference basis data either.
+                block_name=block_name if metric is None else metric_block_name,
                 quadrature_rule=quadrature_rule,
                 reference_inputs=reference_inputs,
                 use_tensor_product_reference=use_tensor_product_reference,
                 use_tensor_product_geometry=use_tensor_product_geometry,
                 use_reference_gradient_vectors=use_reference_gradient_vectors,
-                omit_reference_basis_inputs=omit_reference_basis_inputs,
+                omit_reference_basis_inputs=(
+                    True if metric is not None else omit_reference_basis_inputs
+                ),
                 stream_shape_order=stream_shape_order,
                 identity_stream_shape_order=identity_stream_shape_order,
                 vector_size=effective_vector_size,
@@ -4331,6 +4338,7 @@ def _append_mesh_operator_packed_entry_points(
                 material_parameter_names=material_parameter_names,
                 source_builder=source_builder,
                 n_field_components=n_field_components,
+                metric=metric,
             )
         )
 
@@ -4864,8 +4872,30 @@ def _sfem_soa_mesh_operator_function(
         uses_current,
         uses_direction,
         n_field_components=n_field_components,
+        metric=metric,
+        metric_block_name=block_name,
     )
     return lines
+
+
+
+def _packed_affine_geometry_inputs(dim, metric):
+    """The geometry a packed affine kernel reads, in ABI order.
+
+    The same question `_sfem_soa_mesh_operator_function` asks of the unpacked
+    kernel, asked here so that the two answer alike: a form whose contraction
+    factors through the cached metric reads the symmetric metric, and
+    everything else reads the adjugate and the determinant.  The packed entry
+    points were left on the adjugate when the unpacked ones moved, so a packed
+    laplace ran the general contraction where the unpacked one ran the compact
+    form -- 18 MDOF/s against 44 on the same element.
+    """
+    if metric is not None:
+        return _metric_array_inputs((), dim)
+    return (
+        _adjugate_input(dim),
+        sfem_soa_reference_input("jacobian_determinant", 1, 1, 1),
+    )
 
 
 def _sfem_soa_packed_apply_public_wrappers(
@@ -4892,6 +4922,7 @@ def _sfem_soa_packed_apply_public_wrappers(
     material_parameter_names,
     source_builder,
     n_field_components=None,
+    metric=None,
 ):
     n_field_components = dim if n_field_components is None else n_field_components
     if geometry_mode not in ("affine", "isoparametric"):
@@ -4946,9 +4977,11 @@ def _sfem_soa_packed_apply_public_wrappers(
                     ]
                 )
             if is_affine:
-                for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                    lines.append("        const geom_t *const SFEM_RESTRICT g_%s," % stream)
-                lines.append("        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,")
+                for array_input in _packed_affine_geometry_inputs(dim, metric):
+                    for stream in _soa_array_stream_names(array_input):
+                        lines.append(
+                            "        const geom_t *const SFEM_RESTRICT g_%s," % stream
+                        )
             else:
                 lines.append("        const geom_t *const *const SFEM_RESTRICT points,")
             lines.extend(
@@ -5276,7 +5309,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend(
                     _sfem_soa_affine_geometry_stream_lines(
                         source_builder,
-                        (_adjugate_input(dim), sfem_soa_reference_input("jacobian_determinant", 1, 1, 1)),
+                        _packed_affine_geometry_inputs(dim, metric),
                         "                ",
                         geometry_scalar_type="geom_t",
                     )
@@ -5323,12 +5356,18 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend("    %s" % line if line else line for line in geometry_lines)
                 lines.append("                }")
 
-            call_args = [
-                "nelems",
-                "0" if is_affine else "VECTOR_SIZE",
-                *("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
-                "block_jacobian_determinant0",
-            ]
+            call_args = ["nelems", "0" if is_affine else "VECTOR_SIZE"]
+            if is_affine:
+                call_args.extend(
+                    "block_%s" % stream
+                    for array_input in _packed_affine_geometry_inputs(dim, metric)
+                    for stream in _soa_array_stream_names(array_input)
+                )
+            else:
+                call_args.extend(
+                    ["block_jacobian_adjugate%d" % i for i in range(dim * dim)]
+                    + ["block_jacobian_determinant0"]
+                )
             if omit_reference_basis_inputs:
                 pass
             elif use_tensor_product_reference:

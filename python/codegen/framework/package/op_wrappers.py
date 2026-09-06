@@ -7324,18 +7324,61 @@ def _with_runtime_type_argument(leading_args):
 
 
 def _hyperelastic_packed_return(indent, function, leading_args, trailing_args, kernel_sources):
-    """leading_args usually ['domain.element_type']; trailing follows ghost_idx."""
+    """leading_args usually ['domain.element_type']; trailing follows ghost_idx.
+
+    `trailing_args` may be a callable taking the callee's name, for the same
+    reason `_affine_dispatch_call_lines` takes one: a metric-geometry sibling
+    takes different geometry from the plain dispatch, and each is asked what it
+    takes.  A plain sequence is accepted unchanged, for the callers whose
+    arguments do not depend on the callee.
+    """
+    metric = _metric_dispatch_name(function)
+    elements = ()
+    if _c_abi_function_exists(kernel_sources, metric, public_only=True):
+        elements = _metric_dispatch_elements(kernel_sources, metric)
+    lines = []
+    if elements:
+        lines.extend(
+            [
+                "%sif (%s) {"
+                % (
+                    indent,
+                    " || ".join(
+                        "domain.element_type == smesh::%s" % element
+                        for element in elements
+                    ),
+                ),
+                *_packed_return_lines(
+                    indent + "    ", metric, leading_args, trailing_args, kernel_sources
+                ),
+                "%s}" % indent,
+            ]
+        )
+    lines.extend(
+        _packed_return_lines(indent, function, leading_args, trailing_args, kernel_sources)
+    )
+    return lines
+
+
+def _packed_return_lines(indent, function, leading_args, trailing_args, kernel_sources):
+    """One packed dispatch call, one-pass or two-pass as the operator asks."""
+    trailing = (
+        list(trailing_args(function)) if callable(trailing_args) else list(trailing_args)
+    )
     two_pass = _packed_two_pass_function(function)
     leading_args = _with_runtime_type_argument(leading_args)
     base = list(leading_args) + _packed_call_args_common()
-    one_call = ", ".join(base + list(trailing_args))
+    one_call = ", ".join(base + trailing)
     if not _c_abi_function_exists(kernel_sources, two_pass, public_only=True):
         return ["%sreturn %s(%s);" % (indent, function, one_call)]
+    two_trailing = (
+        list(trailing_args(two_pass)) if callable(trailing_args) else trailing
+    )
     two_call = ", ".join(
         list(leading_args)
         + _packed_call_args_common()
         + _packed_two_pass_extra_args()
-        + list(trailing_args)
+        + two_trailing
     )
     return [
         "%sif (impl_->use_packed_two_pass) {" % indent,
@@ -7681,8 +7724,8 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                         indent + "                ",
                         packed_affine,
                         ["domain.element_type"],
-                        [
-                            *_affine_geometry_call_args(kernel_sources, packed_affine, dim),
+                        lambda callee: [
+                            *_affine_geometry_call_args(kernel_sources, callee, dim),
                             *parameter_args,
                             *current_args,
                             *direction_args,
@@ -7834,8 +7877,8 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
                 indent + "            ",
                 function,
                 ["domain.element_type"],
-                [
-                    *_affine_geometry_call_args(kernel_sources, function, dim),
+                lambda callee: [
+                    *_affine_geometry_call_args(kernel_sources, callee, dim),
                     *parameter_args,
                     *current_args,
                     *output_args,

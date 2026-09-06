@@ -608,13 +608,13 @@
       "material": "laplace"
     },
     "laplace_apply_packed_3d_affine_mesh_soa": {
-      "l1": 0.8018239145985,
-      "l2": 0.1251364939935,
+      "l1": 0.8018239090978,
+      "l2": 0.1251364932314,
       "material": "laplace"
     },
     "laplace_apply_packed_two_pass_3d_affine_mesh_soa": {
-      "l1": 0.8018239145985,
-      "l2": 0.1251364939935,
+      "l1": 0.8018239090978,
+      "l2": 0.1251364932314,
       "material": "laplace"
     },
     "laplace_gradient_3d_affine_mesh_soa": {
@@ -628,13 +628,13 @@
       "material": "laplace"
     },
     "laplace_gradient_packed_3d_affine_mesh_soa": {
-      "l1": 0.4379080868277,
-      "l2": 0.06599697094081,
+      "l1": 0.4379081003031,
+      "l2": 0.06599697249659,
       "material": "laplace"
     },
     "laplace_gradient_packed_two_pass_3d_affine_mesh_soa": {
-      "l1": 0.4379080868277,
-      "l2": 0.06599697094081,
+      "l1": 0.4379081003031,
+      "l2": 0.06599697249659,
       "material": "laplace"
     },
     "laplace_jacobian_action_3d_affine_mesh_soa": {
@@ -1063,13 +1063,13 @@
       "material": "scalar_potential"
     },
     "scalar_potential_apply_packed_3d_affine_mesh_soa": {
-      "l1": 0.8018239145985,
-      "l2": 0.1251364939935,
+      "l1": 0.8018239090978,
+      "l2": 0.1251364932314,
       "material": "scalar_potential"
     },
     "scalar_potential_apply_packed_two_pass_3d_affine_mesh_soa": {
-      "l1": 0.8018239145985,
-      "l2": 0.1251364939935,
+      "l1": 0.8018239090978,
+      "l2": 0.1251364932314,
       "material": "scalar_potential"
     },
     "scalar_potential_gradient_3d_affine_mesh_soa": {
@@ -1083,13 +1083,13 @@
       "material": "scalar_potential"
     },
     "scalar_potential_gradient_packed_3d_affine_mesh_soa": {
-      "l1": 0.4379080868277,
-      "l2": 0.06599697094081,
+      "l1": 0.4379081003031,
+      "l2": 0.06599697249659,
       "material": "scalar_potential"
     },
     "scalar_potential_gradient_packed_two_pass_3d_affine_mesh_soa": {
-      "l1": 0.4379080868277,
-      "l2": 0.06599697094081,
+      "l1": 0.4379081003031,
+      "l2": 0.06599697249659,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_3d_affine_mesh_soa": {
@@ -1215,13 +1215,13 @@
       "material": "laplace"
     },
     "laplace_apply_packed_2d_affine_mesh_soa": {
-      "l1": 0.1174201355107,
-      "l2": 0.03649618310231,
+      "l1": 0.1174201333578,
+      "l2": 0.03649618245755,
       "material": "laplace"
     },
     "laplace_apply_packed_two_pass_2d_affine_mesh_soa": {
-      "l1": 0.1174201355107,
-      "l2": 0.03649618310231,
+      "l1": 0.1174201333578,
+      "l2": 0.03649618245755,
       "material": "laplace"
     },
     "laplace_gradient_2d_affine_mesh_soa": {
@@ -1235,13 +1235,13 @@
       "material": "laplace"
     },
     "laplace_gradient_packed_2d_affine_mesh_soa": {
-      "l1": 0.06386286740033,
-      "l2": 0.0178126093457,
+      "l1": 0.0638628667153,
+      "l2": 0.01781260917268,
       "material": "laplace"
     },
     "laplace_gradient_packed_two_pass_2d_affine_mesh_soa": {
-      "l1": 0.06386286740033,
-      "l2": 0.0178126093457,
+      "l1": 0.0638628667153,
+      "l2": 0.01781260917268,
       "material": "laplace"
     },
     "laplace_jacobian_action_2d_affine_mesh_soa": {
@@ -1670,13 +1670,13 @@
       "material": "scalar_potential"
     },
     "scalar_potential_apply_packed_2d_affine_mesh_soa": {
-      "l1": 0.1174201355107,
-      "l2": 0.03649618310231,
+      "l1": 0.1174201333578,
+      "l2": 0.03649618245755,
       "material": "scalar_potential"
     },
     "scalar_potential_apply_packed_two_pass_2d_affine_mesh_soa": {
-      "l1": 0.1174201355107,
-      "l2": 0.03649618310231,
+      "l1": 0.1174201333578,
+      "l2": 0.03649618245755,
       "material": "scalar_potential"
     },
     "scalar_potential_gradient_2d_affine_mesh_soa": {
@@ -1690,13 +1690,13 @@
       "material": "scalar_potential"
     },
     "scalar_potential_gradient_packed_2d_affine_mesh_soa": {
-      "l1": 0.06386286740033,
-      "l2": 0.0178126093457,
+      "l1": 0.0638628667153,
+      "l2": 0.01781260917268,
       "material": "scalar_potential"
     },
     "scalar_potential_gradient_packed_two_pass_2d_affine_mesh_soa": {
-      "l1": 0.06386286740033,
-      "l2": 0.0178126093457,
+      "l1": 0.0638628667153,
+      "l2": 0.01781260917268,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_2d_affine_mesh_soa": {
