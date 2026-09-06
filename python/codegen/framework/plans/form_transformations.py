@@ -212,3 +212,43 @@ def _constant_reference_gradients(rule):
             row.append(sp.nsimplify(first))
         gradients.append(tuple(row))
     return tuple(gradients)
+
+
+def energy_gradient_metric_scale(weak_form):
+    """The scale `kappa` when an energy's flux is `kappa * grad(u)`, else None.
+
+    The compact metric kernel contracts a P1 simplex element through
+    `FFF * grad`, six symmetric components instead of nine adjugate ones and a
+    determinant.  It is available exactly when the flux is a uniform scalar
+    multiple of the field gradient, because only then does the contraction
+    factor through the metric: a hyperelastic first Piola depends on the
+    gradient nonlinearly and cannot.
+
+    The residual path detects the same specialization from its lowered field
+    records, in `simplex_gradient_metric_transformation`.  An energy has no such
+    records -- it has a weak form -- so the question is asked of the flux
+    directly, which is the one thing both formulations agree on.
+
+    Returns the scale as a SymPy expression, so the emitter can carry it, or
+    None when the specialization does not apply.  A deformation gradient is
+    rejected outright: its variable is `I + grad(u)`, so the flux is not a
+    multiple of the gradient even when it is linear in it.
+    """
+    if weak_form is None or getattr(weak_form, "is_deformation_gradient", True):
+        return None
+    variables = tuple(getattr(weak_form, "deformation_gradient", ()) or ())
+    if not variables:
+        return None
+    flux = tuple(weak_form.first_piola())
+    if len(flux) != len(variables):
+        return None
+    scale = None
+    for entry, variable in zip(flux, variables):
+        ratio = sp.simplify(sp.together(entry / variable))
+        if ratio.has(*variables):
+            return None
+        if scale is None:
+            scale = ratio
+        elif sp.simplify(scale - ratio) != 0:
+            return None
+    return scale
