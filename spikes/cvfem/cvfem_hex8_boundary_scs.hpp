@@ -130,7 +130,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
                                                   const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
                                                   const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
                                                   const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
-                                                  const scalar_t *const SFEM_RESTRICT p, scalar_t *const SFEM_RESTRICT r) {
+                                                  const scalar_t *const SFEM_RESTRICT p, scalar_t *const SFEM_RESTRICT r,
+                                                  const int fmask = -1) {
     scalar_t grad_el[9];
     scalar_t A[3][3];
     if (!isoparam) {
@@ -140,7 +141,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
     }
 
     for (int f = 0; f < 6; ++f) {
-        if (!hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)) continue;
+        // fmask < 0 keeps the historical behaviour: decide from the bounding box. A
+        // non-negative mask is an explicit per-element bitfield, one bit per local face,
+        // which is the only way to get this right on a domain that is not a box -- the
+        // coordinate test cannot see a re-entrant face such as the step of a
+        // backward-facing step, and silently leaves those control volumes unclosed.
+        if (fmask < 0 ? !hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)
+                      : !((fmask >> f) & 1))
+            continue;
         const int      axis = CVFEM_HEX8_BFACE_AXIS[f];
         const scalar_t out  = CVFEM_HEX8_BFACE_OUT[f];
         for (int k = 0; k < 4; ++k) {
@@ -182,7 +190,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
                                                  const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
                                                  const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
                                                  const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
-                                                 const smesh::count_t *const SFEM_RESTRICT slots, scalar_t *const SFEM_RESTRICT values) {
+                                                 const smesh::count_t *const SFEM_RESTRICT slots, scalar_t *const SFEM_RESTRICT values,
+                                                  const int fmask = -1) {
     scalar_t A[3][3];
     scalar_t w_el[CVFEM_HEX8_N_NODES][3];
     if (!isoparam) {
@@ -196,7 +205,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
     }
 
     for (int f = 0; f < 6; ++f) {
-        if (!hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)) continue;
+        // fmask < 0 keeps the historical behaviour: decide from the bounding box. A
+        // non-negative mask is an explicit per-element bitfield, one bit per local face,
+        // which is the only way to get this right on a domain that is not a box -- the
+        // coordinate test cannot see a re-entrant face such as the step of a
+        // backward-facing step, and silently leaves those control volumes unclosed.
+        if (fmask < 0 ? !hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)
+                      : !((fmask >> f) & 1))
+            continue;
         const int      axis = CVFEM_HEX8_BFACE_AXIS[f];
         const scalar_t out  = CVFEM_HEX8_BFACE_OUT[f];
         for (int k = 0; k < 4; ++k) {
@@ -261,7 +277,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
                                                          const scalar_t *const SFEM_RESTRICT ux, const scalar_t *const SFEM_RESTRICT uy,
                                                          const scalar_t *const SFEM_RESTRICT uz, const scalar_t *const SFEM_RESTRICT vx,
                                                          const scalar_t *const SFEM_RESTRICT vy, const scalar_t *const SFEM_RESTRICT vz,
-                                                         const scalar_t *const SFEM_RESTRICT q, scalar_t *const SFEM_RESTRICT r) {
+                                                         const scalar_t *const SFEM_RESTRICT q, scalar_t *const SFEM_RESTRICT r,
+                                                  const int fmask = -1) {
     scalar_t dgrad_el[9];
     scalar_t A[3][3];
     if (!isoparam) {
@@ -271,7 +288,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
     }
 
     for (int f = 0; f < 6; ++f) {
-        if (!hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)) continue;
+        // fmask < 0 keeps the historical behaviour: decide from the bounding box. A
+        // non-negative mask is an explicit per-element bitfield, one bit per local face,
+        // which is the only way to get this right on a domain that is not a box -- the
+        // coordinate test cannot see a re-entrant face such as the step of a
+        // backward-facing step, and silently leaves those control volumes unclosed.
+        if (fmask < 0 ? !hex8_face_on_domain(f, x, y, z, Lx, Ly, Lz)
+                      : !((fmask >> f) & 1))
+            continue;
         const int      axis = CVFEM_HEX8_BFACE_AXIS[f];
         const scalar_t out  = CVFEM_HEX8_BFACE_OUT[f];
         for (int k = 0; k < 4; ++k) {

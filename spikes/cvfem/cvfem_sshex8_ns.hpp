@@ -57,6 +57,10 @@ struct SSMeshData {
     // one, in which case the residual is unchanged. See apply_body_force in the flat core.
     std::vector<scalar_t> fx, fy, fz;
     std::vector<scalar_t> node_vol;
+    // Boundary-face bitmask per MACRO element. The micro mask follows from this and the
+    // lattice indices, and is level-independent, so one macro-level mask serves every level
+    // of the multigrid hierarchy.
+    std::vector<uint8_t> macro_face_mask;
 
     // Deterministic scatter tables, built once. Null means the atomic path.
     std::shared_ptr<struct SSScatter> scatter;

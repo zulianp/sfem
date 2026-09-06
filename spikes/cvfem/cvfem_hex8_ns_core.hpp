@@ -94,6 +94,11 @@ struct MeshData {
     // manufactured-solution case, where f = -(1/Re) lap(u) + (u.grad)u + grad(p).
     std::vector<scalar_t> fx, fy, fz;
     std::vector<scalar_t> node_vol;
+    // Per-element boundary-face bitmask, one bit per CVFEM local face. Empty means "decide
+    // from the bounding box", which is what every box case does and keeps those results
+    // bit-identical. A non-box domain must set it: a coordinate test cannot see a re-entrant
+    // face, and an unclosed control volume does not fail, it just stops conserving mass.
+    std::vector<uint8_t> face_mask;
     std::vector<scalar_t> jacobian_adjugate[9];
     std::vector<scalar_t> jacobian_determinant;
     PackedData           *packed{nullptr};
