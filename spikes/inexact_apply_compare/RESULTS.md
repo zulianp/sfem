@@ -118,6 +118,75 @@ numbers and contracts. Neohookean and linear elasticity converge to nearly the
 same stored throughput (29.63 and 29.88) because at that point they are running
 the *same* kernel on the same amount of data; only the assembly differs.
 
+## All four element/material pairs
+
+Same conditions. TET10 is swept over n = 4..20 rather than 8..40, because it
+carries `(2n+1)^3` nodes; the dof counts are matched to the other elements.
+
+At 206763 degrees of freedom, stored f16:
+
+| material | element | exact | fused | stored f16 | speed-up | break-even | rel. error |
+|---|---|---|---|---|---|---|---|
+| neohookean Ogden  | TET4  |  5.13 |  4.49 | 29.63 | 5.78x | 1.5 | 3.8e-15 (exact) |
+| neohookean Ogden  | TET10 | 11.93 |  3.75 | 45.33 | 3.80x | 4.2 | 2.7e-02 (see below) |
+| neohookean Ogden  | HEX8  |  6.90 |  3.28 | 17.73 | 2.57x | 2.8 | 3.6e-05 |
+| linear elasticity | TET4  | 17.70 | 16.19 | 29.88 | 1.69x | 2.5 | 3.7e-15 (exact) |
+| linear elasticity | TET10 | 26.05 | 38.16 | 46.47 | 1.78x | 0.4 | 3.5e-14 (exact) |
+| linear elasticity | HEX8  | 23.54 | 15.30 | 17.46 | 0.74x | never | 1.1e-14 (exact) |
+
+The split wins on five of the six, by 1.7x to 5.8x, at a break-even between 0.4
+and 4.2 applies per tangent -- well inside one Krylov solve.
+
+**HEX8 linear elasticity is the exception, and it never pays.** Its break-even is
+negative at every precision: the stored apply is slower than the exact one, so no
+amount of reuse repays the assembly. HEX8 has 24 degrees of freedom per element
+against a 45-number tangent, and linear elasticity's exact apply is already cheap,
+so the store is pure added bandwidth. This is the boundary of the technique and it
+is worth knowing where it is.
+
+**TET10 is the only element where the fused form beats the exact apply** for a
+linear material (38.16 against 26.05). Removing the quadrature loop is a real
+saving there rather than a rearrangement, which is why its break-even is below one.
+
+The projection is exact wherever the tangent does not vary over the element: both
+materials on TET4, and linear elasticity everywhere, including on TET10 and HEX8
+where the *basis* varies but the tangent does not.
+
+## An open question: TET10 neohookean does not converge
+
+Under deformation, neohookean on TET10 differs from the exact apply by 2.7%, and
+that figure does not move across a five-fold refinement:
+
+| ndof |   2187 |  14739 |  46875 | 107811 | 206763 |
+|---|---|---|---|---|---|
+| TET10 | 2.8e-02 | 2.8e-02 | 2.7e-02 | 2.7e-02 | 2.7e-02 |
+| HEX8  | 8.9e-04 | 2.3e-04 | 1.0e-04 | 5.7e-05 | 3.6e-05 |
+
+HEX8 converges at about `h^2`, as a consistent projection should. TET10 does not
+converge at all, and a projection error that ignores the mesh size is not a
+projection error.
+
+What has been ruled out. With the state set to zero the deformation gradient is
+the identity, the tangent is constant, and the projection must reproduce the exact
+apply exactly -- it does, on all three elements:
+
+    TET4 3.65e-15    HEX8 1.07e-14    TET10 3.45e-14
+
+That control exercises the packed tangent, the rank-factored contraction, `Wbar`,
+and the element's node ordering, so none of those is the cause. The error also
+scales linearly with the deformation amplitude (0.002 -> 2.8e-3, 0.02 -> 2.8e-2),
+so it behaves like a fixed relative defect proportional to how much the tangent
+varies, rather than like a truncation that shrinks with the element.
+
+The TET10 throughput figures above are therefore reported as throughput only. The
+kernel does the same work whatever it computes, so the speed-up is valid; whether
+what it computes is the intended projection is open.
+
+A caution when reading the assembly column across elements: assembly cost scales
+with the element count, and TET10 has eight times fewer elements per degree of
+freedom than TET4, so its assembly MDOF/s is not comparable to TET4's. The
+break-even figures already account for this; the raw column does not.
+
 ## Accuracy of the store
 
 | store | bytes/element | rel. difference from exact |
