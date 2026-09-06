@@ -3409,6 +3409,53 @@ int main(int argc, char **argv) {
                     }
                 }
 
+                // SFEM_GMG_CHECK=6: write the fine operator and the preconditioner out, so
+                // the spectrum of what the Krylov method actually sees can be examined.
+                //
+                // A Krylov iteration count is a very indirect view of an operator. Whether the
+                // iteration is fragile because the discretisation is badly conditioned,
+                // because the preconditioned operator is strongly non-normal, or because
+                // BiCGStab is simply erratic, are three different diagnoses with three
+                // different remedies, and none of them can be told apart from the count. Both
+                // matrices are recovered by probing with unit vectors, which is O(n) applies
+                // and so only sensible for the small meshes used for this.
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 6 && newton_it == 0) {
+                    const std::string base =
+                            smesh::Env::read_string("SFEM_DUMP_OP", std::string("/tmp/op"));
+                    // Build the same preconditioner the solve would use, so the spectrum
+                    // examined is the one the Krylov method is actually handed.
+                    const std::string pkind =
+                            smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
+                    const real_t pom = (pkind == "vanka")
+                                               ? smoother_omega()
+                                               : smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                    std::shared_ptr<sfem::Operator<real_t>> prec;
+                    if (pkind == "vanka") {
+                        std::vector<uint8_t> cb((size_t)ndof, 0);
+                        for (ptrdiff_t k = 0; k < ndof; ++k)
+                            cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                        prec = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), pom);
+                    } else {
+                        prec = make_block_jacobi(*op, x, cmask.data(), nnodes, pom);
+                    }
+                    std::printf("dump: preconditioner kind %s (omega %g)\n", pkind.c_str(), (double)pom);
+                    std::vector<real_t> col((size_t)ndof), out((size_t)ndof);
+                    std::vector<real_t> dA((size_t)ndof * (size_t)ndof, 0),
+                            dM((size_t)ndof * (size_t)ndof, 0);
+                    for (ptrdiff_t j = 0; j < ndof; ++j) {
+                        std::fill(col.begin(), col.end(), real_t(0));
+                        std::fill(out.begin(), out.end(), real_t(0));
+                        col[(size_t)j] = 1;
+                        linop->apply(col.data(), out.data());
+                        for (ptrdiff_t i = 0; i < ndof; ++i) dA[(size_t)i * ndof + j] = out[(size_t)i];
+                        std::fill(out.begin(), out.end(), real_t(0));
+                        prec->apply(col.data(), out.data());
+                        for (ptrdiff_t i = 0; i < ndof; ++i) dM[(size_t)i * ndof + j] = out[(size_t)i];
+                    }
+                    dump_dense((base + "_A.txt").c_str(), ndof, dA);
+                    dump_dense((base + "_M.txt").c_str(), ndof, dM);
+                }
+
                 if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 2 && newton_it == 0) {
                     std::vector<real_t> probe((size_t)ndof, 0);
                     gmg->mg->verbose = true;
