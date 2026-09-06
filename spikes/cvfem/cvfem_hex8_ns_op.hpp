@@ -81,11 +81,14 @@ namespace sfem {
         // force the residual is untouched.
         void set_body_force(const real_t *fx, const real_t *fy, const real_t *fz);
 
-        // Natural (do-nothing) outflow on a coordinate plane; set before initialize().
-        // Empty means none, which is every case but the backward-facing step.
-        std::string natural_outflow_plane;   // "" | "x" | "y" | "z"
-        int         natural_outflow_axis{0};
-        real_t      natural_outflow_value{0};
+        // Name of the sideset carrying the natural (do-nothing) outflow; set before
+        // initialize(). Empty means none, which is every case but the backward-facing step.
+        //
+        // A name rather than a coordinate plane: the sideset is level-invariant (it stores
+        // (parent, lfi) on the macro element, which a semi-structured level change does not
+        // touch), it costs no geometric test per level, and it cannot disagree with the
+        // Dirichlet set derived from the same object.
+        std::string natural_outflow_sideset;
 
         // Control volume per node -- the CVFEM lumped mass. Exposed because the driver
         // cannot include the kernel headers, and the MMS error norms are volume-weighted.
