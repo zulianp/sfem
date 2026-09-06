@@ -49,6 +49,9 @@ struct SSMeshData {
     smesh::geom_t              **points{nullptr};
     scalar_t                     Lx{1}, Ly{1}, Lz{1};
     scalar_t                     rhie_chow_scale{1};
+    // Harten band for the upwind switch, as an absolute mass-flux magnitude. Zero is the
+    // hard switch, which is what every case that converges quadratically already uses.
+    scalar_t                     upwind_eps{0};
 
     std::vector<scalar_t> ux, uy, uz, p;
     std::vector<scalar_t> pgx, pgy, pgz;
@@ -457,7 +460,8 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho,
                     const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(x, y, z, adj, &det);
-                    cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
+                    cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
+                                                        rc, p, d.upwind_eps);
                     boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                      vx, vy, vz, q, r);
 
@@ -545,7 +549,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_
                         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
                         scalar_t           adj[9], det;
                         sscvfem_micro_geom(x, y, z, adj, &det);
-                        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
+                        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
+                                                        rc, p, d.upwind_eps);
                         boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                          vx, vy, vz, q, r);
 
@@ -662,7 +667,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
                         }
 
                         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
-                        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, madj, mdet, ux, uy, uz, vx, vy, vz, q, r, rc, p);
+                        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, madj, mdet, ux, uy, uz, vx, vy, vz, q, r,
+                                                             rc, p, d.upwind_eps);
                         boundary_scs_add_jacobian_action(rho, mu, 0, madj, mdet, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                          vx, vy, vz, q, r);
 
@@ -749,7 +755,8 @@ static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_
                                                const scalar_t *const SFEM_RESTRICT qgx,
                                                const scalar_t *const SFEM_RESTRICT qgy,
                                                const scalar_t *const SFEM_RESTRICT qgz,
-                                               scalar_t *const SFEM_RESTRICT       r) {
+                                               scalar_t *const SFEM_RESTRICT       r,
+                                              const scalar_t ueps = scalar_t(0)) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     scalar_t dgrad[9];
@@ -791,9 +798,10 @@ static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_
         const scalar_t mdot_rc = -c * corr;
 
         const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
-        const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
-        const scalar_t mpos  = half * (mdot + sgn * mdot);
-        const scalar_t mneg  = half * (mdot - sgn * mdot);
+        scalar_t amdot, sgn;
+        cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+        const scalar_t mpos  = half * (mdot + amdot);
+        const scalar_t mneg  = half * (mdot - amdot);
         const scalar_t d_pos = half * (one + sgn);
         const scalar_t d_neg = half * (one - sgn);
 
@@ -921,7 +929,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
 
                         sscvfem_action_hoisted(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz,
                                                has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
-                                               has_qg ? qgz : nullptr, r);
+                                               has_qg ? qgz : nullptr, r, d.upwind_eps);
                         boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                          ux, uy, uz, vx, vy, vz, q, r,
                                                          d.macro_face_mask.empty()
@@ -1077,7 +1085,8 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
                                               const scalar_t *const SFEM_RESTRICT pgx,
                                               const scalar_t *const SFEM_RESTRICT pgy,
                                               const scalar_t *const SFEM_RESTRICT pgz,
-                                              scalar_t *const SFEM_RESTRICT       r) {
+                                              scalar_t *const SFEM_RESTRICT       r,
+                                              const scalar_t ueps = scalar_t(0)) {
     constexpr bool uu = (Blocks & SSBLOCK_UU) != 0;
     constexpr bool up = (Blocks & SSBLOCK_UP) != 0;
     constexpr bool pu = (Blocks & SSBLOCK_PU) != 0;
@@ -1128,9 +1137,10 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
                                                    half * (pgz[i] + pgz[j]) * g.dvec[s][2]);
             const scalar_t mdot = rho * (half * (ux[i] + ux[j]) * ax + half * (uy[i] + uy[j]) * ay +
                                          half * (uz[i] + uz[j]) * az) - c * corr;
-            const scalar_t sgn  = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
-            mpos  = half * (mdot + sgn * mdot);
-            mneg  = half * (mdot - sgn * mdot);
+            scalar_t amdot, sgn;
+            cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+            mpos  = half * (mdot + amdot);
+            mneg  = half * (mdot - amdot);
             d_pos = half * (one + sgn);
             d_neg = half * (one - sgn);
         }
@@ -1497,7 +1507,8 @@ inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t r
                     const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(x, y, z, adj, &det);
-                    cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc);
+                    cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
+                                                         d.upwind_eps);
                     boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
                     for (int a = 0; a < 8; ++a)
                         for (int c = 0; c < N_FIELDS; ++c)
@@ -1583,7 +1594,8 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                             pgz[a]      = lpgz[(size_t)l];
                         }
                         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
-                        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r, rc);
+                        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r,
+                                                             rc, d.upwind_eps);
                         boundary_scs_add_residual(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                   ux, uy, uz, p, r,
                                                   d.macro_face_mask.empty()

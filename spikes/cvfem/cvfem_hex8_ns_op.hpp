@@ -180,6 +180,9 @@ namespace sfem {
         real_t        rho{1};
         real_t        mu{0.01};
         real_t        rhie_chow_scale{1};
+        // Harten band for the upwind switch, as an absolute mass-flux magnitude. Zero is the
+        // hard switch. See cvfem_upwind_abs.
+        real_t        upwind_eps{0};
         CVFEMGeometry geom{CVFEMGeometry::Affine};
 
         // Affine packing width, mirroring SFEM_PACK_SIZE in the driver. 0 selects the

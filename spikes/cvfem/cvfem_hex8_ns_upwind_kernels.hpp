@@ -580,6 +580,41 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_dmdotc(const s
     return -coeff * corr;
 }
 
+
+// Harten's entropy fix applied to the upwind switch.
+//
+// The upwind flux is m*(phi_i+phi_j)/2 + |m|*(phi_i-phi_j)/2, and |m| has a corner at m = 0.
+// Where the flow stagnates -- inside a recirculation bubble, or across a reversed outlet --
+// sub-control surfaces sit arbitrarily close to that corner while the upwinded values across
+// them still differ by O(1), so the flux is not differentiable in any neighbourhood of the
+// iterate and Newton loses its rate. Measured on the backward-facing step, the finite
+// difference check never reaches its round-off floor at the stalled iterate (7.11e-07 at
+// eps 1e-7, against 2.24e-12 for a case that converges quadratically), and the floor rises
+// as Newton proceeds because the corners get closer.
+//
+// Harten's fix replaces |m| inside a band by a parabola that matches it in value and slope
+// at the band edge:
+//
+//     |m|_e = |m|                for |m| >= e
+//           = (m^2 + e^2)/(2 e)  for |m| <  e
+//
+// so the flux becomes C1 while staying *exactly* the upwind flux outside the band. Only
+// faces that are actually near stagnation are altered, which is what keeps the change from
+// being a global smearing of the scheme.
+//
+// e = 0 reproduces the hard switch bit for bit, which is what every default call site gets.
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_upwind_abs(const scalar_t m, const scalar_t eps,
+                                                          scalar_t &absm, scalar_t &dabs) {
+    if (eps > scalar_t(0) && m < eps && m > -eps) {
+        absm = (m * m + eps * eps) / (scalar_t(2) * eps);
+        dabs = m / eps;
+    } else {
+        absm = m > scalar_t(0) ? m : -m;
+        dabs = m > scalar_t(0) ? scalar_t(1) : (m < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+    }
+}
+
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_convection(const scalar_t rho,
                                                   const scalar_t ux_i,
@@ -597,14 +632,16 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_convection(const scalar_
                                                   scalar_t      &fy,
                                                   scalar_t      &fz,
                                                   scalar_t      &mdot,
-                                                  const scalar_t mdot_rc = scalar_t(0)) {
+                                                  const scalar_t mdot_rc = scalar_t(0),
+                                               const scalar_t ueps = scalar_t(0)) {
     const scalar_t adv_x = scalar_t(0.5) * (ux_i + ux_j);
     const scalar_t adv_y = scalar_t(0.5) * (uy_i + uy_j);
     const scalar_t adv_z = scalar_t(0.5) * (uz_i + uz_j);
     mdot                 = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
-    const scalar_t sgn   = mdot > scalar_t(0) ? scalar_t(1) : (mdot < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
-    const scalar_t mpos  = scalar_t(0.5) * (mdot + sgn * mdot);
-    const scalar_t mneg  = scalar_t(0.5) * (mdot - sgn * mdot);
+    scalar_t amdot, sgn;
+    cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+    const scalar_t mpos  = scalar_t(0.5) * (mdot + amdot);
+    const scalar_t mneg  = scalar_t(0.5) * (mdot - amdot);
     const scalar_t pmid  = scalar_t(0.5) * (p_i + p_j);
     fx                   = mpos * ux_i + mneg * ux_j + pmid * ax;
     fy                   = mpos * uy_i + mneg * uy_j + pmid * ay;
@@ -619,7 +656,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual(const sca
                                                       const scalar_t *const SFEM_RESTRICT   uy,
                                                       const scalar_t *const SFEM_RESTRICT   uz,
                                                       const scalar_t *const SFEM_RESTRICT   p,
-                                                      scalar_t *const SFEM_RESTRICT         r) {
+                                                      scalar_t *const SFEM_RESTRICT         r,
+                                               const scalar_t ueps = scalar_t(0)) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     scalar_t grad[9];
@@ -636,9 +674,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual(const sca
         const scalar_t adv_y = scalar_t(0.5) * (uy[i] + uy[j]);
         const scalar_t adv_z = scalar_t(0.5) * (uz[i] + uz[j]);
         const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
-        const scalar_t sgn   = mdot > scalar_t(0) ? scalar_t(1) : (mdot < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
-        const scalar_t mpos  = scalar_t(0.5) * (mdot + sgn * mdot);
-        const scalar_t mneg  = scalar_t(0.5) * (mdot - sgn * mdot);
+        scalar_t amdot, sgn;
+        cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+        const scalar_t mpos  = scalar_t(0.5) * (mdot + amdot);
+        const scalar_t mneg  = scalar_t(0.5) * (mdot - amdot);
         const scalar_t pmid  = scalar_t(0.5) * (p[i] + p[j]);
 
         const scalar_t tau_x = mu * ((2 * grad[0]) * ax + (grad[1] + grad[3]) * ay + (grad[2] + grad[6]) * az);
@@ -669,7 +708,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               const scalar_t *const SFEM_RESTRICT   uz,
                                                               const scalar_t *const SFEM_RESTRICT   p,
                                                               scalar_t *const SFEM_RESTRICT         r,
-                                                              const Hex8RhieChowT<scalar_t>        &rc = {}) {
+                                                              const Hex8RhieChowT<scalar_t>        &rc = {},
+                                                              const scalar_t ueps = scalar_t(0)) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     scalar_t grad[9];
@@ -731,7 +771,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                   fy,
                                   fz,
                                   mdot,
-                                  mdot_rc);
+                                  mdot_rc,
+                                  ueps);
         r[i * 4 + 0] += fx;
         r[i * 4 + 1] += fy;
         r[i * 4 + 2] += fz;
@@ -756,7 +797,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action(co
                                                              const scalar_t *const SFEM_RESTRICT   q,
                                                              scalar_t *const SFEM_RESTRICT         r,
                                                              const Hex8RhieChowT<scalar_t>        &rc = {},
-                                                             const scalar_t *const SFEM_RESTRICT   p  = nullptr) {
+                                                             const scalar_t *const SFEM_RESTRICT   p  = nullptr,
+                                                             const scalar_t ueps = scalar_t(0)) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     scalar_t dgrad[9];
@@ -809,9 +851,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action(co
         const scalar_t adv_z = half * (uz[i] + uz[j]);
         const scalar_t mdot_rc = p ? cvfem_hex8_rhie_chow_mdotc(rho, mu, rc, i, j, ax, ay, az, p[i], p[j]) : scalar_t(0);
         const scalar_t mdot    = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
-        const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
-        const scalar_t mpos  = half * (mdot + sgn * mdot);
-        const scalar_t mneg  = half * (mdot - sgn * mdot);
+        scalar_t amdot, sgn;
+        cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+        const scalar_t mpos  = half * (mdot + amdot);
+        const scalar_t mneg  = half * (mdot - amdot);
         const scalar_t d_pos = half * (one + sgn);
         const scalar_t d_neg = half * (one - sgn);
         const scalar_t dmdot =
@@ -897,7 +940,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_rhie_chow_p(const scalar
                                                    const scalar_t *const SFEM_RESTRICT   uz,
                                                    const scalar_t *const SFEM_RESTRICT   p,
                                                    const Slot *const SFEM_RESTRICT       slots,
-                                                   scalar_t *const SFEM_RESTRICT         values) {
+                                                   scalar_t *const SFEM_RESTRICT         values,
+                                               const scalar_t ueps = scalar_t(0)) {
     if (!p || !cvfem_hex8_rhie_chow_active(rc)) return;
     const scalar_t dx    = rc.x[j] - rc.x[i];
     const scalar_t dy    = rc.y[j] - rc.y[i];
@@ -910,7 +954,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_rhie_chow_p(const scalar
     const scalar_t corr     = (p[j] - p[i]) - (half * (rc.pgx[i] + rc.pgx[j]) * dx + half * (rc.pgy[i] + rc.pgy[j]) * dy +
                                            half * (rc.pgz[i] + rc.pgz[j]) * dz);
     const scalar_t mdot     = mdot_avg - coeff * corr;
-    const scalar_t sgn      = mdot > scalar_t(0) ? scalar_t(1) : (mdot < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+    scalar_t amdot, sgn;
+    cvfem_upwind_abs(mdot, ueps, amdot, sgn);
     const scalar_t d_pos    = half * (scalar_t(1) + sgn);
     const scalar_t d_neg    = half * (scalar_t(1) - sgn);
     const scalar_t uup_x    = d_pos * ux[i] + d_neg * ux[j];
@@ -981,7 +1026,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_conv_face(const scalar_t
                                                  const scalar_t *const SFEM_RESTRICT   uz,
                                                  const Slot *const SFEM_RESTRICT       slots,
                                                  scalar_t *const SFEM_RESTRICT         values,
-                                                 const scalar_t                        mdot_rc = scalar_t(0));
+                                                 const scalar_t                        mdot_rc = scalar_t(0),
+                                                 const scalar_t                        ueps    = scalar_t(0));
 
 // ---------------------------------------------------------------------------
 // Split assembly: the Jacobian's viscous, geometry-only part does not change between
@@ -1378,7 +1424,8 @@ static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                
                                                   const scalar_t *const SFEM_RESTRICT Az,
                                                   const Hex8InputPack                &in,
                                                   const Hex8RhieChowPack             *rc,
-                                                  Hex8ResidualPack                   &out) {
+                                                  Hex8ResidualPack                   &out,
+                                               const scalar_t ueps = scalar_t(0)) {
     if constexpr (!RC) {
         (void)mu;
         (void)rc_scale;
@@ -1405,9 +1452,10 @@ static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                
                      half * (rc->pgz[I][lane] + rc->pgz[J][lane]) * dz);
             mdot -= coeff * corr;
         }
-        const scalar_t sgn  = mdot > scalar_t(0) ? scalar_t(1) : (mdot < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
-        const scalar_t mpos = half * (mdot + sgn * mdot);
-        const scalar_t mneg = half * (mdot - sgn * mdot);
+        scalar_t amdot, sgn;
+        cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+        const scalar_t mpos = half * (mdot + amdot);
+        const scalar_t mneg = half * (mdot - amdot);
         const scalar_t pmid = half * (in.p[I][lane] + in.p[J][lane]);
         const scalar_t fx   = mpos * in.ux[I][lane] + mneg * in.ux[J][lane] + pmid * ax;
         const scalar_t fy   = mpos * in.uy[I][lane] + mneg * in.uy[J][lane] + pmid * ay;
@@ -1435,7 +1483,8 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t             
                                                      const Hex8InputPack                &u,
                                                      const Hex8InputPack                &du,
                                                      const Hex8RhieChowPack             *rc,
-                                                     Hex8ResidualPack                   &out) {
+                                                     Hex8ResidualPack                   &out,
+                                               const scalar_t ueps = scalar_t(0)) {
     if constexpr (!RC) {
         (void)mu;
         (void)rc_scale;
@@ -1466,9 +1515,10 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t             
             mdot -= coeff * corr;
             dmdot += coeff * (du.p[I][lane] - du.p[J][lane]);
         }
-        const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
-        const scalar_t mpos  = half * (mdot + sgn * mdot);
-        const scalar_t mneg  = half * (mdot - sgn * mdot);
+        scalar_t amdot, sgn;
+        cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+        const scalar_t mpos  = half * (mdot + amdot);
+        const scalar_t mneg  = half * (mdot - amdot);
         const scalar_t d_pos = half * (one + sgn);
         const scalar_t d_neg = half * (one - sgn);
         const scalar_t dpos  = d_pos * dmdot;
@@ -1633,7 +1683,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_conv_face(const scalar_t
                                                  const scalar_t *const SFEM_RESTRICT   uz,
                                                  const Slot *const SFEM_RESTRICT       slots,
                                                  scalar_t *const SFEM_RESTRICT         values,
-                                                 const scalar_t                        mdot_rc) {
+                                                 const scalar_t                        mdot_rc,
+                                                 const scalar_t                        ueps) {
     const scalar_t half  = scalar_t(0.5);
     const scalar_t one   = scalar_t(1);
     const scalar_t alpha = rho * half;
@@ -1641,9 +1692,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_conv_face(const scalar_t
     const scalar_t adv_y = half * (uy[i] + uy[j]);
     const scalar_t adv_z = half * (uz[i] + uz[j]);
     const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
-    const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
-    const scalar_t mpos  = half * (mdot + sgn * mdot);
-    const scalar_t mneg  = half * (mdot - sgn * mdot);
+    scalar_t amdot, sgn;
+    cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+    const scalar_t mpos  = half * (mdot + amdot);
+    const scalar_t mneg  = half * (mdot - amdot);
     const scalar_t d_pos = half * (one + sgn);
     const scalar_t d_neg = half * (one - sgn);
     const scalar_t hax   = half * ax;
@@ -1920,7 +1972,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_isoparam(
                                                               const scalar_t *const SFEM_RESTRICT   uz,
                                                               const scalar_t *const SFEM_RESTRICT   p,
                                                               scalar_t *const SFEM_RESTRICT         r,
-                                                              const Hex8RhieChowT<scalar_t>        &rc = {}) {
+                                                              const Hex8RhieChowT<scalar_t>        &rc = {},
+                                                              const scalar_t ueps = scalar_t(0)) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
@@ -1960,7 +2013,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_isoparam(
         scalar_t fx, fy, fz, mdot;
         const scalar_t mdot_rc = cvfem_hex8_rhie_chow_mdotc(rho, mu, rc, i, j, ax, ay, az, p[i], p[j]);
         cvfem_hex8_scs_convection(rho, ux[i], ux[j], uy[i], uy[j], uz[i], uz[j], p[i], p[j], ax, ay, az, fx, fy, fz, mdot,
-                                  mdot_rc);
+                                  mdot_rc, ueps);
         fx -= tau_x;
         fy -= tau_y;
         fz -= tau_z;
@@ -1991,7 +2044,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action_is
                                                                      const scalar_t *const SFEM_RESTRICT   q,
                                                                      scalar_t *const SFEM_RESTRICT         r,
                                                                      const Hex8RhieChowT<scalar_t>        &rc = {},
-                                                                     const scalar_t *const SFEM_RESTRICT   p  = nullptr) {
+                                                                     const scalar_t *const SFEM_RESTRICT   p  = nullptr,
+                                                                     const scalar_t ueps = scalar_t(0)) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
     const scalar_t half = scalar_t(0.5);
@@ -2041,9 +2095,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action_is
         const scalar_t adv_z = half * (uz[i] + uz[j]);
         const scalar_t mdot_rc = p ? cvfem_hex8_rhie_chow_mdotc(rho, mu, rc, i, j, ax, ay, az, p[i], p[j]) : scalar_t(0);
         const scalar_t mdot    = rho * (adv_x * ax + adv_y * ay + adv_z * az) + mdot_rc;
-        const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
-        const scalar_t mpos  = half * (mdot + sgn * mdot);
-        const scalar_t mneg  = half * (mdot - sgn * mdot);
+        scalar_t amdot, sgn;
+        cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+        const scalar_t mpos  = half * (mdot + amdot);
+        const scalar_t mneg  = half * (mdot - amdot);
         const scalar_t d_pos = half * (one + sgn);
         const scalar_t d_neg = half * (one - sgn);
         const scalar_t dmdot = rho * half * ((vx[i] + vx[j]) * ax + (vy[i] + vy[j]) * ay + (vz[i] + vz[j]) * az) +
@@ -2177,7 +2232,8 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar
                                                                    const scalar_t      mu_s,
                                                                    const Hex8CoordPack &xyz,
                                                                    const Hex8InputPack &in,
-                                                                   Hex8ResidualPack    &out) {
+                                                                   Hex8ResidualPack    &out,
+                                               const scalar_t ueps = scalar_t(0)) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -2256,9 +2312,10 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar
             const scalar_t adv_y = half * (in.uy[i][lane] + in.uy[j][lane]);
             const scalar_t adv_z = half * (in.uz[i][lane] + in.uz[j][lane]);
             const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
-            const scalar_t sgn   = mdot > scalar_t(0) ? scalar_t(1) : (mdot < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
-            const scalar_t mpos  = half * (mdot + sgn * mdot);
-            const scalar_t mneg  = half * (mdot - sgn * mdot);
+            scalar_t amdot, sgn;
+            cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+            const scalar_t mpos  = half * (mdot + amdot);
+            const scalar_t mneg  = half * (mdot - amdot);
             const scalar_t pmid  = half * (in.p[i][lane] + in.p[j][lane]);
             const scalar_t fx    = mpos * in.ux[i][lane] + mneg * in.ux[j][lane] + pmid * ax - tau_x;
             const scalar_t fy    = mpos * in.uy[i][lane] + mneg * in.uy[j][lane] + pmid * ay - tau_y;
@@ -2280,7 +2337,8 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
                                                                           const Hex8CoordPack &xyz,
                                                                           const Hex8InputPack &u,
                                                                           const Hex8InputPack &du,
-                                                                          Hex8ResidualPack    &out) {
+                                                                          Hex8ResidualPack    &out,
+                                               const scalar_t ueps = scalar_t(0)) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -2357,9 +2415,10 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
             const scalar_t adv_y = half * (u.uy[i][lane] + u.uy[j][lane]);
             const scalar_t adv_z = half * (u.uz[i][lane] + u.uz[j][lane]);
             const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
-            const scalar_t sgn   = mdot > scalar_t(0) ? one : (mdot < scalar_t(0) ? -one : scalar_t(0));
-            const scalar_t mpos  = half * (mdot + sgn * mdot);
-            const scalar_t mneg  = half * (mdot - sgn * mdot);
+            scalar_t amdot, sgn;
+            cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+            const scalar_t mpos  = half * (mdot + amdot);
+            const scalar_t mneg  = half * (mdot - amdot);
             const scalar_t d_pos = half * (one + sgn);
             const scalar_t d_neg = half * (one - sgn);
             const scalar_t dmdot = rho * half *

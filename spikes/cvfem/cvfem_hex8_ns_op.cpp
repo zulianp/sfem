@@ -299,6 +299,7 @@ namespace sfem {
                 sscvfem_build_scatter(impl_->ss, *impl_->ss.scatter);
             }
             impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            impl_->ss.upwind_eps      = upwind_eps;
             impl_->initialized        = true;
             return SFEM_SUCCESS;
         }
@@ -353,6 +354,7 @@ namespace sfem {
         }
 
         d.rhie_chow_scale = rhie_chow_scale;
+        d.upwind_eps      = upwind_eps;
 
         // The coarse levels of the multigrid hierarchy are plain HEX8 meshes and take this
         // path, so they need the same treatment as the fine semi-structured level. Without
@@ -458,12 +460,14 @@ namespace sfem {
         if (!impl_->initialized) return SFEM_FAILURE;
         if (impl_->semi_structured) {
             impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            impl_->ss.upwind_eps      = upwind_eps;
             sscvfem_unpack(impl_->ss, x);
             sscvfem_nodal_p_grad(impl_->ss);
             impl_->pgrad_for = x;
             return SFEM_SUCCESS;
         }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
+        impl_->d.upwind_eps      = upwind_eps;
         unpack_fields(impl_->d, x);
         assemble_nodal_p_grad(impl_->d, to_geom_kind(geom));
         impl_->pgrad_for = x;
@@ -475,6 +479,7 @@ namespace sfem {
         if (!impl_->initialized) return SFEM_FAILURE;
         if (impl_->semi_structured) {
             impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            impl_->ss.upwind_eps      = upwind_eps;
             sscvfem_unpack(impl_->ss, x);
             sscvfem_nodal_p_grad(impl_->ss);
             impl_->pgrad_for = x;
@@ -482,6 +487,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
+        impl_->d.upwind_eps      = upwind_eps;
         unpack_fields(impl_->d, x);
         // apply_residual recomputes the gradient itself, so this leaves it current.
         apply_residual(impl_->d, rho, mu, to_geom_kind(geom));
@@ -496,6 +502,7 @@ namespace sfem {
         if (!impl_->initialized) return SFEM_FAILURE;
         if (impl_->semi_structured) {
             impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            impl_->ss.upwind_eps      = upwind_eps;
             sscvfem_unpack(impl_->ss, x);
             if (!(impl_->cache_pgrad && impl_->pgrad_for == x)) {
                 sscvfem_nodal_p_grad(impl_->ss);
@@ -505,6 +512,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
+        impl_->d.upwind_eps      = upwind_eps;
         unpack_fields(impl_->d, x);
         if (!(impl_->cache_pgrad && impl_->pgrad_for == x)) {
             assemble_nodal_p_grad(impl_->d, to_geom_kind(geom));
@@ -523,6 +531,7 @@ namespace sfem {
             return SFEM_FAILURE;
         }
         impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            impl_->ss.upwind_eps      = upwind_eps;
         sscvfem_unpack(impl_->ss, x);
         if (!(impl_->cache_pgrad && impl_->pgrad_for == x)) {
             sscvfem_nodal_p_grad(impl_->ss);
@@ -561,6 +570,7 @@ namespace sfem {
             return SFEM_FAILURE;
         }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
+        impl_->d.upwind_eps      = upwind_eps;
         unpack_fields(impl_->d, x);
 
         // The slot caches were built against the mesh graph in initialize(); assembly
@@ -579,6 +589,7 @@ namespace sfem {
         if (!impl_->initialized) return SFEM_FAILURE;
         if (impl_->semi_structured) {
             impl_->ss.rhie_chow_scale = rhie_chow_scale;
+            impl_->ss.upwind_eps      = upwind_eps;
             sscvfem_unpack(impl_->ss, x);
             sscvfem_nodal_p_grad(impl_->ss);
             impl_->pgrad_for = x;
@@ -587,6 +598,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
+        impl_->d.upwind_eps      = upwind_eps;
         unpack_fields(impl_->d, x);
         assemble_block_diag(impl_->d, rho, mu, to_geom_kind(geom), impl_->diag_scratch);
         const auto &blocks = impl_->diag_scratch;
@@ -606,6 +618,7 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
         impl_->d.rhie_chow_scale = rhie_chow_scale;
+        impl_->d.upwind_eps      = upwind_eps;
         unpack_fields(impl_->d, x);
         assemble_block_diag(impl_->d, rho, mu, to_geom_kind(geom), impl_->diag_scratch);
         const auto &blocks = impl_->diag_scratch;
@@ -668,6 +681,7 @@ namespace sfem {
         ret->rho             = rho;
         ret->mu              = mu;
         ret->rhie_chow_scale = rhie_chow_scale;
+        ret->upwind_eps      = upwind_eps;
         ret->geom            = geom;
         ret->pack_size       = pack_size;
         // The outflow setting must travel to the coarse levels. derefine_op re-runs
