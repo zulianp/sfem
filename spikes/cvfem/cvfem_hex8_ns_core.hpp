@@ -108,6 +108,9 @@ struct MeshData {
     PackedData           *packed{nullptr};
     const PackColoring   *coloring{nullptr};
     scalar_t              rhie_chow_scale{1};
+    // Harten band for the upwind switch, as an absolute mass-flux magnitude; 0 is the
+    // hard switch. See cvfem_upwind_abs.
+    scalar_t upwind_eps{0};
 };
 
 #include "cvfem_hex8_ns_packed.hpp"

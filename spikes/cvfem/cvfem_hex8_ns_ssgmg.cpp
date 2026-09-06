@@ -2797,6 +2797,25 @@ int main(int argc, char **argv) {
     auto f    = sfem::Function::create(fs);
 
     auto op  = std::make_shared<sfem::CVFEMNavierStokes>(fs);
+    // Harten band for the upwind switch, expressed relatively so it does not depend on the
+    // mesh or the units.
+    //
+    // The band has to be compared against a mass flux, so it is scaled by one: rho times a
+    // velocity scale times a fine-cell face area. SFEM_UPWIND_EPS_REL is the fraction of that
+    // flux inside which the upwind switch is rounded off; 0, the default, is the hard switch
+    // and reproduces every existing result bit for bit. SFEM_UPWIND_EPS overrides with an
+    // absolute value for when a specific band is wanted.
+    {
+        const int    Lref_u = std::max(1, refine_level);
+        const real_t h_u    = std::min({Lx / (real_t)(nx * Lref_u), Ly / (real_t)(ny * Lref_u),
+                                        Lz / (real_t)(nz * Lref_u)});
+        const real_t rel_u  = smesh::Env::read<real_t>("SFEM_UPWIND_EPS_REL", real_t(0));
+        const real_t abs_u  = smesh::Env::read<real_t>("SFEM_UPWIND_EPS", real_t(-1));
+        op->upwind_eps = (abs_u >= 0) ? abs_u : rel_u * rho * U * h_u * h_u;
+        if (op->upwind_eps > 0)
+            std::printf("upwind switch: Harten band eps = %.6e (rel %g, rho %g, U %g, h %g)\n",
+                        (double)op->upwind_eps, (double)rel_u, (double)rho, (double)U, (double)h_u);
+    }
     op->rho  = rho;
     op->mu   = mu;
     op->geom = (geom_name == "isoparam") ? sfem::CVFEMGeometry::Isoparam : sfem::CVFEMGeometry::Affine;
