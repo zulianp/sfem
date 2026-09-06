@@ -1,4 +1,4 @@
-"""The inexact Hessian action: what it costs, and where it is not inexact.
+"""The inexact matrix-free apply: what it costs, and where it is not inexact.
 
 Projecting the material tangent onto the constants separates it from the
 quadrature sum, leaving a per-element object and a reference tensor that is a
@@ -17,8 +17,8 @@ from codegen.framework.fem.reference_basis import (
     reference_basis,
     supported_elements,
 )
-from codegen.framework.plans.inexact_hessian import (
-    inexact_hessian_plan,
+from codegen.framework.plans.inexact_apply import (
+    inexact_apply_plan,
     projection_is_exact,
     rank_factored_gradient_product,
     reference_gradient_product,
@@ -123,7 +123,7 @@ class ProjectionTest(unittest.TestCase):
         be written directly.  The plan is built by symbolic integration instead
         and must land on the same expression.
         """
-        plan = inexact_hessian_plan("TET4")
+        plan = inexact_apply_plan("TET4")
         basis = reference_basis("TET4")
         gradients = basis.gradients()
         tangent = sp.symbols("S0:45")
@@ -165,7 +165,7 @@ class CompressionTest(unittest.TestCase):
         being constants and every multiply by zero survives into the emitted
         code.  Folded, TET4's action is a third of the operations.
         """
-        plan = inexact_hessian_plan("TET4")
+        plan = inexact_apply_plan("TET4")
         tangent = sp.symbols("S0:45")
         increment = [
             [sp.Symbol("h%d_%d" % (component, node)) for node in range(plan.n_nodes)]
@@ -260,7 +260,7 @@ class StagedActionTest(unittest.TestCase):
         it is only allowed to do that if it computes the same thing.
         """
         for element in ("TRI3", "TET4", "QUAD4"):
-            plan = inexact_hessian_plan(element)
+            plan = inexact_apply_plan(element)
             tangent, increment, names = _symbols(plan)
             stages = staged_action(plan, tangent, increment, names)
             substitution = {}
@@ -288,7 +288,7 @@ class StagedActionTest(unittest.TestCase):
 
     def test_the_staged_cost_is_what_was_measured(self):
         for element, (dense_expected, staged_expected) in sorted(self.COST.items()):
-            plan = inexact_hessian_plan(element)
+            plan = inexact_apply_plan(element)
             tangent, increment, names = _symbols(plan)
             dense = _operations(plan.action(tangent, increment))
             staged = sum(
@@ -425,7 +425,7 @@ class AgainstTheExactActionTest(unittest.TestCase):
                     * volume
                 )
 
-        plan = inexact_hessian_plan("TET4")
+        plan = inexact_apply_plan("TET4")
         packed = [0] * plan.tangent_components
         for i, k, m, n in itertools.product(range(dim), repeat=4):
             packed[plan.tangent_index(i, k, m, n)] = (
