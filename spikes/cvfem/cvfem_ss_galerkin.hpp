@@ -304,8 +304,22 @@ namespace cvfem_ss {
                             const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
                             cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, mg.adj, mg.det, ux, uy, uz, sl,
                                                                            loc, rc, p);
-                            boundary_scs_add_jacobian<false>(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
-                                                             ux, uy, uz, sl, loc);
+                            // The coarse operator must carry the same boundary treatment as
+                            // the fine one. Without the masks here the element-wise Galerkin
+                            // coarse operator closes control volumes by the bounding-box test
+                            // -- missing the step faces -- and keeps p*a on the outflow where
+                            // the fine level has prescribed it, so the coarse problem is a
+                            // different, singular one. The visible symptom is not a wrong
+                            // answer but no answer: the fine Krylov solve performs zero
+                            // iterations.
+                            boundary_scs_add_jacobian<false>(
+                                    rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
+                                    d.macro_face_mask.empty()
+                                            ? -1
+                                            : sscvfem_micro_face_mask((int)d.macro_face_mask[(size_t)e], L, xi, yi, zi),
+                                    d.macro_natural_mask.empty()
+                                            ? 0
+                                            : sscvfem_micro_face_mask((int)d.macro_natural_mask[(size_t)e], L, xi, yi, zi));
 
                             if (!g.fine_constrained.empty()) {
                                 for (int a = 0; a < 8; ++a) {

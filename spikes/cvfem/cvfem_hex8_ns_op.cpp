@@ -619,6 +619,21 @@ namespace sfem {
         // keeps p_i*a on the outlet and has no pin, so it is singular, its solve returns
         // nothing, and the fine-level Krylov iteration silently does zero work.
         ret->natural_outflow_sideset = natural_outflow_sideset;
+
+        // Carry the named sidesets down to the coarse mesh.
+        //
+        // Derefinement builds a new Mesh and does not copy them, so without this a coarse
+        // level cannot find "skin" or "outlet". The copy is exact rather than a
+        // re-derivation: a Sideset stores (parent, lfi) against the MACRO element, and every
+        // level of a semi-structured hierarchy shares the same macro elements, so the same
+        // pairs address the same faces at every level. That level-invariance is the property
+        // that makes sidesets the right carrier here -- a coordinate test would have to be
+        // re-evaluated per level, and a node-indexed set would have to be filtered.
+        auto fine_mesh   = impl_->space->mesh_ptr();
+        auto coarse_mesh = space->mesh_ptr();
+        if (fine_mesh && coarse_mesh) {
+            for (const auto &kv : fine_mesh->sidesets()) coarse_mesh->add_sideset(kv.first, kv.second);
+        }
         return ret;
     }
 
