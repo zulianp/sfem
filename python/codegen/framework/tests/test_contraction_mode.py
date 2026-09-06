@@ -37,8 +37,13 @@ import unittest
 from codegen.framework.symbolic.forms import FormOrder
 
 #: (material, whether its 1-form carries test-function symbols)
+#:
+#: `laplace` used to be the scalar entry here and is written as an energy now,
+#: so `two_phase_flow` stands in for a residual-formulated scalar system.  The
+#: fact being pinned is about the two contraction modes, not about any one
+#: material, and it stops being pinned if the table holds only one kind.
 MATERIALS = (
-    ("laplace", True),
+    ("two_phase_flow", True),
     ("stokes", True),
     ("linear_elasticity", False),
     ("neohookean_ogden", False),

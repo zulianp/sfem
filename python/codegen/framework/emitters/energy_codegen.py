@@ -6065,10 +6065,17 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
                 ),
             )
         )
+    # A field gradient has one row per field component and one column per
+    # spatial direction, so it is `N_FIELD_COMPONENTS * SPATIAL_DIM` entries
+    # strided by SPATIAL_DIM.  Both used to be spelled N_FIELD_COMPONENTS,
+    # which is right only for a displacement: a scalar field in two dimensions
+    # then declared `trial_grad[1]` and wrote index 1, which the compiler will
+    # tell you about under -Warray-bounds and which no material reached until
+    # laplace was written as an energy.
     lines.extend(
         [
-            "%s            scalar_t trial_grad[N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];" % indent,
-            "%s            for (int i = 0; i < N_FIELD_COMPONENTS * N_FIELD_COMPONENTS; ++i) {" % indent,
+            "%s            scalar_t trial_grad[N_FIELD_COMPONENTS * SPATIAL_DIM];" % indent,
+            "%s            for (int i = 0; i < N_FIELD_COMPONENTS * SPATIAL_DIM; ++i) {" % indent,
             "%s                trial_grad[i] = scalar_t(0);" % indent,
             "%s            }" % indent,
         ]
@@ -6080,10 +6087,10 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
             for ref_component in range(dim)
         ]
         lines.append(
-            "%s            trial_grad[trial_component * N_FIELD_COMPONENTS + %d] = (%s) * inv_jacobian_determinant;"
+            "%s            trial_grad[trial_component * SPATIAL_DIM + %d] = (%s) * inv_jacobian_determinant;"
             % (indent, phys_component, " + ".join(terms))
         )
-    lines.append("%s            scalar_t material[N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];" % indent)
+    lines.append("%s            scalar_t material[N_FIELD_COMPONENTS * SPATIAL_DIM];" % indent)
     local_material_lines = []
     _append_cse_array_assignments(
         local_material_lines,
@@ -6130,7 +6137,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     lines.append("%s                    scalar_t entry = scalar_t(0);" % indent)
     for ref_component in range(dim):
         terms = [
-            "material[test_component * N_FIELD_COMPONENTS + %d] * jacobian_adjugate_lane%d"
+            "material[test_component * SPATIAL_DIM + %d] * jacobian_adjugate_lane%d"
             % (k, ref_component * dim + k)
             for k in range(dim)
         ]
@@ -6225,11 +6232,21 @@ def _sfem_soa_hessian_packed_crs_passes(
     use_tensor_product_reference,
     uses_current,
     n_field_components=None,
+    assembly=None,
 ):
     """The multi-pass packed CRS assembly: discover the pattern, then fill it.
 
-    Lifted out of `_sfem_soa_hessian_matrix_assembly_function` unchanged.
+    Lifted out of `_sfem_soa_hessian_matrix_assembly_function` unchanged --
+    except that `row_pointer` and `column_index` were free variables of the
+    enclosing function and did not come across, so the discover pass raised
+    `NameError` the moment anything reached it.  Nothing did while the only
+    materials with a packed CRS variant were vector-valued and took another
+    branch first.  They are parameters now, defaulted the way every other
+    scatter in this file defaults them.
     """
+    assembly = BSRAssemblyPlan() if assembly is None else assembly
+    row_pointer = assembly.row_pointer
+    column_index = assembly.column_index
     n_field_components = dim if n_field_components is None else n_field_components
     if packed_crs_passes:
         packed_fill_impl = "%s_packed_fill_impl" % function_base

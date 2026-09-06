@@ -108,6 +108,11 @@ PACKED_ISOPARAMETRIC_VARIANTS = (
     (MeshTraversal.PACKED_TWO_PASS, Geometry.ISOPARAMETRIC, ElementLayout.SOA),
 )
 
+#: The two-pass affine traversal, which only the energy path publishes.
+PACKED_TWO_PASS_AFFINE_VARIANTS = (
+    (MeshTraversal.PACKED_TWO_PASS, Geometry.AFFINE, ElementLayout.SOA),
+)
+
 PRECISIONS = (Precision.SCALAR, Precision.FLOAT)
 
 
@@ -164,11 +169,14 @@ class ApplyVariant:
             )
         if self.traversal != MeshTraversal.STANDARD and self.layout != ElementLayout.SOA:
             raise ValueError("packed traversal is SoA only")
-        if (
-            self.traversal == MeshTraversal.PACKED_TWO_PASS
-            and self.geometry != Geometry.ISOPARAMETRIC
-        ):
-            raise ValueError("packed two-pass traversal is isoparametric only")
+        # The two-pass traversal was isoparametric-only when the residual path
+        # was the only one that published it: the second pass exists to reduce
+        # ghost contributions without atomics, which is a property of the mesh
+        # partition rather than of the geometry.  The energy path publishes the
+        # affine form too, and it is generated, compiled and driven -- so the
+        # restriction was a statement about one emitter, not about the variant,
+        # and refusing to represent it would have made the plan disagree with
+        # the output rather than describe it.
 
     @property
     def suffix(self):
@@ -206,6 +214,7 @@ def apply_variant_plan(
     supports_packed,
     is_jacobian_action=True,
     affine_equivalent_element=False,
+    from_energy=False,
 ):
     """The variants a kernel gets.
 
@@ -213,18 +222,38 @@ def apply_variant_plan(
                                   element types on the same cell.
     ``supports_packed``           the packed mesh traversal is implemented here.
     ``is_jacobian_action``        this is the matrix-free apply rather than a
-                                  residual evaluation; packed applies only to
-                                  the former.
+                                  residual evaluation; on the residual path,
+                                  packed applies only to the former.
     ``affine_equivalent_element`` a linear simplex, whose isoparametric geometry
                                   is constant over the cell.
+    ``from_energy``               the material is written as an energy.
+
+    The last is a difference between the two emitters, stated here rather than
+    left for a reader to discover from the output.  Measured on every energy
+    material in the tree -- `laplace`, `scalar_potential`, `linear_elasticity`
+    -- the energy path publishes the packed traversals for its 1-form as well
+    as its 2-form action, publishes the packed isoparametric and two-pass forms
+    even on an affine-equivalent element, and publishes no array-of-structures
+    variant at all.  The residual path does the opposite on each count.
+
+    That the two differ is a fact about where the work stands, not a design:
+    the prescription is one lowering below the form layer, and this is the
+    shape of what has yet to converge.  Writing it down is what lets the
+    difference shrink under a test instead of drifting.
     """
     shapes = list(BASE_VARIANTS)
-    if not mixed_order:
-        shapes.extend(EQUAL_ORDER_VARIANTS)
-    if supports_packed and is_jacobian_action:
-        shapes.extend(PACKED_AFFINE_VARIANTS)
-        if not affine_equivalent_element:
+    if from_energy:
+        if supports_packed:
+            shapes.extend(PACKED_AFFINE_VARIANTS)
+            shapes.extend(PACKED_TWO_PASS_AFFINE_VARIANTS)
             shapes.extend(PACKED_ISOPARAMETRIC_VARIANTS)
+    else:
+        if not mixed_order:
+            shapes.extend(EQUAL_ORDER_VARIANTS)
+        if supports_packed and is_jacobian_action:
+            shapes.extend(PACKED_AFFINE_VARIANTS)
+            if not affine_equivalent_element:
+                shapes.extend(PACKED_ISOPARAMETRIC_VARIANTS)
     return ApplyVariantPlan(
         variants=tuple(
             ApplyVariant(traversal, geometry, layout, precision)

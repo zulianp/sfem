@@ -115,7 +115,10 @@ class EveryLocalKernelIsATreeTest(unittest.TestCase):
         try:
             from sfem import gen
 
-            from codegen.framework.materials.laplace import material
+            # A residual-formulated scalar operator on a lowest-order simplex:
+            # `laplace` was one and is written as an energy now, so the form
+            # lives in the tests.  See residual_reference_material.
+            from codegen.framework.tests.residual_reference_material import material
 
             user_input = gen.UserInputStage.create(material, ("TET4",), 8, None)
             form_evaluation = gen._evaluate_forms(user_input)
@@ -132,7 +135,8 @@ class EveryLocalKernelIsATreeTest(unittest.TestCase):
             self.assertIn("scalar_t", " ".join(node.template_params))
 
     def test_migrated_bodies_carry_no_raw_lines(self):
-        """laplace/TET4 takes the gradient-metric path, which is fully IR."""
+        """The reference residual on TET4 takes the gradient-metric path,
+        which is fully IR."""
         seen = []
         original = residual_codegen._print_kernel_function
 
@@ -144,7 +148,10 @@ class EveryLocalKernelIsATreeTest(unittest.TestCase):
         try:
             from sfem import gen
 
-            from codegen.framework.materials.laplace import material
+            # A residual-formulated scalar operator on a lowest-order simplex:
+            # `laplace` was one and is written as an energy now, so the form
+            # lives in the tests.  See residual_reference_material.
+            from codegen.framework.tests.residual_reference_material import material
 
             user_input = gen.UserInputStage.create(material, ("TET4",), 8, None)
             form_evaluation = gen._evaluate_forms(user_input)

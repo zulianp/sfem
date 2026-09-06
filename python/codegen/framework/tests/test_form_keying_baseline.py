@@ -217,9 +217,14 @@ class ComponentBlocksTest(unittest.TestCase):
     def _collection(self, material_name, dim=3):
         import importlib
 
-        material = importlib.import_module(
-            "codegen.framework.materials.%s" % material_name
-        ).material
+        return self._collection_of(
+            importlib.import_module(
+                "codegen.framework.materials.%s" % material_name
+            ).material,
+            dim,
+        )
+
+    def _collection_of(self, material, dim=3):
         system = material.systems.for_dim(dim)
         return system.form_collection(system.equations[0])
 
@@ -258,8 +263,18 @@ class ComponentBlocksTest(unittest.TestCase):
             self.assertIs(block, source)
 
     def test_a_scalar_field_is_its_own_single_component(self):
-        """Laplace has one field and one block, and both keyings agree."""
-        collection = self._collection("laplace")
+        """A scalar residual has one field and one block, both keyings agreeing.
+
+        This was `laplace`, which is written as an energy now -- and an energy
+        reports nothing here, which is the gap the next test pins.  The form
+        lives in the tests so that the residual side keeps being checked; see
+        residual_reference_material.
+        """
+        from codegen.framework.tests.residual_reference_material import (
+            material as reference,
+        )
+
+        collection = self._collection_of(reference)
         one = collection.component_blocks_for(FormOrder.ONE)
         self.assertEqual([block.row_field for block in one], ["u"])
 

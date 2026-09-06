@@ -47,6 +47,13 @@ from codegen.framework.ir.kernel_ast import (
 #: materials, only this one.  A sweep of all fifteen found it on TET4 and TRI3
 #: and nowhere else, which is why the test below names it explicitly rather
 #: than searching.
+def _residual_reference():
+    """The Dirichlet form as a residual; see residual_reference_material."""
+    from codegen.framework.tests.residual_reference_material import material
+
+    return material
+
+
 EXPANDED_MATERIAL = "mooney_rivlin_kelvin_voigt_newmark"
 EXPANDED_ELEMENT = "TET4"
 
@@ -196,6 +203,16 @@ class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
     """Two kernels now, distinguished by the AST name each one registers."""
 
     def _capture(self, material_name, element):
+        import importlib
+
+        return self._capture_material(
+            importlib.import_module(
+                "codegen.framework.materials.%s" % material_name
+            ).material,
+            element,
+        )
+
+    def _capture_material(self, material, element):
         captured = {}
         original = residual_codegen._quadrature_lane_kernel_node
 
@@ -205,13 +222,8 @@ class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
 
         residual_codegen._quadrature_lane_kernel_node = capture
         try:
-            import importlib
-
             from sfem import gen
 
-            material = importlib.import_module(
-                "codegen.framework.materials.%s" % material_name
-            ).material
             user_input = gen.UserInputStage.create(material, (element,), 8, None)
             form_evaluation = gen._evaluate_forms(user_input)
             plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
@@ -232,7 +244,9 @@ class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
         self.assertTrue(any(isinstance(n, BufferDeclNode) for n in statements))
 
     def test_gradient_metric_body_is_nodes(self):
-        captured = self._capture("laplace", "TET4")
+        # A residual-formulated scalar operator on a lowest-order simplex, which
+        # no shipped material is any more; see residual_reference_material.
+        captured = self._capture_material(_residual_reference(), "TET4")
         self.assertIn("simplex_gradient_metric_body", captured)
         self._assert_all_nodes(captured["simplex_gradient_metric_body"])
 
