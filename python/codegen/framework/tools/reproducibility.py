@@ -249,6 +249,12 @@ SCALARS = ("const double", "const float", "const real_t", "const int")
 
 #: How many trial step lengths a `value_steps` kernel is driven with.  More than
 #: one, so the per-step layout is exercised rather than just the first slot.
+#: Elements per pack.  Small enough that a pack's node set fits the uint16_t
+#: the ABI indexes with, and large enough that the gather and scatter through
+#: thread scratch are worth their setup.  SFEM's own packed meshes use a few
+#: thousand; this is sized for the refinement this harness drives.
+PACK_SIZE = 512
+
 N_STEPS = 3
 
 #: Pointer element types that name a field the kernel reads or writes.
@@ -321,27 +327,75 @@ def _bind(params, element, components, block_values=None):
     args = []
     inputs = []
     outputs = []
+    scratch = []
+    # A packed kernel is driven over the renumbered mesh the packed layout
+    # implies, so every mesh-shaped argument comes from there instead.  Which
+    # one it is, is read off the signature rather than guessed: `n_packs` is a
+    # parameter no unpacked kernel has.
+    packed = any(name == "n_packs" for _t, name, _e in params)
+    mesh = "packed.mesh" if packed else "mesh"
     for ctype, name, extent in params:
         if name == "element_type":
             args.append("smesh::ElemType::%s" % element)
         elif name == "nelements":
-            args.append("mesh.nelements")
+            args.append("%s.nelements" % mesh)
         elif name == "nnodes":
-            args.append("mesh.nnodes")
+            args.append("%s.nnodes" % mesh)
+        elif name == "n_packs":
+            args.append("packed.n_packs")
+        elif name == "n_elements_per_pack":
+            args.append("packed.n_elements_per_pack")
+        elif name == "max_nodes_per_pack":
+            args.append("packed.max_nodes_per_pack")
+        elif name == "owned_nodes_ptr":
+            args.append("packed.owned_nodes_ptr.data()")
+        elif name == "n_shared_nodes":
+            args.append("packed.n_shared_nodes.data()")
+        elif name == "ghost_ptr":
+            args.append("packed.ghost_ptr.data()")
+        elif name == "ghost_idx":
+            args.append("packed.ghost_idx.data()")
+        elif name == "n_ghost_entries":
+            args.append("packed.n_ghost_entries")
+        elif name == "n_ghost_reduce_rows":
+            args.append("packed.n_ghost_reduce_rows")
+        elif name == "ghost_reduce_ptr":
+            args.append("packed.ghost_reduce_ptr.data()")
+        elif name == "ghost_reduce_idx":
+            args.append("packed.ghost_reduce_idx.data()")
+        elif name == "ghost_reduce_dest":
+            args.append("packed.ghost_reduce_dest.data()")
+        elif name == "ghost_buf":
+            # Scratch, not an answer: the two-pass apply stages each pack's
+            # ghost contributions here and reduces them into the output in a
+            # second pass.  Sized `components * n_ghost_entries`, which is how
+            # the kernel strides it, and deliberately not digested -- what it
+            # holds afterwards is an implementation detail, and the output it
+            # was reduced into is the thing to compare.
+            scalar = _scalar_type(ctype)
+            buffer = "scratch_%s_%s" % (scalar, name)
+            scratch.append((buffer, scalar, components))
+            args.append(
+                "(%s *)%s.data()" % (scalar, buffer)
+                if ctype.startswith("void")
+                else "%s.data()" % buffer
+            )
+        elif name == "elements" and ctype.startswith("uint16_t **"):
+            args.append("packed.element_ptrs.data()")
         elif name == "elements" and ctype.startswith("idx_t **"):
-            args.append("mesh.element_ptrs.data()")
+            args.append("%s.element_ptrs.data()" % mesh)
         elif name == "points" and "*const *const" in ctype:
-            args.append("mesh.point_ptrs.data()")
+            args.append("%s.point_ptrs.data()" % mesh)
         elif re.fullmatch(r"g_jacobian_adjugate(\d+)", name or ""):
             index = int(re.fullmatch(r"g_jacobian_adjugate(\d+)", name).group(1))
-            args.append("mesh.adjugate[%d].data()" % index)
+            args.append("%s.adjugate[%d].data()" % (mesh, index))
         elif name == "g_jacobian_determinant0":
-            args.append("mesh.determinant.data()")
+            args.append("%s.determinant.data()" % mesh)
         elif re.fullmatch(r"g_geom_metric(\d+)", name or ""):
             index = int(re.fullmatch(r"g_geom_metric(\d+)", name).group(1))
-            args.append("mesh.metric[%d].data()" % index)
+            args.append("%s.metric[%d].data()" % (mesh, index))
         elif name == "g_geom_metric":
-            args.append("mesh.metric_aos.data()")
+            args.append("%s.metric_aos.data()" % mesh)
         elif "PrimitiveType" in ctype:
             args.append(RUNTIME_TYPE_VALUE)
         elif name.endswith("_stride") and ctype == "const ptrdiff_t":
@@ -392,7 +446,7 @@ def _bind(params, element, components, block_values=None):
             raise Unbindable("%s %s" % (ctype, name))
     if not outputs:
         raise Unbindable("no output to digest")
-    return args, inputs, outputs
+    return args, inputs, outputs, scratch, packed
 
 
 # --------------------------------------------------------------------------
@@ -407,6 +461,7 @@ DRIVER_HEAD = r"""
 #include <cstdio>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "sfem_base.hpp"
@@ -766,6 +821,183 @@ static Mesh build_grid_quad4(int n) {
     return m;
 }
 
+// The packed layout, built here rather than borrowed.
+//
+// A packed kernel takes a mesh partitioned into packs of elements, each pack
+// owning a contiguous range of node ids so its gather and scatter run through
+// thread-local scratch instead of through atomics.  `smesh::PackedMesh` builds
+// exactly this, and calling it would be the same move as calling `tet4_fff` --
+// but the driver deliberately links no library: it compiles the generated
+// operators and nothing else, which is what keeps this gate cheap to run.  So
+// the layout is built here, to the contract the generated kernel states:
+//
+//   * elements are partitioned into contiguous ranges of `n_elements_per_pack`
+//   * `owned_nodes_ptr[p] .. owned_nodes_ptr[p+1]` are the global ids the pack
+//     owns, and they are contiguous because the nodes are renumbered to make
+//     them so
+//   * the last `n_shared_nodes[p]` of those are touched by another pack too,
+//     so the kernel scatters them atomically and the rest plainly
+//   * `ghost_idx[ghost_ptr[p] .. ghost_ptr[p+1])` are the global ids the pack
+//     touches but does not own
+//   * `elements[a][e]` is a *pack-local* index: below `n_contiguous` it is an
+//     owned slot, at or above it a ghost slot
+//
+// The renumbering means a packed kernel and an unpacked one are driven over
+// differently numbered meshes.  `to_old` records the permutation so the input
+// can be seeded through it, and then the two are the same problem relabelled:
+// the l1 and l2 digests are permutation-invariant, so a packed kernel must
+// reproduce the unpacked kernel's answer exactly.  That is the check, and it
+// is stronger than running the packed kernel on its own and trusting it.
+struct Packed {
+    Mesh mesh;
+    ptrdiff_t n_packs = 0;
+    ptrdiff_t n_elements_per_pack = 0;
+    ptrdiff_t max_nodes_per_pack = 0;
+    std::vector<std::vector<uint16_t>> elements;
+    std::vector<uint16_t *> element_ptrs;
+    std::vector<ptrdiff_t> owned_nodes_ptr;
+    std::vector<ptrdiff_t> n_shared_nodes;
+    std::vector<ptrdiff_t> ghost_ptr;
+    std::vector<idx_t> ghost_idx;
+    std::vector<idx_t> to_old;
+    // The gather graph a two-pass apply reduces through: row r sums the ghost
+    // buffer slots ghost_reduce_idx[ghost_reduce_ptr[r] .. r+1) into the global
+    // dof ghost_reduce_dest[r].  Derived from the ghost lists above, because it
+    // is the same information grouped by destination instead of by pack.
+    ptrdiff_t n_ghost_entries = 0;
+    ptrdiff_t n_ghost_reduce_rows = 0;
+    std::vector<ptrdiff_t> ghost_reduce_ptr;
+    std::vector<ptrdiff_t> ghost_reduce_idx;
+    std::vector<idx_t> ghost_reduce_dest;
+};
+
+static Packed build_packed(const Mesh &source, ptrdiff_t elements_per_pack) {
+    Packed p;
+    const int n_shape = (int)source.elements.size();
+    p.n_elements_per_pack = elements_per_pack;
+    p.n_packs = (source.nelements + elements_per_pack - 1) / elements_per_pack;
+
+    // Which pack owns each node, and whether more than one touches it.  The
+    // owner is the first pack that reaches it, which is deterministic.
+    std::vector<ptrdiff_t> owner((size_t)source.nnodes, -1);
+    std::vector<char> shared((size_t)source.nnodes, 0);
+    for (ptrdiff_t e = 0; e < source.nelements; ++e) {
+        const ptrdiff_t pack = e / elements_per_pack;
+        for (int a = 0; a < n_shape; ++a) {
+            const idx_t node = source.elements[a][e];
+            if (owner[node] < 0) {
+                owner[node] = pack;
+            } else if (owner[node] != pack) {
+                shared[node] = 1;
+            }
+        }
+    }
+
+    // Renumber: pack by pack, owned-and-private first, owned-and-shared last,
+    // which is the order the kernel's two scatter loops assume.
+    std::vector<idx_t> to_new((size_t)source.nnodes, 0);
+    p.to_old.assign((size_t)source.nnodes, 0);
+    p.owned_nodes_ptr.assign((size_t)p.n_packs + 1, 0);
+    p.n_shared_nodes.assign((size_t)p.n_packs, 0);
+    ptrdiff_t next = 0;
+    for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+        p.owned_nodes_ptr[pack] = next;
+        for (int pass = 0; pass < 2; ++pass) {
+            for (ptrdiff_t node = 0; node < source.nnodes; ++node) {
+                if (owner[node] != pack) continue;
+                if ((int)shared[node] != pass) continue;
+                to_new[node] = (idx_t)next;
+                p.to_old[next] = (idx_t)node;
+                ++next;
+                if (pass == 1) ++p.n_shared_nodes[pack];
+            }
+        }
+    }
+    p.owned_nodes_ptr[p.n_packs] = next;
+
+    // The same mesh under the new numbering.  Geometry is per element and so
+    // is untouched; only the connectivity and the coordinates move.
+    p.mesh.nelements = source.nelements;
+    p.mesh.nnodes = source.nnodes;
+    p.mesh.h = source.h;
+    p.mesh.adjugate = source.adjugate;
+    p.mesh.determinant = source.determinant;
+    p.mesh.metric = source.metric;
+    p.mesh.metric_aos = source.metric_aos;
+    p.mesh.elements.assign((size_t)n_shape, std::vector<idx_t>((size_t)source.nelements));
+    p.mesh.points.assign(source.points.size(), std::vector<geom_t>((size_t)source.nnodes));
+    for (size_t d = 0; d < source.points.size(); ++d)
+        for (ptrdiff_t node = 0; node < source.nnodes; ++node)
+            p.mesh.points[d][to_new[node]] = source.points[d][node];
+    for (int a = 0; a < n_shape; ++a)
+        for (ptrdiff_t e = 0; e < source.nelements; ++e)
+            p.mesh.elements[a][e] = to_new[source.elements[a][e]];
+    for (auto &row : p.mesh.elements) p.mesh.element_ptrs.push_back(row.data());
+    for (auto &row : p.mesh.points) p.mesh.point_ptrs.push_back(row.data());
+
+    // Ghosts, and the pack-local connectivity that indexes them.
+    p.elements.assign((size_t)n_shape, std::vector<uint16_t>((size_t)source.nelements, 0));
+    p.ghost_ptr.assign((size_t)p.n_packs + 1, 0);
+    for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+        const ptrdiff_t e_start = pack * elements_per_pack;
+        const ptrdiff_t e_end = MIN(source.nelements, (pack + 1) * elements_per_pack);
+        const ptrdiff_t owned_begin = p.owned_nodes_ptr[pack];
+        const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned_begin;
+        std::vector<idx_t> ghosts;
+        for (ptrdiff_t e = e_start; e < e_end; ++e)
+            for (int a = 0; a < n_shape; ++a) {
+                const idx_t node = p.mesh.elements[a][e];
+                if (node < owned_begin || node >= owned_begin + n_contiguous)
+                    ghosts.push_back(node);
+            }
+        std::sort(ghosts.begin(), ghosts.end());
+        ghosts.erase(std::unique(ghosts.begin(), ghosts.end()), ghosts.end());
+        p.ghost_ptr[pack + 1] = p.ghost_ptr[pack] + (ptrdiff_t)ghosts.size();
+        for (const idx_t node : ghosts) p.ghost_idx.push_back(node);
+        const ptrdiff_t slots = n_contiguous + (ptrdiff_t)ghosts.size();
+        if (slots > p.max_nodes_per_pack) p.max_nodes_per_pack = slots;
+        if (slots > 65535) {
+            std::fprintf(stderr, "pack %ld needs %ld slots; the ABI indexes with uint16_t\n",
+                         (long)pack, (long)slots);
+            std::exit(1);
+        }
+        for (ptrdiff_t e = e_start; e < e_end; ++e)
+            for (int a = 0; a < n_shape; ++a) {
+                const idx_t node = p.mesh.elements[a][e];
+                if (node >= owned_begin && node < owned_begin + n_contiguous) {
+                    p.elements[a][e] = (uint16_t)(node - owned_begin);
+                } else {
+                    const ptrdiff_t slot =
+                            std::lower_bound(ghosts.begin(), ghosts.end(), node) - ghosts.begin();
+                    p.elements[a][e] = (uint16_t)(n_contiguous + slot);
+                }
+            }
+    }
+    for (auto &row : p.elements) p.element_ptrs.push_back(row.data());
+
+    p.n_ghost_entries = p.ghost_ptr[p.n_packs];
+    std::vector<std::pair<idx_t, ptrdiff_t>> by_destination;
+    by_destination.reserve((size_t)p.n_ghost_entries);
+    for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack)
+        for (ptrdiff_t slot = p.ghost_ptr[pack]; slot < p.ghost_ptr[pack + 1]; ++slot)
+            by_destination.push_back(std::make_pair(p.ghost_idx[slot], slot));
+    std::sort(by_destination.begin(), by_destination.end());
+    p.ghost_reduce_ptr.push_back(0);
+    for (size_t i = 0; i < by_destination.size();) {
+        const idx_t dest = by_destination[i].first;
+        size_t j = i;
+        while (j < by_destination.size() && by_destination[j].first == dest) {
+            p.ghost_reduce_idx.push_back(by_destination[j].second);
+            ++j;
+        }
+        p.ghost_reduce_dest.push_back(dest);
+        p.ghost_reduce_ptr.push_back((ptrdiff_t)p.ghost_reduce_idx.size());
+        i = j;
+    }
+    p.n_ghost_reduce_rows = (ptrdiff_t)p.ghost_reduce_dest.size();
+    return p;
+}
+
 // The node adjacency graph of the mesh, in CRS form: node i is adjacent to
 // every node sharing an element with it, itself included.  This is the sparsity
 // pattern the assembly kernels expect, built from the same connectivity they
@@ -831,6 +1063,25 @@ static void fill_field(std::vector<T> &v, const char *name) {
     }
 }
 
+// The same values, placed through the packed renumbering.  Seeding by index
+// would make the packed mesh a different problem from the unpacked one, and
+// then their digests could not be compared; seeding through `to_old` makes it
+// the same problem relabelled, and the l1/l2 digests are permutation-invariant,
+// so the two must agree exactly.
+template <typename T>
+static void fill_field_permuted(std::vector<T> &v,
+                                const char *name,
+                                const std::vector<idx_t> &to_old,
+                                const int components) {
+    const double s = name_seed(name);
+    for (size_t node = 0; node < to_old.size(); ++node)
+        for (int c = 0; c < components; ++c) {
+            const size_t old_slot = (size_t)to_old[node] * (size_t)components + (size_t)c;
+            v[node * (size_t)components + (size_t)c] =
+                    (T)(std::sin(0.5 + s + 0.125 * (double)old_slot) * (0.25 + s) * FIELD_AMPLITUDE);
+        }
+}
+
 // Material parameters are positive and distinct, and never 1, so a kernel that
 // drops one is visible in the digest rather than silently correct.
 static double material_scalar(const std::string &name) {
@@ -865,7 +1116,23 @@ static void report_rate(const char *name, double seconds, ptrdiff_t nnodes) {
 """
 
 
-def _call_block(name, args, inputs, outputs, repeats=0):
+def _fill_call(packed, buffer, param, components):
+    """How one input buffer is seeded.
+
+    A packed kernel is driven over a renumbered mesh, so its inputs are placed
+    through the permutation; that keeps the two layouts the same problem and
+    makes their digests comparable.
+    """
+    if packed:
+        return 'fill_field_permuted(%s, "%s", packed.to_old, %d)' % (
+            buffer,
+            param,
+            components,
+        )
+    return 'fill_field(%s, "%s")' % (buffer, param)
+
+
+def _call_block(name, args, inputs, outputs, repeats=0, packed=False, scratch=()):
     # Announce the kernel on stderr before running it.  A driver that dies
     # silently -- and one did, with SIGABRT and no message -- otherwise names
     # only the last kernel that *finished*, which is the one before the
@@ -878,8 +1145,16 @@ def _call_block(name, args, inputs, outputs, repeats=0):
         if extent:
             for slot in range(extent):
                 lines.append(
-                    "        std::vector<%s> %s_%d(nodes * %d); fill_field(%s_%d, \"%s_%d\");"
-                    % (scalar, buffer, slot, components, buffer, slot, param, slot)
+                    "        std::vector<%s> %s_%d(nodes * %d); %s;"
+                    % (
+                        scalar,
+                        buffer,
+                        slot,
+                        components,
+                        _fill_call(
+                            packed, "%s_%d" % (buffer, slot), "%s_%d" % (param, slot), components
+                        ),
+                    )
                 )
             lines.append(
                 "        const %s *const %s[%d] = {%s};"
@@ -892,9 +1167,14 @@ def _call_block(name, args, inputs, outputs, repeats=0):
             )
         else:
             lines.append(
-                "        std::vector<%s> %s(nodes * %d); fill_field(%s, \"%s\");"
-                % (scalar, buffer, components, buffer, param)
+                "        std::vector<%s> %s(nodes * %d); %s;"
+                % (scalar, buffer, components, _fill_call(packed, buffer, param, components))
             )
+    for buffer, scalar, components in scratch:
+        lines.append(
+            "        std::vector<%s> %s((size_t)packed.n_ghost_entries * %d, (%s)0);"
+            % (scalar, buffer, components, scalar)
+        )
     for buffer, scalar, _param, components, extent, length in outputs:
         if length is not None:
             lines.append(
@@ -979,6 +1259,11 @@ def _driver_source(declarations, blocks, refine, builder):
             % (builder, refine),
             "    const Graph graph = build_graph(mesh);",
             "    const size_t nodes = (size_t)mesh.nnodes;",
+            "    // The same mesh in the layout the packed kernels require.  Built",
+            "    // unconditionally: it costs one pass over the connectivity, and a",
+            "    // driver that builds it only when something asks would need to know",
+            "    // which kernels those are before it has bound them.",
+            "    Packed packed = build_packed(mesh, %d);" % PACK_SIZE,
             "",
             "\n\n".join(blocks),
             "    return 0;",
@@ -1096,7 +1381,7 @@ def run_material(root, generated, material, refine, compiler, verbose=False, rep
                 if "_bsr_" in entry["name"]
                 else None
             )
-            args, inputs, outputs = _bind(
+            args, inputs, outputs, scratch, packed = _bind(
                 params,
                 grid_element,
                 n_fields if interleaved else 1,
@@ -1106,7 +1391,11 @@ def run_material(root, generated, material, refine, compiler, verbose=False, rep
             skipped.append((entry["name"], str(reason)))
             continue
         declarations.append(entry["declaration"].replace('extern "C" ', "").strip())
-        blocks.append(_call_block(entry["name"], args, inputs, outputs, repeats))
+        blocks.append(
+            _call_block(
+                entry["name"], args, inputs, outputs, repeats, packed, scratch
+            )
+        )
 
     if not blocks:
         return {}, {}, skipped
@@ -1239,6 +1528,37 @@ def _geometry_parity(measured):
         if "_affine_" not in name:
             continue
         twin = name.replace("_affine_", "_isoparametric_")
+        if twin not in measured:
+            continue
+        tolerance = _parity_tolerance(name)
+        worst = 0.0
+        for key in ("l1", "l2"):
+            a, b = measured[name][key], measured[twin][key]
+            scale = max(abs(a), abs(b), 1e-30)
+            worst = max(worst, abs(a - b) / scale)
+        if worst > tolerance:
+            disagreements.append((name, twin, worst, tolerance))
+    return disagreements
+
+
+def _packed_parity(measured):
+    """Packed kernels that disagree with the unpacked kernel they mirror.
+
+    A packed kernel is the same mathematics over a mesh partitioned into packs,
+    gathered through thread-local scratch and scattered back.  Driven over the
+    renumbered mesh with its input placed through the same permutation, it is
+    the same problem relabelled, and the l1/l2 digests are permutation-invariant
+    -- so it must reproduce the unpacked answer, not merely be close to it.
+
+    This is what makes the packed layout the harness builds checkable at all.
+    Nothing else validates the partition, the ghost lists or the pack-local
+    indices; a wrong ghost list still runs and still returns a number.
+    """
+    disagreements = []
+    for name in sorted(measured):
+        if "_packed_" not in name:
+            continue
+        twin = name.replace("_packed_", "_")
         if twin not in measured:
             continue
         tolerance = _parity_tolerance(name)
@@ -1433,6 +1753,26 @@ def main(argv=None):
     )
     if parity_pairs:
         print("affine/isoparametric parity holds for %d pairs" % parity_pairs)
+
+    packed_disagreements = _packed_parity(measured)
+    if packed_disagreements:
+        sys.stderr.write(
+            "%d packed kernels disagree with the unpacked kernel they mirror:\n"
+            % len(packed_disagreements)
+        )
+        for name, twin, worst, tolerance in packed_disagreements:
+            sys.stderr.write(
+                "    %s vs %s  rel=%.3e  tolerance=%.0e\n"
+                % (name, twin, worst, tolerance)
+            )
+        return 1
+    packed_pairs = sum(
+        1
+        for name in measured
+        if "_packed_" in name and name.replace("_packed_", "_") in measured
+    )
+    if packed_pairs:
+        print("packed/unpacked parity holds for %d pairs" % packed_pairs)
 
     if args.record:
         merged = dict(recorded)
