@@ -2,10 +2,217 @@
   "laplace": {
     "2": {
       "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    }
+  },
+  "linear_elasticity": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    }
+  },
+  "modified_mooney_rivlin": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    }
+  },
+  "mooney_rivlin": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    }
+  },
+  "mooney_rivlin_kelvin_voigt_newmark": {
+    "2": {
+      "elastic": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      },
+      "viscous": {
         "jacobian_action_blocks": [
           [
-            "u",
-            "u"
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
           ]
         ],
         "kind": "residual",
@@ -34,7 +241,185 @@
           }
         },
         "residual_fields": [
-          "u"
+          "u0",
+          "u1"
+        ]
+      }
+    },
+    "3": {
+      "elastic": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      },
+      "viscous": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "u2"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "u2"
+          ],
+          [
+            "u2",
+            "u0"
+          ],
+          [
+            "u2",
+            "u1"
+          ],
+          [
+            "u2",
+            "u2"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "u"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1",
+          "u2"
+        ]
+      }
+    }
+  },
+  "navier_stokes": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "p"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "p"
+          ],
+          [
+            "p",
+            "u0"
+          ],
+          [
+            "p",
+            "u1"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ],
+              [
+                "p",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "u"
+              ],
+              [
+                "u",
+                "p"
+              ],
+              [
+                "p",
+                "u"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1",
+          "p"
         ]
       }
     },
@@ -42,8 +427,179 @@
       "": {
         "jacobian_action_blocks": [
           [
-            "u",
-            "u"
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "u2"
+          ],
+          [
+            "u0",
+            "p"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "u2"
+          ],
+          [
+            "u1",
+            "p"
+          ],
+          [
+            "u2",
+            "u0"
+          ],
+          [
+            "u2",
+            "u1"
+          ],
+          [
+            "u2",
+            "u2"
+          ],
+          [
+            "u2",
+            "p"
+          ],
+          [
+            "p",
+            "u0"
+          ],
+          [
+            "p",
+            "u1"
+          ],
+          [
+            "p",
+            "u2"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ],
+              [
+                "p",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "u"
+              ],
+              [
+                "u",
+                "p"
+              ],
+              [
+                "p",
+                "u"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1",
+          "u2",
+          "p"
+        ]
+      }
+    }
+  },
+  "neohookean_ogden": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    }
+  },
+  "neumann": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
           ]
         ],
         "kind": "residual",
@@ -58,10 +614,272 @@
             "form": true
           },
           "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1"
+        ]
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "u2"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "u2"
+          ],
+          [
+            "u2",
+            "u0"
+          ],
+          [
+            "u2",
+            "u1"
+          ],
+          [
+            "u2",
+            "u2"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
             "blocks": [
               [
                 "u",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1",
+          "u2"
+        ]
+      }
+    }
+  },
+  "neumann_general": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1"
+        ]
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "u2"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "u2"
+          ],
+          [
+            "u2",
+            "u0"
+          ],
+          [
+            "u2",
+            "u1"
+          ],
+          [
+            "u2",
+            "u2"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1",
+          "u2"
+        ]
+      }
+    }
+  },
+  "poro_hyperelasticity": {
+    "2": {
+      "poro": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "p"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "p"
+          ],
+          [
+            "p",
+            "u0"
+          ],
+          [
+            "p",
+            "u1"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ],
+              [
+                "p",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "p"
+              ],
+              [
+                "p",
                 "u"
+              ],
+              [
+                "p",
+                "p"
               ]
             ],
             "form": true
@@ -72,12 +890,209 @@
           }
         },
         "residual_fields": [
-          "u"
+          "u0",
+          "u1",
+          "p"
         ]
+      },
+      "solid": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    },
+    "3": {
+      "poro": {
+        "jacobian_action_blocks": [
+          [
+            "u0",
+            "u0"
+          ],
+          [
+            "u0",
+            "u1"
+          ],
+          [
+            "u0",
+            "u2"
+          ],
+          [
+            "u0",
+            "p"
+          ],
+          [
+            "u1",
+            "u0"
+          ],
+          [
+            "u1",
+            "u1"
+          ],
+          [
+            "u1",
+            "u2"
+          ],
+          [
+            "u1",
+            "p"
+          ],
+          [
+            "u2",
+            "u0"
+          ],
+          [
+            "u2",
+            "u1"
+          ],
+          [
+            "u2",
+            "u2"
+          ],
+          [
+            "u2",
+            "p"
+          ],
+          [
+            "p",
+            "u0"
+          ],
+          [
+            "p",
+            "u1"
+          ],
+          [
+            "p",
+            "u2"
+          ],
+          [
+            "p",
+            "p"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "u",
+                null
+              ],
+              [
+                "p",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "u",
+                "p"
+              ],
+              [
+                "p",
+                "u"
+              ],
+              [
+                "p",
+                "p"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "u0",
+          "u1",
+          "u2",
+          "p"
+        ]
+      },
+      "solid": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
       }
     }
   },
-  "linear_elasticity": {
+  "saint_venant_kirchhoff": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [],
+        "kind": "energy",
+        "orders": {
+          "ONE": {
+            "blocks": [],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": []
+      }
+    }
+  },
+  "scalar_potential": {
     "2": {
       "": {
         "jacobian_action_blocks": [],
@@ -316,6 +1331,142 @@
           "u1",
           "u2",
           "p"
+        ]
+      }
+    }
+  },
+  "two_phase_flow": {
+    "2": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "p_w",
+            "p_w"
+          ],
+          [
+            "p_w",
+            "p_c"
+          ],
+          [
+            "p_c",
+            "p_w"
+          ],
+          [
+            "p_c",
+            "p_c"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "p_w",
+                null
+              ],
+              [
+                "p_c",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "p_w",
+                "p_w"
+              ],
+              [
+                "p_w",
+                "p_c"
+              ],
+              [
+                "p_c",
+                "p_w"
+              ],
+              [
+                "p_c",
+                "p_c"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "p_w",
+          "p_c"
+        ]
+      }
+    },
+    "3": {
+      "": {
+        "jacobian_action_blocks": [
+          [
+            "p_w",
+            "p_w"
+          ],
+          [
+            "p_w",
+            "p_c"
+          ],
+          [
+            "p_c",
+            "p_w"
+          ],
+          [
+            "p_c",
+            "p_c"
+          ]
+        ],
+        "kind": "residual",
+        "orders": {
+          "ONE": {
+            "blocks": [
+              [
+                "p_w",
+                null
+              ],
+              [
+                "p_c",
+                null
+              ]
+            ],
+            "form": true
+          },
+          "TWO": {
+            "blocks": [
+              [
+                "p_w",
+                "p_w"
+              ],
+              [
+                "p_w",
+                "p_c"
+              ],
+              [
+                "p_c",
+                "p_w"
+              ],
+              [
+                "p_c",
+                "p_c"
+              ]
+            ],
+            "form": true
+          },
+          "ZERO": {
+            "blocks": [],
+            "form": true
+          }
+        },
+        "residual_fields": [
+          "p_w",
+          "p_c"
         ]
       }
     }

@@ -32,9 +32,9 @@ from codegen.framework.plans.apply_variants import apply_variant_plan
 #: (material, element, plan inputs) covering each dimension of the rule.
 CASES = (
     ("laplace", "HEX8", dict(mixed_order=False, supports_packed=True,
-                             affine_equivalent_element=False)),
+                             affine_equivalent_element=False, from_energy=True)),
     ("laplace", "TET4", dict(mixed_order=False, supports_packed=True,
-                             affine_equivalent_element=True)),
+                             affine_equivalent_element=True, from_energy=True)),
     ("two_phase_flow", "TRI3", dict(mixed_order=False, supports_packed=False,
                                     affine_equivalent_element=True)),
     ("stokes", None, dict(mixed_order=True, supports_packed=False,
@@ -85,7 +85,7 @@ class ApplyVariantsMatchGenerationTest(unittest.TestCase):
         if not emitted:
             self.skipTest("%s emits no %s apply kernels" % (material_name, form))
         plan = apply_variant_plan(
-            is_jacobian_action=(form == "jacobian_action"), **plan_inputs
+            is_jacobian_action=(form in self.TWO_FORM_ACTION_NAMES), **plan_inputs
         )
         expected = set(plan.suffixes())
         self.assertEqual(
@@ -102,15 +102,40 @@ class ApplyVariantsMatchGenerationTest(unittest.TestCase):
             ),
         )
 
+    #: The 1-form and the 2-form action are named for the formulation the
+    #: material was written in: a residual publishes `residual` and
+    #: `jacobian_action`, an energy publishes `gradient` and `apply`.  Both
+    #: names are checked so that a material changing formulation moves from one
+    #: to the other rather than falling through the skip -- which is what
+    #: `laplace` did the moment it was written as an energy, taking four
+    #: subtests quietly out of the suite.
+    ONE_FORM_NAMES = ("residual", "gradient")
+    TWO_FORM_ACTION_NAMES = ("jacobian_action", "apply")
+
+    def _check_any(self, material_name, element, forms, plan_inputs):
+        for form in forms:
+            files = _generate(material_name, element)
+            if _emitted_suffixes(files, form):
+                self._check(material_name, element, form, plan_inputs)
+                return
+        self.skipTest(
+            "%s emits no apply kernels under any of %s"
+            % (material_name, ", ".join(forms))
+        )
+
     def test_jacobian_action_variants_match_the_plan(self):
         for material_name, element, plan_inputs in CASES:
             with self.subTest(material=material_name, element=element):
-                self._check(material_name, element, "jacobian_action", plan_inputs)
+                self._check_any(
+                    material_name, element, self.TWO_FORM_ACTION_NAMES, plan_inputs
+                )
 
     def test_residual_variants_match_the_plan(self):
         for material_name, element, plan_inputs in CASES:
             with self.subTest(material=material_name, element=element):
-                self._check(material_name, element, "residual", plan_inputs)
+                self._check_any(
+                    material_name, element, self.ONE_FORM_NAMES, plan_inputs
+                )
 
 
 if __name__ == "__main__":

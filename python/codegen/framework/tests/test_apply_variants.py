@@ -42,11 +42,20 @@ class ApplyVariantInvariantsTest(unittest.TestCase):
                 MeshTraversal.PACKED, Geometry.ISOPARAMETRIC, ElementLayout.AOS, Precision.SCALAR
             )
 
-    def test_packed_two_pass_is_isoparametric_only(self):
-        with self.assertRaises(ValueError):
-            ApplyVariant(
-                MeshTraversal.PACKED_TWO_PASS, Geometry.AFFINE, ElementLayout.SOA, Precision.SCALAR
+    def test_packed_two_pass_is_available_on_both_geometries(self):
+        """The second pass reduces ghosts, which the geometry does not decide.
+
+        This asserted that an affine two-pass variant could not exist, which
+        was true of the residual emitter and never of the variant: the energy
+        path generates, compiles and drives one.  A plan that refuses to
+        represent what the generator emits disagrees with the output instead of
+        describing it.
+        """
+        for geometry in (Geometry.AFFINE, Geometry.ISOPARAMETRIC):
+            variant = ApplyVariant(
+                MeshTraversal.PACKED_TWO_PASS, geometry, ElementLayout.SOA, Precision.SCALAR
             )
+            self.assertIs(variant.geometry, geometry)
 
     def test_every_generated_plan_satisfies_the_invariants(self):
         """Construction validates, so a bad combination cannot reach a plan."""

@@ -34,9 +34,10 @@ MATERIALS = os.path.join(
 )
 
 #: Every material written as a residual.  `neumann_general` is absent because
-#: it does not expose a `systems` attribute to import from.
+#: it does not expose a `systems` attribute to import from, and `laplace` is
+#: absent because it is written as an energy now -- which is why the test below
+#: builds its residual form rather than importing one.
 RESIDUAL_MATERIALS = (
-    "laplace",
     "stokes",
     "navier_stokes",
     "two_phase_flow",
@@ -73,7 +74,27 @@ class FluxFormTest(unittest.TestCase):
                         )
 
     def test_the_same_operator_written_both_ways_has_one_flux(self):
-        system, residual = _collection("laplace", -1)
+        # The Dirichlet form as a residual, built here rather than imported.
+        # It used to come from `laplace`, which is written as an energy now --
+        # and the check is worth keeping precisely because no material states
+        # the same operator both ways any more, so nothing else would notice
+        # the two front ends drifting apart.
+        from sfem import gen
+
+        dim = 3
+        builder = gen.EquationSystemBuilder(dim)
+        with gen.geometric_dimension_context(dim):
+            u = gen.Function(gen.FunctionSpace(gen.FiniteElement("Lagrange", degree=1)), "u")
+            v = gen.TestFunction(
+                gen.FunctionSpace(gen.FiniteElement("Lagrange", degree=1)), name="u_test"
+            )
+            builder.add_residual(
+                "",
+                gen.material_parameter("kappa") * gen.inner(gen.grad(u), gen.grad(v)),
+                fields=(u,),
+            )
+        system = builder.build()
+        residual = system.form_collection(list(system.equations)[0])
         from_residual = flux_form_from_residual(
             residual.residual_expressions, residual.residual_fields, system.dim
         )
@@ -96,10 +117,13 @@ class FluxFormTest(unittest.TestCase):
         self.assertFalse(from_residual.has_source)
 
     def test_a_pure_diffusion_has_no_source_and_a_mixed_form_does(self):
-        system, laplace = _collection("laplace", -1)
-        self.assertFalse(
+        system, neumann = _collection("neumann", -1)
+        # A traction contracts against the test *value* and nothing else, so it
+        # is all source and no flux -- the opposite extreme from a diffusion,
+        # and the one still available as a residual.
+        self.assertTrue(
             flux_form_from_residual(
-                laplace.residual_expressions, laplace.residual_fields, system.dim
+                neumann.residual_expressions, neumann.residual_fields, system.dim
             ).has_source
         )
         system, stokes = _collection("stokes", -1)

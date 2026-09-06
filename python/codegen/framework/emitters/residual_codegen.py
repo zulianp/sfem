@@ -4053,6 +4053,13 @@ def _operator_source(
         "#include <cstdio>",
         "",
     ]
+    # SFEM's hand-written Laplacian kernels, delegated to here.  `laplace` is
+    # written as an energy now and no longer reaches this emitter, so these
+    # three branches take no material in the tree today -- and they stay
+    # anyway, deliberately.  They are the reference the generated kernels are
+    # measured against, in answers and in throughput, and the packed path has
+    # a gap still to close; deleting the thing you are meant to compare with is
+    # how a performance investigation loses its baseline.
     if prefix == "laplace_tet4":
         lines.append('#include "tet4_laplacian_inline_cpu.hpp"')
         lines.append("")

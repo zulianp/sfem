@@ -1,5 +1,45 @@
 {
   "element=QUAD4 refine=3": {
+    "laplace_apply_2d_affine_mesh_soa": {
+      "l1": 0.1149619212445,
+      "l2": 0.03615827765525,
+      "material": "laplace"
+    },
+    "laplace_apply_2d_isoparametric_mesh_soa": {
+      "l1": 0.1149619206974,
+      "l2": 0.03615827770774,
+      "material": "laplace"
+    },
+    "laplace_apply_packed_2d_affine_mesh_soa": {
+      "l1": 0.1149619212445,
+      "l2": 0.03615827765525,
+      "material": "laplace"
+    },
+    "laplace_apply_packed_two_pass_2d_affine_mesh_soa": {
+      "l1": 0.1149619212445,
+      "l2": 0.03615827765525,
+      "material": "laplace"
+    },
+    "laplace_gradient_2d_affine_mesh_soa": {
+      "l1": 0.06386286835221,
+      "l2": 0.0176099373805,
+      "material": "laplace"
+    },
+    "laplace_gradient_2d_isoparametric_mesh_soa": {
+      "l1": 0.0638628666853,
+      "l2": 0.01760993698927,
+      "material": "laplace"
+    },
+    "laplace_gradient_packed_2d_affine_mesh_soa": {
+      "l1": 0.06386286835221,
+      "l2": 0.0176099373805,
+      "material": "laplace"
+    },
+    "laplace_gradient_packed_two_pass_2d_affine_mesh_soa": {
+      "l1": 0.06386286835221,
+      "l2": 0.0176099373805,
+      "material": "laplace"
+    },
     "laplace_jacobian_action_2d_affine_mesh_soa": {
       "l1": 0.1384137781028,
       "l2": 0.04301143701488,
@@ -28,6 +68,26 @@
     "laplace_jacobian_action_packed_two_pass_2d_isoparametric_mesh_soa": {
       "l1": 0.1384137772989,
       "l2": 0.04301143708004,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_2d_affine_mesh_soa": {
+      "l1": 0.0003704514306261,
+      "l2": 9.477227047524e-05,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_2d_isoparametric_mesh_soa": {
+      "l1": 0.0003704514200982,
+      "l2": 9.477226824868e-05,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_packed_2d_affine_mesh_soa": {
+      "l1": 0.0003704514306261,
+      "l2": 9.477227047524e-05,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_packed_2d_isoparametric_mesh_soa": {
+      "l1": 0.0003704514200982,
+      "l2": 9.477226824868e-05,
       "material": "laplace"
     },
     "laplace_residual_2d_affine_mesh_soa": {
@@ -537,6 +597,46 @@
     }
   },
   "element=TET4 refine=3": {
+    "laplace_apply_3d_affine_mesh_soa": {
+      "l1": 0.8018239090978,
+      "l2": 0.1251364932314,
+      "material": "laplace"
+    },
+    "laplace_apply_3d_isoparametric_mesh_soa": {
+      "l1": 0.8018239327058,
+      "l2": 0.125136496646,
+      "material": "laplace"
+    },
+    "laplace_apply_packed_3d_affine_mesh_soa": {
+      "l1": 0.8018239145985,
+      "l2": 0.1251364939935,
+      "material": "laplace"
+    },
+    "laplace_apply_packed_two_pass_3d_affine_mesh_soa": {
+      "l1": 0.8018239145985,
+      "l2": 0.1251364939935,
+      "material": "laplace"
+    },
+    "laplace_gradient_3d_affine_mesh_soa": {
+      "l1": 0.4379081003031,
+      "l2": 0.06599697249659,
+      "material": "laplace"
+    },
+    "laplace_gradient_3d_isoparametric_mesh_soa": {
+      "l1": 0.4379080959156,
+      "l2": 0.06599697213785,
+      "material": "laplace"
+    },
+    "laplace_gradient_packed_3d_affine_mesh_soa": {
+      "l1": 0.4379080868277,
+      "l2": 0.06599697094081,
+      "material": "laplace"
+    },
+    "laplace_gradient_packed_two_pass_3d_affine_mesh_soa": {
+      "l1": 0.4379080868277,
+      "l2": 0.06599697094081,
+      "material": "laplace"
+    },
     "laplace_jacobian_action_3d_affine_mesh_soa": {
       "l1": 0.9223948683443,
       "l2": 0.1460796841062,
@@ -565,6 +665,26 @@
     "laplace_jacobian_action_packed_3d_affine_mesh_soa": {
       "l1": 0.9223948683443,
       "l2": 0.1460796841062,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_3d_affine_mesh_soa": {
+      "l1": 0.01329653250869,
+      "l2": 0.0006939880914078,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_3d_isoparametric_mesh_soa": {
+      "l1": 0.01329653279013,
+      "l2": 0.0006939881061598,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_packed_3d_affine_mesh_soa": {
+      "l1": 0.01329653250869,
+      "l2": 0.0006939880914078,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_packed_3d_isoparametric_mesh_soa": {
+      "l1": 0.01329653279013,
+      "l2": 0.0006939881061598,
       "material": "laplace"
     },
     "laplace_residual_3d_affine_mesh_soa": {
@@ -1084,6 +1204,46 @@
     }
   },
   "element=TRI3 refine=3": {
+    "laplace_apply_2d_affine_mesh_soa": {
+      "l1": 0.1174201333578,
+      "l2": 0.03649618245755,
+      "material": "laplace"
+    },
+    "laplace_apply_2d_isoparametric_mesh_soa": {
+      "l1": 0.1174201327126,
+      "l2": 0.036496182286,
+      "material": "laplace"
+    },
+    "laplace_apply_packed_2d_affine_mesh_soa": {
+      "l1": 0.1174201355107,
+      "l2": 0.03649618310231,
+      "material": "laplace"
+    },
+    "laplace_apply_packed_two_pass_2d_affine_mesh_soa": {
+      "l1": 0.1174201355107,
+      "l2": 0.03649618310231,
+      "material": "laplace"
+    },
+    "laplace_gradient_2d_affine_mesh_soa": {
+      "l1": 0.0638628667153,
+      "l2": 0.01781260917268,
+      "material": "laplace"
+    },
+    "laplace_gradient_2d_isoparametric_mesh_soa": {
+      "l1": 0.0638628666853,
+      "l2": 0.01781260912201,
+      "material": "laplace"
+    },
+    "laplace_gradient_packed_2d_affine_mesh_soa": {
+      "l1": 0.06386286740033,
+      "l2": 0.0178126093457,
+      "material": "laplace"
+    },
+    "laplace_gradient_packed_two_pass_2d_affine_mesh_soa": {
+      "l1": 0.06386286740033,
+      "l2": 0.0178126093457,
+      "material": "laplace"
+    },
     "laplace_jacobian_action_2d_affine_mesh_soa": {
       "l1": 0.1425845638565,
       "l2": 0.04395885534688,
@@ -1112,6 +1272,26 @@
     "laplace_jacobian_action_packed_2d_affine_mesh_soa": {
       "l1": 0.1425845638565,
       "l2": 0.04395885534688,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_2d_affine_mesh_soa": {
+      "l1": 0.0003790615126957,
+      "l2": 6.833585457052e-05,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_2d_isoparametric_mesh_soa": {
+      "l1": 0.0003790615080287,
+      "l2": 6.833585366465e-05,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_packed_2d_affine_mesh_soa": {
+      "l1": 0.0003790615126957,
+      "l2": 6.833585457052e-05,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_packed_2d_isoparametric_mesh_soa": {
+      "l1": 0.0003790615080287,
+      "l2": 6.833585366465e-05,
       "material": "laplace"
     },
     "laplace_residual_2d_affine_mesh_soa": {
@@ -1641,6 +1821,16 @@
       "l2": 0.1131223293009,
       "material": "laplace"
     },
+    "laplace_apply_packed_3d_affine_mesh_soa": {
+      "l1": 0.7296043781552,
+      "l2": 0.1131223310491,
+      "material": "laplace"
+    },
+    "laplace_apply_packed_two_pass_3d_affine_mesh_soa": {
+      "l1": 0.7296043781552,
+      "l2": 0.1131223310491,
+      "material": "laplace"
+    },
     "laplace_gradient_3d_affine_mesh_soa": {
       "l1": 0.3950076460791,
       "l2": 0.05942431530075,
@@ -1649,6 +1839,16 @@
     "laplace_gradient_3d_isoparametric_mesh_soa": {
       "l1": 0.3950076479677,
       "l2": 0.05942431577605,
+      "material": "laplace"
+    },
+    "laplace_gradient_packed_3d_affine_mesh_soa": {
+      "l1": 0.3950076460791,
+      "l2": 0.05942431530075,
+      "material": "laplace"
+    },
+    "laplace_gradient_packed_two_pass_3d_affine_mesh_soa": {
+      "l1": 0.3950076460791,
+      "l2": 0.05942431530075,
       "material": "laplace"
     },
     "laplace_jacobian_action_3d_affine_mesh_soa": {
@@ -1687,6 +1887,16 @@
       "material": "laplace"
     },
     "laplace_objective_steps_3d_isoparametric_mesh_soa": {
+      "l1": 0.01237805458029,
+      "l2": 0.0016099557489,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_packed_3d_affine_mesh_soa": {
+      "l1": 0.01237805454905,
+      "l2": 0.001609955738767,
+      "material": "laplace"
+    },
+    "laplace_objective_steps_packed_3d_isoparametric_mesh_soa": {
       "l1": 0.01237805458029,
       "l2": 0.0016099557489,
       "material": "laplace"
