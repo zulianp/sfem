@@ -2459,10 +2459,37 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "mesh generation failed\n");
         return EXIT_FAILURE;
     }
+    // Named sidesets, built once on the MACRO mesh and carried from there.
+    //
+    // These are the specification of the boundary; the per-element bitmask the kernels read
+    // is the compiled form of them. Building them here has three consequences worth stating.
+    //
+    // The outlet is named rather than found by a coordinate test. Selecting it by comparing
+    // corners against x = Lx was the same box-thinking that makes hex8_face_on_domain wrong
+    // on this geometry -- it happens to work because this outlet is a plane, and would not on
+    // one that is not.
+    //
+    // The Dirichlet set and the control-volume closure are then derived from the *same*
+    // objects rather than from two independent tests. cvfem_ns_channel_case.hpp documents the
+    // invariant that the two must decide the same thing, "and if they disagree a node gets a
+    // closed control volume without a boundary condition, or the reverse"; one source removes
+    // the possibility instead of testing for it.
+    //
+    // And they are level-invariant. Sideset stores (parent, lfi) on the macro element, which
+    // a semi-structured level change leaves untouched, so every multigrid level compiles its
+    // mask from these same sidesets instead of re-deriving the skin -- which cost an
+    // element-adjacency pass per level.
+    std::shared_ptr<smesh::Sideset> step_skin, step_outlet;
     if (want_step) {
-        // The coordinate boundary test cannot see the step faces, so the topological mask is
-        // not optional here -- without it those control volumes are never closed and mass is
-        // silently not conserved along the step.
+        step_skin = smesh::skin_sideset(mesh);
+        auto outs = smesh::Sideset::create_from_plane(mesh, 1, 0, 0, (smesh::geom_t)Lx, 1e-6);
+        if (!step_skin || outs.empty()) {
+            std::fprintf(stderr, "step: could not build the boundary sidesets\n");
+            return EXIT_FAILURE;
+        }
+        step_outlet = outs.front();
+        std::printf("step: sidesets  skin %td faces, outlet %td faces\n",
+                    (ptrdiff_t)step_skin->parent()->size(), (ptrdiff_t)step_outlet->parent()->size());
         setenv("SFEM_BOUNDARY_MASK", "1", 0);
     }
     // SFEM_ELEMENT_REFINE_LEVEL > 1 turns the mesh semi-structured: the cells above become
@@ -2473,6 +2500,13 @@ int main(int argc, char **argv) {
     const int refine_level = smesh::Env::read<int>("SFEM_ELEMENT_REFINE_LEVEL", 1);
     if (refine_level > 1) {
         mesh = smesh::to_semistructured(refine_level, mesh, true, false);
+        // to_semistructured builds a new Mesh and does not copy sidesets. The macro elements
+        // are the same and (parent, lfi) refers to them, so re-attaching is exact rather than
+        // a re-derivation.
+        if (mesh && step_skin) {
+            mesh->add_sideset("skin", step_skin);
+            mesh->add_sideset("outlet", step_outlet);
+        }
         if (!mesh) {
             std::fprintf(stderr, "to_semistructured failed for level %d\n", refine_level);
             return EXIT_FAILURE;
@@ -2490,9 +2524,7 @@ int main(int argc, char **argv) {
         // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
         // the pressure gauge -- so the pin must come off with it, or the system is
         // over-determined.
-        op->natural_outflow_plane = "x";
-        op->natural_outflow_axis  = 0;
-        op->natural_outflow_value = Lx;
+        op->natural_outflow_sideset = "outlet";
     }
     if (op->initialize() != SFEM_SUCCESS) return EXIT_FAILURE;
     // The Newton loop below evaluates the residual immediately after every step and
