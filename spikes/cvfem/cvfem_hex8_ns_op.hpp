@@ -74,6 +74,17 @@ namespace sfem {
         // its state fields only after update().
         const ::SSMeshData *semi_structured_data() const;
 
+        // Body force, one vector per node, in the node numbering the operator uses.
+        // MUST be called after initialize(): the packed path renumbers mesh nodes, so a
+        // force built against the pre-initialize numbering would be silently scrambled.
+        // Passing nullptr clears it. Only the manufactured-solution case sets one; with no
+        // force the residual is untouched.
+        void set_body_force(const real_t *fx, const real_t *fy, const real_t *fz);
+
+        // Control volume per node -- the CVFEM lumped mass. Exposed because the driver
+        // cannot include the kernel headers, and the MMS error norms are volume-weighted.
+        int node_volume(real_t *const out) const;
+
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;
 
