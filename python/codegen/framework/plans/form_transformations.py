@@ -325,3 +325,30 @@ def cached_metric_geometry(weak_form, rule):
     if scale is None:
         return None
     return CachedMetricGeometry(dim=int(rule.dim), scale=scale)
+
+
+def metric_value_scale(weak_form):
+    """The scale when the energy is exactly `scale/2 * ||grad u||^2`, else None.
+
+    The metric-based 0-form evaluates the element energy as
+    `scale/2 * g^T FFF g`, and that identity holds only for the quadratic
+    invariant: `FFF` is `J^-1 J^-T det J`, which contracts two gradients and
+    can express nothing else.
+
+    This cannot be inferred from `flux_gradient_metric_scale`.  Adding a
+    constant to an energy density leaves its flux untouched, so a form whose
+    metric-based gradient is valid can have a value that is not, and the
+    difference would show up as a 0-form that is wrong by a constant times the
+    element measure -- which the gradient tests would never catch.  So the
+    question is asked of the density itself.
+    """
+    if weak_form is None or getattr(weak_form, "is_deformation_gradient", True):
+        return None
+    scale = energy_gradient_metric_scale(weak_form)
+    if scale is None:
+        return None
+    variables = tuple(getattr(weak_form, "deformation_gradient", ()) or ())
+    quadratic = scale / 2 * sum((variable ** 2 for variable in variables), sp.Integer(0))
+    if sp.simplify(sp.expand(weak_form.energy_density - quadratic)) != 0:
+        return None
+    return scale
