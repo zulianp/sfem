@@ -3601,20 +3601,42 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
                 "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
                 *([] if is_affine or identity_stream_shape_order else ["                    const uint16_t *const SFEM_RESTRICT coordinate_shape = coordinate_elements[shape];"]),
-                "                    for (int d = 0; d < SPATIAL_DIM; ++d) {",
-                *source_builder.simd_lines(),
-                "                        for (int lane = 0; lane < nelems; ++lane) {",
-                "                            const uint16_t packed_node = element_shape[evbegin + lane];",
-                *([] if is_affine or identity_stream_shape_order else ["                            const uint16_t coordinate_packed_node = coordinate_shape[evbegin + lane];"]),
             ]
         )
+                # The coordinates carry one component per spatial direction and
+                # the field one per field component.  Those are the same number
+                # for a displacement and different for everything else, which is
+                # why gathering both in one loop bounded by SPATIAL_DIM went
+                # unnoticed: a scalar field read `pack_h[2 * max_nodes_per_pack
+                # + node]` out of a buffer holding a single component.  Found by
+                # AddressSanitizer the first time the gate could reach a packed
+                # kernel at all.
         if not is_affine:
-            lines.append(
-                "                            block_coordinate_data[shape * SPATIAL_DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + %s];"
-                % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node")
+            coordinate_node = (
+                "packed_node" if identity_stream_shape_order else "coordinate_packed_node"
+            )
+            lines.extend(
+                [
+                    "                    for (int d = 0; d < SPATIAL_DIM; ++d) {",
+                    *source_builder.simd_lines(),
+                    "                        for (int lane = 0; lane < nelems; ++lane) {",
+                    "                            const uint16_t %s = %s[evbegin + lane];"
+                    % (
+                        coordinate_node,
+                        "element_shape" if identity_stream_shape_order else "coordinate_shape",
+                    ),
+                    "                            block_coordinate_data[shape * SPATIAL_DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + %s];"
+                    % coordinate_node,
+                    "                        }",
+                    "                    }",
+                ]
             )
         lines.extend(
             [
+                "                    for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {",
+                *source_builder.simd_lines(),
+                "                        for (int lane = 0; lane < nelems; ++lane) {",
+                "                            const uint16_t packed_node = element_shape[evbegin + lane];",
                 "                            block_u_base_data[shape * N_FIELD_COMPONENTS + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];",
                 "                            block_h_data[shape * N_FIELD_COMPONENTS + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];",
                 "                        }",
@@ -5196,18 +5218,43 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "                for (int shape = 0; shape < N_SHAPE; ++shape) {",
                     "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
                     *([] if identity_stream_shape_order else ["                    const uint16_t *const SFEM_RESTRICT coordinate_shape = coordinate_elements[shape];"]),
-                    "                    for (int d = 0; d < SPATIAL_DIM; ++d) {",
+                ]
+            )
+            # Two loops, for the reason spelled at the other packed gather: the
+            # coordinates are indexed by spatial direction and the field by
+            # field component, and only a displacement makes those the same.
+            if not is_affine:
+                coordinate_node = (
+                    "packed_node"
+                    if identity_stream_shape_order
+                    else "coordinate_packed_node"
+                )
+                lines.extend(
+                    [
+                        "                    for (int d = 0; d < SPATIAL_DIM; ++d) {",
+                        *source_builder.simd_lines(),
+                        "                        for (int lane = 0; lane < nelems; ++lane) {",
+                        "                            const uint16_t %s = %s[evbegin + lane];"
+                        % (
+                            coordinate_node,
+                            "element_shape"
+                            if identity_stream_shape_order
+                            else "coordinate_shape",
+                        ),
+                        "                            block_coordinate_data[shape * SPATIAL_DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + %s];"
+                        % coordinate_node,
+                        "                        }",
+                        "                    }",
+                    ]
+                )
+            lines.extend(
+                [
+                    "                    for (int d = 0; d < N_FIELD_COMPONENTS; ++d) {",
                     *source_builder.simd_lines(),
                     "                        for (int lane = 0; lane < nelems; ++lane) {",
                     "                            const uint16_t packed_node = element_shape[evbegin + lane];",
-                    *([] if identity_stream_shape_order else ["                            const uint16_t coordinate_packed_node = coordinate_shape[evbegin + lane];"]),
                 ]
             )
-            if not is_affine:
-                lines.append(
-                    "                            block_coordinate_data[shape * SPATIAL_DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + %s];"
-                    % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node")
-                )
             if uses_current:
                 lines.append(
                     "                            block_u_data[shape * N_FIELD_COMPONENTS + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];"
