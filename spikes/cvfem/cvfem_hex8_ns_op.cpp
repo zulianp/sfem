@@ -360,6 +360,38 @@ namespace sfem {
 
     std::shared_ptr<Op> CVFEMNavierStokes::clone() const { return clone_onto(impl_->space); }
 
+    void CVFEMNavierStokes::set_body_force(const real_t *fx, const real_t *fy, const real_t *fz) {
+        const ptrdiff_t n = impl_->semi_structured ? impl_->ss.nnodes : impl_->d.nnodes;
+        auto assign = [&](auto &dst_x, auto &dst_y, auto &dst_z) {
+            if (!fx) {
+                dst_x.clear(); dst_y.clear(); dst_z.clear();
+                return;
+            }
+            dst_x.assign(fx, fx + n);
+            dst_y.assign(fy, fy + n);
+            dst_z.assign(fz, fz + n);
+        };
+        if (impl_->semi_structured) {
+            assign(impl_->ss.fx, impl_->ss.fy, impl_->ss.fz);
+            impl_->ss.node_vol.clear();  // rebuilt lazily on the next residual
+        } else {
+            assign(impl_->d.fx, impl_->d.fy, impl_->d.fz);
+            impl_->d.node_vol.clear();
+        }
+    }
+
+    int CVFEMNavierStokes::node_volume(real_t *const out) const {
+        if (!impl_->initialized) return SFEM_FAILURE;
+        std::vector<scalar_t> v;
+        if (impl_->semi_structured) {
+            sscvfem_node_volume(impl_->ss, v);
+        } else {
+            build_node_volume(impl_->d, v);
+        }
+        for (size_t i = 0; i < v.size(); ++i) out[i] = (real_t)v[i];
+        return SFEM_SUCCESS;
+    }
+
     std::shared_ptr<Op> CVFEMNavierStokes::clone_onto(const std::shared_ptr<FunctionSpace> &space) const {
         auto ret             = std::make_shared<CVFEMNavierStokes>(space);
         ret->rho             = rho;

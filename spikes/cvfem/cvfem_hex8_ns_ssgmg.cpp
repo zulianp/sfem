@@ -59,7 +59,7 @@ namespace {
                      "directly comparable.\n"
                      "\n"
                      "Environment:\n"
-                     "  SFEM_CASE            poiseuille | couette | cavity (required)\n"
+                     "  SFEM_CASE            poiseuille | couette | cavity | cavity_reg | mms (required)\n"
                      "  SFEM_N               cells in y (default 8)\n"
                      "  SFEM_NX SFEM_NY SFEM_NZ   override cells per direction\n"
                      "  SFEM_LX SFEM_LY SFEM_LZ   channel size (default 4, 1, 1)\n"
@@ -2375,12 +2375,20 @@ int main(int argc, char **argv) {
     int               nz         = smesh::Env::read<int>("SFEM_NZ", 0);
     // The channel default is 4x1x1; a cavity wants a square box, so its default differs.
     // Explicit SFEM_LX/LY/LZ still win.
+    // The manufactured pressure's gauge constant makes it zero-mean on [0,2]^2 and nowhere
+    // else, so the MMS domain is not a free parameter -- default it, and reject an override.
+    const std::string case_req    = smesh::Env::read_string("SFEM_CASE", "");
+    const bool        want_mms    = case_req == "mms" || case_req == "manufactured";
+    // Their cavity is the cube [0,2]^3 and the lid profile is written for it; on any other
+    // box the polynomial no longer vanishes at the edges and it is a different problem.
+    const bool        want_cavreg = case_req == "cavity_reg" || case_req == "regularized_cavity" ||
+                             case_req == "cavity_regularized";
     const bool        want_cavity = smesh::Env::read_string("SFEM_CASE", "") == "cavity" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid_driven_cavity";
-    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", want_cavity ? 1 : 4);
-    const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", 1);
-    const real_t      Lz         = smesh::Env::read<real_t>("SFEM_LZ", 1);
+    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", (want_mms || want_cavreg) ? 2 : (want_cavity ? 1 : 4));
+    const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg) ? 2 : 1);
+    const real_t      Lz         = smesh::Env::read<real_t>("SFEM_LZ", (want_mms || want_cavreg) ? 2 : 1);
     const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", 1);
     const real_t      mu         = smesh::Env::read<real_t>("SFEM_MU", 0.01);
     const real_t      U          = smesh::Env::read<real_t>("SFEM_U", 1);
@@ -2423,7 +2431,8 @@ int main(int argc, char **argv) {
 
     FlowCase flow;
     if (case_name.empty() || !cvfem_case::parse_case(case_name, flow)) {
-        std::fprintf(stderr, "SFEM_CASE is required (poiseuille, couette or cavity)\n");
+        std::fprintf(stderr, "SFEM_CASE is required "
+                                 "(poiseuille, couette, cavity, cavity_reg or mms)\n");
         usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -2471,6 +2480,7 @@ int main(int argc, char **argv) {
     const ptrdiff_t     nnodes = mesh->n_nodes();
     const ptrdiff_t     ndof   = nnodes * N_FIELDS;
     std::vector<real_t> p_exact;
+    ptrdiff_t           pin_node = 0;  // pressure pin, needed again by the MMS diagnostics
 
     // Built after op->initialize(), and that order is required rather than incidental:
     // initialize() renumbers the mesh nodes for the packed layout, so node indices taken
@@ -2500,7 +2510,7 @@ int main(int argc, char **argv) {
         std::vector<idx_t>  uvw_nodes, uz_nodes;
         std::vector<real_t> uvw_ux, uvw_uy, uvw_uz, uz_vals;
         p_exact.assign((size_t)nnodes, real_t(0));
-        ptrdiff_t           pin  = 0;
+        ptrdiff_t          &pin  = pin_node;
         real_t              best = 1e300;
 
         for (ptrdiff_t i = 0; i < nnodes; ++i) {
@@ -2519,7 +2529,33 @@ int main(int argc, char **argv) {
             const bool outlet = cvfem_case::on_plane(x, Lx, Lx);
             const bool span   = cvfem_case::on_plane(z, real_t(0), Lz) || cvfem_case::on_plane(z, Lz, Lz);
 
-            if (wall_y || inlet || outlet) {
+            if (flow == cvfem_case::FlowCase::CavityRegularized) {
+                // No-slip on every wall including the spanwise pair, with the lid profile on
+                // y = Ly. This is a genuinely three-dimensional cavity, which is what their
+                // section 5.5 solves and what Table 5.6 is measured on.
+                //
+                // Note this differs deliberately from FlowCase::Cavity, which leaves the
+                // z-planes with uz = 0 only -- a slip/symmetry condition that makes the flow
+                // quasi-two-dimensional. That is the right choice there, because our
+                // constant-lid cavity is compared against Ghia et al.'s 2D reference data;
+                // it is the wrong choice here. Same geometry, different problem.
+                if (wall_y || inlet || outlet || span) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(ux);
+                    uvw_uy.push_back(uy);
+                    uvw_uz.push_back(uz);
+                }
+            } else if (flow == cvfem_case::FlowCase::MMS) {
+                // Every boundary node, all three components. The manufactured field has a
+                // nonzero tangential velocity on the z-planes too, so the channel pattern
+                // below (which constrains only uz there) would impose the wrong data.
+                if (wall_y || inlet || outlet || span) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(ux);
+                    uvw_uy.push_back(uy);
+                    uvw_uz.push_back(uz);
+                }
+            } else if (wall_y || inlet || outlet) {
                 uvw_nodes.push_back((idx_t)i);
                 uvw_ux.push_back(ux);
                 uvw_uy.push_back(uy);
@@ -2561,6 +2597,14 @@ int main(int argc, char **argv) {
 
         f->add_constraint(sfem::DirichletConditions::create(fs, conds));
 
+        // The manufactured solution is driven by a body force. This must happen after
+        // op->initialize() -- which ran above -- because the packed path renumbers mesh
+        // nodes, and a force built against the old numbering would be silently scrambled
+        // rather than rejected.
+        if (flow == cvfem_case::FlowCase::MMS)
+            std::printf("mms: forcing recomputed per continuation stage (rho varies, mu=%g, Re=%g)\n",
+                        (double)mu, (double)(1.0 / mu));
+
         std::printf("constraints: uvw_nodes=%td  uz_nodes=%td  p_pin=%td\n",
                     (ptrdiff_t)uvw_nodes.size(),
                     (ptrdiff_t)uz_nodes.size(),
@@ -2571,7 +2615,16 @@ int main(int argc, char **argv) {
                 case_name.c_str(), geom_name.c_str(), refine_level, op->is_semi_structured() ? 1 : 0);
     std::printf("channel: L=(%g,%g,%g)  cells=(%d,%d,%d)\n", Lx, Ly, Lz, nx, ny, nz);
     std::printf("nnodes: %td  nelements: %td  ndof: %td\n", nnodes, mesh->n_elements(0), ndof);
-    std::printf("rho: %g  mu: %g  U: %g  Re: %g\n", rho, mu, U, rho * U * Ly / mu);
+    if (flow == cvfem_case::FlowCase::MMS) {
+        // Two different quantities would otherwise both be printed as "Re": the driver's
+        // flow Reynolds number rho*U*Ly/mu, and the manufactured solution's own parameter
+        // 1/mu which appears in its pressure formula. On the MMS domain Ly=2, so they differ
+        // by a factor of two and a run asked for Re=200 would report 400.
+        std::printf("rho: %g  mu: %g  mms_Re (=1/mu, the parameter in p): %g   "
+                    "[continuation ramps rho to 1]\n", rho, mu, 1.0 / mu);
+    } else {
+        std::printf("rho: %g  mu: %g  U: %g  Re: %g\n", rho, mu, U, rho * U * Ly / mu);
+    }
 
     // The state lives in a SharedBuffer because the Jacobian operator is built from it:
     // create_linear_operator assembles once, at construction, so a nonlinear problem has
@@ -2823,6 +2876,20 @@ int main(int argc, char **argv) {
 
     for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
     const real_t rho_use = rho_schedule[stage];
+    // The manufactured forcing is a function of rho, so it must track the continuation. The
+    // exact solution does not move -- u and p depend only on mu -- which is precisely why
+    // the error measured at the final stage is still against the right reference.
+    if (flow == cvfem_case::FlowCase::MMS) {
+        const auto *const mx = mesh->points()->data()[0];
+        const auto *const my = mesh->points()->data()[1];
+        const auto *const mz = mesh->points()->data()[2];
+        std::vector<real_t> bfx((size_t)nnodes), bfy((size_t)nnodes), bfz((size_t)nnodes);
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            cvfem_case::body_force(flow, rho_use, mu, (real_t)mx[i], (real_t)my[i], (real_t)mz[i],
+                                   bfx[(size_t)i], bfy[(size_t)i], bfz[(size_t)i]);
+        }
+        op->set_body_force(bfx.data(), bfy.data(), bfz.data());
+    }
     op->rho              = rho_use;
     std::copy(x, x + ndof, x_stage_start.begin());
     std::printf("stage %d/%d: rho: %g  Re: %g\n",
@@ -3325,8 +3392,100 @@ int main(int argc, char **argv) {
             u_linf = std::max(u_linf, std::fabs(x[(size_t)i * 4 + 2] - uz));
             p_linf = std::max(p_linf, std::fabs(x[(size_t)i * 4 + 3] - p));
         }
+
+        // Volume-weighted L2 norms, and the pressure additionally compared up to a constant.
+        //
+        // Both matter for a convergence study and neither is available from L-infinity. L-inf
+        // is set by a single worst node, so it reports the worst corner rather than the field,
+        // and it is the noisiest possible basis for an observed order. The mean shift matters
+        // more: the pressure is fixed by a pin at one node rather than by a zero-mean
+        // constraint, so a discrete solution that is right everywhere but offset by a constant
+        // is penalised at every node. Subtracting mean(p_h - p_exact) is the standard MMS
+        // treatment and separates "the pressure field is wrong" from "the gauge is offset".
+        if (flow == cvfem_case::FlowCase::MMS) {
+            std::vector<real_t> vol((size_t)nnodes, 0);
+            op->node_volume(vol.data());
+            long double vtot = 0, u_l2 = 0, p_l2 = 0, p_l2s = 0, dp_mean = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                real_t ux, uy, uz, p;
+                cvfem_case::exact_state(flow, mu, U, Lx, Ly, (real_t)px[i], (real_t)py[i],
+                                        (real_t)pz[i], ux, uy, uz, p);
+                const long double v = vol[(size_t)i];
+                vtot += v;
+                dp_mean += v * (long double)(x[(size_t)i * 4 + 3] - p);
+            }
+            dp_mean /= (vtot > 0 ? vtot : 1);
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                real_t ux, uy, uz, p;
+                cvfem_case::exact_state(flow, mu, U, Lx, Ly, (real_t)px[i], (real_t)py[i],
+                                        (real_t)pz[i], ux, uy, uz, p);
+                const long double v  = vol[(size_t)i];
+                const long double ex = x[(size_t)i * 4 + 0] - ux;
+                const long double ey = x[(size_t)i * 4 + 1] - uy;
+                const long double ez = x[(size_t)i * 4 + 2] - uz;
+                const long double ep = x[(size_t)i * 4 + 3] - p;
+                u_l2  += v * (ex * ex + ey * ey + ez * ez);
+                p_l2  += v * ep * ep;
+                p_l2s += v * (ep - dp_mean) * (ep - dp_mean);
+            }
+            std::printf("mms_err: u_l2 %.6e  p_l2 %.6e  p_l2_shifted %.6e  (dp_mean %.6e, vol %.6f)\n",
+                        (double)std::sqrt((double)u_l2), (double)std::sqrt((double)p_l2),
+                        (double)std::sqrt((double)p_l2s), (double)dp_mean, (double)vtot);
+
+            // Is the pressure pin polluting its neighbourhood?
+            //
+            // The pin fixes p at a single node instead of constraining the mean, which acts
+            // as a point constraint on the pressure equation and can drive a spurious local
+            // velocity in a colocated scheme. If that is happening, the worst errors sit on
+            // top of the pin and excluding a few cells around it should collapse them. If the
+            // errors are spread over the domain instead, the pin is exonerated and the
+            // convergence rate is telling us about the discretisation.
+            {
+                const real_t hh   = Lx / (real_t)std::max<ptrdiff_t>(1, (ptrdiff_t)std::lround(
+                                            std::cbrt((double)nnodes) - 1));
+                const real_t pinx = (real_t)px[pin_node], piny = (real_t)py[pin_node],
+                             pinz = (real_t)pz[pin_node];
+                real_t    wu = 0, wp = 0, wux = 0, wuy = 0, wuz = 0, wpx = 0, wpy = 0, wpz = 0;
+                real_t    fu[4] = {0, 0, 0, 0}, fp[4] = {0, 0, 0, 0};  // excluding r <= k*h, k=0,1,2,4
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    real_t ux, uy, uz, p;
+                    cvfem_case::exact_state(flow, mu, U, Lx, Ly, (real_t)px[i], (real_t)py[i],
+                                            (real_t)pz[i], ux, uy, uz, p);
+                    const real_t eu = std::max(std::max(std::fabs(x[(size_t)i * 4 + 0] - ux),
+                                                        std::fabs(x[(size_t)i * 4 + 1] - uy)),
+                                               std::fabs(x[(size_t)i * 4 + 2] - uz));
+                    const real_t ep = std::fabs(x[(size_t)i * 4 + 3] - p);
+                    if (eu > wu) { wu = eu; wux = (real_t)px[i]; wuy = (real_t)py[i]; wuz = (real_t)pz[i]; }
+                    if (ep > wp) { wp = ep; wpx = (real_t)px[i]; wpy = (real_t)py[i]; wpz = (real_t)pz[i]; }
+                    const real_t dx0 = (real_t)px[i] - pinx, dy0 = (real_t)py[i] - piny,
+                                 dz0 = (real_t)pz[i] - pinz;
+                    const real_t rr  = std::sqrt(dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
+                    const real_t ks[4] = {0, 1, 2, 4};
+                    for (int k = 0; k < 4; ++k)
+                        if (rr > ks[k] * hh) {
+                            fu[k] = std::max(fu[k], eu);
+                            fp[k] = std::max(fp[k], ep);
+                        }
+                }
+                std::printf("mms_pin: pin at (%.4f,%.4f,%.4f)  h=%.4f\n",
+                            (double)pinx, (double)piny, (double)pinz, (double)hh);
+                std::printf("mms_pin: worst u err %.4e at (%.4f,%.4f,%.4f), dist_to_pin %.4f (%.1f h)\n",
+                            (double)wu, (double)wux, (double)wuy, (double)wuz,
+                            (double)std::sqrt((wux-pinx)*(wux-pinx)+(wuy-piny)*(wuy-piny)+(wuz-pinz)*(wuz-pinz)),
+                            (double)(std::sqrt((wux-pinx)*(wux-pinx)+(wuy-piny)*(wuy-piny)+(wuz-pinz)*(wuz-pinz))/hh));
+                std::printf("mms_pin: worst p err %.4e at (%.4f,%.4f,%.4f), dist_to_pin %.4f (%.1f h)\n",
+                            (double)wp, (double)wpx, (double)wpy, (double)wpz,
+                            (double)std::sqrt((wpx-pinx)*(wpx-pinx)+(wpy-piny)*(wpy-piny)+(wpz-pinz)*(wpz-pinz)),
+                            (double)(std::sqrt((wpx-pinx)*(wpx-pinx)+(wpy-piny)*(wpy-piny)+(wpz-pinz)*(wpz-pinz))/hh));
+                std::printf("mms_pin: u_linf excluding r<=0h %.4e  1h %.4e  2h %.4e  4h %.4e\n",
+                            (double)fu[0], (double)fu[1], (double)fu[2], (double)fu[3]);
+                std::printf("mms_pin: p_linf excluding r<=0h %.4e  1h %.4e  2h %.4e  4h %.4e\n",
+                            (double)fp[0], (double)fp[1], (double)fp[2], (double)fp[3]);
+            }
+        }
         phase_report();
-        if (flow == cvfem_case::FlowCase::Cavity) {
+        if (flow == cvfem_case::FlowCase::Cavity ||
+            flow == cvfem_case::FlowCase::CavityRegularized) {
             // No closed form to compare against. Report what a cavity run is actually judged
             // on: the velocity extrema, and u_x down the vertical centreline, which is the
             // profile tabulated by Ghia, Ghia & Shin (1982) for the square cavity.

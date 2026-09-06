@@ -10,12 +10,14 @@
 // benchmark layouts fight over. So it is safe to include next to either family, or next
 // to cvfem_hex8_ns_op.hpp alone.
 
+#include "cvfem_ns_mms_case.hpp"
+
 #include <cmath>
 #include <string>
 
 namespace cvfem_case {
 
-    enum class FlowCase { Poiseuille, Couette, Cavity };
+    enum class FlowCase { Poiseuille, Couette, Cavity, CavityRegularized, MMS };
 
     inline bool parse_case(const std::string &name, FlowCase &out) {
         if (name == "poiseuille") {
@@ -28,6 +30,14 @@ namespace cvfem_case {
         }
         if (name == "cavity" || name == "lid_driven_cavity" || name == "lid") {
             out = FlowCase::Cavity;
+            return true;
+        }
+        if (name == "cavity_reg" || name == "regularized_cavity" || name == "cavity_regularized") {
+            out = FlowCase::CavityRegularized;
+            return true;
+        }
+        if (name == "mms" || name == "manufactured") {
+            out = FlowCase::MMS;
             return true;
         }
         return false;
@@ -63,13 +73,46 @@ namespace cvfem_case {
                             const T        Ly,
                             const T        x,
                             const T        y,
-                            const T /*z*/,
+                            const T z,
                             T &ux,
                             T &uy,
                             T &uz,
                             T &p) {
         uy = T(0);
         uz = T(0);
+        if (flow == FlowCase::MMS) {
+            // Their equation carries 1/Re on the viscous term and ours carries mu, so the
+            // manufactured case mandates rho = 1 and mu = 1/Re. Re is therefore recoverable
+            // from mu alone and need not be threaded through this signature -- but that
+            // mandate is load-bearing: at any other (rho, mu) the pressure below is not the
+            // exact pressure and the measured convergence rate would be meaningless.
+            const T Re = T(1) / mu;
+            cvfem_mms::velocity(x, y, z, ux, uy, uz);
+            cvfem_mms::pressure(x, y, z, Re, p);
+            return;
+        }
+        if (flow == FlowCase::CavityRegularized) {
+            // Farrell, Mitchell & Wechsung section 5.5: the cube [0,2]^3, no-slip everywhere
+            // except the top y = Ly, where u = (x^2 (2-x)^2 z^2 (2-z)^2, 0, 0).
+            //
+            // The lid velocity vanishes at the edges, which removes the corner singularity of
+            // the constant-lid cavity. That is not cosmetic: the singularity is what limits
+            // the attainable Reynolds number, so this and FlowCase::Cavity are different
+            // problems and only this one is comparable with their Table 5.6.
+            //
+            // Peak value is exactly 1 at (x,z) = (1,1), so U scales it directly. Note
+            // x^2 (2-x)^2 is exactly the manufactured solution's u1(x, y=2) -- a free
+            // cross-check between the two cases that share this paper.
+            if (on_plane(y, Ly, Ly)) {
+                const T sx = x * x * (T(2) - x) * (T(2) - x);
+                const T sz = z * z * (T(2) - z) * (T(2) - z);
+                ux = U * sx * sz;
+            } else {
+                ux = T(0);
+            }
+            p = T(0);
+            return;
+        }
         if (flow == FlowCase::Cavity) {
             ux = on_plane(y, Ly, Ly) ? U : T(0);
             p  = T(0);
@@ -83,6 +126,23 @@ namespace cvfem_case {
         const T G = T(8) * mu * U / (Ly * Ly);
         ux        = T(4) * U * y * (Ly - y) / (Ly * Ly);
         p         = G * (T(0.5) * Lx - x);
+    }
+
+    // Body force for the manufactured case; zero for every other case, which is what makes
+    // the force array empty and the residual post-pass a no-op elsewhere.
+    // rho is a parameter because the forcing depends on it: f = rho (u.grad)u - mu lap(u)
+    // + grad p. That is what makes continuation legitimate here -- ramping rho and
+    // recomputing f leaves the exact solution (u, p) untouched, since those depend only on
+    // mu. Without recomputing, every intermediate stage would be solving a problem whose
+    // solution is not the one being differenced against.
+    template <typename T>
+    inline void body_force(const FlowCase flow, const T rho, const T mu, const T x, const T y,
+                           const T z, T &fx, T &fy, T &fz) {
+        if (flow != FlowCase::MMS) {
+            fx = fy = fz = T(0);
+            return;
+        }
+        cvfem_mms::body_force(x, y, z, rho, mu, T(1) / mu, fx, fy, fz);
     }
 
 }  // namespace cvfem_case
