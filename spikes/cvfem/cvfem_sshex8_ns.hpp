@@ -286,6 +286,26 @@ static SFEM_INLINE void sscvfem_micro_geom(const scalar_t x[8], const scalar_t y
 // The reconstruction over an arbitrary strided nodal scalar. It is linear in that scalar
 // with geometry-only weights, so applying it to a Jacobian direction q gives exactly the
 // derivative of applying it to p -- the term the Rhie-Chow Jacobian was missing.
+// Micro-element boundary-face mask, derived from the macro element's mask and the lattice
+// position. A micro element carries a macro face only where it sits against that face of the
+// lattice, so this is six tests and no storage.
+//
+// Level-independent by construction, which is why one macro-level mask serves every level of
+// the multigrid hierarchy: nothing has to be rebuilt or transferred when a level is derefined.
+// A negative macro mask means "no mask", and the coordinate test is used instead.
+static SFEM_INLINE int sscvfem_micro_face_mask(const int macro, const int L, const int xi,
+                                               const int yi, const int zi) {
+    if (macro < 0) return -1;
+    int m = 0;
+    if (xi == 0)     m |= macro & 0x01;  // CVFEM face 0, x-min
+    if (xi == L - 1) m |= macro & 0x02;  // face 1, x-max
+    if (yi == 0)     m |= macro & 0x04;  // face 2, y-min
+    if (yi == L - 1) m |= macro & 0x08;  // face 3, y-max
+    if (zi == 0)     m |= macro & 0x10;  // face 4, z-min
+    if (zi == L - 1) m |= macro & 0x20;  // face 5, z-max
+    return m;
+}
+
 inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
                                        const int stride, std::vector<scalar_t> &ogx,
                                        std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz) {
@@ -900,7 +920,12 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
                                                has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
                                                has_qg ? qgz : nullptr, r);
                         boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
-                                                         ux, uy, uz, vx, vy, vz, q, r);
+                                                         ux, uy, uz, vx, vy, vz, q, r,
+                                                         d.macro_face_mask.empty()
+                                                          ? -1
+                                                          : sscvfem_micro_face_mask(
+                                                                    (int)d.macro_face_mask[(size_t)e],
+                                                                    L, xi, yi, zi));
 
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
@@ -1553,7 +1578,12 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
                         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r, rc);
                         boundary_scs_add_residual(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
-                                                  ux, uy, uz, p, r);
+                                                  ux, uy, uz, p, r,
+                                                  d.macro_face_mask.empty()
+                                                          ? -1
+                                                          : sscvfem_micro_face_mask(
+                                                                    (int)d.macro_face_mask[(size_t)e],
+                                                                    L, xi, yi, zi));
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
                             for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
@@ -1733,7 +1763,12 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
                         cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, madj, mdet, ux, uy, uz, sl,
                                                                        lout.data(), rc, p);
                         boundary_scs_add_jacobian<false>(rho, mu, 0, madj, mdet, d.Lx, d.Ly, d.Lz, x, y, z,
-                                                         ux, uy, uz, sl, lout.data());
+                                                         ux, uy, uz, sl, lout.data(),
+                                                         d.macro_face_mask.empty()
+                                                          ? -1
+                                                          : sscvfem_micro_face_mask(
+                                                                    (int)d.macro_face_mask[(size_t)e],
+                                                                    L, xi, yi, zi));
                     }
                 }
             }

@@ -476,7 +476,8 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc);
-        boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
+        boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
+                                  d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e]);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -501,7 +502,8 @@ inline SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x, y, z, pgx, pgy, pgz, d.rhie_chow_scale};
         cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r, rc);
-        boundary_scs_add_residual(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
+        boundary_scs_add_residual(rho, mu, 1, (const scalar_t *)nullptr, scalar_t(0), d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
+                                  d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e]);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];

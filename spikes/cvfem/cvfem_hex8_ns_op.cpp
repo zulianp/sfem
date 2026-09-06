@@ -123,6 +123,24 @@ namespace sfem {
             const int level        = smesh::semistructured_level(*mesh);
             sscvfem_init(impl_->ss, mesh, level);
 
+            // SFEM_BOUNDARY_MASK=1 replaces the bounding-box coordinate test with the
+            // topological skin. Off by default so every existing box case is untouched;
+            // required for a non-box domain, where the coordinate test cannot see a
+            // re-entrant face and silently leaves those control volumes unclosed.
+            //
+            // Built on the MACRO mesh: (parent, lfi) is invariant under semi-structured
+            // level changes, so this one mask is correct at every multigrid level and
+            // derefine_op -- which re-runs initialize() on the coarse space -- rebuilds an
+            // equally valid one rather than needing the array transferred.
+            if (smesh::Env::read<int>("SFEM_BOUNDARY_MASK", 0)) {
+                if (!build_face_mask(mesh, mesh->n_elements(0), impl_->ss.macro_face_mask)) {
+                    SFEM_ERROR("CVFEMNavierStokes: SFEM_BOUNDARY_MASK=1 but skin_sideset failed\n");
+                    return SFEM_FAILURE;
+                }
+            } else {
+                impl_->ss.macro_face_mask.clear();
+            }
+
             // Deterministic two-pass scatter, the semi-structured counterpart of the packed
             // HEX8 layout. Off gives the atomic scatter, which is not reproducible across
             // thread counts.
