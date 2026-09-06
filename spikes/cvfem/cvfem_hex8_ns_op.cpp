@@ -110,6 +110,42 @@ namespace sfem {
         return true;
     }
 
+    // Refine a boundary mask to the faces lying on one coordinate plane.
+    //
+    // `corner_off` maps CVFEM local corner index to the element array row holding it: the
+    // identity for a plain HEX8, and the lattice extremes for a semi-structured macro
+    // element. Getting that wrong is silent -- using a micro cell's corners on a macro
+    // element reaches only the first micro cell, so no face matches the plane and the mask
+    // comes out empty rather than wrong.
+    static ptrdiff_t refine_natural_mask(const std::vector<uint8_t> &face_mask,
+                                         const smesh::idx_t *const *elems,
+                                         const smesh::geom_t *const *pts, const int *corner_off,
+                                         const int axis, const double value,
+                                         std::vector<uint8_t> &natural) {
+        natural.assign(face_mask.size(), 0);
+        ptrdiff_t nfaces = 0;
+        for (size_t e = 0; e < face_mask.size(); ++e) {
+            const int bm = face_mask[e];
+            if (!bm) continue;
+            int nm = 0;
+            for (int f = 0; f < 6; ++f) {
+                if (!((bm >> f) & 1)) continue;
+                bool on = true;
+                for (int k = 0; k < 4; ++k) {
+                    const smesh::idx_t g = elems[corner_off[CVFEM_HEX8_BFACE_NODES[f][k]]][(ptrdiff_t)e];
+                    if (std::fabs((double)pts[axis][g] - value) >
+                        1e-8 * std::max(1.0, std::fabs(value))) {
+                        on = false;
+                        break;
+                    }
+                }
+                if (on) { nm |= (1 << f); ++nfaces; }
+            }
+            natural[e] = (uint8_t)nm;
+        }
+        return nfaces;
+    }
+
     int CVFEMNavierStokes::initialize(const std::vector<std::string> & /*block_names*/) {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::initialize");
 
@@ -139,6 +175,84 @@ namespace sfem {
                 }
             } else {
                 impl_->ss.macro_face_mask.clear();
+            }
+
+            // Natural (do-nothing) outflow faces, selected by plane. Empty unless asked for,
+            // so no existing case can take the outflow branch.
+            impl_->ss.macro_natural_mask.clear();
+            if (smesh::Env::read<int>("SFEM_DEBUG_OUTFLOW", 0))
+                std::printf("outflow debug: plane='%s' face_mask=%zu nmacro=%td level=%d\n",
+                            natural_outflow_plane.c_str(), impl_->ss.macro_face_mask.size(),
+                            impl_->ss.nmacro, impl_->ss.level);
+            if (!natural_outflow_plane.empty() && !impl_->ss.macro_face_mask.empty()) {
+                impl_->ss.macro_natural_mask.assign(impl_->ss.macro_face_mask.size(), 0);
+                // On a semi-structured mesh the element array holds every lattice node, so
+                // rows 0..7 are not the macro corners. Nor is sscvfem_corner_offsets what is
+                // wanted here: that gives the corners of one MICRO cell (the lattice cell at
+                // the origin), so on the last macro element it reaches 9.875 rather than 10
+                // and the plane test matched nothing at all.
+                //
+                // The macro corners are the lattice extremes: index 0 or L along each axis,
+                // in the standard hex ordering.
+                const int L_ = impl_->ss.level;
+                int       corner_off[8];
+                {
+                    static const int c[8][3] = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
+                                                {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
+                    for (int a = 0; a < 8; ++a)
+                        corner_off[a] = sscvfem_lidx(L_, c[a][0] * L_, c[a][1] * L_, c[a][2] * L_);
+                }
+                auto            pts = impl_->ss.points;
+                auto            els = impl_->ss.elems;
+                const ptrdiff_t ne  = impl_->ss.nmacro;
+                for (ptrdiff_t e = 0; e < ne; ++e) {
+                    const int bm = impl_->ss.macro_face_mask[(size_t)e];
+                    if (!bm) continue;
+                    int nm = 0;
+                    for (int f = 0; f < 6; ++f) {
+                        if (!((bm >> f) & 1)) continue;
+                        // A boundary face is natural when all four of its nodes lie on the
+                        // named plane. Reusing the face-node table keeps this consistent with
+                        // the mask it refines.
+                        bool on = true;
+                        for (int k = 0; k < 4; ++k) {
+                            const smesh::idx_t g = els[corner_off[CVFEM_HEX8_BFACE_NODES[f][k]]][e];
+                            const double       c = (double)pts[natural_outflow_axis][g];
+                            if (std::fabs(c - natural_outflow_value) > 1e-8 * std::max(1.0, std::fabs(natural_outflow_value))) {
+                                on = false;
+                                break;
+                            }
+                        }
+                        if (on) nm |= (1 << f);
+                    }
+                    impl_->ss.macro_natural_mask[(size_t)e] = (uint8_t)nm;
+                }
+                if (smesh::Env::read<int>("SFEM_DEBUG_OUTFLOW", 0)) {
+                    double cmax = -1e30, cmin = 1e30;
+                    ptrdiff_t bfaces = 0;
+                    for (ptrdiff_t e = 0; e < ne; ++e) {
+                        const int bm = impl_->ss.macro_face_mask[(size_t)e];
+                        for (int f = 0; f < 6; ++f) {
+                            if (!((bm >> f) & 1)) continue;
+                            ++bfaces;
+                            for (int k = 0; k < 4; ++k) {
+                                const smesh::idx_t g =
+                                        els[corner_off[CVFEM_HEX8_BFACE_NODES[f][k]]][e];
+                                const double c = (double)pts[natural_outflow_axis][g];
+                                cmax = std::max(cmax, c); cmin = std::min(cmin, c);
+                            }
+                        }
+                    }
+                    std::printf("outflow debug: boundary faces %td, corner %s in [%g, %g], target %g\n",
+                                bfaces, natural_outflow_axis == 0 ? "x" : "y", cmin, cmax,
+                                natural_outflow_value);
+                }
+                ptrdiff_t nfaces = 0;
+                for (auto m : impl_->ss.macro_natural_mask)
+                    for (int f = 0; f < 6; ++f) nfaces += (m >> f) & 1;
+                std::printf("natural outflow: %td macro faces on %s = %g\n", nfaces,
+                            natural_outflow_axis == 0 ? "x" : (natural_outflow_axis == 1 ? "y" : "z"),
+                            natural_outflow_value);
             }
 
             // Deterministic two-pass scatter, the semi-structured counterpart of the packed
@@ -203,6 +317,29 @@ namespace sfem {
         }
 
         d.rhie_chow_scale = rhie_chow_scale;
+
+        // The coarse levels of the multigrid hierarchy are plain HEX8 meshes and take this
+        // path, so they need the same treatment as the fine semi-structured level. Without
+        // it a coarse level silently misses the step faces and keeps p_i*a on the outlet
+        // with no pin -- a singular coarse operator, whose only visible symptom is that the
+        // fine Krylov solve performs zero iterations.
+        d.face_mask.clear();
+        d.natural_mask.clear();
+        if (smesh::Env::read<int>("SFEM_BOUNDARY_MASK", 0)) {
+            if (!build_face_mask(mesh, d.nelements, d.face_mask)) {
+                SFEM_ERROR("CVFEMNavierStokes: SFEM_BOUNDARY_MASK=1 but skin_sideset failed\n");
+                return SFEM_FAILURE;
+            }
+            if (!natural_outflow_plane.empty()) {
+                int ident[8];
+                for (int a = 0; a < 8; ++a) ident[a] = a;  // plain HEX8: corners are rows 0..7
+                const ptrdiff_t nf =
+                        refine_natural_mask(d.face_mask, d.elems, d.points, ident,
+                                            natural_outflow_axis, (double)natural_outflow_value,
+                                            d.natural_mask);
+                std::printf("natural outflow (flat): %td faces\n", nf);
+            }
+        }
 
         // SFEM_BOUNDARY_MASK_CHECK=1 compares the topological mask against the coordinate
         // test, element by element and face by face.
@@ -482,6 +619,14 @@ namespace sfem {
         ret->rhie_chow_scale = rhie_chow_scale;
         ret->geom            = geom;
         ret->pack_size       = pack_size;
+        // The outflow setting must travel to the coarse levels. derefine_op re-runs
+        // initialize() on the coarse space, which rebuilds the boundary and natural masks --
+        // but only if it knows an outflow plane exists. Without this the coarse operator
+        // keeps p_i*a on the outlet and has no pin, so it is singular, its solve returns
+        // nothing, and the fine-level Krylov iteration silently does zero work.
+        ret->natural_outflow_plane = natural_outflow_plane;
+        ret->natural_outflow_axis  = natural_outflow_axis;
+        ret->natural_outflow_value = natural_outflow_value;
         return ret;
     }
 

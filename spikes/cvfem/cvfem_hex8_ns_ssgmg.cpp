@@ -27,6 +27,7 @@
 #include "sfem_mask.hpp"
 
 #include "smesh_env.hpp"
+#include "smesh_sideset.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_buffer.hpp"
 #include "smesh_mesh.hpp"
@@ -2383,11 +2384,15 @@ int main(int argc, char **argv) {
     // box the polynomial no longer vanishes at the edges and it is a different problem.
     const bool        want_cavreg = case_req == "cavity_reg" || case_req == "regularized_cavity" ||
                              case_req == "cavity_regularized";
+    // The backward-facing step is not a box: it needs its own generator and the topological
+    // boundary mask, since a coordinate test cannot see the two step faces.
+    const bool        want_step   = case_req == "step" || case_req == "backward_facing_step" ||
+                           case_req == "bfs";
     const bool        want_cavity = smesh::Env::read_string("SFEM_CASE", "") == "cavity" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid_driven_cavity";
-    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", (want_mms || want_cavreg) ? 2 : (want_cavity ? 1 : 4));
-    const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg) ? 2 : 1);
+    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", want_step ? 10 : ((want_mms || want_cavreg) ? 2 : (want_cavity ? 1 : 4)));
+    const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg || want_step) ? 2 : 1);
     const real_t      Lz         = smesh::Env::read<real_t>("SFEM_LZ", (want_mms || want_cavreg) ? 2 : 1);
     const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", 1);
     const real_t      mu         = smesh::Env::read<real_t>("SFEM_MU", 0.01);
@@ -2446,7 +2451,20 @@ int main(int argc, char **argv) {
 
     const double tick = smesh::time_seconds();
 
-    auto mesh = smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
+    auto mesh = want_step ? smesh::Mesh::create_hex8_lshape(ctx->communicator(), nx, ny, nz, Lx, Ly, Lz,
+                                                            smesh::Env::read<real_t>("SFEM_STEP_X", 1),
+                                                            smesh::Env::read<real_t>("SFEM_STEP_Y", 1))
+                          : smesh::Mesh::create_hex8_cube(ctx->communicator(), nx, ny, nz, 0, 0, 0, Lx, Ly, Lz);
+    if (!mesh) {
+        std::fprintf(stderr, "mesh generation failed\n");
+        return EXIT_FAILURE;
+    }
+    if (want_step) {
+        // The coordinate boundary test cannot see the step faces, so the topological mask is
+        // not optional here -- without it those control volumes are never closed and mass is
+        // silently not conserved along the step.
+        setenv("SFEM_BOUNDARY_MASK", "1", 0);
+    }
     // SFEM_ELEMENT_REFINE_LEVEL > 1 turns the mesh semi-structured: the cells above become
     // macro-elements, each holding a level^3 lattice, and the operator switches to the
     // sshex8 kernels on its own from what the space carries. The requested cell counts then
@@ -2468,6 +2486,14 @@ int main(int argc, char **argv) {
     op->mu   = mu;
     op->geom = (geom_name == "isoparam") ? sfem::CVFEMGeometry::Isoparam : sfem::CVFEMGeometry::Affine;
     op->pack_size = pack_size;
+    if (want_step && smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet") {
+        // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
+        // the pressure gauge -- so the pin must come off with it, or the system is
+        // over-determined.
+        op->natural_outflow_plane = "x";
+        op->natural_outflow_axis  = 0;
+        op->natural_outflow_value = Lx;
+    }
     if (op->initialize() != SFEM_SUCCESS) return EXIT_FAILURE;
     // The Newton loop below evaluates the residual immediately after every step and
     // before the linear solve, which is the condition this option asks for: the nodal
@@ -2507,6 +2533,28 @@ int main(int argc, char **argv) {
             std::printf("mesh coords checksum: %.17g %.17g %.17g\n", (double)cx, (double)cy, (double)cz);
         }
 
+        const bool step_outflow_natural =
+                smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet";
+
+        // Which nodes lie on the domain skin. Topological, so the step faces are included.
+        std::vector<char> skin_node((size_t)nnodes, 0);
+        if (flow == cvfem_case::FlowCase::Step) {
+            auto skin = smesh::skin_sideset(mesh);
+            if (!skin) {
+                std::fprintf(stderr, "step: skin_sideset failed\n");
+                return EXIT_FAILURE;
+            }
+            auto ns = smesh::create_nodeset_from_sideset(mesh, skin);
+            if (!ns) {
+                std::fprintf(stderr, "step: create_nodeset_from_sideset failed\n");
+                return EXIT_FAILURE;
+            }
+            for (ptrdiff_t k = 0; k < ns->size(); ++k) skin_node[(size_t)ns->data()[k]] = 1;
+            ptrdiff_t n_skin = 0;
+            for (auto c : skin_node) n_skin += c;
+            std::printf("step: skin nodes %td of %td\n", n_skin, nnodes);
+        }
+
         std::vector<idx_t>  uvw_nodes, uz_nodes;
         std::vector<real_t> uvw_ux, uvw_uy, uvw_uz, uz_vals;
         p_exact.assign((size_t)nnodes, real_t(0));
@@ -2529,7 +2577,38 @@ int main(int argc, char **argv) {
             const bool outlet = cvfem_case::on_plane(x, Lx, Lx);
             const bool span   = cvfem_case::on_plane(z, real_t(0), Lz) || cvfem_case::on_plane(z, Lz, Lz);
 
-            if (flow == cvfem_case::FlowCase::CavityRegularized) {
+            if (flow == cvfem_case::FlowCase::Step) {
+                // Constrain the skin, minus the outflow plane. The skin comes from the same
+                // smesh::skin_sideset that builds the boundary mask, so the Dirichlet set and
+                // the control-volume closure agree by construction.
+                //
+                // That matters more than it sounds. cvfem_ns_channel_case.hpp documents the
+                // invariant that boundary marking and the sub-control-surface test must decide
+                // the same thing, "and if they disagree a node gets a closed control volume
+                // without a boundary condition, or the reverse". On a box two independent
+                // coordinate tests happen to agree; on the L-shape they would not, because the
+                // step faces lie on no bounding-box plane. Deriving both from one skin removes
+                // the possibility rather than testing for it.
+                //
+                // Outflow nodes are simply left out: no Dirichlet condition, and the boundary
+                // sub-control-surface term then evaluates the flux from the interior state.
+                // SFEM_STEP_OUTFLOW selects the outlet treatment.
+                //   natural   (default) leave x=Lx unconstrained; the boundary
+                //             sub-control-surface term then evaluates the flux from the
+                //             interior state -- a zero-gradient finite-volume outflow.
+                //   dirichlet impose the inflow profile's fully-developed counterpart. Not
+                //             their boundary condition, so any number produced under it must
+                //             be labelled as such; it exists to separate an outflow problem
+                //             from a geometry or marking problem.
+                const bool outflow = cvfem_case::on_plane(x, Lx, Lx);
+                const bool free_outlet = step_outflow_natural && outflow;
+                if (skin_node[(size_t)i] && !free_outlet) {
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(ux);
+                    uvw_uy.push_back(uy);
+                    uvw_uz.push_back(uz);
+                }
+            } else if (flow == cvfem_case::FlowCase::CavityRegularized) {
                 // No-slip on every wall including the spanwise pair, with the lid profile on
                 // y = Ly. This is a genuinely three-dimensional cavity, which is what their
                 // section 5.5 solves and what Table 5.6 is measured on.
@@ -2593,7 +2672,16 @@ int main(int argc, char **argv) {
         conds.push_back(make_cond(uvw_nodes, uvw_uy, 1));
         conds.push_back(make_cond(uvw_nodes, uvw_uz, 2));
         if (!uz_nodes.empty()) conds.push_back(make_cond(uz_nodes, uz_vals, 2));
-        conds.push_back(make_cond({(idx_t)pin}, {pp}, 3));
+        // SFEM_PIN_PRESSURE=0 drops the pin. Needed as an experiment for the open-outflow
+        // step: if the outflow condition determines the pressure level, pinning as well
+        // over-determines the system, and the symptom would be exactly what an under-
+        // determined one gives -- a large, useless Newton step.
+        const bool step_natural = want_step &&
+                smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") != "dirichlet";
+        if (smesh::Env::read<int>("SFEM_PIN_PRESSURE", step_natural ? 0 : 1))
+            conds.push_back(make_cond({(idx_t)pin}, {pp}, 3));
+        else
+            std::printf("pressure pin: DISABLED\n");
 
         f->add_constraint(sfem::DirichletConditions::create(fs, conds));
 
@@ -3484,6 +3572,65 @@ int main(int argc, char **argv) {
             }
         }
         phase_report();
+        if (flow == cvfem_case::FlowCase::Step) {
+            // Global mass balance. This is the check that detects an unclosed control volume
+            // along the step: if a step face is missing its boundary sub-control-surface
+            // term, mass leaks there, and the imbalance is of the order of (step area) x
+            // (a velocity) -- large and obvious, not subtle.
+            //
+            // Fluxes are integrated on the inlet and outlet planes with trapezoidal nodal
+            // weights, which are exact for the bilinear variation the mesh carries there.
+            // Spacing is the FINE spacing: the macro mesh is refined by refine_level, so
+            // Ly/ny is the macro cell size and using it overstates every area by
+            // refine_level^2. Also, the two planes have different extents -- the inlet spans
+            // y in [step_y, Ly] because the notch removes the rest, so its half-weight edge
+            // is at y = step_y and not at y = 0.
+            const int    Lref = std::max(1, refine_level);
+            const real_t hy   = Ly / (real_t)(ny * Lref), hz = Lz / (real_t)(nz * Lref);
+            const real_t step_y = smesh::Env::read<real_t>("SFEM_STEP_Y", 1);
+            auto wgt = [](real_t c, real_t lo, real_t hi, real_t h) {
+                return (std::fabs(c - lo) < 1e-9 || std::fabs(c - hi) < 1e-9) ? real_t(0.5) * h : h;
+            };
+            long double q_in = 0, q_out = 0;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                const real_t xx = (real_t)px[i], yy = (real_t)py[i], zz = (real_t)pz[i];
+                const real_t wz = wgt(zz, 0, Lz, hz);
+                if (cvfem_case::on_plane(xx, real_t(0), Lx))
+                    q_in += (long double)(wgt(yy, step_y, Ly, hy) * wz) * x[(size_t)i * 4 + 0];
+                if (cvfem_case::on_plane(xx, Lx, Lx))
+                    q_out += (long double)(wgt(yy, real_t(0), Ly, hy) * wz) * x[(size_t)i * 4 + 0];
+            }
+            // Quadrature-free mass balance. The continuity residual at a node is the net mass
+            // flux out of its control volume; summed over every node the interior faces
+            // cancel in pairs and what remains is the net flux through the domain boundary.
+            // For an incompressible solution with all control volumes closed that is zero, so
+            // this separates "the discretisation leaks mass" from "my trapezoidal rule on the
+            // inlet and outlet planes disagrees with itself".
+            {
+                std::vector<real_t> rr((size_t)ndof, 0);
+                f->gradient(x, rr.data());
+                long double net = 0, absnet = 0;
+                for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                    net += (long double)rr[(size_t)i * 4 + 3];
+                    absnet += std::fabs((long double)rr[(size_t)i * 4 + 3]);
+                }
+                std::printf("step: sum of continuity residual %.6Le  (sum |.| %.6Le, ratio %.3Le)\n",
+                            net, absnet, absnet > 0 ? std::fabs(net) / absnet : 0.0L);
+            }
+
+            const long double exact_in = 1.0L / 9.0L;
+            std::printf("step: inflow flux %.9Lf  (exact %.9Lf, err %.3Le)\n",
+                        q_in, exact_in, std::fabs(q_in - exact_in));
+            std::printf("step: outflow flux %.9Lf   imbalance (out-in) %.3Le  relative %.3Le\n",
+                        q_out, q_out - q_in, std::fabs((q_out - q_in) / (q_in != 0 ? q_in : 1)));
+            std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
+            if (!converged) {
+                std::fprintf(stderr, "verification failed (step did not converge)\n");
+                return EXIT_FAILURE;
+            }
+            (void)out_folder;
+            return EXIT_SUCCESS;
+        }
         if (flow == cvfem_case::FlowCase::Cavity ||
             flow == cvfem_case::FlowCase::CavityRegularized) {
             // No closed form to compare against. Report what a cavity run is actually judged

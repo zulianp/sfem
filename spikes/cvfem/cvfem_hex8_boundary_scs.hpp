@@ -131,7 +131,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
                                                   const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
                                                   const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
                                                   const scalar_t *const SFEM_RESTRICT p, scalar_t *const SFEM_RESTRICT r,
-                                                  const int fmask = -1) {
+                                                  const int fmask = -1,
+                                                  const int nmask = 0) {
     scalar_t grad_el[9];
     scalar_t A[3][3];
     if (!isoparam) {
@@ -176,10 +177,32 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
             cvfem_hex8_traction(mu, grad[0], grad[1], grad[2], grad[3], grad[4], grad[5], grad[6], grad[7], grad[8], ax, ay, az,
                                 tau_x, tau_y, tau_z);
             const scalar_t mdot = rho * (ux[i] * ax + uy[i] * ay + uz[i] * az);
-            r[i * 4 + 0] += mdot * ux[i] + p[i] * ax - tau_x;
-            r[i * 4 + 1] += mdot * uy[i] + p[i] * ay - tau_y;
-            r[i * 4 + 2] += mdot * uz[i] + p[i] * az - tau_z;
-            r[i * 4 + 3] += mdot;
+            if ((nmask >> f) & 1) {
+                // Do-nothing (natural) outflow: (p I - tau) . n = 0, so the pressure and
+                // viscous traction are prescribed rather than evaluated. Dropping them is
+                // what makes this a genuine outflow condition and what removes the constant-
+                // pressure nullspace -- with p_i * a retained, a uniform pressure shift
+                // integrates to zero over every closed control volume and the gauge stays
+                // undetermined, so the solve needs a pin and behaves badly with one.
+                //
+                // Backflow guard: the convective term uses max(mdot, 0). The interior kernel
+                // has an upwind switch (mpos/mneg) and this one does not, so on a face where
+                // mdot < 0 the unguarded form would convect the *downwind* value into the
+                // domain -- the classic finite-volume backflow instability, and a
+                // recirculating outlet is where it bites.
+                const scalar_t mup = mdot > scalar_t(0) ? mdot : scalar_t(0);
+                r[i * 4 + 0] += mup * ux[i];
+                r[i * 4 + 1] += mup * uy[i];
+                r[i * 4 + 2] += mup * uz[i];
+                // Continuity carries the true flux, not the guarded one: clipping it would
+                // destroy global mass conservation, which is the property being verified.
+                r[i * 4 + 3] += mdot;
+            } else {
+                r[i * 4 + 0] += mdot * ux[i] + p[i] * ax - tau_x;
+                r[i * 4 + 1] += mdot * uy[i] + p[i] * ay - tau_y;
+                r[i * 4 + 2] += mdot * uz[i] + p[i] * az - tau_z;
+                r[i * 4 + 3] += mdot;
+            }
         }
     }
 }
@@ -191,7 +214,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
                                                  const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
                                                  const scalar_t *const SFEM_RESTRICT uy, const scalar_t *const SFEM_RESTRICT uz,
                                                  const smesh::count_t *const SFEM_RESTRICT slots, scalar_t *const SFEM_RESTRICT values,
-                                                  const int fmask = -1) {
+                                                  const int fmask = -1,
+                                                  const int nmask = 0) {
     scalar_t A[3][3];
     scalar_t w_el[CVFEM_HEX8_N_NODES][3];
     if (!isoparam) {
@@ -278,7 +302,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
                                                          const scalar_t *const SFEM_RESTRICT uz, const scalar_t *const SFEM_RESTRICT vx,
                                                          const scalar_t *const SFEM_RESTRICT vy, const scalar_t *const SFEM_RESTRICT vz,
                                                          const scalar_t *const SFEM_RESTRICT q, scalar_t *const SFEM_RESTRICT r,
-                                                  const int fmask = -1) {
+                                                  const int fmask = -1,
+                                                  const int nmask = 0) {
     scalar_t dgrad_el[9];
     scalar_t A[3][3];
     if (!isoparam) {
@@ -324,10 +349,23 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
                                 ay, az, dtx, dty, dtz);
             const scalar_t mdot  = rho * (ux[i] * ax + uy[i] * ay + uz[i] * az);
             const scalar_t dmdot = rho * (vx[i] * ax + vy[i] * ay + vz[i] * az);
-            r[i * 4 + 0] += dmdot * ux[i] + mdot * vx[i] + q[i] * ax - dtx;
-            r[i * 4 + 1] += dmdot * uy[i] + mdot * vy[i] + q[i] * ay - dty;
-            r[i * 4 + 2] += dmdot * uz[i] + mdot * vz[i] + q[i] * az - dtz;
-            r[i * 4 + 3] += dmdot;
+            if ((nmask >> f) & 1) {
+                // Exact derivative of the natural-outflow residual above. The max(mdot, 0)
+                // guard is piecewise linear, so its derivative is dmdot*u_i + mdot*v_i where
+                // mdot > 0 and zero where it is not. The kink at mdot == 0 is the same class
+                // of non-differentiability the interior upwind switch already has.
+                if (mdot > scalar_t(0)) {
+                    r[i * 4 + 0] += dmdot * ux[i] + mdot * vx[i];
+                    r[i * 4 + 1] += dmdot * uy[i] + mdot * vy[i];
+                    r[i * 4 + 2] += dmdot * uz[i] + mdot * vz[i];
+                }
+                r[i * 4 + 3] += dmdot;
+            } else {
+                r[i * 4 + 0] += dmdot * ux[i] + mdot * vx[i] + q[i] * ax - dtx;
+                r[i * 4 + 1] += dmdot * uy[i] + mdot * vy[i] + q[i] * ay - dty;
+                r[i * 4 + 2] += dmdot * uz[i] + mdot * vz[i] + q[i] * az - dtz;
+                r[i * 4 + 3] += dmdot;
+            }
         }
     }
 }

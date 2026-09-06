@@ -81,6 +81,12 @@ namespace sfem {
         // force the residual is untouched.
         void set_body_force(const real_t *fx, const real_t *fy, const real_t *fz);
 
+        // Natural (do-nothing) outflow on a coordinate plane; set before initialize().
+        // Empty means none, which is every case but the backward-facing step.
+        std::string natural_outflow_plane;   // "" | "x" | "y" | "z"
+        int         natural_outflow_axis{0};
+        real_t      natural_outflow_value{0};
+
         // Control volume per node -- the CVFEM lumped mass. Exposed because the driver
         // cannot include the kernel headers, and the MMS error norms are volume-weighted.
         int node_volume(real_t *const out) const;

@@ -61,6 +61,9 @@ struct SSMeshData {
     // lattice indices, and is level-independent, so one macro-level mask serves every level
     // of the multigrid hierarchy.
     std::vector<uint8_t> macro_face_mask;
+    // Faces carrying the do-nothing outflow. Empty means none, which is every case except
+    // the backward-facing step, so the outflow branch is never taken elsewhere.
+    std::vector<uint8_t> macro_natural_mask;
 
     // Deterministic scatter tables, built once. Null means the atomic path.
     std::shared_ptr<struct SSScatter> scatter;
@@ -925,7 +928,11 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
                                                           ? -1
                                                           : sscvfem_micro_face_mask(
                                                                     (int)d.macro_face_mask[(size_t)e],
-                                                                    L, xi, yi, zi));
+                                                                    L, xi, yi, zi),
+                                                  sscvfem_micro_face_mask(
+                                                          d.macro_natural_mask.empty() ? 0
+                                                              : (int)d.macro_natural_mask[(size_t)e],
+                                                          L, xi, yi, zi));
 
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
@@ -1583,7 +1590,11 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                                                           ? -1
                                                           : sscvfem_micro_face_mask(
                                                                     (int)d.macro_face_mask[(size_t)e],
-                                                                    L, xi, yi, zi));
+                                                                    L, xi, yi, zi),
+                                                  sscvfem_micro_face_mask(
+                                                          d.macro_natural_mask.empty() ? 0
+                                                              : (int)d.macro_natural_mask[(size_t)e],
+                                                          L, xi, yi, zi));
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
                             for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
@@ -1768,7 +1779,11 @@ inline SFEM_NOINLINE void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, 
                                                           ? -1
                                                           : sscvfem_micro_face_mask(
                                                                     (int)d.macro_face_mask[(size_t)e],
-                                                                    L, xi, yi, zi));
+                                                                    L, xi, yi, zi),
+                                                  sscvfem_micro_face_mask(
+                                                          d.macro_natural_mask.empty() ? 0
+                                                              : (int)d.macro_natural_mask[(size_t)e],
+                                                          L, xi, yi, zi));
                     }
                 }
             }
