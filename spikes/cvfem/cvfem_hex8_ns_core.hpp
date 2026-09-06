@@ -88,6 +88,12 @@ struct MeshData {
     std::vector<scalar_t> rx, ry, rz, rc;
     std::vector<scalar_t> pgx, pgy, pgz;
     std::vector<scalar_t> qgx, qgy, qgz;  // same reconstruction applied to the Jacobian direction
+    // Optional body force, one value per node, and the control volume it is weighted by.
+    // Left empty for every case that has no source term, in which case nothing is added and
+    // the residual is bit-identical to what it was before this existed. Used by the
+    // manufactured-solution case, where f = -(1/Re) lap(u) + (u.grad)u + grad(p).
+    std::vector<scalar_t> fx, fy, fz;
+    std::vector<scalar_t> node_vol;
     std::vector<scalar_t> jacobian_adjugate[9];
     std::vector<scalar_t> jacobian_determinant;
     PackedData           *packed{nullptr};
@@ -663,20 +669,49 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
     }
 }
 
+inline void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol);  // defined below
+
+// Subtract the body force from the momentum residual.
+//
+// The residual is a *volume integral* over each node's control volume -- see the flux form in
+// cvfem_hex8_ns_upwind_residual_sumfact, where the face contribution is added at the owner and
+// subtracted at the neighbour, so r[i*4+0..2] accumulates the integral of
+// div(rho u u) + grad p - div tau over CV_i. A source term therefore enters as -f(x_i) * V_i,
+// with V_i the control volume from build_node_volume.
+//
+// This is a per-node post-pass rather than a term inside the element kernels, and that is
+// deliberate: the forcing does not interact with any sub-control-surface flux, so putting it
+// here covers the sumfact, isoparametric and packed sweeps at once instead of touching five
+// host kernels and five CUDA kernels for the same arithmetic.
+inline void apply_body_force(MeshData &d) {
+    if (d.fx.empty()) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) build_node_volume(d, d.node_vol);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t v = d.node_vol[(size_t)i];
+        d.rx[(size_t)i] -= d.fx[(size_t)i] * v;
+        d.ry[(size_t)i] -= d.fy[(size_t)i] * v;
+        d.rz[(size_t)i] -= d.fz[(size_t)i] * v;
+    }
+}
+
 inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual");
     assemble_nodal_p_grad(d, geom);
     if (geom == GeomKind::Isoparam) {
         apply_residual_atomic_isoparam(d, rho, mu);
+        apply_body_force(d);
         return;
     }
     if (d.packed) {
         reset_residual(d);
         cvfem_hex8_apply_residual_packed(d, *d.packed, rho, mu);
         apply_boundary_scs_residual(d, rho, mu, 0);
+        apply_body_force(d);
         return;
     }
     apply_residual_atomic_sumfact(d, rho, mu);
+    apply_body_force(d);
 }
 
 // zero_first=false accumulates into whatever is already in b. sfem::Function::hessian_bsr
@@ -778,7 +813,12 @@ inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, co
     // The Rhie-Chow correction differentiates through the nodal pressure-gradient
     // reconstruction, so the direction's own reconstructed gradient is needed. One extra
     // pass per Jacobian apply, the same shape as the one update() already does for p.
-    if (d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
+    // SFEM_RC_EXACT_JAC=0 restores the frozen-pg Jacobian. Parity with the semi-structured
+    // path, and it is what lets cvfem_ns_op_gate compare the assembled operator against the
+    // matrix-free action like for like: the assembled Jacobian keeps the frozen form on
+    // purpose, so with the exact term on they are *meant* to differ.
+    static const int rc_exact = smesh::Env::read<int>("SFEM_RC_EXACT_JAC", 1);
+    if (rc_exact && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
         SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_q_grad");
         assemble_nodal_grad_strided(d, geom, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
     } else {
