@@ -14,6 +14,7 @@ from codegen.framework.package.op_wrappers import (
     generate_op_files,
     generate_op_registration_files,
 )
+from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
 from codegen.framework.emitters.artifacts import (
     GeneratedKernelFile,
 )
@@ -279,6 +280,11 @@ class CodeGenerator:
     matrix_mesh_layouts: tuple = ("standard",)
     matrix_packed_passes: tuple = ("one_pass", "two_pass")
     matrix_patch_node_index_filter: bool = False
+    #: Opt in to the projected apply of `plans.inexact_apply`.  Off by default
+    #: and additive when on: it publishes an extra entry point beside the exact
+    #: one rather than replacing it, because on anything but an affine simplex
+    #: it computes a deliberately different operator.
+    inexact_apply: bool = False
 
     def __post_init__(self):
         _validate_name(self.name)
@@ -713,6 +719,8 @@ class CodeGenerationStage:
     def run(self):
         outputs = {}
         target = _normalize_generation_target(self.target)
+        material = self.user_input.material
+        wants_inexact = bool(getattr(material, "inexact_apply", False))
         for context in self.user_input.element_contexts:
             for unit in self.codegen_plan.emission_kernels_for_context(context):
                 _merge_files(
@@ -723,6 +731,20 @@ class CodeGenerationStage:
                         _emit_codegen_unit(unit, context, target),
                     ),
                 )
+                if wants_inexact:
+                    _merge_files(
+                        outputs,
+                        _layout_codegen_files(
+                            unit,
+                            context,
+                            tuple(
+                                GeneratedKernelFile(path, source)
+                                for path, source in inexact_apply_files(
+                                    material, unit, context
+                                )
+                            ),
+                        ),
+                    )
         return outputs
 
 

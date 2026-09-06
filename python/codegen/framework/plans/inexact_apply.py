@@ -427,3 +427,23 @@ def staged_action(plan, tangent, increment, output_names):
         ActionStage("mixed", tuple(mixed_defs)),
         ActionStage("output", tuple(output_defs)),
     )
+
+
+def emittable_inexact_apply_plan(element_type, dim, n_nodes, flux_form, rule):
+    """The plan when this element and form can take the projected apply.
+
+    Every condition is here rather than in the emitter: an element with no
+    symbolic basis, a plan whose shape disagrees with the specialization, a
+    rule whose reference gradients are not the constants an affine simplex
+    has, or a form whose field arity is not the spatial dimension.  Emission
+    asks once and spells the answer.
+    """
+    plan = inexact_apply_plan(element_type)
+    if plan is None or plan.dim != int(dim) or plan.n_nodes != int(n_nodes):
+        return None
+    if flux_form is None or flux_form.n_field_components != int(dim):
+        return None
+    values = tuple(getattr(rule, "reference_gradients", ()) or ())
+    if len(values) != int(n_nodes) * int(dim):
+        return None
+    return plan
