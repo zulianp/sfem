@@ -1918,7 +1918,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     % (
                         output_streams,
                         shape,
-                        dim,
+                        n_field_components,
                         row,
                         work_item,
                         op,
