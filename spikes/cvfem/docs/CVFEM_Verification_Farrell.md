@@ -179,3 +179,81 @@ Ordered by how much work each is, not by importance.
 
 Items 2 and 3 are the ones that actually gate the step benchmark; the mesh is not the hard
 part despite being the visible one.
+
+---
+
+# Measured results
+
+All on an Apple M1 (10 cores), 8 threads, under other load — **wall-clock figures are
+indicative only; iteration counts are the comparable quantity.**
+
+## 1. Manufactured solution — the discretisation is second order
+
+`[0,2]³` at Re=1, volume-weighted `L²`, pressure compared up to a constant.
+
+| h | dof | `u_l2` | order | `p_l2` (gauge-shifted) | order |
+|---|---|---|---|---|---|
+| 0.5000 | 500 | 3.970e-01 | — | 2.320e+00 | — |
+| 0.2500 | 2,916 | 9.158e-02 | 2.12 | 9.321e-01 | 1.32 |
+| 0.1250 | 19,652 | 2.015e-02 | 2.18 | 3.451e-01 | 1.43 |
+| 0.0625 | 143,748 | 4.924e-03 | 2.03 | 1.345e-01 | 1.36 |
+
+**Second order in velocity, ≈1.4 in pressure**, both stable across the ladder rather than
+drifting. Re=1 is the informative point: upwinding is inactive there, so first order would
+have indicated a consistency error rather than benign upwind diffusion. This is the first
+measurement of this solver's order of accuracy.
+
+Two measurement choices were necessary; the naive ones actively mislead. In `L∞` the same
+data reads 1.92/2.35/1.43 for velocity and 0.90/0.53/0.38 for pressure — a pressure order
+that appears to collapse. `L∞` is set by a single worst node, and the pin lets the gauge
+drift (`dp_mean` 0.033 → −0.151), which is then charged as error at every node.
+
+The pin was the obvious suspect for the pressure behaviour and was measured innocent: it sits
+at (0,0,0), the worst velocity error is 21 h away and the worst pressure error 22.6 h away,
+and excluding balls of radius 1h, 2h and 4h around it changes neither error in any digit.
+
+Re=200 and Re=500 do not converge at these resolutions (cell Reynolds number ≈50 on the
+coarse meshes). Expected without the AL preconditioner.
+
+## 2. Regularized lid-driven cavity
+
+`[0,2]³`, 32³ cells, 19,652 dof, fully 3D no-slip.
+
+| Re | reached | Newton | Krylov/Newton | theirs (Table 5.6) | ratio |
+|---|---|---|---|---|---|
+| 10 | 10 | 7 | 192.9 | 4.50 | 43× |
+| 100 | 100 | 13 | 86.2 | 4.00 | 22× |
+| 1000 | 928.2 | 62 | 752.7 | 5.00 | 151× |
+
+Their count is flat across two decades; ours improves to Re=100 then degrades ninefold by
+Re=1000. **That divergence is the augmented-Lagrangian preconditioner's contribution**, which
+is out of scope here — not a shortfall of the discretisation.
+
+**The regularization matters, and by how much was checked rather than asserted:** at the same
+mesh and Reynolds target the regularized lid reaches **928.2** where the constant lid reaches
+**549.5**, a factor of 1.69. The corner singularity, not the solver, is what caps the
+constant-lid case. Note the constant-lid case keeps `uz=0` slip spanwise walls, which is
+correct for comparison against Ghia et al.'s 2D data and wrong for comparison against theirs.
+
+## 3. Backward-facing step
+
+40×8×4 macro at level 2, 47,268 dof, Re=20, `SFEM_GMG=0`.
+
+**Global mass conservation: Σ continuity residual = 7.04e-14.** Every control volume is
+closed, including the two step faces — which is exactly what fails if the boundary marking
+misses them.
+
+That check is quadrature-free and is the conservation test. A cruder plane-integrated flux
+comparison gives 0.1077 in and 0.0896 out, a 17% "imbalance" that is entirely trapezoidal
+error: the inlet is a smooth parabola (3% low against the exact 1/9) while the outlet profile
+is developing and recirculating. The inlet figure is worth keeping as a check on the
+prescribed profile; the outlet one is not a conservation measure.
+
+The outflow required the genuine do-nothing condition. Dirichlet outlet: solves, Newton
+quadratic. Unconstrained outlet with `p_i·a` retained: diverges, `|dx|_inf` 108 against 49.
+Unconstrained and unpinned: linear solve diverges outright — confirming the nullspace
+survives. Prescribing `(pI − τ)·n = 0` fixes the gauge and lets the pin come off.
+
+**Known limitation:** multigrid does not yet work for this case. `cvfem_ss_galerkin.hpp` still
+calls the boundary term without the masks, so the coarse operator is inconsistent and the
+solve stalls at zero Krylov iterations.
