@@ -206,6 +206,26 @@ class InexactApplyPlan:
         order = self.dim * self.dim
         return row * order - row * (row - 1) // 2 + (column - row)
 
+    def state_dependence(self, packed, state):
+        """Which state values the projected tangent actually reads.
+
+        A state-independent material -- linear elasticity, whose tangent is the
+        constant elasticity tensor -- reads none of them, and a kernel that
+        gathers a state it never uses is carrying twelve dead loads on a
+        tetrahedron and twenty-four on a hexahedron.  The question is answered
+        here because it is a property of the projected tangent, and because an
+        emitter that answered it would be analysing rather than printing.
+        """
+        read = set()
+        for expression in packed:
+            read |= expression.free_symbols
+        return frozenset(
+            symbol
+            for row in state
+            for symbol in row
+            if symbol in read
+        )
+
     def action(self, tangent, increment):
         """`(H h)_{i,p}`, as expressions in the packed tangent and increment.
 
@@ -453,3 +473,94 @@ def emittable_inexact_apply_plan(element_type, dim, n_nodes, flux_form, rule):
     if not tuple(getattr(rule, "weights", ()) or ()):
         return None
     return plan
+
+
+def projected_tangent(
+    plan,
+    flux_form,
+    rule,
+    adjugate,
+    determinant,
+    state,
+    is_deformation_gradient,
+):
+    """`Sbar` packed, as expressions in the adjugate, determinant and state.
+
+    This is the projection itself, and it lives here rather than in the
+    emitter because two kernels need the same answer: the fused apply, which
+    builds `Sbar` and immediately consumes it, and the partial assembly, which
+    builds it and stores it.  Emitting it twice from two places is how the two
+    would drift apart.
+
+    `Sbar` is the material tangent pulled back through the geometry,
+
+        Sbar_{ikmn} = (1/|E|) integral A_{ijkl} adj_{nj} adj_{ml} / det
+
+    averaged over the element -- for a quadrature rule, its weighted average
+    over the points.  On an element whose state does not vary (a linear
+    simplex, or any element under a state-independent material) every point
+    gives the same value and the average is that value, which is the sense in
+    which the kernel is exact there.
+    """
+    dim, n_nodes = plan.dim, plan.n_nodes
+    gradients = reference_gradients_by_point(rule, n_nodes, dim)
+    inverse = adjugate / determinant
+
+    variables = list(flux_form.gradient)
+    flux = list(flux_form.flux)
+    tangent = {
+        (i, j, k, l): sp.diff(flux[i * dim + j], variables[k * dim + l])
+        for i, j, k, l in itertools.product(range(dim), repeat=4)
+    }
+    # `is_deformation_gradient` says whether the form's variable is `I + grad u`
+    # rather than `grad u`.  It shifts the diagonal and nothing else.
+    shift = {True: sp.Integer(1), False: sp.Integer(0)}[bool(is_deformation_gradient)]
+
+    weights = tuple(sp.nsimplify(weight) for weight in rule.weights)
+    measure = sum(weights, sp.Integer(0))
+    packed = [sp.Integer(0)] * plan.tangent_components
+    for point, weight in enumerate(weights):
+        substitution = {}
+        for c in range(dim):
+            for axis in range(dim):
+                substitution[variables[c * dim + axis]] = shift * int(c == axis) + sum(
+                    state[c][j]
+                    * sum(gradients[point][j][m] * inverse[m, axis] for m in range(dim))
+                    for j in range(n_nodes)
+                )
+        seen = set()
+        for i, k, m, n in itertools.product(range(dim), repeat=4):
+            slot = plan.tangent_index(i, k, m, n)
+            if slot in seen:
+                continue
+            seen.add(slot)
+            pulled = (
+                sum(
+                    tangent[(i, j, k, l)] * adjugate[n, j] * adjugate[m, l]
+                    for j, l in itertools.product(range(dim), repeat=2)
+                )
+                / determinant
+            )
+            packed[slot] += weight * pulled.subs(substitution) / measure
+    return tuple(packed)
+
+
+def reference_gradients_by_point(rule, n_nodes, dim):
+    """The specialization's reference gradients, indexed `[point][node][axis]`.
+
+    A linear simplex has one point and constant gradients, which is this shape
+    with a single block, so no caller separates the two cases.
+    """
+    values = tuple(rule.reference_gradients)
+    points = int(getattr(rule, "n_qp", 1) or 1)
+    stride = n_nodes * dim
+    return tuple(
+        tuple(
+            tuple(
+                sp.nsimplify(values[point * stride + node * dim + axis])
+                for axis in range(dim)
+            )
+            for node in range(n_nodes)
+        )
+        for point in range(points)
+    )

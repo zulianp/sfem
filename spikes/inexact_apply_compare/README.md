@@ -43,3 +43,29 @@ element: on HEX8 or TET10 the projection is a genuine approximation and the
 right measurement is a relative error against the exact apply, not agreement.
 That needs the kernel emitted for those elements and a driver that sweeps mesh
 resolution, and it is not done.
+
+## The split kernels
+
+`bench_split.cpp` / `run_split.sh` measure the form that pays: `Sbar` assembled
+once into a store, then applied. The generated header carries four entry points
+per element —
+
+    <material>_<element>_apply_inexact_affine_mesh_soa
+        fused: geometry, state, parameters and the vector.  The correctness
+        gate, not a performance variant.
+
+    <material>_<element>_inexact_apply_tangent_affine_mesh_soa
+        geometry, state and parameters in, `Sbar` out.  Once per tangent.
+
+    <material>_<element>_inexact_apply_stored_affine_mesh_soa
+    <material>_<element>_inexact_apply_compressed_affine_mesh_soa
+        `Sbar` and the vector.  No geometry, no state, no material parameters.
+
+`Sbar` is 45 numbers per element in three dimensions, the same packing the
+hand-written `*_S_IKMN_SIZE` operators use, under the major symmetry
+`S[i,k,m,n] == S[k,i,n,m]`. The store's type is a template parameter, so
+`double`, `metric_tensor_t` (float) and `compressed_t` (half, with one
+`scaling_t` per element) are the same kernel. Its two strides let the caller
+choose element-major or component-major without a second kernel.
+
+See `RESULTS.md` for the measured throughput and break-even.
