@@ -15,7 +15,7 @@
 
 namespace cvfem_case {
 
-    enum class FlowCase { Poiseuille, Couette };
+    enum class FlowCase { Poiseuille, Couette, Cavity };
 
     inline bool parse_case(const std::string &name, FlowCase &out) {
         if (name == "poiseuille") {
@@ -24,6 +24,10 @@ namespace cvfem_case {
         }
         if (name == "couette" || name == "coutte") {
             out = FlowCase::Couette;
+            return true;
+        }
+        if (name == "cavity" || name == "lid_driven_cavity" || name == "lid") {
+            out = FlowCase::Cavity;
             return true;
         }
         return false;
@@ -43,6 +47,14 @@ namespace cvfem_case {
     // Fully developed flow between plates at y = 0 and y = Ly. Couette is driven by the
     // lid, Poiseuille by the pressure gradient G = 8 mu U / Ly^2 that produces peak
     // velocity U.
+    //
+    // The lid-driven cavity has no closed form, so for that case this returns the boundary
+    // data rather than a solution: u = (U,0,0) on the lid y = Ly and zero on the other three
+    // walls. That is all the driver asks of it when imposing constraints -- and the reason a
+    // cavity run must not be verified against it, because in the interior it is not the
+    // answer. Unlike Poiseuille and Couette, whose profiles are independent of Reynolds
+    // number, the cavity's solution genuinely changes with Re, which is what makes it a real
+    // test of the continuation rather than a formality.
     template <typename T>
     inline void exact_state(const FlowCase flow,
                             const T        mu,
@@ -58,6 +70,11 @@ namespace cvfem_case {
                             T &p) {
         uy = T(0);
         uz = T(0);
+        if (flow == FlowCase::Cavity) {
+            ux = on_plane(y, Ly, Ly) ? U : T(0);
+            p  = T(0);
+            return;
+        }
         if (flow == FlowCase::Couette) {
             ux = U * (y / Ly);
             p  = T(0);

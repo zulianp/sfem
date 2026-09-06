@@ -59,7 +59,7 @@ namespace {
                      "directly comparable.\n"
                      "\n"
                      "Environment:\n"
-                     "  SFEM_CASE            poiseuille | couette (required)\n"
+                     "  SFEM_CASE            poiseuille | couette | cavity (required)\n"
                      "  SFEM_N               cells in y (default 8)\n"
                      "  SFEM_NX SFEM_NY SFEM_NZ   override cells per direction\n"
                      "  SFEM_LX SFEM_LY SFEM_LZ   channel size (default 4, 1, 1)\n"
@@ -2373,7 +2373,12 @@ int main(int argc, char **argv) {
     int               ny         = smesh::Env::read<int>("SFEM_NY", n);
     int               nx         = smesh::Env::read<int>("SFEM_NX", 0);
     int               nz         = smesh::Env::read<int>("SFEM_NZ", 0);
-    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", 4);
+    // The channel default is 4x1x1; a cavity wants a square box, so its default differs.
+    // Explicit SFEM_LX/LY/LZ still win.
+    const bool        want_cavity = smesh::Env::read_string("SFEM_CASE", "") == "cavity" ||
+                             smesh::Env::read_string("SFEM_CASE", "") == "lid" ||
+                             smesh::Env::read_string("SFEM_CASE", "") == "lid_driven_cavity";
+    const real_t      Lx         = smesh::Env::read<real_t>("SFEM_LX", want_cavity ? 1 : 4);
     const real_t      Ly         = smesh::Env::read<real_t>("SFEM_LY", 1);
     const real_t      Lz         = smesh::Env::read<real_t>("SFEM_LZ", 1);
     const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", 1);
@@ -2418,7 +2423,7 @@ int main(int argc, char **argv) {
 
     FlowCase flow;
     if (case_name.empty() || !cvfem_case::parse_case(case_name, flow)) {
-        std::fprintf(stderr, "SFEM_CASE is required (poiseuille or couette)\n");
+        std::fprintf(stderr, "SFEM_CASE is required (poiseuille, couette or cavity)\n");
         usage(argv[0]);
         return EXIT_FAILURE;
     }
@@ -3263,6 +3268,34 @@ int main(int argc, char **argv) {
                 t_solve,
                 lin_it_total ? 1e6 * t_solve / lin_it_total : 0.0);
 
+    // Write the mesh and the solution so a run can actually be looked at afterwards.
+    // argv[1] has always been taken as an output folder but was discarded, so every
+    // verification case ran blind: a converged number and nothing to inspect. The layout is
+    // the one the rest of the tree uses -- mesh/ plus SoA field files -- so
+    // external/smesh/python/smesh/raw_to_db.py converts it without special-casing.
+    //
+    // Semi-structured meshes need semistructured_export_as_standard: the macro-element mesh
+    // on its own describes only the corners, and writing that would silently show a
+    // level-1 mesh with the fine solution attached to it.
+    if (smesh::Env::read<int>("SFEM_ENABLE_OUTPUT", 1)) {
+        const smesh::Path out_dir(out_folder);
+        smesh::create_directory(out_dir);
+        if (fs->has_semi_structured_mesh()) {
+            mesh->write(out_dir / "coarse_mesh");
+            smesh::semistructured_export_as_standard(fs->mesh_ptr(), out_dir / "mesh");
+        } else {
+            mesh->write(out_dir / "mesh");
+        }
+        auto output = f->output();
+        // block_size is 4 (ux, uy, uz, p), so split the interleaved state into one file per
+        // field: x.0 x.1 x.2 are the velocity components and x.3 the pressure.
+        output->enable_AoS_to_SoA(true);
+        output->set_output_dir(out_dir);
+        output->write("x", x);
+        std::printf("output: wrote mesh and solution to %s (x.0 x.1 x.2 = u, x.3 = p)\n",
+                    out_folder.c_str());
+    }
+
     // Verification against the analytic profile, on the free nodes only, matching what
     // the standalone driver reports.
     {
@@ -3280,6 +3313,38 @@ int main(int argc, char **argv) {
             p_linf = std::max(p_linf, std::fabs(x[(size_t)i * 4 + 3] - p));
         }
         phase_report();
+        if (flow == cvfem_case::FlowCase::Cavity) {
+            // No closed form to compare against. Report what a cavity run is actually judged
+            // on: the velocity extrema, and u_x down the vertical centreline, which is the
+            // profile tabulated by Ghia, Ghia & Shin (1982) for the square cavity.
+            real_t umin = 1e300, umax = -1e300, vmin = 1e300, vmax = -1e300;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                umin = std::min(umin, x[(size_t)i * 4 + 0]);
+                umax = std::max(umax, x[(size_t)i * 4 + 0]);
+                vmin = std::min(vmin, x[(size_t)i * 4 + 1]);
+                vmax = std::max(vmax, x[(size_t)i * 4 + 1]);
+            }
+            std::printf("cavity: ux in [%.6f, %.6f]   uy in [%.6f, %.6f]\n",
+                        (double)umin, (double)umax, (double)vmin, (double)vmax);
+            std::printf("cavity: u_x on the vertical centreline (x=%.3g, z=%.3g)\n",
+                        (double)(0.5 * Lx), (double)(0.5 * Lz));
+            const real_t xtol = real_t(1e-6) * std::max(Lx, real_t(1));
+            const real_t ztol = real_t(1e-6) * std::max(Lz, real_t(1));
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                if (std::fabs((real_t)px[i] - real_t(0.5) * Lx) > xtol) continue;
+                if (std::fabs((real_t)pz[i] - real_t(0.5) * Lz) > ztol) continue;
+                std::printf("   y/Ly %.4f   ux %+.6f   uy %+.6f\n",
+                            (double)((real_t)py[i] / Ly), (double)x[(size_t)i * 4 + 0],
+                            (double)x[(size_t)i * 4 + 1]);
+            }
+            std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
+            if (!converged) {
+                std::fprintf(stderr, "verification failed (cavity did not converge)\n");
+                return EXIT_FAILURE;
+            }
+            (void)out_folder;
+            return EXIT_SUCCESS;
+        }
     std::printf("u_linf: %.6e  p_linf: %.6e\n", u_linf, p_linf);
         std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
 
