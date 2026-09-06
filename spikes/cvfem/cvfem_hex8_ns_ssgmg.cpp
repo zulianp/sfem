@@ -3221,9 +3221,18 @@ int main(int argc, char **argv) {
                 if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 2 && newton_it == 0) {
                     std::vector<real_t> probe((size_t)ndof, 0);
                     gmg->mg->verbose = true;
+                    // Multigrid::debug prints, per level per cycle, the coarse residual after
+                    // the coarse solve, the coarse correction before prolongation, the
+                    // prolonged correction, and the fine residual after the correction. Those
+                    // are exactly the intermediate norms needed to localise where a cycle
+                    // first produces a non-finite value; the residual monitor alone only
+                    // reports once per cycle, which localises no further than "somewhere
+                    // between the restriction of one cycle and the residual of the next".
+                    gmg->mg->debug = smesh::Env::read<int>("SFEM_GMG_DEBUG", 0) != 0;
                     gmg->mg->set_max_it(smesh::Env::read<int>("SFEM_GMG_CHECK_IT", 20));
                     gmg->mg->apply(rhs.data(), probe.data());
                     gmg->mg->verbose = false;
+                    gmg->mg->debug   = false;
                     gmg->mg->set_max_it(1);
 
                     // Where does the stalled error live?

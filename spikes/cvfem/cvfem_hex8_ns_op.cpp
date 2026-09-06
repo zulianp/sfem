@@ -110,6 +110,45 @@ namespace sfem {
         return true;
     }
 
+    // Report where a face mask's marked faces actually lie.
+    //
+    // This is the check that discriminates a mask that names the right faces from one whose
+    // element indices no longer address what they did. A Sideset stores (parent, lfi) with
+    // parent an ELEMENT index; if a mesh derived from another renumbers elements, the same
+    // pairs silently name different faces, and every component test still passes while the
+    // boundary condition is applied in the domain interior.
+    //
+    // `corner_off` maps CVFEM local corner index to the element-array row holding it: the
+    // identity for a plain HEX8, the lattice extremes for a semi-structured macro element.
+    static void report_mask_extent(const char *what, const std::vector<uint8_t> &mask,
+                                   const smesh::idx_t *const *elems, const smesh::geom_t *const *pts,
+                                   const int *corner_off) {
+        double lo[3] = {1e30, 1e30, 1e30}, hi[3] = {-1e30, -1e30, -1e30};
+        ptrdiff_t nfaces = 0;
+        for (size_t e = 0; e < mask.size(); ++e) {
+            const int bm = mask[e];
+            if (!bm) continue;
+            for (int f = 0; f < 6; ++f) {
+                if (!((bm >> f) & 1)) continue;
+                ++nfaces;
+                for (int k = 0; k < 4; ++k) {
+                    const smesh::idx_t g = elems[corner_off[CVFEM_HEX8_BFACE_NODES[f][k]]][(ptrdiff_t)e];
+                    for (int d = 0; d < 3; ++d) {
+                        const double c = (double)pts[d][g];
+                        lo[d] = std::min(lo[d], c);
+                        hi[d] = std::max(hi[d], c);
+                    }
+                }
+            }
+        }
+        if (!nfaces) {
+            std::printf("mask_extent[%s]: EMPTY\n", what);
+            return;
+        }
+        std::printf("mask_extent[%s]: %td faces, x in [%g,%g]  y in [%g,%g]  z in [%g,%g]\n",
+                    what, nfaces, lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
+    }
+
     // Compile a Sideset into the per-element bitmask the kernels read.
     //
     // The sideset is the specification and the mask is its compiled form: a sideset is a list
@@ -238,6 +277,18 @@ namespace sfem {
                 }
                 std::printf("natural outflow: %td macro faces from sideset '%s'\n", nf,
                             natural_outflow_sideset.c_str());
+                if (smesh::Env::read<int>("SFEM_BOUNDARY_MASK_CHECK", 0)) {
+                    const int L_ = impl_->ss.level;
+                    int       co[8];
+                    static const int c[8][3] = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
+                                                {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
+                    for (int a = 0; a < 8; ++a)
+                        co[a] = sscvfem_lidx(L_, c[a][0] * L_, c[a][1] * L_, c[a][2] * L_);
+                    report_mask_extent("ss natural", impl_->ss.macro_natural_mask, impl_->ss.elems,
+                                       impl_->ss.points, co);
+                    report_mask_extent("ss skin", impl_->ss.macro_face_mask, impl_->ss.elems,
+                                       impl_->ss.points, co);
+                }
             }
 
             // Deterministic two-pass scatter, the semi-structured counterpart of the packed
@@ -332,6 +383,12 @@ namespace sfem {
                         compile_sideset_mask(named.front(), d.nelements, d.natural_mask);
                 std::printf("natural outflow (flat): %td faces from sideset '%s'\n", nf,
                             natural_outflow_sideset.c_str());
+                if (smesh::Env::read<int>("SFEM_BOUNDARY_MASK_CHECK", 0)) {
+                    int ident[8];
+                    for (int a = 0; a < 8; ++a) ident[a] = a;
+                    report_mask_extent("flat natural", d.natural_mask, d.elems, d.points, ident);
+                    report_mask_extent("flat skin", d.face_mask, d.elems, d.points, ident);
+                }
             }
         }
 
@@ -618,7 +675,20 @@ namespace sfem {
         // but only if it knows an outflow plane exists. Without this the coarse operator
         // keeps p_i*a on the outlet and has no pin, so it is singular, its solve returns
         // nothing, and the fine-level Krylov iteration silently does zero work.
-        ret->natural_outflow_sideset = natural_outflow_sideset;
+        // SFEM_GMG_COARSE_OUTFLOW=natural (default) gives coarse levels the same do-nothing
+        // outflow as the fine level. =closed withholds it, so coarse levels use the standard
+        // closure instead.
+        //
+        // Kept as a documented negative result, not a recommendation. The reasoning was that
+        // a coarse grid is a preconditioner rather than a model, so it need not reproduce the
+        // boundary physics -- and a step hierarchy whose outlet is Dirichlet throughout does
+        // converge, at rate 0.55. Withholding the outflow only from the coarse levels does
+        // not: the fine residual after one correction goes to 9.8e10, against 2.35 when the
+        // coarse levels do carry it. So the coarse operator has to match the fine one more
+        // closely here, not less, and "closed" is worse than the default. Left in because the
+        // measurement is worth more than the guess it refutes.
+        if (smesh::Env::read_string("SFEM_GMG_COARSE_OUTFLOW", "natural") != "closed")
+            ret->natural_outflow_sideset = natural_outflow_sideset;
 
         // Carry the named sidesets down to the coarse mesh.
         //
