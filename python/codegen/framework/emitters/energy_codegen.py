@@ -7,6 +7,7 @@ from codegen.framework.plans.affine_element_kernel import (
 )
 from codegen.framework.plans.form_transformations import (
     cached_metric_geometry,
+    metric_value_scale,
 )
 from codegen.framework.plans.form_emission import (
     FormContraction,
@@ -21,6 +22,7 @@ from codegen.framework.plans.evaluation_strategy import (
 )
 from codegen.framework.plans.affine_element_kernel import (
     expanded_simplex_metric_plan,
+    expanded_simplex_metric_value_plan,
 )
 
 from codegen.framework.ir.kernel_ast import (
@@ -3359,6 +3361,68 @@ def _tet4_linear_elasticity_aos_unit_mesh_operator_function(
     return lines
 
 
+def _expanded_simplex_metric_packed_value_body(plan):
+    """The pack's stepped 0-form, in closed form.
+
+    The packed counterpart of `_expanded_simplex_metric_value_body`, reading
+    the pack-local base state and direction the pack gather already produced.
+    There is nothing to scatter: the 0-form writes one value per element per
+    step, so the pack's output scratch and its reduction do not apply here.
+    """
+    from codegen.framework.plans.form_transformations import (
+        symmetric_metric_component_count,
+    )
+
+    scale = _sfem_ccode(plan.scale)
+    lines = ["            for (ptrdiff_t element = e_start; element < e_end; ++element) {"]
+    lines.extend(
+        "                const uint16_t ev%d = elements[%d][element];" % (shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    lines.extend(
+        "                const scalar_t x%d = pack_u_base[ev%d];" % (shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    lines.extend(
+        "                const scalar_t h%d = pack_h[ev%d];" % (shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    for component in range(symmetric_metric_component_count(plan.dim)):
+        value = "scalar_t(g_geom_metric%d[element])" % component
+        if scale != "1":
+            value = "%s * %s" % (scale, value)
+        lines.append("                const scalar_t fff%d = %s;" % (component, value))
+    lines.append("                for (int step = 0; step < nsteps; ++step) {")
+    lines.append("                    const scalar_t alpha = steps[step];")
+    lines.extend(
+        "                    const scalar_t u%d = x%d + alpha * h%d;" % (shape, shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    lines.extend(
+        "                    const scalar_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        for symbol, expression in plan.kernel.temporaries
+    )
+    (energy,) = plan.kernel.outputs
+    lines.extend(
+        [
+            "                    value[(ptrdiff_t)step * nelements + element] = %s;"
+            % _sfem_ccode(energy),
+            "                }",
+            "            }",
+            "",
+        ]
+    )
+    return lines
+
+
+#: As for the other two, the choice is a table lookup on a plan the planning
+#: layer produced, not a condition emission evaluates.
+_PACKED_VALUE_BODY_BY_EXPANDED = {
+    True: _expanded_simplex_metric_packed_value_body,
+    False: lambda plan: None,
+}
+
+
 def _sfem_soa_packed_objective_steps_public_wrappers(
     function_name,
     dim,
@@ -3380,6 +3444,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
     material_parameter_names,
     source_builder,
     n_field_components=None,
+    metric=None,
+    expanded_value_plan=None,
 ):
     n_field_components = dim if n_field_components is None else n_field_components
     if geometry_mode not in ("affine", "isoparametric"):
@@ -3415,9 +3481,11 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             ]
         )
         if is_affine:
-            for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                lines.append("        const geom_t *const SFEM_RESTRICT g_%s," % stream)
-            lines.append("        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,")
+            for array_input in _packed_affine_geometry_inputs(dim, metric):
+                for stream in _soa_array_stream_names(array_input):
+                    lines.append(
+                        "        const geom_t *const SFEM_RESTRICT g_%s," % stream
+                    )
         else:
             lines.append("        const geom_t *const *const SFEM_RESTRICT points,")
         lines.extend(
@@ -3563,9 +3631,10 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "            }",
             ]
         )
+        lines.append("")
+        element_loop_start = len(lines)
         lines.extend(
             [
-                "",
                 "            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {",
                 "                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);",
                 "                scalar_t block_u_data[N_SHAPE * N_FIELD_COMPONENTS][VECTOR_SIZE];",
@@ -3649,7 +3718,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             lines.extend(
                 _sfem_soa_affine_geometry_stream_lines(
                     source_builder,
-                    (_adjugate_input(dim), sfem_soa_reference_input("jacobian_determinant", 1, 1, 1)),
+                    _packed_affine_geometry_inputs(dim, metric),
                     "                ",
                     geometry_scalar_type="geom_t",
                 )
@@ -3688,12 +3757,18 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             )
             lines.extend("    %s" % line if line else line for line in geometry_lines)
             lines.append("                }")
-        call_args = [
-            "nelems",
-            "0" if is_affine else "VECTOR_SIZE",
-            *("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
-            "block_jacobian_determinant0",
-        ]
+        call_args = ["nelems", "0" if is_affine else "VECTOR_SIZE"]
+        if is_affine:
+            call_args.extend(
+                "block_%s" % stream
+                for array_input in _packed_affine_geometry_inputs(dim, metric)
+                for stream in _soa_array_stream_names(array_input)
+            )
+        else:
+            call_args.extend(
+                ["block_jacobian_adjugate%d" % i for i in range(dim * dim)]
+                + ["block_jacobian_determinant0"]
+            )
         if omit_reference_basis_inputs:
             pass
         elif use_tensor_product_reference:
@@ -3738,6 +3813,17 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "                    }",
                 "                }",
                 "            }",
+            ]
+        )
+        expanded_body = _PACKED_VALUE_BODY_BY_EXPANDED[expanded_value_plan is not None](
+            expanded_value_plan
+        )
+        if expanded_body is not None:
+            # The element's own strategy reaching the packed 0-form, the last
+            # of the three matrix-free kernels to get it.
+            lines[element_loop_start:] = expanded_body
+        lines.extend(
+            [
                 "        }",
                 "    }",
                 "    return SFEM_SUCCESS;",
@@ -5575,6 +5661,101 @@ def _sfem_soa_packed_apply_public_wrappers(
     return lines
 
 
+def _expanded_simplex_metric_value_body(plan, source_builder):
+    """The stepped 0-form of a lowest-order simplex, in closed form.
+
+    The third member of the matrix-free triple, and the one that was left on
+    the old path: while the gradient and the action moved to the cached metric
+    and the closed-form loop, `objective_steps` still read nine adjugate
+    components and a determinant and staged every element through
+    ``VECTOR_SIZE``-wide block arrays.  Measured on TET4 at --refine 24 that is
+    16.4 MDOF/s against 41.4 for the two kernels beside it.
+
+    The element energy is `g^T (scale * FFF) g / 2` with `g` the reference
+    gradient, which `p1_simplex_metric_value_plan` derives.  The geometry and
+    the base state are read once per element and the step loop is inside, so
+    `nsteps` evaluations share one gather -- the arrangement the blocked body
+    could not express, because its staging was per element block and the step
+    loop had to wrap it.
+
+    Reached only when `plans.affine_element_kernel` produced a plan; the table
+    routes the other case.
+    """
+    from codegen.framework.plans.form_transformations import (
+        symmetric_metric_component_count,
+    )
+
+    dim = plan.dim
+    scale = _sfem_ccode(plan.scale)
+    lines = [
+        "    (void)nnodes;",
+        "",
+    ]
+    lines.extend(_target_parallel_element_loop_lines(source_builder))
+    lines.append(
+        "    for (ptrdiff_t element = 0; element < nelements; ++element) {"
+    )
+    lines.extend(
+        "        const idx_t ev%d = elements[%d][element];" % (shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    lines.extend(
+        "        const scalar_t x%d = ux[ev%d * u_stride];" % (shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    lines.extend(
+        "        const scalar_t h%d = hx[ev%d * h_stride];" % (shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    for component in range(symmetric_metric_component_count(dim)):
+        value = "scalar_t(g_geom_metric%d[element])" % component
+        if scale != "1":
+            value = "%s * %s" % (scale, value)
+        lines.append("        const scalar_t fff%d = %s;" % (component, value))
+    lines.append("        for (int step = 0; step < nsteps; ++step) {")
+    lines.append("            const scalar_t alpha = steps[step];")
+    lines.extend(
+        "            const scalar_t u%d = x%d + alpha * h%d;" % (shape, shape, shape)
+        for shape in range(plan.n_shape)
+    )
+    lines.extend(
+        "            const scalar_t %s = %s;" % (symbol, _sfem_ccode(expression))
+        for symbol, expression in plan.kernel.temporaries
+    )
+    (energy,) = plan.kernel.outputs
+    lines.extend(
+        [
+            "            value[(ptrdiff_t)step * nelements + element] = %s;"
+            % _sfem_ccode(energy),
+            "        }",
+            "    }",
+            "",
+            "    return SFEM_SUCCESS;",
+        ]
+    )
+    return lines
+
+
+#: Which element inputs the 0-form reads follows from the same answer: the
+#: closed-form kernel takes the symmetric metric and no reference data, the
+#: general one takes the adjugate, the determinant and the basis it integrates
+#: against.  A table, for the reason the bodies below are one.
+_OBJECTIVE_STEPS_INPUTS_BY_EXPANDED = {
+    True: lambda array_inputs, dim: _metric_array_inputs(array_inputs, dim),
+    False: lambda array_inputs, dim: array_inputs,
+}
+
+
+#: Whether the element's strategy produced a closed-form 0-form decides which
+#: body is spelled, as it does for the 1-form and the action.
+_OBJECTIVE_STEPS_BODY_BY_EXPANDED = {
+    True: lambda plan, source_builder: _expanded_simplex_metric_value_body(
+        plan, source_builder
+    ),
+    False: lambda plan, source_builder: None,
+}
+
+
 def _sfem_soa_mesh_objective_steps_function(
     form,
     prefix,
@@ -5615,6 +5796,26 @@ def _sfem_soa_mesh_objective_steps_function(
     )
     if specialized_prefix is not None:
         block_name = "%s_objective_block" % specialized_prefix
+    # The third member of the triple takes the cached metric on the same terms
+    # the other two do, and additionally only when the energy really is the
+    # quadratic invariant the metric can express.
+    metric = (
+        cached_metric_geometry(form.weak_form, quadrature_rule)
+        if geometry_mode == "affine" and specialized_prefix is not None
+        else None
+    )
+    value_plan = expanded_simplex_metric_value_plan(
+        metric,
+        dim,
+        n_nodes,
+        n_qp,
+        n_field_components,
+        writes_per_shape(form),
+        metric_value_scale(form.weak_form) if metric is not None else None,
+    )
+    array_inputs = _OBJECTIVE_STEPS_INPUTS_BY_EXPANDED[value_plan is not None](
+        array_inputs, dim
+    )
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     use_tensor_product_reference = _use_tensor_product_reference(
@@ -5701,6 +5902,7 @@ def _sfem_soa_mesh_objective_steps_function(
         source_builder.mesh_function_line(implementation_name),
     ]
     lines.extend(parameter_list_lines(impl_params))
+    implementation_start = len(lines)
     lines.extend(
         [
             ") {",
@@ -6043,6 +6245,25 @@ def _sfem_soa_mesh_objective_steps_function(
         ]
     )
 
+    expanded_body = _OBJECTIVE_STEPS_BODY_BY_EXPANDED[value_plan is not None](
+        value_plan, source_builder
+    )
+    if expanded_body is not None:
+        # The element's own strategy reaching the 0-form.  Built and dropped
+        # rather than skipped, for the reason the other two bodies state.
+        del lines[implementation_start:]
+        lines.extend(
+            [
+                ") {",
+                *expanded_body,
+                "}",
+                "",
+                "} // namespace codegen",
+                "} // namespace sfem",
+                "",
+            ]
+        )
+
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
     for public_name, scalar_type in (
         (function_name, "double"),
@@ -6086,6 +6307,8 @@ def _sfem_soa_mesh_objective_steps_function(
             material_parameter_names=material_parameter_names,
             source_builder=source_builder,
             n_field_components=n_field_components,
+            metric=metric,
+            expanded_value_plan=value_plan,
         )
     )
     return lines

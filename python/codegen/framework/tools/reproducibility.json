@@ -668,8 +668,8 @@
       "material": "laplace"
     },
     "laplace_objective_steps_3d_affine_mesh_soa": {
-      "l1": 0.01329653250869,
-      "l2": 0.0006939880914078,
+      "l1": 0.01329653283598,
+      "l2": 0.0006939881097485,
       "material": "laplace"
     },
     "laplace_objective_steps_3d_isoparametric_mesh_soa": {
@@ -678,8 +678,8 @@
       "material": "laplace"
     },
     "laplace_objective_steps_packed_3d_affine_mesh_soa": {
-      "l1": 0.01329653250869,
-      "l2": 0.0006939880914078,
+      "l1": 0.01329653283598,
+      "l2": 0.0006939881097485,
       "material": "laplace"
     },
     "laplace_objective_steps_packed_3d_isoparametric_mesh_soa": {
@@ -1093,8 +1093,8 @@
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_3d_affine_mesh_soa": {
-      "l1": 0.01329653250869,
-      "l2": 0.0006939880914078,
+      "l1": 0.01329653283598,
+      "l2": 0.0006939881097485,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_3d_isoparametric_mesh_soa": {
@@ -1103,8 +1103,8 @@
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_packed_3d_affine_mesh_soa": {
-      "l1": 0.01329653250869,
-      "l2": 0.0006939880914078,
+      "l1": 0.01329653283598,
+      "l2": 0.0006939881097485,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_packed_3d_isoparametric_mesh_soa": {
@@ -1275,8 +1275,8 @@
       "material": "laplace"
     },
     "laplace_objective_steps_2d_affine_mesh_soa": {
-      "l1": 0.0003790615126957,
-      "l2": 6.833585457052e-05,
+      "l1": 0.0003790615089835,
+      "l2": 6.83358539182e-05,
       "material": "laplace"
     },
     "laplace_objective_steps_2d_isoparametric_mesh_soa": {
@@ -1285,8 +1285,8 @@
       "material": "laplace"
     },
     "laplace_objective_steps_packed_2d_affine_mesh_soa": {
-      "l1": 0.0003790615126957,
-      "l2": 6.833585457052e-05,
+      "l1": 0.0003790615089835,
+      "l2": 6.83358539182e-05,
       "material": "laplace"
     },
     "laplace_objective_steps_packed_2d_isoparametric_mesh_soa": {
@@ -1700,8 +1700,8 @@
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_2d_affine_mesh_soa": {
-      "l1": 0.0003790615126957,
-      "l2": 6.833585457052e-05,
+      "l1": 0.0003790615089835,
+      "l2": 6.83358539182e-05,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_2d_isoparametric_mesh_soa": {
@@ -1710,8 +1710,8 @@
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_packed_2d_affine_mesh_soa": {
-      "l1": 0.0003790615126957,
-      "l2": 6.833585457052e-05,
+      "l1": 0.0003790615089835,
+      "l2": 6.83358539182e-05,
       "material": "scalar_potential"
     },
     "scalar_potential_objective_steps_packed_2d_isoparametric_mesh_soa": {

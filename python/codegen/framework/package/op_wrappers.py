@@ -7611,19 +7611,19 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append("%s    if (impl_->objective_uses_affine) {" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
-            lines.append(
-                "%s        status = %s(%s);"
-                % (
-                    indent,
+            lines.extend(
+                _affine_dispatch_status_lines(
+                    kernel_sources,
                     affine,
-                    ", ".join(
+                    indent + "        ",
+                    lambda callee: ", ".join(
                         [
                             "domain.element_type",
                             "real_type",
                             "nelements",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
-                            *_affine_geometry_call_args(kernel_sources, affine, dim),
+                            *_affine_geometry_call_args(kernel_sources, callee, dim),
                             *parameter_args,
                             *current_args,
                             *direction_args,
@@ -8463,6 +8463,42 @@ def _affine_dispatch_call_lines(kernel_sources, name, indent, arguments):
             ]
         )
     lines.append("%sreturn %s(%s);" % (indent, name, arguments(name)))
+    return lines
+
+
+
+def _affine_dispatch_status_lines(kernel_sources, name, indent, arguments):
+    """`status = name(args);`, routing metric elements to their own dispatch.
+
+    The assignment form of `_affine_dispatch_call_lines`, for the 0-form: it
+    folds a status across domains rather than returning one, so it cannot use
+    the returning shape and would otherwise be the one member of the
+    matrix-free triple left unrouted.
+    """
+    lines = []
+    metric = _metric_dispatch_name(name)
+    elements = ()
+    if _c_abi_function_exists(kernel_sources, metric, public_only=True):
+        elements = _metric_dispatch_elements(kernel_sources, metric)
+    if elements:
+        lines.extend(
+            [
+                "%sif (%s) {"
+                % (
+                    indent,
+                    " || ".join(
+                        "domain.element_type == smesh::%s" % element
+                        for element in elements
+                    ),
+                ),
+                "%s    status = %s(%s);" % (indent, metric, arguments(metric)),
+                "%s} else {" % indent,
+                "%s    status = %s(%s);" % (indent, name, arguments(name)),
+                "%s}" % indent,
+            ]
+        )
+        return lines
+    lines.append("%sstatus = %s(%s);" % (indent, name, arguments(name)))
     return lines
 
 

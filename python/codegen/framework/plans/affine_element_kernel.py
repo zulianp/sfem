@@ -167,3 +167,87 @@ def expanded_simplex_metric_plan(
         input_prefix="u" if reads_current else "h",
         scale=metric.scale,
     )
+
+
+def p1_simplex_metric_value_plan(
+    dim, temporary_prefix="t", order=DEFAULT_COMPONENT_ORDER
+):
+    """The element energy for a P1 simplex whose geometry is a cached metric.
+
+    The 0-form of the same operator ``p1_simplex_metric_apply_plan`` gives the
+    1-form of.  With ``g`` the reference gradient ``(u_1 - u_0, ...)``, the
+    element energy is ``g^T FFF g / 2``: the metric already carries
+    ``J^-1 J^-T det J``, so the quadrature weight and the Jacobian are in it and
+    there is nothing else to multiply by.
+
+    The two plans agree exactly -- ``E == (1/2) * sum_a e_a u_a`` with ``e`` the
+    apply plan's outputs -- which is asserted in the tests rather than assumed
+    here, and is what says the 0-form and the 1-form describe one operator.
+
+    As with the apply plan the scale is not in here: the emitter folds it into
+    the metric components it loads, so ``fff_i = scale * g_geom_metric_i`` makes
+    this the scaled energy without the plan knowing the scale exists.
+    """
+    dim = int(dim)
+    metric = metric_matrix(dim, order=order)
+    dofs = dof_symbols(dim)
+    gradient = sp.Matrix([dofs[d + 1] - dofs[0] for d in range(dim)])
+    energy = (gradient.T * metric * gradient)[0, 0] / 2
+    temporaries, reduced = sp.cse(
+        [energy], symbols=sp.numbered_symbols(temporary_prefix)
+    )
+    return AffineElementKernelPlan(
+        dim=dim,
+        temporaries=tuple(temporaries),
+        outputs=tuple(reduced),
+    )
+
+
+@dataclass(frozen=True)
+class ExpandedSimplexMetricValuePlan:
+    """The closed-form 0-form loop a lowest-order simplex calls for.
+
+    The stepped objective evaluates at ``x + alpha * h`` for each of `nsteps`
+    steps, so unlike the 1-form it reads both field roles; that is why it has a
+    plan of its own rather than a flag on the other one.
+    """
+
+    kernel: AffineElementKernelPlan
+    scale: object
+
+    @property
+    def dim(self):
+        return self.kernel.dim
+
+    @property
+    def n_shape(self):
+        return self.kernel.n_shape
+
+
+def expanded_simplex_metric_value_plan(
+    metric,
+    dim,
+    n_nodes,
+    n_qp,
+    n_field_components,
+    writes_per_shape,
+    value_scale,
+):
+    """That plan, or ``None`` when the shape does not call for it.
+
+    ``value_scale`` is the caller's answer to whether the energy really is
+    ``scale/2 * ||grad u||^2``.  It cannot be inferred from the flux: adding a
+    constant to an energy density leaves the flux untouched, so a form whose
+    metric-based *gradient* is valid can still have a metric-based *value* that
+    is not.  The question is asked of the density and answered before this.
+    """
+    if metric is None or value_scale is None or n_qp != 1:
+        return None
+    if dim not in (2, 3) or n_nodes != dim + 1:
+        return None
+    if int(n_field_components) != 1 or writes_per_shape:
+        return None
+    return ExpandedSimplexMetricValuePlan(
+        kernel=p1_simplex_metric_value_plan(dim),
+        scale=value_scale,
+    )
