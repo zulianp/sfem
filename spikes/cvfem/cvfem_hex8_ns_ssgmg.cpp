@@ -3287,12 +3287,25 @@ int main(int argc, char **argv) {
             mesh->write(out_dir / "mesh");
         }
         auto output = f->output();
-        // block_size is 4 (ux, uy, uz, p), so split the interleaved state into one file per
-        // field: x.0 x.1 x.2 are the velocity components and x.3 the pressure.
+        // block_size is 4 (ux, uy, uz, p), and Output::write with AoS_to_SoA appends .0 .. .3
+        // to the given name -- so it cannot by itself produce three velocity components plus a
+        // differently named pressure. Write the block as "vel", then rename the fourth
+        // component to "p": the files are plain nodal arrays, so this is a rename and not a
+        // conversion. The result is vel.0 vel.1 vel.2 and p, named as the fields actually are
+        // rather than after the state vector they happen to be packed in.
         output->enable_AoS_to_SoA(true);
         output->set_output_dir(out_dir);
-        output->write("x", x);
-        std::printf("output: wrote mesh and solution to %s (x.0 x.1 x.2 = u, x.3 = p)\n",
+        output->write("vel", x);
+
+        const char *const ext  = sizeof(real_t) == 8 ? "float64" : "float32";
+        const std::string from = std::string(out_folder) + "/vel.3." + ext;
+        const std::string to   = std::string(out_folder) + "/p." + ext;
+        std::remove(to.c_str());
+        if (std::rename(from.c_str(), to.c_str()) != 0) {
+            std::fprintf(stderr, "output: could not rename %s -> %s; pressure stays as vel.3\n",
+                         from.c_str(), to.c_str());
+        }
+        std::printf("output: wrote mesh and solution to %s (vel.0 vel.1 vel.2 = u, p = pressure)\n",
                     out_folder.c_str());
     }
 
