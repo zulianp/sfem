@@ -604,6 +604,10 @@ def _hyperelastic_op(
     dependencies_by_dim = {}
     gradient_affine_aos_flags = []
     apply_affine_aos_flags = []
+    # Whether any affine entry point this wrapper calls takes the gradient
+    # metric rather than the Jacobian adjugate.  The kernels decide; the
+    # wrapper reads their declarations and caches what they ask for.
+    affine_metric_flags = []
     for element in elements:
         dim = _element_dim(element)
         dependencies = dependencies_by_dim.get(dim)
@@ -660,8 +664,13 @@ def _hyperelastic_op(
         )
         gradient_common_affine_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), %s, determinant%s"
-            % (_affine_geometry_offsets(dim), gradient_args)
+            "domain.block->elements()->data(), %s%s"
+            % (
+                _affine_geometry_offsets_for(
+                    kernel_sources, "%s_gradient_affine_mesh_soa" % stem, dim
+                ),
+                gradient_args,
+            )
         )
         gradient_common_affine_aos_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
@@ -674,8 +683,13 @@ def _hyperelastic_op(
         )
         apply_common_affine_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), %s, determinant%s"
-            % (_affine_geometry_offsets(dim), apply_args)
+            "domain.block->elements()->data(), %s%s"
+            % (
+                _affine_geometry_offsets_for(
+                    kernel_sources, "%s_apply_affine_mesh_soa" % stem, dim
+                ),
+                apply_args,
+            )
         )
         apply_common_affine_aos_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
@@ -690,6 +704,19 @@ def _hyperelastic_op(
         )
         gradient_affine_aos_flags.append(gradient_affine_uses_aos)
         apply_affine_aos_flags.append(apply_affine_uses_aos)
+        affine_metric_flags.extend(
+            _affine_dispatch_uses_metric(kernel_sources, name)
+            for name in (
+                "%s_gradient_affine_mesh_soa" % stem,
+                "%s_apply_affine_mesh_soa" % stem,
+                "%s_objective_affine_mesh_soa" % stem,
+                "%s_objective_steps_affine_mesh_soa" % stem,
+                "%s_gradient_%dd_affine_mesh_soa" % (material.name, dim),
+                "%s_apply_%dd_affine_mesh_soa" % (material.name, dim),
+                "%s_objective_%dd_affine_mesh_soa" % (material.name, dim),
+                "%s_objective_steps_%dd_affine_mesh_soa" % (material.name, dim),
+            )
+        )
         gradient_affine_args = ", ".join(
             _nonempty(
                 gradient_common_affine_args,
@@ -808,7 +835,14 @@ def _hyperelastic_op(
                 "%s_objective_affine_mesh_soa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
-                    % (_affine_geometry_offsets(dim), objective_args),
+                    % (
+                        _affine_geometry_offsets_for(
+                            kernel_sources,
+                            "%s_objective_affine_mesh_soa" % stem,
+                            dim,
+                        ),
+                        objective_args,
+                    ),
                     *_energy_field_args(objective_dependencies, dim, components, current="x"),
                     "impl_->element_values.get()",
                 )),
@@ -827,7 +861,14 @@ def _hyperelastic_op(
                 "%s_objective_steps_affine_mesh_soa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
-                    % (_affine_geometry_offsets(dim), objective_args),
+                    % (
+                        _affine_geometry_offsets_for(
+                            kernel_sources,
+                            "%s_objective_affine_mesh_soa" % stem,
+                            dim,
+                        ),
+                        objective_args,
+                    ),
                     *_energy_field_args(objective_dependencies, dim, components, current="x"),
                     dim,
                     _offsets("h", components),
@@ -996,7 +1037,7 @@ namespace sfem {
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
-        };
+%(metric_cache_field)s        };
 
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains) {
@@ -1020,7 +1061,7 @@ namespace sfem {
                         return SFEM_FAILURE;
                     }
                 }
-                entry.second.user_data = std::static_pointer_cast<void>(cache);
+%(metric_cache_setup)s                entry.second.user_data = std::static_pointer_cast<void>(cache);
             }
             return SFEM_SUCCESS;
         }
@@ -1159,7 +1200,7 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *adjugate_aos = nullptr;
             const geom_t *determinant = nullptr;
-            if (impl_->gradient_uses_affine) {
+%(metric_declaration)s            if (impl_->gradient_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
                 if (!cache || !cache->jacobian_soa) {
@@ -1180,7 +1221,7 @@ namespace sfem {
                     determinant = reinterpret_cast<const geom_t *>(
                             cache->jacobian_aos->jacobian_determinant()->data());
                 }
-            }
+%(gradient_metric_binding)s            }
 %(gradient_packed_dispatch_body)s
 %(gradient_dispatch_body)s
         });
@@ -1196,7 +1237,7 @@ namespace sfem {
             const geom_t *const *adjugate = nullptr;
             const geom_t *adjugate_aos = nullptr;
             const geom_t *determinant = nullptr;
-            if (impl_->apply_uses_affine) {
+%(metric_declaration)s            if (impl_->apply_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
                 if (!cache || !cache->jacobian_soa) {
@@ -1217,7 +1258,7 @@ namespace sfem {
                     determinant = reinterpret_cast<const geom_t *>(
                             cache->jacobian_aos->jacobian_determinant()->data());
                 }
-            }
+%(apply_metric_binding)s            }
 %(apply_dispatch_body)s
         });
     }
@@ -1256,7 +1297,7 @@ namespace sfem {
             const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
             const geom_t *const *adjugate = nullptr;
             const geom_t *determinant = nullptr;
-            if (impl_->objective_uses_affine) {
+%(metric_declaration)s            if (impl_->objective_uses_affine) {
                 auto cache = std::static_pointer_cast<AffineGeometryCache>(
                         domain.user_data);
                 if (!cache || !cache->jacobian_soa) {
@@ -1267,7 +1308,7 @@ namespace sfem {
                         cache->jacobian_soa->jacobian_adjugate_SoA()->data());
                 determinant = reinterpret_cast<const geom_t *>(
                         cache->jacobian_soa->jacobian_determinant()->data());
-            }
+%(objective_steps_metric_binding)s            }
             if (nvalues > impl_->element_capacity) {
                 impl_->element_values.reset(new real_t[nvalues]);
                 impl_->element_capacity = nvalues;
@@ -1466,6 +1507,18 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "gradient_affine_uses_jacobian_aos": _cpp_bool(any(gradient_affine_aos_flags)),
         "apply_affine_uses_jacobian_aos": _cpp_bool(any(apply_affine_aos_flags)),
+        "metric_cache_field": _metric_cache_field(any(affine_metric_flags)),
+        "metric_cache_setup": _metric_cache_setup(any(affine_metric_flags)),
+        "metric_declaration": _metric_declaration(any(affine_metric_flags)),
+        "gradient_metric_binding": _metric_binding(
+            any(affine_metric_flags), material.op_name, "gradient"
+        ),
+        "apply_metric_binding": _metric_binding(
+            any(affine_metric_flags), material.op_name, "hessian action"
+        ),
+        "objective_steps_metric_binding": _metric_binding(
+            any(affine_metric_flags), material.op_name, "objective_steps"
+        ),
         "gradient_cases": "\n".join(gradient_cases),
         "apply_cases": "\n".join(apply_cases),
         "objective_cases": "\n".join(objective_cases),
@@ -5171,16 +5224,41 @@ def _dispatch_groups(material, elements, declarations):
         )
 
     ordered = []
-    emitted_names = set()
+    signatures_by_name = {}
+    for key in groups:
+        signatures_by_name.setdefault(key[0], []).append(key)
     for _, group in sorted(groups.items(), key=lambda item: item[0][0]):
-        if group["name"] in emitted_names:
-            continue
-        emitted_names.add(group["name"])
+        if len(signatures_by_name[group["name"]]) > 1:
+            # Elements of one dimension can want different geometry -- an
+            # affine simplex contracts through the symmetric metric where a
+            # hexahedron needs the full adjugate -- and that is two ABIs, not
+            # one.  They used to collide here and the second was dropped
+            # silently, which left the metric elements with no affine entry
+            # point at all and a runtime `default:` failure as the only sign.
+            # Naming the geometry keeps both.
+            group["name"] = _geometry_qualified_dispatch_name(
+                group["name"], group["params"]
+            )
         group["variants"] = tuple(
             sorted(group["variants"], key=lambda item: item["mesh_element"])
         )
         ordered.append(group)
     return _merge_precision_groups(tuple(ordered))
+
+
+def _geometry_qualified_dispatch_name(name, params):
+    """`name` with the geometry it takes spelled in it.
+
+    Only the metric is qualified; the adjugate keeps the plain name because it
+    is the shape every element can be handed.
+    """
+    if not any("g_geom_metric0" in parameter for parameter in params):
+        return name
+    marker = "_mesh_"
+    index = name.rfind(marker)
+    if index < 0:
+        return "%s_metric" % name
+    return "%s_metric%s" % (name[:index], name[index:])
 
 
 def _dispatch_mapping(material_name, function_name, element_names):
@@ -6025,11 +6103,23 @@ def _c_abi_public_dispatch_case_elements(kernel_sources, function_name):
                     depth -= 1
                     if depth == 0:
                         body = source[body_start : idx + 1]
+                        # A dispatch switches on the element type and then
+                        # on the real type, and both are `case smesh::`.  Only
+                        # the element types answer the question asked here;
+                        # the `SMESH_`-prefixed names are precisions, and
+                        # comparing an element type against one is nonsense.
                         return tuple(
-                            sorted(set(re.findall(r"\bcase\s+smesh::([A-Z0-9_]+)\s*:", body)))
+                            sorted(
+                                name
+                                for name in set(
+                                    re.findall(
+                                        r"\bcase\s+smesh::([A-Z0-9_]+)\s*:", body
+                                    )
+                                )
+                                if not name.startswith("SMESH_")
+                            )
                         )
-            return ()
-        return ()
+            break
     return ()
 
 
@@ -7311,23 +7401,22 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
             )
             lines.append("%s        }" % indent)
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
-            lines.append(
-                "%s        return %s(%s);"
-                % (
-                    indent,
+            lines.extend(
+                _affine_dispatch_call_lines(
+                    kernel_sources,
                     affine,
-                    ", ".join(
+                    indent + "        ",
+                    lambda callee: ", ".join(
                         [
                             "domain.element_type",
                             "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
-                            *("adjugate[%d]" % i for i in range(dim * dim)),
-                            "determinant",
+                            *_affine_geometry_call_args(kernel_sources, callee, dim),
                             *_c_abi_ordered_domain_parameter_args(
                                 kernel_sources,
-                                affine,
+                                callee,
                                 dependencies,
                             ),
                             *current_args,
@@ -7409,8 +7498,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                             "nelements",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
-                            *("adjugate[%d]" % i for i in range(dim * dim)),
-                            "determinant",
+                            *_affine_geometry_call_args(kernel_sources, affine, dim),
                             *parameter_args,
                             *current_args,
                             "impl_->element_values.get()",
@@ -7492,8 +7580,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                             "nelements",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
-                            *("adjugate[%d]" % i for i in range(dim * dim)),
-                            "determinant",
+                            *_affine_geometry_call_args(kernel_sources, affine, dim),
                             *parameter_args,
                             *current_args,
                             *direction_args,
@@ -7595,8 +7682,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                         packed_affine,
                         ["domain.element_type"],
                         [
-                            *("adjugate[%d]" % i for i in range(dim * dim)),
-                            "determinant",
+                            *_affine_geometry_call_args(kernel_sources, packed_affine, dim),
                             *parameter_args,
                             *current_args,
                             *direction_args,
@@ -7611,20 +7697,19 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                         "%s        }" % indent,
                     ]
                 )
-            lines.append(
-                "%s        return %s(%s);"
-                % (
-                    indent,
+            lines.extend(
+                _affine_dispatch_call_lines(
+                    kernel_sources,
                     affine,
-                    ", ".join(
+                    indent + "        ",
+                    lambda callee: ", ".join(
                         [
                             "domain.element_type",
                             "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
                             "domain.block->elements()->data()",
-                            *("adjugate[%d]" % i for i in range(dim * dim)),
-                            "determinant",
+                            *_affine_geometry_call_args(kernel_sources, callee, dim),
                             *parameter_args,
                             *current_args,
                             *direction_args,
@@ -7750,8 +7835,7 @@ def _hyperelastic_gradient_packed_dispatch_body(material_name, kernel_sources, g
                 function,
                 ["domain.element_type"],
                 [
-                    *("adjugate[%d]" % i for i in range(dim * dim)),
-                    "determinant",
+                    *_affine_geometry_call_args(kernel_sources, function, dim),
                     *parameter_args,
                     *current_args,
                     *output_args,
@@ -7878,8 +7962,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                             "n_shared_nodes->data()",
                             "ghost_ptr->data()",
                             "ghost_idx->data()",
-                            *("adjugate[%d]" % i for i in range(dim * dim)),
-                            "determinant",
+                            *_affine_geometry_call_args(kernel_sources, function, dim),
                             *parameter_args,
                             *current_args,
                             *direction_args,
@@ -8289,6 +8372,107 @@ def _offsets(name, components):
     return ", ".join("%s + %d" % (name, i) for i, _ in enumerate(components))
 
 
+
+
+def _metric_dispatch_name(name):
+    """The metric-geometry sibling of an affine dispatch name."""
+    marker = "_mesh_"
+    index = name.rfind(marker)
+    if index < 0:
+        return "%s_metric" % name
+    return "%s_metric%s" % (name[:index], name[index:])
+
+
+def _metric_dispatch_elements(kernel_sources, name):
+    """The element types a metric dispatch covers, from its own switch."""
+    return _c_abi_public_dispatch_case_elements(kernel_sources, name)
+
+
+def _affine_dispatch_call_lines(kernel_sources, name, indent, arguments):
+    """A call to an affine dispatch, routing metric elements to their own.
+
+    Elements of one dimension can want different geometry, so `name` may have
+    a metric-geometry sibling covering the elements whose flux factors through
+    it.  Those elements are named here rather than discovered at run time: the
+    plain dispatch has no case for them and would answer SFEM_FAILURE.
+
+    `arguments` is called with the callee, because the two take different
+    geometry and each is asked what it takes.
+    """
+    lines = []
+    metric = _metric_dispatch_name(name)
+    elements = ()
+    if _c_abi_function_exists(kernel_sources, metric, public_only=True):
+        elements = _metric_dispatch_elements(kernel_sources, metric)
+    if elements:
+        lines.extend(
+            [
+                "%sif (%s) {"
+                % (
+                    indent,
+                    " || ".join(
+                        "domain.element_type == smesh::%s" % element
+                        for element in elements
+                    ),
+                ),
+                "%s    return %s(%s);" % (indent, metric, arguments(metric)),
+                "%s}" % indent,
+            ]
+        )
+    lines.append("%sreturn %s(%s);" % (indent, name, arguments(name)))
+    return lines
+
+
+def _metric_cache_field(uses_metric):
+    """The cache slot for the gradient metric, where anything reads it.
+
+    An operator whose flux does not factor through the metric never asks for
+    one, so it gets no slot, no allocation and no dead branch guarding a
+    pointer nothing uses.
+    """
+    if not uses_metric:
+        return ""
+    return "            std::shared_ptr<smesh::FFF> metric_soa;\n"
+
+
+def _metric_cache_setup(uses_metric):
+    """Building that metric once per domain, alongside the Jacobian."""
+    if not uses_metric:
+        return ""
+    return (
+        "                cache->metric_soa = smesh::FFF::create_SoA(\n"
+        "                        mesh, smesh::MEMORY_SPACE_HOST, block_id);\n"
+        "                if (!cache->metric_soa) {\n"
+        "                    return SFEM_FAILURE;\n"
+        "                }\n"
+    )
+
+
+def _metric_declaration(uses_metric):
+    """The metric pointer an operation body passes to its affine kernels."""
+    if not uses_metric:
+        return ""
+    return "            const geom_t *const *geom_metric = nullptr;\n"
+
+
+def _metric_binding(uses_metric, op_name, label):
+    """Reading that pointer out of the cache, under the affine guard.
+
+    Emitted text rather than a template hole, so the operator name is spelled
+    here: this string is a substitution value and is not itself substituted.
+    """
+    if not uses_metric:
+        return ""
+    return (
+        "                if (!cache->metric_soa) {\n"
+        '                    SFEM_ERROR("%s affine %s requires cached metric geometry\\n");\n'
+        "                    return SFEM_FAILURE;\n"
+        "                }\n"
+        "                geom_metric = reinterpret_cast<const geom_t *const *>(\n"
+        "                        cache->metric_soa->fff_SoA()->data());\n"
+    ) % (op_name, label)
+
+
 def _cpp_bool(value):
     return "true" if value else "false"
 
@@ -8296,6 +8480,58 @@ def _cpp_bool(value):
 def _affine_geometry_offsets(dim):
     return ", ".join("adjugate[%d]" % i for i in range(dim * dim))
 
+
+def _affine_dispatch_parameters(kernel_sources, name):
+    """The parameter list of a declared entry point, or None if undeclared.
+
+    Matched on the declaration rather than on the name appearing anywhere in a
+    source, because a source that merely calls the function would otherwise
+    answer for it.
+    """
+    # Matched on `int <name>(`, which every declaration and definition of an
+    # entry point spells and no call site does, so an element-level kernel --
+    # declared in its own header without `extern "C"` -- answers here too.
+    pattern = re.compile(
+        r"\bint\s+" + re.escape(name) + r"\s*\(([^;{}]*)\)",
+        re.S,
+    )
+    for source in (kernel_sources or {}).values():
+        found = pattern.search(source)
+        if found:
+            return found.group(1)
+    return None
+
+
+def _affine_dispatch_uses_metric(kernel_sources, name):
+    """Whether a declared affine entry point takes the gradient metric.
+
+    The wrapper does not re-derive whether this operator's contraction factors
+    through the metric.  The kernel already says so -- it declares
+    `g_geom_metric0` or it declares `g_jacobian_adjugate0` -- and reading that
+    is what keeps the two sides from agreeing only by coincidence.  See
+    ARCHITECTURE.html OP 16 for what the wrapper deriving geometry
+    independently cost the last time.
+    """
+    parameters = _affine_dispatch_parameters(kernel_sources, name)
+    return bool(parameters) and "g_geom_metric0" in parameters
+
+
+def _affine_geometry_call_args(kernel_sources, name, dim):
+    """The geometry arguments an affine entry point takes, in ABI order."""
+    if _affine_dispatch_uses_metric(kernel_sources, name):
+        # The metric carries the determinant, so there is none to pass.
+        return tuple(
+            "geom_metric[%d]" % index
+            for index in range(symmetric_metric_component_count(dim))
+        )
+    return tuple(
+        ["adjugate[%d]" % index for index in range(dim * dim)] + ["determinant"]
+    )
+
+
+def _affine_geometry_offsets_for(kernel_sources, name, dim):
+    """Those same arguments, spelled as one comma-separated list."""
+    return ", ".join(_affine_geometry_call_args(kernel_sources, name, dim))
 
 def _affine_metric_offsets(dim):
     # The count is the plan's, not a second copy of the arithmetic.  Both sides

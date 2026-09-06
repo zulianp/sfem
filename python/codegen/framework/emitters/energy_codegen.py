@@ -1,5 +1,13 @@
 import sympy as sp
 
+from codegen.framework.plans.affine_element_kernel import (
+    dof_symbols,
+    metric_symbols,
+    p1_simplex_metric_apply_plan,
+)
+from codegen.framework.plans.form_transformations import (
+    cached_metric_geometry,
+)
 from codegen.framework.plans.form_emission import (
     FormContraction,
     form_contraction,
@@ -702,6 +710,26 @@ def generate_sfem_soa_cpp_files_for_element(
     )
 
 
+def _metric_array_inputs(array_inputs, dim):
+    """The same reference data, with the metric in place of the adjugate.
+
+    The reference gradients are unchanged -- the basis is the basis -- and only
+    the geometry differs: one symmetric metric where there were `dim * dim`
+    adjugate components and a determinant.
+    """
+    from codegen.framework.fem.reference import sfem_soa_array_input
+    from codegen.framework.plans.form_transformations import (
+        symmetric_metric_component_count,
+    )
+
+    # The metric kernel reads no reference data at all: the basis gradients of a
+    # constant-P1 simplex are folded into the plan, and the quadrature weight is
+    # already carried by `FFF`.  Keeping `grad_ref` and `q_weight` here would
+    # put two unused parameters on every one of these kernels.
+    return (
+        sfem_soa_array_input("geom_metric", symmetric_metric_component_count(dim)),
+    )
+
 def _sfem_soa_local_header(
     forms,
     prefix,
@@ -786,6 +814,32 @@ def _sfem_soa_local_header(
                 )
             )
             lines.append("")
+            # And, when the contraction factors through the metric, a third
+            # block for the affine variant alone.  It cannot replace the one
+            # above: the isoparametric variant builds its geometry from
+            # coordinates and has an adjugate rather than a cached metric, so
+            # the two modes genuinely need different kernels.  That is the
+            # shape the residual path already has.
+            metric = cached_metric_geometry(form.weak_form, specialized_rule)
+            if metric is not None:
+                metric_array_inputs = _metric_array_inputs(array_inputs, dim)
+                lines.extend(
+                    _sfem_soa_block_function(
+                        form,
+                        prefix,
+                        dim,
+                        n_nodes,
+                        metric_array_inputs,
+                        specialized_rule,
+                        basis_family,
+                        use_shared_weak_local,
+                        source_builder,
+                        function_name="%s_metric_%s_block"
+                        % (specialized_prefix, form.name),
+                        constant_p1_gradient_expansion=True,
+                    )
+                )
+                lines.append("")
 
     lines.extend(["} // namespace codegen", "} // namespace sfem", "", "#endif", ""])
     return "\n".join(lines)
@@ -1317,6 +1371,17 @@ def _sfem_soa_weak_form_block_function(
         use_stream_arrays,
         source_builder,
         constant_p1_gradient_expansion=constant_p1_gradient_expansion,
+        # The geometry this block was given says which kernel it is: the metric
+        # block is emitted with metric inputs, the general one with the
+        # adjugate, and the body follows.
+        metric=(
+            cached_metric_geometry(form.weak_form, quadrature_rule)
+            if any(
+                getattr(entry, "name", "") == "geom_metric"
+                for entry in shared.element_inputs
+            )
+            else None
+        ),
     )
     lines.append("}")
     return lines
@@ -1759,6 +1824,117 @@ def _constant_p1_field_gradient_expr(reference_gradients, dim, field_value, comp
     return _sum_cpp_terms(terms)
 
 
+def _metric_plan_bindings(form, dim, source_builder, use_stream_arrays):
+    """The plan's abstract `fff` and `u` bound to what this ABI calls them."""
+    n_field_components = form_n_field_components(form, dim)
+    work_item = _work_item_index(source_builder)
+    uses_direction = _form_uses_direction(form, default=form.has_direction)
+    field = "h" if uses_direction else "u"
+    stream_prefix = "" if use_stream_arrays else "weak_"
+    bindings = {}
+    for index, symbol in enumerate(metric_symbols(dim)):
+        bindings[symbol] = sp.Symbol(
+            _work_item_name(source_builder, "geom_metric", index)
+        )
+    for shape, symbol in enumerate(dof_symbols(dim)):
+        bindings[symbol] = sp.Symbol(
+            "%s%s_streams[%d * %d + 0][%s]"
+            % (stream_prefix, field, shape, n_field_components, work_item)
+        )
+    return bindings, n_field_components, work_item
+
+
+def _metric_scatter_lines(dim, metric, plan, bindings, n_field_components,
+                          work_item, use_stream_arrays):
+    """A 1- or 2-form: one contribution per shape, scattered."""
+    output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
+    return [
+        "            %s[%d * %d + 0][%s] += %s;"
+        % (
+            output_streams,
+            shape,
+            n_field_components,
+            work_item,
+            _sfem_ccode((metric.scale * expression).xreplace(bindings)),
+        )
+        for shape, expression in enumerate(plan.outputs)
+    ]
+
+
+def _metric_value_lines(dim, metric, plan, bindings, n_field_components,
+                        work_item, use_stream_arrays):
+    """A 0-form: half the gradient contracted with its own flux, per element.
+
+    `plan.outputs` after the first are the flux entries -- the first is minus
+    their sum -- so the energy is half the gradient dotted with them, reusing
+    the same temporaries.
+    """
+    dofs = dof_symbols(dim)
+    gradient = [dofs[d + 1] - dofs[0] for d in range(dim)]
+    energy = sp.Rational(1, 2) * metric.scale * sum(
+        gradient[d] * plan.outputs[d + 1] for d in range(dim)
+    )
+    return [
+        "            value[%s] += %s;"
+        % (work_item, _sfem_ccode(energy.xreplace(bindings)))
+    ]
+
+
+#: Which body a metric-carried form emits, by whether it scatters per shape.
+#: A table rather than a test, so the choice reads as the form algebra's.
+_METRIC_BODY_BY_WRITES_PER_SHAPE = {
+    True: _metric_scatter_lines,
+    False: _metric_value_lines,
+}
+
+
+def _append_constant_p1_metric_weak_form_lines(
+    lines,
+    form,
+    dim,
+    metric,
+    use_stream_arrays,
+    source_builder,
+):
+    """The P1 simplex contraction carried through a cached metric.
+
+    `grad(v) . flux` factors as `B^T (scale * FFF) B`, and the element
+    contribution is the plan in `plans.affine_element_kernel` -- the same one
+    the residual path spells, so both formulations emit the same arithmetic for
+    the same operator rather than each deriving it.
+
+    The saving is the geometry: six symmetric components where the adjugate
+    form reads nine and a determinant.
+    """
+    plan = p1_simplex_metric_apply_plan(dim)
+    bindings, n_field_components, work_item = _metric_plan_bindings(
+        form, dim, source_builder, use_stream_arrays
+    )
+    lines.extend(_work_item_loop_lines(source_builder, "        "))
+    # A constant-P1 simplex has one quadrature point, so the offset is just the
+    # work item: `q` is zero and the stride term vanishes.
+    lines.append(
+        "            const ptrdiff_t geometry_offset = %s;" % work_item
+    )
+    for index in range(metric.metric_components):
+        lines.append(
+            "            const scalar_t %s = geom_metric%d[geometry_offset];"
+            % (_work_item_name(source_builder, "geom_metric", index), index)
+        )
+    for symbol, expression in plan.temporaries:
+        lines.append(
+            "            const scalar_t %s = %s;"
+            % (symbol, _sfem_ccode(expression.xreplace(bindings)))
+        )
+    lines.extend(
+        _METRIC_BODY_BY_WRITES_PER_SHAPE[writes_per_shape(form)](
+            dim, metric, plan, bindings, n_field_components,
+            work_item, use_stream_arrays,
+        )
+    )
+    lines.append("        }")
+
+
 def _append_constant_p1_sfem_soa_weak_form_lines(
     lines,
     form,
@@ -1940,7 +2116,17 @@ def _append_sfem_soa_weak_form_lines(
     use_stream_arrays=False,
     source_builder=None,
     constant_p1_gradient_expansion=False,
+    metric=None,
 ):
+    # A metric-carrying kernel reads no reference data, so the checks below --
+    # which say a weak form takes exactly one `grad_ref` -- describe the general
+    # kernel rather than this one, and it is answered before them.
+    if constant_p1_gradient_expansion and metric is not None:
+        _append_constant_p1_metric_weak_form_lines(
+            lines, form, dim, metric, use_stream_arrays, source_builder,
+        )
+        return
+
     n_field_components = form_n_field_components(form, dim)
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
@@ -4164,6 +4350,22 @@ def _sfem_soa_mesh_operator_function(
     )
     if specialized_prefix is not None and form.weak_form is not None:
         block_name = "%s_%s_block" % (specialized_prefix, form.name)
+    # The affine variant of a metric-carrying form reads the cached metric.
+    # The isoparametric one cannot: it builds its geometry from coordinates and
+    # holds an adjugate, so it keeps the general kernel.  This is the one place
+    # the two modes take different arguments for the same form.
+    metric = (
+        cached_metric_geometry(form.weak_form, quadrature_rule)
+        if geometry_mode == "affine" and specialized_prefix is not None
+        else None
+    )
+    # The packed entry points build their own adjugate arguments and have not
+    # been converted, so they keep the general block.  Only the kernel whose
+    # arguments are built below moves to the metric one.
+    general_block_name = block_name
+    if metric is not None:
+        block_name = "%s_metric_%s_block" % (specialized_prefix, form.name)
+        array_inputs = _metric_array_inputs(array_inputs, dim)
     element_inputs = _sfem_soa_element_inputs(array_inputs)
     reference_inputs = _sfem_soa_reference_inputs(array_inputs)
     use_tensor_product_reference = _use_tensor_product_reference(
@@ -4481,7 +4683,7 @@ def _sfem_soa_mesh_operator_function(
             ]
         )
     _append_mesh_operator_packed_entry_points(
-        block_name,
+        general_block_name,
         dim,
         effective_vector_size,
         form,
