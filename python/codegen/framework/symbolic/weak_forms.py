@@ -210,6 +210,26 @@ class SfemSoAFluxForm:
         return sp.Matrix(self.n_field_components, self.dim, self.flux)
 
     @property
+    def parameters(self):
+        """The material parameters the flux and source mention, sorted.
+
+        The form describing itself, so that nothing downstream has to reach for
+        `free_symbols` to find out what a kernel's signature needs -- which is
+        a planning question and one an emitter must not be answering.
+        """
+        gradient = {str(symbol) for symbol in self.gradient}
+        return tuple(
+            sorted(
+                {
+                    str(symbol)
+                    for entry in tuple(self.flux) + tuple(self.source)
+                    for symbol in entry.free_symbols
+                }
+                - gradient
+            )
+        )
+
+    @property
     def has_source(self):
         """Whether anything contracts against the test value.
 
