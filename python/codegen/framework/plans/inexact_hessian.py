@@ -176,8 +176,24 @@ class InexactHessianPlan:
         return order * (order + 1) // 2
 
     def tangent_index(self, i, k, m, n):
-        """Where `S_{ikmn}` sits in the packed tangent, by major symmetry."""
-        row, column = i * self.dim + k, m * self.dim + n
+        """Where `S_{ikmn}` sits in the packed tangent, by major symmetry.
+
+        The symmetry is `S[i,k,m,n] == S[k,i,n,m]`, and getting it wrong is the
+        easiest mistake in the whole construction.  It follows from what the
+        indices are: `i` is the output component and `n` the test function's
+        reference direction, `k` the increment's component and `m` its
+        reference direction.  The element matrix entry is
+        `S[i,k,m,n] * Wbar[j,m,p,n]`, and its symmetry under exchanging the two
+        (component, node) pairs, together with `Wbar`'s own major symmetry,
+        forces exactly this pairing.
+
+        So the pair that swaps is `(i,n)` against `(k,m)` -- not `(i,k)`
+        against `(m,n)`, which is the plausible-looking wrong answer and which
+        no test comparing the staged form against the dense form can catch,
+        because both would share it.  It was caught by evaluating the action
+        against a directly integrated one on a concrete tetrahedron.
+        """
+        row, column = i * self.dim + n, k * self.dim + m
         if row > column:
             row, column = column, row
         order = self.dim * self.dim
