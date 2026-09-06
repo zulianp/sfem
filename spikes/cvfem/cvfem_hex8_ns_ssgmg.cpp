@@ -40,6 +40,7 @@
 #include <omp.h>
 
 #include <map>
+#include <random>
 #include <vector>
 
 using cvfem_case::FlowCase;
@@ -2322,6 +2323,18 @@ int main(int argc, char **argv) {
     const int         max_newton = smesh::Env::read<int>("SFEM_NL_MAX_IT", 40);
     const real_t      nl_rtol    = smesh::Env::read<real_t>("SFEM_NL_RTOL", 1e-8);
     const real_t      nl_atol    = smesh::Env::read<real_t>("SFEM_NL_ATOL", 1e-12);
+    // Step-size convergence. The residual tests above cannot fire once ||R|| has reached its
+    // round-off floor, because no further relative reduction is achievable; but a Newton step
+    // of size 1e-10 has converged whatever the residual is doing. Without this the loop asks
+    // for another linear solve, that solve chases a relative tolerance against a residual it
+    // cannot reduce and burns its whole iteration cap, and the line search then correctly
+    // finds no decrease -- abandoning a stage that had in fact succeeded.
+    // Off by default: measured harmful. Accepting convergence on the step alone declares a
+    // stage successful without ever confirming ||R|| came down, and the continuation then
+    // grows its step from a state that has not converged. At Re=3200 it produced 8 such false
+    // successes and took the reachable Reynolds number from 3200 (at target) down to 1682.
+    // Retained only as an experiment knob.
+    const real_t      nl_stol    = smesh::Env::read<real_t>("SFEM_NL_STOL", 0);
     const real_t      lin_rtol   = smesh::Env::read<real_t>("SFEM_LSOLVE_RTOL", 1e-8);
     const real_t      lin_atol   = smesh::Env::read<real_t>("SFEM_LSOLVE_ATOL", 1e-14);
     const int         lin_max_it = smesh::Env::read<int>("SFEM_LSOLVE_MAX_IT", 1000);
@@ -2579,6 +2592,77 @@ int main(int argc, char **argv) {
             std::printf(" %g", (double)(rho_schedule[k] * U * Ly / std::max(mu, real_t(1e-30))));
         std::printf("\n");
     }
+    // SFEM_FD_CHECK: is the Jacobian action actually the derivative of the residual?
+    //
+    // cvfem_ns_op_gate compares the assembled matrix against the matrix-free action, which
+    // catches a wiring mistake but not a modelling one: both encode the same linearisation, so
+    // a term missing from both is invisible to it. This compares J*v against a central
+    // difference of the residual, which has no such blind spot.
+    //
+    // Mode 2 evaluates at a random state, where every sub-control surface has mdot != 0.
+    // Mode 1 evaluates at the current iterate, which for Poiseuille has mdot ~ 0 on the faces
+    // perpendicular to the flow -- exactly where the upwind switch sgn(mdot) is not
+    // differentiable. If the Jacobian is exact in mode 2 and inexact in mode 1, the upwind
+    // kink is the cause of the linear Newton tail, and no solver tuning will remove it.
+    if (const int fd_mode = smesh::Env::read<int>("SFEM_FD_CHECK", 0)) {
+        std::vector<real_t> v((size_t)ndof), jv((size_t)ndof), rp((size_t)ndof),
+                            rm((size_t)ndof), xt((size_t)ndof), xb(x, x + ndof);
+        std::mt19937                       gen(12345u);
+        std::uniform_real_distribution<real_t> dist(real_t(-1), real_t(1));
+        for (ptrdiff_t i = 0; i < ndof; ++i) v[(size_t)i] = dist(gen);
+        if (fd_mode == 2)
+            for (ptrdiff_t i = 0; i < ndof; ++i) xb[(size_t)i] = real_t(0.1) * dist(gen);
+        f->apply_zero_constraints(v.data());
+
+        // SFEM_FD_NO_RC=1 switches Rhie-Chow off. The suspected missing term is the
+        // derivative of the reconstructed nodal pressure gradient inside the Rhie-Chow
+        // correction, so with rc off the Jacobian should be exact and the error collapse.
+        if (smesh::Env::read<int>("SFEM_FD_NO_RC", 0)) {
+            op->rhie_chow_scale = real_t(0);
+            op->update(xb.data());
+            std::printf("fd_check: Rhie-Chow DISABLED\n");
+        }
+
+        std::fill(jv.begin(), jv.end(), real_t(0));
+        f->apply(xb.data(), v.data(), jv.data());
+        f->apply_zero_constraints(jv.data());
+
+        std::printf("fd_check: mode %d (%s), ndof %ld\n", fd_mode,
+                    fd_mode == 2 ? "random state, mdot != 0" : "current iterate", (long)ndof);
+        for (const real_t eps : {real_t(1e-3), real_t(1e-4), real_t(1e-5), real_t(1e-6),
+                                 real_t(1e-7), real_t(1e-8)}) {
+            for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = xb[(size_t)i] + eps * v[(size_t)i];
+            std::fill(rp.begin(), rp.end(), real_t(0));
+            f->gradient(xt.data(), rp.data());
+            f->apply_zero_constraints(rp.data());
+            for (ptrdiff_t i = 0; i < ndof; ++i) xt[(size_t)i] = xb[(size_t)i] - eps * v[(size_t)i];
+            std::fill(rm.begin(), rm.end(), real_t(0));
+            f->gradient(xt.data(), rm.data());
+            f->apply_zero_constraints(rm.data());
+            // Split by field. A discrepancy confined to the continuity rows or to the
+            // pressure columns is invisible in a global norm dominated by momentum, yet it is
+            // exactly what would set Newton's asymptotic rate.
+            real_t num = 0, den = 0, nmom = 0, dmom = 0, ncon = 0, dcon = 0;
+            real_t worst = 0; ptrdiff_t worst_i = -1;
+            for (ptrdiff_t i = 0; i < ndof; ++i) {
+                const real_t fd = (rp[(size_t)i] - rm[(size_t)i]) / (real_t(2) * eps);
+                const real_t d  = fd - jv[(size_t)i];
+                num += d * d; den += fd * fd;
+                if (i % 4 == 3) { ncon += d * d; dcon += fd * fd; }
+                else            { nmom += d * d; dmom += fd * fd; }
+                if (std::fabs(d) > worst) { worst = std::fabs(d); worst_i = i; }
+            }
+            std::printf("  eps %.1e  all %.4e  momentum %.4e  continuity %.4e"
+                        "  worst |d| %.3e at dof %ld (field %ld)\n",
+                        (double)eps,
+                        (double)std::sqrt(num / std::max(den, real_t(1e-300))),
+                        (double)std::sqrt(nmom / std::max(dmom, real_t(1e-300))),
+                        (double)std::sqrt(ncon / std::max(dcon, real_t(1e-300))),
+                        (double)worst, (long)worst_i, (long)(worst_i % 4));
+        }
+        return 0;
+    }
+
     std::vector<real_t> x_stage_start((size_t)ndof, real_t(0));
     int                 re_retries = 0;
     real_t              step_f     = re_step;  // current continuation step factor
@@ -2649,6 +2733,12 @@ int main(int argc, char **argv) {
     const int    ls_max    = smesh::Env::read<int>("SFEM_NL_MAX_LS", 8);
     const real_t ls_armijo = smesh::Env::read<real_t>("SFEM_NL_ARMIJO", real_t(1e-4));
     const real_t div_grow  = smesh::Env::read<real_t>("SFEM_NL_DIVERGE", real_t(1e3));
+    // Relative residual below which a line search that cannot improve means "converged", not
+    // "failed": at the round-off floor there is no decrease left to find.
+    // Ten times nl_rtol, not a hundred: a line search that cannot improve a residual already
+    // this small has genuinely reached the floor, but anything looser starts accepting states
+    // that simply have not converged.
+    const real_t nl_ls_floor = smesh::Env::read<real_t>("SFEM_NL_LS_FLOOR", real_t(1e-7));
     std::vector<real_t> x_try((size_t)ndof, 0), r_try((size_t)ndof, 0);
     bool converged    = false;
     // Set once from the first nonzero residual and kept across stages, as in the
@@ -2769,12 +2859,13 @@ int main(int argc, char **argv) {
             fsolver->set_rtol(lin_rtol);
             fsolver->set_atol(lin_atol);
             fsolver->set_restart(smesh::Env::read<int>("SFEM_FGMRES_RESTART", 30));
+            fsolver->set_dtol(smesh::Env::read<real_t>("SFEM_LSOLVE_DTOL", real_t(1e4)));
             set_prec = [fsolver](const std::shared_ptr<sfem::Operator<real_t>> &p) {
                 fsolver->set_preconditioner_op(p);
             };
             get_its  = [fsolver]() { return fsolver->iterations(); };
             do_solve = [fsolver](const real_t *b, real_t *x) { fsolver->apply(b, x); };
-            lin_failed = []() { return false; };  // FGMRES has no divergence test yet
+            lin_failed = [fsolver]() { return fsolver->has_diverged(); };
         } else {
             bsolver = sfem::create_bcgs<real_t>(linop_timed, sfem::EXECUTION_SPACE_HOST);
             bsolver->set_max_it(lin_max_it);
@@ -2927,6 +3018,19 @@ int main(int argc, char **argv) {
         real_t dxinf = 0;
         for (ptrdiff_t i = 0; i < ndof; ++i) dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
 
+        {
+            real_t xinf = 0;
+            for (ptrdiff_t i = 0; i < ndof; ++i) xinf = std::max(xinf, std::fabs(x[(size_t)i]));
+            if (dxinf <= nl_stol * std::max(xinf, real_t(1))) {
+                for (ptrdiff_t i = 0; i < ndof; ++i) x[(size_t)i] += dx[(size_t)i];
+                std::printf("  lin_it: %d  |dx|_inf: %.6e  converged on step size\n",
+                            get_its(), dxinf);
+                converged = true;
+                ++newton_total;
+                break;
+            }
+        }
+
         // Backtracking line search on ||R||. Accept the first step that reduces the residual by
         // the Armijo margin; halve otherwise. A step that cannot reduce it at all is not
         // accepted -- the stage is abandoned so the continuation can bisect.
@@ -2949,8 +3053,18 @@ int main(int argc, char **argv) {
                 alpha *= real_t(0.5);
             }
             if (!ok) {
-                std::printf("  line search failed (no decrease down to alpha=%.3g) -- abandoning stage\n",
-                            (double)alpha);
+                // No step reduces ||R||. That is a genuine failure only if the residual is
+                // still large; at the round-off floor it just means there is nothing left to
+                // reduce, and treating it as failure discards a converged stage.
+                if (rel < nl_ls_floor) {
+                    std::printf("  line search found no decrease at rel=%.3e -- residual floor,"
+                                " accepting as converged\n", (double)rel);
+                    converged = true;
+                    ++newton_total;
+                    break;
+                }
+                std::printf("  line search failed (no decrease down to alpha=%.3g, rel=%.3e)"
+                            " -- abandoning stage\n", (double)alpha, (double)rel);
                 diverged = true;
                 break;
             }

@@ -22,6 +22,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -36,8 +37,15 @@ namespace sfem {
         void set_rtol(const T v) { rtol_ = v; }
         void set_atol(const T v) { atol_ = v; }
         void set_restart(const int v) { restart_ = v; }
+        // Growth factor at which the solve is abandoned; 0 disables the test. See apply()
+        // for why this is measured on the true residual at a restart rather than on the
+        // Arnoldi estimate.
+        void set_dtol(const T v) { dtol_ = v; }
         void set_preconditioner_op(const std::shared_ptr<Operator<T>> &p) { prec_ = p; }
         int  iterations() const { return iterations_; }
+        // Why the last solve stopped. A count that ended on max_it is a floor, not a result.
+        bool has_diverged() const { return diverged_; }
+        bool hit_max_it() const { return iterations_ >= max_it_; }
 
         bool verbose{true};
 
@@ -50,6 +58,14 @@ namespace sfem {
             std::vector<T>              cs((size_t)m, 0), sn((size_t)m, 0), g((size_t)m + 1, 0);
 
             iterations_ = 0;
+            diverged_   = false;
+
+            // Best iterate seen, so a solve abandoned as divergent hands back the best point
+            // it reached rather than the diverging one. GMRES only writes x at the end of a
+            // restart cycle, so without this the caller receives precisely the worst iterate.
+            // One extra vector against the 2*(restart+1) the Krylov basis already holds.
+            std::vector<T> x_best;
+            T              beta_best = std::numeric_limits<T>::max();
 
             T bnorm = 0;
             for (ptrdiff_t i = 0; i < n; ++i) bnorm += b[i] * b[i];
@@ -66,6 +82,22 @@ namespace sfem {
                 T beta = 0;
                 for (ptrdiff_t i = 0; i < n; ++i) beta += r[(size_t)i] * r[(size_t)i];
                 beta = std::sqrt(beta);
+
+                // Divergence is tested here, on the true residual, and not on the Arnoldi
+                // estimate below: within a restart cycle GMRES minimises over the Krylov
+                // space, so the estimate is monotonically non-increasing by construction and
+                // can never report growth. Growth is only visible across restarts -- and with
+                // a flexible (varying) preconditioner the estimate can drift from the true
+                // residual in any case, so the recomputed one is the honest measure.
+                if (!std::isfinite(beta) || (dtol_ > T(0) && beta > dtol_ * bnorm)) {
+                    if (!x_best.empty()) std::copy(x_best.begin(), x_best.end(), x);
+                    diverged_ = true;
+                    break;
+                }
+                if (dtol_ > T(0) && beta < beta_best) {
+                    beta_best = beta;
+                    x_best.assign(x, x + n);
+                }
 
                 if (beta / bnorm < rtol_ || beta < atol_) break;
 
@@ -127,10 +159,21 @@ namespace sfem {
                         std::printf("%d: residual abs: %g, rel: %g\n", iterations_, (double)resid,
                                     (double)(resid / bnorm));
 
+                    if (!std::isfinite(resid)) {
+                        // Arnoldi breakdown: the least-squares solve below would be garbage.
+                        diverged_ = true;
+                        break;
+                    }
+
                     if (resid / bnorm < rtol_ || resid < atol_) {
                         ++j;
                         break;
                     }
+                }
+
+                if (diverged_) {
+                    if (!x_best.empty()) std::copy(x_best.begin(), x_best.end(), x);
+                    break;
                 }
 
                 // Back-substitute the least-squares problem and form the update from the
@@ -146,7 +189,7 @@ namespace sfem {
 
                 if (j < m) break;  // inner loop converged rather than exhausting the restart
             }
-            return 0;
+            return diverged_ ? 1 : 0;
         }
 
     private:
@@ -156,6 +199,8 @@ namespace sfem {
         int                          iterations_{0};
         T                            rtol_{1e-8};
         T                            atol_{1e-14};
+        T                            dtol_{0};
+        bool                         diverged_{false};
     };
 
 }  // namespace sfem

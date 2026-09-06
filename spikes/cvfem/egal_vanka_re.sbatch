@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=cvfem-vanka-re
 #SBATCH --account=c40
-#SBATCH --partition=debug
+#SBATCH --partition=normal
 #SBATCH --time=00:30:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
