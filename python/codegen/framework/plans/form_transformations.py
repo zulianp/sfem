@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 import sympy as sp
 
+from codegen.framework.symbolic.weak_forms import flux_form_from_energy
+
 
 @dataclass(frozen=True)
 class GradientMetricTransformation:
@@ -214,8 +216,48 @@ def _constant_reference_gradients(rule):
     return tuple(gradients)
 
 
+def flux_gradient_metric_scale(flux_form):
+    """The scale `kappa` when a form's flux is `kappa * grad(u)`, else None.
+
+    This is the predicate itself, asked of a `SfemSoAFluxForm` -- the object
+    both front ends reach.  An energy formulation gets there by differentiating
+    its density; a residual formulation by differentiating out its test
+    function.  Asking it here, of the flux, is what makes the answer a property
+    of the operator rather than of how the material was written.
+
+    A deformation gradient is rejected outright: its variable is `I + grad(u)`,
+    so the flux is not a multiple of the gradient even when it is linear in it.
+    """
+    if flux_form is None or flux_form.is_deformation_gradient:
+        return None
+    variables = tuple(flux_form.gradient)
+    if not variables:
+        return None
+    flux = tuple(flux_form.flux)
+    if len(flux) != len(variables):
+        return None
+    if flux_form.has_source:
+        # Something contracts against the test value, so the element integral
+        # is not `grad(v) . flux` alone and does not factor through the metric.
+        return None
+    scale = None
+    for entry, variable in zip(flux, variables):
+        ratio = sp.simplify(sp.together(entry / variable))
+        if ratio.has(*variables):
+            return None
+        if scale is None:
+            scale = ratio
+        elif sp.simplify(scale - ratio) != 0:
+            return None
+    return scale
+
+
 def energy_gradient_metric_scale(weak_form):
-    """The scale `kappa` when an energy's flux is `kappa * grad(u)`, else None.
+    """The same question asked of an energy density.
+
+    Kept as its own entry point because that is what the energy emitter holds,
+    and because the two guards below are about the weak form rather than the
+    flux: a form with no gradient variables has no flux to ask about.
 
     The compact metric kernel contracts a P1 simplex element through
     `FFF * grad`, six symmetric components instead of nine adjugate ones and a
@@ -236,22 +278,9 @@ def energy_gradient_metric_scale(weak_form):
     """
     if weak_form is None or getattr(weak_form, "is_deformation_gradient", True):
         return None
-    variables = tuple(getattr(weak_form, "deformation_gradient", ()) or ())
-    if not variables:
+    if not tuple(getattr(weak_form, "deformation_gradient", ()) or ()):
         return None
-    flux = tuple(weak_form.first_piola())
-    if len(flux) != len(variables):
-        return None
-    scale = None
-    for entry, variable in zip(flux, variables):
-        ratio = sp.simplify(sp.together(entry / variable))
-        if ratio.has(*variables):
-            return None
-        if scale is None:
-            scale = ratio
-        elif sp.simplify(scale - ratio) != 0:
-            return None
-    return scale
+    return flux_gradient_metric_scale(flux_form_from_energy(weak_form))
 
 
 @dataclass(frozen=True)

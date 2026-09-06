@@ -413,6 +413,7 @@ DRIVER_HEAD = r"""
 #include "smesh_elem_type.hpp"
 #include "smesh_types.hpp"
 #include "tet4_inline_cpu.hpp"
+#include "tri3_inline_cpu.hpp"
 
 // The grid, its affine geometry, and the deterministic fills are shared with
 // codegen.framework.tools.apply_bench: a Cartesian grid of hexahedra whose map
@@ -608,6 +609,157 @@ static Mesh build_grid_tet4(int n) {
             m.metric[k][e] = fff[k];
             m.metric_aos[(size_t)e * 6 + k] = fff[k];
         }
+    }
+    for (auto &row : m.elements) m.element_ptrs.push_back(row.data());
+    for (auto &row : m.points) m.point_ptrs.push_back(row.data());
+    return m;
+}
+
+// The two-dimensional grids.  Everything above builds a cube, so a kernel for
+// a triangle or a quadrilateral had no mesh to run on: `--element TRI3` fell
+// through to the hexahedral builder, was handed a `metric` array that builder
+// never fills, and segmentation-faulted before its first element.  Half the
+// elements the framework generates for were outside the gate because of that,
+// which is why the 2D families could not be changed with evidence.
+//
+// The layout mirrors the 3D builders exactly -- `points` has two rows, the
+// adjugate has four components and the symmetric metric three -- because the
+// binding code indexes them by position and knows nothing about dimension.
+
+static void fill_metric_tri3(Mesh &m) {
+    m.metric.assign(3, std::vector<geom_t>(m.nelements, (geom_t)0));
+    m.metric_aos.assign((size_t)m.nelements * 3, (geom_t)0);
+    for (ptrdiff_t e = 0; e < m.nelements; ++e) {
+        jacobian_t fff[3];
+        // SFEM's own tri3_fff, for the same reason the tetrahedral builder
+        // calls tet4_fff: the convention is theirs and cannot drift from the
+        // kernels being checked.
+        tri3_fff(m.points[0][m.elements[0][e]], m.points[0][m.elements[1][e]],
+                 m.points[0][m.elements[2][e]],
+                 m.points[1][m.elements[0][e]], m.points[1][m.elements[1][e]],
+                 m.points[1][m.elements[2][e]],
+                 fff);
+        // The two references do not agree on one factor: tet4_fff folds the
+        // reference tetrahedron's measure into what it returns -- the 1/6
+        // visible in its body -- and tri3_fff returns J^-1 J^-T det(J) with no
+        // reference area at all.  The generated kernels take the weighted
+        // form, so the triangle's 1/2 is applied here.  This is not a guess:
+        // without it the affine kernels answered exactly twice their
+        // isoparametric counterparts, which compute their geometry from the
+        // node coordinates alone, and the parity check is what says so.
+        for (int k = 0; k < 3; ++k) {
+            const geom_t weighted = (geom_t)(0.5 * (double)fff[k]);
+            m.metric[k][e] = weighted;
+            m.metric_aos[(size_t)e * 3 + k] = weighted;
+        }
+    }
+}
+
+// A triangular grid: the unit square split into n x n squares, each cut along
+// its rising diagonal into two triangles.  As with the tetrahedra the cells
+// are not all alike under the affine map, so the adjugate and determinant are
+// computed per element.
+static Mesh build_grid_tri3(int n) {
+    Mesh m;
+    const int nn = n + 1;
+    m.h = 1.0 / (double)n;
+    m.nnodes = (ptrdiff_t)nn * nn;
+    m.nelements = (ptrdiff_t)n * n * 2;
+    m.elements.assign(3, std::vector<idx_t>(m.nelements));
+    m.points.assign(2, std::vector<geom_t>(m.nnodes));
+    auto nid = [&](int i, int j) { return (idx_t)(j * nn + i); };
+    for (int j = 0; j < nn; ++j)
+        for (int i = 0; i < nn; ++i) {
+            const idx_t id = nid(i, j);
+            m.points[0][id] = (geom_t)(i * m.h);
+            m.points[1][id] = (geom_t)(j * m.h);
+        }
+    static const int tris[2][3][2] = {
+        {{0, 0}, {1, 0}, {1, 1}},
+        {{0, 0}, {1, 1}, {0, 1}},
+    };
+    m.adjugate.assign(4, std::vector<geom_t>(m.nelements, (geom_t)0));
+    m.determinant.assign(m.nelements, (geom_t)0);
+    ptrdiff_t e = 0;
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i)
+            for (int t = 0; t < 2; ++t, ++e) {
+                idx_t v[3];
+                for (int c = 0; c < 3; ++c)
+                    v[c] = nid(i + tris[t][c][0], j + tris[t][c][1]);
+                double J[4];
+                for (int c = 0; c < 2; ++c)
+                    for (int d = 0; d < 2; ++d)
+                        J[d * 2 + c] = (double)m.points[d][v[c + 1]] - (double)m.points[d][v[0]];
+                double det = J[0] * J[3] - J[1] * J[2];
+                if (det < 0.0) {           // keep every element positively oriented
+                    const idx_t swap = v[1]; v[1] = v[2]; v[2] = swap;
+                    for (int c = 0; c < 2; ++c)
+                        for (int d = 0; d < 2; ++d)
+                            J[d * 2 + c] = (double)m.points[d][v[c + 1]] - (double)m.points[d][v[0]];
+                    det = -det;
+                }
+                for (int c = 0; c < 3; ++c) m.elements[c][e] = v[c];
+                // adj(J) = det(J) * J^-1, written row-major.
+                m.adjugate[0][e] = (geom_t)J[3];
+                m.adjugate[1][e] = (geom_t)(-J[1]);
+                m.adjugate[2][e] = (geom_t)(-J[2]);
+                m.adjugate[3][e] = (geom_t)J[0];
+                m.determinant[e] = (geom_t)det;
+            }
+    fill_metric_tri3(m);
+    for (auto &row : m.elements) m.element_ptrs.push_back(row.data());
+    for (auto &row : m.points) m.point_ptrs.push_back(row.data());
+    return m;
+}
+
+// A quadrilateral grid: the same squares, uncut.  The map is affine and the
+// same everywhere, so the adjugate and determinant are constants -- the 2D
+// counterpart of build_grid.
+static Mesh build_grid_quad4(int n) {
+    Mesh m;
+    const int nn = n + 1;
+    m.h = 1.0 / (double)n;
+    m.nnodes = (ptrdiff_t)nn * nn;
+    m.nelements = (ptrdiff_t)n * n;
+    m.elements.assign(4, std::vector<idx_t>(m.nelements));
+    m.points.assign(2, std::vector<geom_t>(m.nnodes));
+    auto nid = [&](int i, int j) { return (idx_t)(j * nn + i); };
+    for (int j = 0; j < nn; ++j)
+        for (int i = 0; i < nn; ++i) {
+            const idx_t id = nid(i, j);
+            m.points[0][id] = (geom_t)(i * m.h);
+            m.points[1][id] = (geom_t)(j * m.h);
+        }
+    ptrdiff_t e = 0;
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i, ++e) {
+            m.elements[0][e] = nid(i, j);
+            m.elements[1][e] = nid(i + 1, j);
+            m.elements[2][e] = nid(i + 1, j + 1);
+            m.elements[3][e] = nid(i, j + 1);
+        }
+    m.adjugate.assign(4, std::vector<geom_t>(m.nelements, (geom_t)0));
+    m.determinant.assign(m.nelements, (geom_t)(m.h * m.h));
+    for (ptrdiff_t i = 0; i < m.nelements; ++i) {
+        m.adjugate[0][i] = (geom_t)m.h;
+        m.adjugate[3][i] = (geom_t)m.h;
+    }
+    // On this grid the cell map is J = h*I, so the symmetric metric
+    // J^-1 J^-T det(J) is the identity exactly.  Written out rather than left
+    // empty: a kernel that asks for the metric on a quadrilateral must be
+    // handed the value its own geometry implies, and an unfilled array is how
+    // `--element TRI3` used to crash.
+    m.metric.assign(3, std::vector<geom_t>(m.nelements, (geom_t)0));
+    m.metric_aos.assign((size_t)m.nelements * 3, (geom_t)0);
+    for (ptrdiff_t i = 0; i < m.nelements; ++i) {
+        // The reference square has unit measure, so unlike the triangle there
+        // is no factor to fold in.
+        const geom_t diag = (geom_t)1;
+        m.metric[0][i] = diag;
+        m.metric[2][i] = diag;
+        m.metric_aos[(size_t)i * 3 + 0] = diag;
+        m.metric_aos[(size_t)i * 3 + 2] = diag;
     }
     for (auto &row : m.elements) m.element_ptrs.push_back(row.data());
     for (auto &row : m.points) m.point_ptrs.push_back(row.data());
@@ -908,6 +1060,9 @@ def run_material(root, generated, material, refine, compiler, verbose=False, rep
         "HEX27": "build_grid_hex27",
         "TET4": "build_grid_tet4",
         "TET10": "build_grid_tet4",
+        "TRI3": "build_grid_tri3",
+        "TRI6": "build_grid_tri3",
+        "QUAD4": "build_grid_quad4",
     }.get(grid_element, "build_grid")
 
     # How many fields the system carries, read off the structure-of-arrays
@@ -1158,7 +1313,18 @@ def main(argv=None):
     # run at a different --refine compared against another mesh's numbers and
     # reported every kernel as moved -- a gate that cries wolf is worth about as
     # much as one that stays silent.
-    bucket = "refine=%d" % args.refine
+    #
+    # It is also a property of the element, and that was missing: a HEX8 run
+    # and a TET4 run generate the same kernel names -- both are `_3d_` -- so a
+    # recorded TET4 answer would overwrite the HEX8 one under the same key and
+    # the next `--all` run would report every kernel moved.  The default bucket
+    # therefore keeps its meaning, "each material on its own default grid", and
+    # an explicit `--element` gets a bucket of its own.
+    bucket = (
+        "element=%s refine=%d" % (ELEMENT_OVERRIDE, args.refine)
+        if ELEMENT_OVERRIDE
+        else "refine=%d" % args.refine
+    )
     baseline = {}
     if os.path.exists(BASELINE_PATH):
         with open(BASELINE_PATH, encoding="utf-8") as handle:
