@@ -1,6 +1,13 @@
-"""The inexact Hessian action: quadrature removed by an L2 projection.
+"""The inexact matrix-free apply: quadrature removed by an L2 projection.
 
-The exact matrix-free Hessian action of a hyperelastic operator is
+Named for the kernel it varies, not for the mathematics.  The framework's
+energy path publishes `objective_steps`, `gradient` and `apply`, and `apply` is
+its name for the matrix-free action of the second form -- the operator applied
+to a vector, with nothing assembled.  Calling this `inexact_hessian` would name
+a matrix, and the assembled second form is a different thing here with its own
+kernels and formats, so the name would say the opposite of what the kernel does.
+
+The exact matrix-free apply of a hyperelastic operator is
 
     (H h)_{i,p} = sum_q w_q * S_{ikmn}(F(xi_q)) * dh_k/dxi_n * dphi_p/dxi_m
 
@@ -156,8 +163,8 @@ def projection_is_exact(element_type):
 
 
 @dataclass(frozen=True)
-class InexactHessianPlan:
-    """What an inexact Hessian-action kernel emits.
+class InexactApplyPlan:
+    """What an inexact apply kernel emits.
 
     `tangent_components` is how many numbers the projected tangent takes per
     element, using its major symmetry: a `dim^2` square, so 45 in three
@@ -232,12 +239,12 @@ class InexactHessianPlan:
         return tuple(outputs)
 
 
-def inexact_hessian_plan(element_type):
+def inexact_apply_plan(element_type):
     """That plan, or ``None`` for an element with no symbolic basis."""
     reference = reference_gradient_product(element_type)
     if reference is None:
         return None
-    return InexactHessianPlan(
+    return InexactApplyPlan(
         element_type=reference.element_type,
         dim=reference.dim,
         n_nodes=reference.n_nodes,
