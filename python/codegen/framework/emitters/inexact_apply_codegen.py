@@ -1,19 +1,10 @@
 """The opt-in inexact apply, emitted as one header per element.
 
-The plan is `plans/inexact_apply.py`; this prints it.  It prints the operator
-in two forms, because they answer different questions.
+The plan is `plans/inexact_apply.py`; this prints it.
 
-**Fused.**  `<material>_<element>_apply_inexact_affine_mesh_soa` takes the same
-arguments the exact apply takes, builds the projected tangent from the state
-itself, and applies it.  Identical arguments, identical driver, and on an
-affine simplex an answer that must agree with the exact kernel -- which is what
-makes it the correctness gate on the whole construction.  It cannot be faster
-than the exact apply, because it does the exact apply's material work and then
-the projection on top.
-
-**Split.**  The form that pays.  `Sbar` depends on the state, not on the vector
-being applied, so in a Krylov solve one tangent serves every apply of that
-Newton step:
+`Sbar` depends on the state and the geometry but not on the vector being
+applied, so in a Krylov solve one tangent serves every apply of that Newton
+step.  The header carries that split:
 
     <material>_<element>_inexact_apply_tangent_affine_mesh_soa
         once per tangent: state, geometry and material in, `Sbar` out
@@ -24,9 +15,7 @@ Newton step:
 
 The apply kernels take no geometry, no state and no material parameters at all
 -- the material has been evaluated away into `Sbar`, and what is left is a
-contraction that is the same for every material.  That is the whole point of
-storing it, and it is why the split can beat an exact apply that the fused form
-cannot.
+contraction that is the same for every material.
 
 `Sbar` is 45 numbers per element in three dimensions, whatever the element, so
 the store is small and its precision is a free parameter: the kernels are
@@ -35,6 +24,10 @@ and applies it to the *outputs*, of which there are `dim * n_nodes`, rather
 than to the tangent's 45 components -- the action is linear in `Sbar`, so this
 is the same number, arrived at with fewer multiplies and without a decompressed
 copy of the tangent in registers.
+
+Correctness is gated by the stored apply against the exact one: on an affine
+simplex the projection loses nothing, so the two must agree to round-off, and
+any difference there is a defect rather than an approximation.
 """
 
 import sympy as sp
@@ -145,22 +138,14 @@ def _inexact_apply_kernel_source(
         "",
     ]
     lines.extend(
-        _fused_lines(
-            prefix, dim, n_nodes, component, parameters, used_state, packed,
-            tangent_symbols, action_body, output,
-        )
-    )
-    lines.extend(
         _tangent_lines(
             prefix, dim, n_nodes, component, parameters, used_state, packed, plan,
         )
     )
-    lines.extend(_stored_lines(prefix, dim, n_nodes, component, plan, action_body, output))
-    lines.extend(
-        _compressed_lines(prefix, dim, n_nodes, component, plan, action_body, output)
-    )
+    lines.extend(_stored_lines(prefix, n_nodes, component, plan, action_body))
+    lines.extend(_compressed_lines(prefix, n_nodes, component, plan, action_body))
     lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
-    return "%s_apply_inexact_affine_mesh_soa" % prefix, "\n".join(lines)
+    return "%s_inexact_apply_tangent_affine_mesh_soa" % prefix, "\n".join(lines)
 
 
 #: Whether the plan layer produced a plan decides whether there is a kernel.
@@ -281,33 +266,6 @@ def _scatter_body(component, n_nodes, scale=""):
     return lines
 
 
-def _fused_lines(
-    prefix, dim, n_nodes, component, parameters, used_state, packed,
-    tangent_symbols, action_body, output,
-):
-    """The reference kernel: tangent built and consumed in the same pass."""
-    body = _element_lines(n_nodes)
-    body.extend(_gather_lines("u", component, n_nodes, used_state))
-    body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
-    body.extend(_geometry_lines(dim))
-    body.extend(_assignment_lines(list(zip(tangent_symbols, packed)), "tangent"))
-    body.extend(action_body)
-    body.extend(_scatter_body(component, n_nodes))
-
-    signature = ["        const ptrdiff_t nelements,", "        idx_t **const SFEM_RESTRICT elements,"]
-    signature.extend(_geometry_arguments(dim))
-    signature.extend("        const scalar_t %s," % name for name in parameters)
-    signature.extend(_stream_arguments("u", component))
-    signature.extend(_stream_arguments("h", component))
-    signature.extend(_output_arguments(component))
-    return _function_lines(
-        "%s_apply_inexact_affine_mesh_soa" % prefix,
-        "template <typename scalar_t, typename jacobian_t>",
-        signature,
-        body,
-    )
-
-
 def _tangent_lines(
     prefix, dim, n_nodes, component, parameters, used_state, packed, plan
 ):
@@ -343,7 +301,7 @@ def _tangent_lines(
     )
 
 
-def _stored_lines(prefix, dim, n_nodes, component, plan, action_body, output):
+def _stored_lines(prefix, n_nodes, component, plan, action_body):
     """The apply: stored tangent and the vector, and nothing else."""
     body = _element_lines(n_nodes)
     body.extend(_gather_lines("h", component, n_nodes, _all_names("h", component, n_nodes)))
@@ -373,7 +331,7 @@ def _stored_lines(prefix, dim, n_nodes, component, plan, action_body, output):
     )
 
 
-def _compressed_lines(prefix, dim, n_nodes, component, plan, action_body, output):
+def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     """The same apply from a scaled low-precision store.
 
     The scale multiplies the outputs, not the tangent: the action is linear in

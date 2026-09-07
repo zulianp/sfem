@@ -47,12 +47,8 @@ resolution, and it is not done.
 ## The split kernels
 
 `bench_split.cpp` / `run_split.sh` measure the form that pays: `Sbar` assembled
-once into a store, then applied. The generated header carries four entry points
+once into a store, then applied. The generated header carries three entry points
 per element —
-
-    <material>_<element>_apply_inexact_affine_mesh_soa
-        fused: geometry, state, parameters and the vector.  The correctness
-        gate, not a performance variant.
 
     <material>_<element>_inexact_apply_tangent_affine_mesh_soa
         geometry, state and parameters in, `Sbar` out.  Once per tangent.
@@ -68,4 +64,11 @@ hand-written `*_S_IKMN_SIZE` operators use, under the major symmetry
 `scaling_t` per element) are the same kernel. Its two strides let the caller
 choose element-major or component-major without a second kernel.
 
-See `RESULTS.md` for the measured throughput and break-even.
+`warp_sweep.cpp` / `run_warp.sh` characterise the approximation instead of its
+speed: the displacement is warped away from a constant-gradient one by a severity
+parameter, and the deviation is measured against it.  At zero warp the tangent is
+constant and the projection is exact, which makes that row a control on the node
+ordering and the reference integral as well.
+
+See `RESULTS.md` for the measured throughput, the break-even, the warp sweep, and
+why a smooth increment makes a converging projection look flat.

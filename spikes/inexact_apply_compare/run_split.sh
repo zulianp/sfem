@@ -62,7 +62,6 @@ $CXX -std=c++17 -O3 -march=native -DNDEBUG $TAKES_STATE \
     -DMATERIAL_LABEL="\"$MATERIAL\"" \
     -DMATERIAL_INEXACT_HEADER="\"${MATERIAL}_${LOWER}_inexact_apply_inline.hpp\"" \
     -DEXACT_APPLY=${MATERIAL}_${LOWER}_apply_affine_mesh_soa \
-    -DFUSED_APPLY=${MATERIAL}_${LOWER}_apply_inexact_affine_mesh_soa_impl \
     -DTANGENT_KERNEL=${MATERIAL}_${LOWER}_inexact_apply_tangent_affine_mesh_soa_impl \
     -DSTORED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_stored_affine_mesh_soa_impl \
     -DCOMPRESSED_APPLY=${MATERIAL}_${LOWER}_inexact_apply_compressed_affine_mesh_soa_impl \
