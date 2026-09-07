@@ -1,0 +1,13 @@
+name,calls,total,avg
+Function::apply,32,7.86425,0.245758
+Function::copy_constrained_dofs,32,7.09901e-07,2.21844e-08
+Function::update,2,0.652481,0.32624
+GeneratedNeoHookeanOgden::apply,16,6.57845,0.411153
+GeneratedNeoHookeanOgden::initialize,2,1.61249e-05,8.06246e-06
+Mesh::create_cube,1,0.00553571,0.00553571
+Mesh::node_to_node_graph_upper_triangular,1,0.0999287,0.0999287
+NeoHookeanOgden::apply,16,1.28571,0.0803568
+NeoHookeanOgden::create,1,3.44161e-05,3.44161e-05
+NeoHookeanOgden::update,1,0.652476,0.652476
+create_crs_graph_upper_triangular_from_element,1,0.099824,0.099824
+create_n2e,1,0.0415567,0.0415567
