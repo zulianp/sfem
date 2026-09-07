@@ -34,10 +34,10 @@ import sympy as sp
 
 from codegen.framework.emitters.cprinter import _sfem_ccode
 from codegen.framework.plans.inexact_apply import (
+    action_stages,
     emittable_inexact_apply_plan,
     flux_form_for_collection,
     projected_tangent,
-    staged_action,
 )
 from codegen.framework.targets import current_target
 
@@ -133,7 +133,7 @@ def _inexact_apply_kernel_source(
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
     ]
-    stages = staged_action(plan, tangent_symbols, increment, output)
+    stages = action_stages(plan, tangent_symbols, increment, output)
     action_body = []
     for stage in stages:
         action_body.extend(_assignment_lines(stage.assignments, stage.name))
@@ -156,7 +156,22 @@ def _inexact_apply_kernel_source(
     lines.extend(_stored_lines(prefix, n_nodes, component, plan, action_body))
     lines.extend(_compressed_lines(prefix, n_nodes, component, plan, action_body))
     lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
-    return "%s_inexact_apply_tangent_affine_mesh_soa" % prefix, "\n".join(lines)
+
+    # The extern "C" definitions go in their own translation unit, the way the
+    # rest of the generated operators are laid out: the header carries the
+    # templates, the source carries the symbols the library links against.
+    operator_lines = [
+        '#include "%s_inexact_apply_inline.hpp"' % prefix,
+        "",
+    ]
+    operator_lines.extend(
+        _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous)
+    )
+    return (
+        "%s_inexact_apply_tangent_affine_mesh_soa" % prefix,
+        "\n".join(lines),
+        "\n".join(operator_lines),
+    )
 
 
 #: Whether the plan layer produced a plan decides whether there is a kernel.
@@ -415,6 +430,156 @@ def _function_lines(name, template, signature, body):
     return lines
 
 
+
+#: How the tangent is stored at the ABI boundary.  These are SFEM's own types
+#: for exactly this object: `metric_tensor_t` is what the hand-written partial
+#: assembly stores, and `compressed_t` with a `scaling_t` per element is what it
+#: compresses to.  Emitting the pair `<name>` and `<name>_float` is what makes
+#: the dispatch layer collapse them into one runtime-typed entry point.
+_ABI_SCALARS = (("", "double"), ("_float", "float"))
+
+
+def _abi_stream(scalar, role, component, const="const "):
+    lines = ["        const ptrdiff_t %s_stride," % role]
+    lines.extend(
+        "        %s%s *const SFEM_RESTRICT %s%s," % (const, scalar, role, name)
+        for name in component
+    )
+    return lines
+
+
+def _abi_geometry(dim):
+    lines = [
+        "        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate%d," % index
+        for index in range(dim * dim)
+    ]
+    lines.append("        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,")
+    return lines
+
+
+def _abi_tangent_arguments(dim, n_nodes, component):
+    return ["adjugate%d" % i for i in range(dim * dim)]
+
+
+def _c_abi_lines(prefix, dim, n_nodes, component, parameters, used_previous):
+    """`extern "C"` wrappers, so the split is reachable from SFEM.
+
+    The templated kernels above are what the generator produces; these are what
+    the library links against.  Each is emitted twice, once per scalar type,
+    because the dispatch layer collapses a `<name>`/`<name>_float` pair into a
+    single public entry point that takes the scalar type as a
+    `smesh::PrimitiveType` and the buffers as `void *` -- the shape the rest of
+    SFEM's C ABI already has.
+    """
+    geometry_call = ", ".join(
+        ["nelements", "elements"]
+        + ["g_jacobian_adjugate%d" % index for index in range(dim * dim)]
+        + ["g_jacobian_determinant0"]
+    )
+    previous_signature = _PREVIOUS_ABI_BY_USE[bool(used_previous)]
+    previous_call = _PREVIOUS_CALL_BY_USE[bool(used_previous)]
+
+    lines = []
+    for suffix, scalar in _ABI_SCALARS:
+        # --- the partial assembly ---------------------------------------
+        name = "%s_inexact_apply_tangent_affine_mesh_soa%s" % (prefix, suffix)
+        lines.append('extern "C" int %s(' % name)
+        lines.append("        const ptrdiff_t nelements,")
+        lines.append("        idx_t **const SFEM_RESTRICT elements,")
+        lines.extend(_abi_geometry(dim))
+        lines.extend("        const %s %s," % (scalar, p) for p in parameters)
+        lines.extend(_abi_stream(scalar, "u", component))
+        lines.extend(previous_signature(scalar, component))
+        lines.extend(
+            [
+                "        const ptrdiff_t tangent_element_stride,",
+                "        const ptrdiff_t tangent_component_stride,",
+                "        metric_tensor_t *const SFEM_RESTRICT tangent",
+                ") {",
+                "    return sfem::codegen::%s_inexact_apply_tangent_affine_mesh_soa_impl<"
+                "%s, geom_t, metric_tensor_t>(" % (prefix, scalar),
+                "            %s," % geometry_call,
+                "            %s," % ", ".join(parameters),
+                "            u_stride, %s," % ", ".join("u%s" % n for n in component),
+                "            %stangent_element_stride, tangent_component_stride, tangent);"
+                % previous_call(component),
+                "}",
+                "",
+            ]
+        )
+
+        # --- the apply, from a `metric_tensor_t` store --------------------
+        name = "%s_inexact_apply_stored_affine_mesh_soa%s" % (prefix, suffix)
+        lines.append('extern "C" int %s(' % name)
+        lines.extend(
+            [
+                "        const ptrdiff_t nelements,",
+                "        idx_t **const SFEM_RESTRICT elements,",
+                "        const ptrdiff_t tangent_element_stride,",
+                "        const ptrdiff_t tangent_component_stride,",
+                "        const metric_tensor_t *const SFEM_RESTRICT tangent,",
+            ]
+        )
+        lines.extend(_abi_stream(scalar, "h", component))
+        lines.extend(_abi_stream(scalar, "out", component, const=""))
+        lines[-1] = lines[-1].rstrip(",")
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s_inexact_apply_stored_affine_mesh_soa_impl<"
+                "%s, metric_tensor_t>(" % (prefix, scalar),
+                "            nelements, elements,",
+                "            tangent_element_stride, tangent_component_stride, tangent,",
+                "            h_stride, %s," % ", ".join("h%s" % n for n in component),
+                "            out_stride, %s);" % ", ".join("out%s" % n for n in component),
+                "}",
+                "",
+            ]
+        )
+
+        # --- the apply, from a compressed store ---------------------------
+        name = "%s_inexact_apply_compressed_affine_mesh_soa%s" % (prefix, suffix)
+        lines.append('extern "C" int %s(' % name)
+        lines.extend(
+            [
+                "        const ptrdiff_t nelements,",
+                "        idx_t **const SFEM_RESTRICT elements,",
+                "        const ptrdiff_t tangent_element_stride,",
+                "        const ptrdiff_t tangent_component_stride,",
+                "        const compressed_t *const SFEM_RESTRICT tangent,",
+                "        const scaling_t *const SFEM_RESTRICT scaling,",
+            ]
+        )
+        lines.extend(_abi_stream(scalar, "h", component))
+        lines.extend(_abi_stream(scalar, "out", component, const=""))
+        lines[-1] = lines[-1].rstrip(",")
+        lines.extend(
+            [
+                ") {",
+                "    return sfem::codegen::%s_inexact_apply_compressed_affine_mesh_soa_impl<"
+                "%s, compressed_t, scaling_t>(" % (prefix, scalar),
+                "            nelements, elements,",
+                "            tangent_element_stride, tangent_component_stride, tangent, scaling,",
+                "            h_stride, %s," % ", ".join("h%s" % n for n in component),
+                "            out_stride, %s);" % ", ".join("out%s" % n for n in component),
+                "}",
+                "",
+            ]
+        )
+    return lines
+
+
+#: The previous state reaches the ABI only where the material reads one.
+_PREVIOUS_ABI_BY_USE = {
+    True: lambda scalar, component: _abi_stream(scalar, "z", component),
+    False: lambda scalar, component: [],
+}
+_PREVIOUS_CALL_BY_USE = {
+    True: lambda component: "z_stride, %s, " % ", ".join("z%s" % n for n in component),
+    False: lambda component: "",
+}
+
+
 def inexact_apply_files(material, unit, context):
     """The opt-in header for one unit, or ``()`` when the path does not apply.
 
@@ -442,13 +607,14 @@ def inexact_apply_files(material, unit, context):
     )
     if emitted is None:
         return ()
-    _function, source = emitted
+    _function, header, operator_source = emitted
+    stem = "%s_%s_inexact_apply" % (
+        _unit_name(material, unit),
+        str(context.element_type).lower(),
+    )
     return (
-        (
-            "%s_%s_inexact_apply_inline.hpp"
-            % (_unit_name(material, unit), str(context.element_type).lower()),
-            source,
-        ),
+        ("%s_inline.hpp" % stem, header),
+        ("%s_operator.cpp" % stem, operator_source),
     )
 
 

@@ -492,6 +492,125 @@ def flux_tangent_is_symmetric(flux_form):
     return True
 
 
+def gradient_first_action(plan, tangent, increment, output_names):
+    """The action contracted against the reference tensor first.
+
+        G[k,m,p,n] = sum_j Wbar[j,m,p,n] h[k,j]
+        out[i,p]   = sum_kmn Sbar[i,k,m,n] G[k,m,p,n]
+
+    `Sbar` appears once, in a single contraction of 27 terms per output, and
+    everything else is the increment against a tensor of rationals.  Where the
+    rank factorisation is weak this is much the cheaper of the two: it has no
+    compression or expansion stages to pay for.
+
+    `Wbar`'s entries go in as the rationals they are rather than through a
+    runtime table, for the reason the module docstring gives, and which holds
+    here too -- tabulating them costs 1956 operations on HEX8 against 1731
+    folded.
+    """
+    dim, n_nodes, reference = plan.dim, plan.n_nodes, plan.reference
+
+    product, product_defs = {}, []
+    for k, m, p, n in itertools.product(
+        range(dim), range(dim), range(n_nodes), range(dim)
+    ):
+        expression = sum(
+            (
+                increment[k][j] * reference.entry(j, m, p, n)
+                for j in range(n_nodes)
+                if reference.entry(j, m, p, n) != 0
+            ),
+            sp.Integer(0),
+        )
+        if expression == 0:
+            continue
+        symbol = sp.Symbol("pa_g%d_%d_%d_%d" % (k, m, p, n))
+        product[(k, m, p, n)] = symbol
+        product_defs.append((symbol, expression))
+
+    output_defs = []
+    for row in range(dim):
+        for node in range(n_nodes):
+            expression = sum(
+                (
+                    tangent[plan.tangent_index(row, other, m, n)]
+                    * product[(other, m, node, n)]
+                    for other, m, n in itertools.product(range(dim), repeat=3)
+                    if (other, m, node, n) in product
+                ),
+                sp.Integer(0),
+            )
+            output_defs.append((output_names[row][node], expression))
+
+    return (
+        ActionStage("reference_product", tuple(product_defs)),
+        ActionStage("output", tuple(output_defs)),
+    )
+
+
+def _contraction_cost(stages):
+    """Operations the stages cost once common subexpressions are shared."""
+    total = 0
+    for stage in stages:
+        if not stage.assignments:
+            continue
+        expressions = [expression for _symbol, expression in stage.assignments]
+        temporaries, reduced = sp.cse(expressions, symbols=sp.numbered_symbols("c"))
+        total += sum(sp.count_ops(expression) for _s, expression in temporaries)
+        total += sum(sp.count_ops(expression) for expression in reduced)
+    return total
+
+
+@lru_cache(maxsize=None)
+def contraction_ordering(element_type):
+    """Which contraction is cheaper on this element, measured rather than assumed.
+
+    Two orderings compute the same action.  The staged one factors `Wbar` as
+    `C^T X C` and carries the increment through the factorisation; the
+    gradient-first one contracts `Wbar` with the increment directly.  Which wins
+    depends on how much the factorisation actually compresses, and that is a
+    property of the element:
+
+        TET4    staged  207   gradient-first  342     rank 1 of 12
+        TET10   staged 1380   gradient-first 1605     rank 4 of 30
+        HEX8    staged 2610   gradient-first 1731     rank 7 of 24
+
+    On HEX8 the rank is high enough that the compression and expansion stages
+    cost more than they save, and contracting directly is 1.51x cheaper.  This
+    is the framework's rule that the evaluation strategy follows the element,
+    applied to the contraction: it is decided here, by counting, and emission
+    spells the answer.
+    """
+    plan = inexact_apply_plan(element_type)
+    if plan is None:
+        return "staged"
+    tangent = sp.symbols("cost_S0:%d" % plan.tangent_components)
+    increment = [
+        [sp.Symbol("cost_h%d_%d" % (c, j)) for j in range(plan.n_nodes)]
+        for c in range(plan.dim)
+    ]
+    names = [
+        [sp.Symbol("cost_o%d_%d" % (c, j)) for j in range(plan.n_nodes)]
+        for c in range(plan.dim)
+    ]
+    staged = _contraction_cost(staged_action(plan, tangent, increment, names))
+    direct = _contraction_cost(gradient_first_action(plan, tangent, increment, names))
+    return "staged" if staged <= direct else "gradient_first"
+
+
+#: The two orderings, looked up by what `contraction_ordering` decided.
+_ACTION_BY_ORDERING = {
+    "staged": staged_action,
+    "gradient_first": gradient_first_action,
+}
+
+
+def action_stages(plan, tangent, increment, output_names):
+    """The action, contracted whichever way is cheaper on this element."""
+    ordering = contraction_ordering(plan.element_type)
+    return _ACTION_BY_ORDERING[ordering](plan, tangent, increment, output_names)
+
+
 def emittable_inexact_apply_plan(element_type, dim, n_nodes, flux_form, rule):
     """The plan when this element and form can take the projected apply.
 

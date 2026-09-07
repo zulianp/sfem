@@ -19,6 +19,9 @@ from codegen.framework.fem.reference_basis import (
     supported_elements,
 )
 from codegen.framework.plans.inexact_apply import (
+    _contraction_cost,
+    contraction_ordering,
+    gradient_first_action,
     inexact_apply_plan,
     projection_is_exact,
     rank_factored_gradient_product,
@@ -321,6 +324,57 @@ class StagedActionTest(unittest.TestCase):
             with self.subTest(element=element):
                 self.assertLess(staged * 3, dense * 2)
         self.assertEqual(self.COST["QUAD4"][0], self.COST["QUAD4"][1])
+
+
+class ContractionOrderingTest(unittest.TestCase):
+    """Two ways to contract the same action, and the choice between them.
+
+    The staged ordering carries the increment through `Wbar`'s rank
+    factorisation; the gradient-first ordering contracts `Wbar` with the
+    increment directly.  Which is cheaper is a property of the element -- on
+    HEX8 the rank is high enough that the factorisation costs more than it
+    saves -- so the plan measures rather than assumes.  What may never differ is
+    the answer.
+    """
+
+    def test_both_orderings_compute_the_same_action(self):
+        for element in ("TRI3", "TET4", "QUAD4", "HEX8"):
+            plan = _symmetric(inexact_apply_plan(element))
+            tangent, increment, names = _symbols(plan)
+            dense = plan.action(tangent, increment)
+            for build in (staged_action, gradient_first_action):
+                stages = build(plan, tangent, increment, names)
+                substitution = {}
+                for stage in stages[:-1]:
+                    for symbol, expression in stage.assignments:
+                        substitution[symbol] = expression.subs(substitution)
+                with self.subTest(element=element, ordering=build.__name__):
+                    for (_name, staged), reference in zip(stages[-1].assignments, dense):
+                        self.assertEqual(
+                            sp.simplify(sp.expand(staged.subs(substitution)) - reference), 0
+                        )
+
+    def test_the_choice_is_the_cheaper_one(self):
+        """Whatever it picks must actually be the cheaper of the two."""
+        for element in ("TET4", "HEX8"):
+            plan = inexact_apply_plan(element)
+            tangent, increment, names = _symbols(plan)
+            staged = _contraction_cost(staged_action(plan, tangent, increment, names))
+            direct = _contraction_cost(gradient_first_action(plan, tangent, increment, names))
+            chosen = contraction_ordering(element)
+            with self.subTest(element=element, staged=staged, gradient_first=direct):
+                self.assertEqual(chosen, "staged" if staged <= direct else "gradient_first")
+
+    def test_hex8_does_not_use_the_rank_factorisation(self):
+        """Pinned, because it is the one that pays for measuring.
+
+        HEX8's `Wbar` has rank 7 of 24, high enough that the compression and
+        expansion stages cost more than they save, and contracting directly is
+        about 1.5x cheaper.  TET4's rank is 1 and the factorisation is decisive
+        there, so the two elements must not share an ordering.
+        """
+        self.assertEqual(contraction_ordering("HEX8"), "gradient_first")
+        self.assertEqual(contraction_ordering("TET4"), "staged")
 
 
 class UnsymmetricTangentTest(unittest.TestCase):
