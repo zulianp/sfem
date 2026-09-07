@@ -32,7 +32,7 @@ struct linear_elasticity_proteus_hex125_isoparametric_reference_data {
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[6] = {scalar_t(0.085662246189585192), scalar_t(0.18038078652406936), scalar_t(0.23395696728634552), scalar_t(0.23395696728634552), scalar_t(0.18038078652406936), scalar_t(0.085662246189585192)};
+        static const scalar_t data[6] = {scalar_t(0.085662246189585178), scalar_t(0.18038078652406936), scalar_t(0.23395696728634555), scalar_t(0.23395696728634555), scalar_t(0.18038078652406936), scalar_t(0.085662246189585178)};
         return data;
     }
 };

@@ -6,6 +6,11 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
+#if defined(__has_include)
+#if __has_include("smesh_types.hpp")
+#include "smesh_types.hpp"
+#endif
+#endif
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -862,7 +867,8 @@ static SFEM_INLINE int two_phase_flow_form_2_p_c_p_w_tri3_residual_isoparametric
         }
 
         scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        for (int q = 0; q < N_QP; ++q) {
+        {
+            const int q = 0;  // TRI3 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const scalar_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[2][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2];
@@ -1281,7 +1287,8 @@ static SFEM_INLINE int two_phase_flow_form_2_p_c_p_w_tri3_jacobian_action_isopar
         }
 
         scalar_t *block_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        for (int q = 0; q < N_QP; ++q) {
+        {
+            const int q = 0;  // TRI3 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 const scalar_t J00 = block_coordinates[0][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 0] + block_coordinates[2][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 1] + block_coordinates[4][lane] * isoparametric_grad_ref_x[q * N_SHAPE + 2];

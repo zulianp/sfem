@@ -90,30 +90,6 @@ extern "C" int neohookean_ogden_proteus_quad4_hessian_bsr_isoparametric_mesh_soa
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 );
-extern "C" int neohookean_ogden_proteus_quad4_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int neohookean_ogden_proteus_quad4_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
 extern "C" int neohookean_ogden_proteus_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -225,38 +201,6 @@ extern "C" int neohookean_ogden_proteus_quad4_gradient_affine_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
-);
-extern "C" int neohookean_ogden_proteus_quad4_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int neohookean_ogden_proteus_quad4_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
 );
 extern "C" int neohookean_ogden_proteus_quad4_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -998,48 +942,6 @@ extern "C" int neohookean_ogden_quad4_hessian_bsr_isoparametric_mesh_soa_float(
     return neohookean_ogden_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
 }
 
-extern "C" int neohookean_ogden_quad4_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return neohookean_ogden_proteus_quad4_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
-}
-
-extern "C" int neohookean_ogden_quad4_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return neohookean_ogden_proteus_quad4_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, value);
-}
-
 extern "C" int neohookean_ogden_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1204,56 +1106,6 @@ extern "C" int neohookean_ogden_quad4_gradient_affine_mesh_soa_float(
         elements[2]
     };
     return neohookean_ogden_proteus_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-}
-
-extern "C" int neohookean_ogden_quad4_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return neohookean_ogden_proteus_quad4_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-}
-
-extern "C" int neohookean_ogden_quad4_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return neohookean_ogden_proteus_quad4_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
 }
 
 extern "C" int neohookean_ogden_quad4_objective_steps_affine_mesh_soa(

@@ -20,6 +20,7 @@
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
 typedef ptrdiff_t idx_t;
+typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
 namespace sfem {
@@ -54,9 +55,9 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_objective_b
     static_assert(ipow(N_QP_1D, 3) == N_QP, "N_QP must be tensor-product compatible");
     static_assert(ipow(N_SHAPE_1D, 3) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
     scalar_t grad_u_ref_q[N_QP * 9 * VECTOR_SIZE];
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 2, &grad_u_ref_q[2 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 2, &grad_u_ref_q[2 * N_QP * 3 * VECTOR_SIZE]);
     for (int q = 0; q < N_QP; ++q) {
         const int qx = q % N_QP_1D;
         const int qy = (q / N_QP_1D) % N_QP_1D;
@@ -135,9 +136,9 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_gradient_bl
     static_assert(ipow(N_SHAPE_1D, 3) == N_SHAPE, "N_SHAPE must be tensor-product compatible");
     scalar_t grad_u_ref_q[N_QP * 9 * VECTOR_SIZE];
     scalar_t loperand_q[N_QP * 9 * VECTOR_SIZE];
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 2, &grad_u_ref_q[2 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 2, &grad_u_ref_q[2 * N_QP * 3 * VECTOR_SIZE]);
     for (int q = 0; q < N_QP; ++q) {
         const int qx = q % N_QP_1D;
         const int qy = (q / N_QP_1D) % N_QP_1D;
@@ -227,9 +228,9 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_gradient_bl
             loperand_q[((2 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane] = loperand[8];
         }
     }
-    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, &loperand_q[0 * N_QP * 3 * VECTOR_SIZE], out_streams, 0);
-    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, &loperand_q[1 * N_QP * 3 * VECTOR_SIZE], out_streams, 1);
-    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, &loperand_q[2 * N_QP * 3 * VECTOR_SIZE], out_streams, 2);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[0 * N_QP * 3 * VECTOR_SIZE], out_streams, 0);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[1 * N_QP * 3 * VECTOR_SIZE], out_streams, 1);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[2 * N_QP * 3 * VECTOR_SIZE], out_streams, 2);
 }
 
 template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
@@ -264,12 +265,12 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_apply_block
     scalar_t grad_u_ref_q[N_QP * 9 * VECTOR_SIZE];
     scalar_t grad_h_ref_q[N_QP * 9 * VECTOR_SIZE];
     scalar_t loperand_q[N_QP * 9 * VECTOR_SIZE];
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, u_streams, 2, &grad_u_ref_q[2 * N_QP * 3 * VECTOR_SIZE]);
-    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[2 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 0, &grad_u_ref_q[0 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 1, &grad_u_ref_q[1 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[1 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, u_streams, 2, &grad_u_ref_q[2 * N_QP * 3 * VECTOR_SIZE]);
+    tensor_gradient<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[2 * N_QP * 3 * VECTOR_SIZE]);
     for (int q = 0; q < N_QP; ++q) {
         const int qx = q % N_QP_1D;
         const int qy = (q / N_QP_1D) % N_QP_1D;
@@ -474,9 +475,9 @@ static SFEM_INLINE void poro_hyperelasticity_solid_d3_tensor_product_apply_block
             loperand_q[((2 * N_QP + q) * 3 + 2) * VECTOR_SIZE + lane] = loperand[8];
         }
     }
-    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, &loperand_q[0 * N_QP * 3 * VECTOR_SIZE], out_streams, 0);
-    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, &loperand_q[1 * N_QP * 3 * VECTOR_SIZE], out_streams, 1);
-    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, shape_1d, grad_1d, &loperand_q[2 * N_QP * 3 * VECTOR_SIZE], out_streams, 2);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[0 * N_QP * 3 * VECTOR_SIZE], out_streams, 0);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[1 * N_QP * 3 * VECTOR_SIZE], out_streams, 1);
+    tensor_test<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3, 3>(nelems, shape_1d, grad_1d, &loperand_q[2 * N_QP * 3 * VECTOR_SIZE], out_streams, 2);
 }
 
 } // namespace codegen

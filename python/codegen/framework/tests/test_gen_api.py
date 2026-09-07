@@ -130,7 +130,7 @@ def _compile_include_only(test_case, compiler, out_dir, source, object_name):
     completed = subprocess.run(
         [
             compiler,
-            "-std=c++14",
+            "-std=c++17",
             "-O2",
             "-fopenmp-simd",
             *include_flags,
@@ -181,7 +181,7 @@ def _assert_source_reports_vectorized_loops(
     completed = subprocess.run(
         [
             compiler,
-            "-std=c++14",
+            "-std=c++17",
             *flags,
             "-c",
             source_path,
@@ -2637,7 +2637,7 @@ int main() {
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-c",
                     source,
                     "-I",
@@ -3969,7 +3969,7 @@ int main() {
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fopenmp-simd",
                     "-Werror",
@@ -4002,7 +4002,7 @@ int main() {
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fopenmp-simd",
                     "-Werror",
@@ -4315,7 +4315,7 @@ int main() {
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fopenmp-simd",
                     "-Werror",
@@ -4480,7 +4480,7 @@ int main() {
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fopenmp-simd",
                     "-Werror",
@@ -4573,7 +4573,7 @@ int main() {
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fopenmp-simd",
                     "-Werror",
@@ -4606,7 +4606,7 @@ int main() {
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fopenmp-simd",
                     "-Werror",

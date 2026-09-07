@@ -221,6 +221,16 @@ namespace sfem {
             }
             return SFEM_SUCCESS;
         }
+
+        ptrdiff_t block_size_for_dim(const int dim) {
+            switch (dim) {
+                case 2: return 2;
+                case 3: return 3;
+                default:
+                    SFEM_ERROR("unsupported spatial dimension %d for generated block size\n", dim);
+                    return 0;
+            }
+        }
     }  // namespace
 
     class GeneratedLinearElasticity::Impl {
@@ -239,8 +249,11 @@ namespace sfem {
     };
 
     std::unique_ptr<Op> GeneratedLinearElasticity::create(const std::shared_ptr<FunctionSpace> &space) {
-        if (space->block_size() != space->mesh_ptr()->spatial_dimension()) {
-            SFEM_ERROR("GeneratedLinearElasticity requires block_size=spatial_dimension\n");
+        const ptrdiff_t expected_block_size =
+                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        if (space->block_size() != expected_block_size) {
+            SFEM_ERROR("GeneratedLinearElasticity requires block_size=%ld\n",
+                       static_cast<long>(expected_block_size));
             return nullptr;
         }
         auto op = std::make_unique<GeneratedLinearElasticity>(space);
@@ -498,35 +511,24 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
         }
-        auto mesh = impl_->space->mesh_ptr();
         const bool needs_affine_geometry =
                 impl_->objective_uses_affine ||
                 impl_->gradient_uses_affine ||
                 impl_->apply_uses_affine ||
-                (mesh->spatial_dimension() == 3 /* the inexact path assembles from the affine geometry, which smesh fills for 3D elements only */);
+                (impl_->space->mesh_ptr()->spatial_dimension() == 3 /* the inexact path assembles from the affine geometry, which smesh fills for 3D elements only */);
         for (auto &entry : impl_->domains->domains()) {
             seed_parameters(*entry.second.parameters);
             impl_->element_capacity =
                     std::max(impl_->element_capacity, entry.second.block->n_elements());
-            if (needs_affine_geometry) {
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                auto cache = std::make_shared<AffineGeometryCache>();
-                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!cache->jacobian_soa) {
-                    return SFEM_FAILURE;
-                }
-                if ((impl_->gradient_uses_affine && true) ||
-                    (impl_->apply_uses_affine && true)) {
-                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->jacobian_aos) {
-                        return SFEM_FAILURE;
-                    }
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(cache);
-            }
+        }
+        // One cache builder, shared with set_option.  This used to be a second
+        // copy of the loop inlined here, and the copies drifted: the inlined
+        // one never built the metric, so an operator whose affine kernels read
+        // it worked when the option was set after initialize and failed when it
+        // was set before.
+        if (needs_affine_geometry &&
+            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
         impl_->use_packed_two_pass = smesh::Env::read("SFEM_PACKED_TWO_PASS", false);

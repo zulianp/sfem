@@ -21,10 +21,12 @@ run_generator codegen.framework.generators.mooney_rivlin_kelvin_voigt_newmark
 run_generator codegen.framework.generators.neumann
 # shellcheck disable=SC2086
 run_generator codegen.framework.generators.neumann_general ${SFEM_NEUMANN_GENERAL_ARGS:-}
-run_generator codegen.framework.generators.poro_elasticity
+run_generator codegen.framework.generators.poro_hyperelasticity
 # shellcheck disable=SC2086
 run_generator codegen.framework.generators.stokes ${SFEM_STOKES_ARGS:-}
 run_generator codegen.framework.generators.two_phase_flow
+run_generator codegen.framework.generators.navier_stokes
+run_generator codegen.framework.generators.scalar_potential
 
 if [[ "${SFEM_GENERATE_CUDA:-0}" == "1" ]]; then
     run_generator codegen.framework.generators.cuda ${SFEM_CUDA_ARGS:-}

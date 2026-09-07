@@ -1,0 +1,817 @@
+#include "sfem_GeneratedScalarPotential_c_abi.hpp"
+#include <cstdio>
+
+#ifndef SFEM_SUCCESS
+#define SFEM_SUCCESS 0
+#endif
+#ifndef SFEM_FAILURE
+#define SFEM_FAILURE 1
+#endif
+#ifndef SFEM_CODEGEN_PUBLIC_C_ABI
+#define SFEM_CODEGEN_PUBLIC_C_ABI
+#endif
+
+extern "C" int scalar_potential_proteus_quad4_apply_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_proteus_quad4_apply_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_quad4_apply_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_quad4_apply_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_tri3_apply_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_tri3_apply_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_hex8_apply_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_hex8_apply_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_proteus_hex8_apply_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_proteus_hex8_apply_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_tet4_apply_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_tet4_apply_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_proteus_quad4_gradient_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_proteus_quad4_gradient_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_quad4_gradient_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_quad4_gradient_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_tri3_gradient_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_tri3_gradient_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_hex8_gradient_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_hex8_gradient_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_proteus_hex8_gradient_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_proteus_hex8_gradient_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_tet4_gradient_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_tet4_gradient_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx
+);
+extern "C" int scalar_potential_proteus_quad4_objective_steps_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_quad4_objective_steps_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_quad4_objective_steps_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_tri3_objective_steps_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_tri3_objective_steps_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_hex8_objective_steps_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_hex8_objective_steps_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_proteus_hex8_objective_steps_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_tet4_objective_steps_isoparametric_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const double kappa,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
+extern "C" int scalar_potential_tet4_objective_steps_isoparametric_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const float kappa,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const float *const SFEM_RESTRICT steps,
+        float *const SFEM_RESTRICT value
+);
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int scalar_potential_apply_2d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::PROTEUS_QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_tri3_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_tri3_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "scalar_potential_apply_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int scalar_potential_apply_3d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const SFEM_RESTRICT hx,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_tet4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_tet4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "scalar_potential_apply_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int scalar_potential_gradient_2d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::PROTEUS_QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_tri3_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_tri3_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "scalar_potential_gradient_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int scalar_potential_gradient_3d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const SFEM_RESTRICT ux,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_tet4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_tet4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "scalar_potential_gradient_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int scalar_potential_objective_steps_2d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const void *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const void *const SFEM_RESTRICT steps,
+        void *const SFEM_RESTRICT value
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::PROTEUS_QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_tri3_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_tri3_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "scalar_potential_objective_steps_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int scalar_potential_objective_steps_3d_isoparametric_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const *const SFEM_RESTRICT points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const SFEM_RESTRICT ux,
+        const ptrdiff_t h_stride,
+        const void *const SFEM_RESTRICT hx,
+        const int nsteps,
+        const void *const SFEM_RESTRICT steps,
+        void *const SFEM_RESTRICT value
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return scalar_potential_tet4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return scalar_potential_tet4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "scalar_potential_objective_steps_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}

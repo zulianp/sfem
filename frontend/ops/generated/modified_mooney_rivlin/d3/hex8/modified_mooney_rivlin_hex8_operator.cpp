@@ -108,34 +108,6 @@ extern "C" int modified_mooney_rivlin_proteus_hex8_hessian_bsr_isoparametric_mes
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 );
-extern "C" int modified_mooney_rivlin_proteus_hex8_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
 extern "C" int modified_mooney_rivlin_proteus_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -287,52 +259,6 @@ extern "C" int modified_mooney_rivlin_proteus_hex8_gradient_affine_mesh_soa_floa
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
 );
 extern "C" int modified_mooney_rivlin_proteus_hex8_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -1250,60 +1176,6 @@ extern "C" int modified_mooney_rivlin_hex8_hessian_bsr_isoparametric_mesh_soa_fl
     return modified_mooney_rivlin_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
 }
 
-extern "C" int modified_mooney_rivlin_hex8_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return modified_mooney_rivlin_proteus_hex8_objective_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-}
-
-extern "C" int modified_mooney_rivlin_hex8_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return modified_mooney_rivlin_proteus_hex8_objective_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-}
-
 extern "C" int modified_mooney_rivlin_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1532,78 +1404,6 @@ extern "C" int modified_mooney_rivlin_hex8_gradient_affine_mesh_soa_float(
         elements[6]
     };
     return modified_mooney_rivlin_proteus_hex8_gradient_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int modified_mooney_rivlin_hex8_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return modified_mooney_rivlin_proteus_hex8_objective_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, value);
-}
-
-extern "C" int modified_mooney_rivlin_hex8_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return modified_mooney_rivlin_proteus_hex8_objective_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, value);
 }
 
 extern "C" int modified_mooney_rivlin_hex8_objective_steps_affine_mesh_soa(

@@ -131,27 +131,28 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_bsr_isoparametric_mesh_soa", source)
         bsr_scatter = _static_function_body(
             source,
-            "static SFEM_INLINE int neohookean_ogden_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_bsr",
+            "static SFEM_INLINE void neohookean_ogden_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_bsr",
         )
         self.assertIn("count_t entries[N_SHAPE * N_SHAPE];", bsr_scatter)
-        self.assertIn("bool valid_block_graph = true;", bsr_scatter)
-        self.assertIn("missing block graph entry", bsr_scatter)
-        self.assertIn("if (!valid_block_graph) return SFEM_FAILURE;", bsr_scatter)
-        self.assertIn("return SFEM_SUCCESS;", bsr_scatter)
+        # The scatter no longer reports a malformed graph: it returns void, and
+        # the graph is settled once at Op::initialize instead of being retested
+        # per element.  What is pinned here is that the check has not crept back
+        # into the element loop.
+        self.assertNotIn("valid_block_graph", bsr_scatter)
+        self.assertNotIn("missing block graph entry", bsr_scatter)
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);", bsr_scatter)
         self.assertIn("entries[i * N_SHAPE + j] = row_begin + ks[j];", bsr_scatter)
-        self.assertIn("scalar_t *const block = &values[entries[i * N_SHAPE + j] * DIM * DIM];", bsr_scatter)
-        self.assertIn("block[bi * DIM + bj] += element_matrix[row * (DIM * N_SHAPE) + col];", bsr_scatter)
+        self.assertIn("scalar_t *const block = &values[entries[i * N_SHAPE + j] * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];", bsr_scatter)
+        self.assertIn("block[bi * N_FIELD_COMPONENTS + bj] += element_matrix[row * (N_FIELD_COMPONENTS * N_SHAPE) + col];", bsr_scatter)
         self.assertLess(
             bsr_scatter.index("entries[i * N_SHAPE + j] = row_begin + ks[j];"),
-            bsr_scatter.index("scalar_t *const block = &values[entries[i * N_SHAPE + j] * DIM * DIM];"),
+            bsr_scatter.index("scalar_t *const block = &values[entries[i * N_SHAPE + j] * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];"),
         )
         self.assertNotIn("std::vector", bsr_scatter)
-        self.assertIn("int invalid_matrix_graph = 0;", source)
-        self.assertIn("reduction(|:invalid_matrix_graph)", source)
-        self.assertIn("return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;", source)
-        self.assertIn("invalid_matrix_graph |= (neohookean_ogden_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_bsr", source)
-        self.assertIn("values[entries[i * N_SHAPE + j] * DIM * DIM]", source)
+        self.assertIn("int unsupported_matrix_format = 0;", source)
+        self.assertIn("reduction(|:unsupported_matrix_format)", source)
+        self.assertIn("return unsupported_matrix_format ? SFEM_FAILURE : SFEM_SUCCESS;", source)
+        self.assertIn("values[entries[i * N_SHAPE + j] * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS]", source)
         for matrix_format in ("crs", "dia", "coo", "patch"):
             self.assertNotIn(
                 "neohookean_ogden_proteus_hex8_hessian_isoparametric_mesh_soa_scatter_%s"

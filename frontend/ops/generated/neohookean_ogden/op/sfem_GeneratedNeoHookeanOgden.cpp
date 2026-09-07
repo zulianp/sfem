@@ -220,6 +220,16 @@ namespace sfem {
             }
             return SFEM_SUCCESS;
         }
+
+        ptrdiff_t block_size_for_dim(const int dim) {
+            switch (dim) {
+                case 2: return 2;
+                case 3: return 3;
+                default:
+                    SFEM_ERROR("unsupported spatial dimension %d for generated block size\n", dim);
+                    return 0;
+            }
+        }
     }  // namespace
 
     class GeneratedNeoHookeanOgden::Impl {
@@ -238,8 +248,11 @@ namespace sfem {
     };
 
     std::unique_ptr<Op> GeneratedNeoHookeanOgden::create(const std::shared_ptr<FunctionSpace> &space) {
-        if (space->block_size() != space->mesh_ptr()->spatial_dimension()) {
-            SFEM_ERROR("GeneratedNeoHookeanOgden requires block_size=spatial_dimension\n");
+        const ptrdiff_t expected_block_size =
+                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        if (space->block_size() != expected_block_size) {
+            SFEM_ERROR("GeneratedNeoHookeanOgden requires block_size=%ld\n",
+                       static_cast<long>(expected_block_size));
             return nullptr;
         }
         auto op = std::make_unique<GeneratedNeoHookeanOgden>(space);
@@ -440,10 +453,63 @@ namespace sfem {
         return total;
     }
 
+    // Establish once, at setup, that this operator's dof graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // N_SHAPE x N_SHAPE candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x N_SHAPE^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    static int validate_dof_graph(const count_t *const rowptr,
+                                  const idx_t *const colidx,
+                                  const ptrdiff_t n_nodes,
+                                  const ptrdiff_t nnz) {
+        if (!rowptr || !colidx || n_nodes < 0) {
+            return SFEM_FAILURE;
+        }
+        if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
+            return SFEM_FAILURE;
+        }
+        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+            const count_t begin = rowptr[i];
+            const count_t end = rowptr[i + 1];
+            if (end < begin || (ptrdiff_t)end > nnz) {
+                return SFEM_FAILURE;
+            }
+            for (count_t k = begin; k < end; ++k) {
+                if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
+                    return SFEM_FAILURE;
+                }
+                if (k > begin && colidx[k] <= colidx[k - 1]) {
+                    return SFEM_FAILURE;
+                }
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
     int GeneratedNeoHookeanOgden::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
-        auto mesh = impl_->space->mesh_ptr();
+        {
+            auto dof_graph = impl_->space->dof_to_dof_graph();
+            if (!dof_graph ||
+                validate_dof_graph(dof_graph->rowptr()->data(),
+                                   dof_graph->colidx()->data(),
+                                   dof_graph->n_nodes(),
+                                   dof_graph->nnz()) != SFEM_SUCCESS) {
+                SFEM_ERROR("GeneratedNeoHookeanOgden::initialize: the dof graph is malformed; the assembly kernels assume it is not\n");
+                return SFEM_FAILURE;
+            }
+        }
         const bool needs_affine_geometry =
                 impl_->objective_uses_affine ||
                 impl_->gradient_uses_affine ||
@@ -452,25 +518,15 @@ namespace sfem {
             seed_parameters(*entry.second.parameters);
             impl_->element_capacity =
                     std::max(impl_->element_capacity, entry.second.block->n_elements());
-            if (needs_affine_geometry) {
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                auto cache = std::make_shared<AffineGeometryCache>();
-                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!cache->jacobian_soa) {
-                    return SFEM_FAILURE;
-                }
-                if ((impl_->gradient_uses_affine && false) ||
-                    (impl_->apply_uses_affine && false)) {
-                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->jacobian_aos) {
-                        return SFEM_FAILURE;
-                    }
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(cache);
-            }
+        }
+        // One cache builder, shared with set_option.  This used to be a second
+        // copy of the loop inlined here, and the copies drifted: the inlined
+        // one never built the metric, so an operator whose affine kernels read
+        // it worked when the option was set after initialize and failed when it
+        // was set before.
+        if (needs_affine_geometry &&
+            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
         impl_->use_packed_two_pass = smesh::Env::read("SFEM_PACKED_TWO_PASS", false);
@@ -538,15 +594,15 @@ namespace sfem {
                     const int dim = mesh->spatial_dimension();
                     if (dim == 2) {
                         if (impl_->use_packed_two_pass) {
-                            return neohookean_ogden_gradient_packed_two_pass_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                            return neohookean_ogden_gradient_packed_two_pass_2d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                         }
-                        return neohookean_ogden_gradient_packed_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                        return neohookean_ogden_gradient_packed_2d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                     }
                     else if (dim == 3) {
                         if (impl_->use_packed_two_pass) {
-                            return neohookean_ogden_gradient_packed_two_pass_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                            return neohookean_ogden_gradient_packed_two_pass_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                         }
-                        return neohookean_ogden_gradient_packed_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                        return neohookean_ogden_gradient_packed_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                     }
                 }
             }
@@ -565,30 +621,30 @@ namespace sfem {
                     const int dim = mesh->spatial_dimension();
                     if (dim == 2) {
                         if (impl_->use_packed_two_pass) {
-                            return neohookean_ogden_gradient_packed_two_pass_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                            return neohookean_ogden_gradient_packed_two_pass_2d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                         }
-                        return neohookean_ogden_gradient_packed_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                        return neohookean_ogden_gradient_packed_2d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                     }
                     else if (dim == 3) {
                         if (impl_->use_packed_two_pass) {
-                            return neohookean_ogden_gradient_packed_two_pass_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                            return neohookean_ogden_gradient_packed_two_pass_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                         }
-                        return neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                        return neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                     }
                 }
             }
             const int dim = mesh->spatial_dimension();
             if (dim == 2) {
                 if (impl_->gradient_uses_affine) {
-                    return neohookean_ogden_gradient_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                    return neohookean_ogden_gradient_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
                 }
-                return neohookean_ogden_gradient_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+                return neohookean_ogden_gradient_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
             }
             else if (dim == 3) {
                 if (impl_->gradient_uses_affine) {
-                    return neohookean_ogden_gradient_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                    return neohookean_ogden_gradient_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
                 }
-                return neohookean_ogden_gradient_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+                return neohookean_ogden_gradient_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
             }
             SFEM_ERROR("neohookean_ogden gradient does not support spatial dimension %d\n", dim);
             return SFEM_FAILURE;
@@ -643,12 +699,12 @@ namespace sfem {
                             auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
                             auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
                             if (impl_->use_packed_two_pass) {
-                                return neohookean_ogden_apply_packed_two_pass_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+                                return neohookean_ogden_apply_packed_two_pass_2d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
                             }
-                            return neohookean_ogden_apply_packed_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+                            return neohookean_ogden_apply_packed_2d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
                         }
                     }
-                    return neohookean_ogden_apply_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+                    return neohookean_ogden_apply_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
                 }
                 if (impl_->space->has_packed_mesh()) {
                     auto packed = impl_->space->packed_mesh();
@@ -663,12 +719,12 @@ namespace sfem {
                         auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
                         auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
                         if (impl_->use_packed_two_pass) {
-                            return neohookean_ogden_apply_packed_two_pass_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+                            return neohookean_ogden_apply_packed_two_pass_2d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
                         }
-                        return neohookean_ogden_apply_packed_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+                        return neohookean_ogden_apply_packed_2d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
                     }
                 }
-                return neohookean_ogden_apply_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+                return neohookean_ogden_apply_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
             }
             else if (dim == 3) {
                 if (impl_->apply_uses_affine) {
@@ -685,12 +741,12 @@ namespace sfem {
                             auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
                             auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
                             if (impl_->use_packed_two_pass) {
-                                return neohookean_ogden_apply_packed_two_pass_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                                return neohookean_ogden_apply_packed_two_pass_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                             }
-                            return neohookean_ogden_apply_packed_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                            return neohookean_ogden_apply_packed_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                         }
                     }
-                    return neohookean_ogden_apply_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                    return neohookean_ogden_apply_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                 }
                 if (impl_->space->has_packed_mesh()) {
                     auto packed = impl_->space->packed_mesh();
@@ -705,12 +761,12 @@ namespace sfem {
                         auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
                         auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
                         if (impl_->use_packed_two_pass) {
-                            return neohookean_ogden_apply_packed_two_pass_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                            return neohookean_ogden_apply_packed_two_pass_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                         }
-                        return neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                        return neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
                     }
                 }
-                return neohookean_ogden_apply_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+                return neohookean_ogden_apply_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
             }
             SFEM_ERROR("neohookean_ogden apply does not support spatial dimension %d\n", dim);
             return SFEM_FAILURE;
@@ -719,57 +775,20 @@ namespace sfem {
 
     int GeneratedNeoHookeanOgden::value(const real_t *x, real_t *const out) {
         SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::value");
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        // The objective is the 0-form at one step of length zero.  `value_steps`
+        // evaluates at `x + alpha * h`, so alpha = 0 leaves the increment
+        // unused and `x` itself can stand in for it -- `x + 0 * x` is `x`
+        // exactly in IEEE arithmetic for any finite state, and the kernel then
+        // calls the same block function the objective kernel called.
+        //
+        // Writing it this way is what keeps the two from disagreeing.  They
+        // did: this method zeroed `*out` before accumulating while
+        // `value_steps` only accumulated, so the same Op answered the same
+        // question two ways depending on which entry point was used.  With one
+        // implementation there is nothing left to diverge.
+        const real_t objective_step = 0;
         *out = 0;
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const ptrdiff_t nelements = domain.block->n_elements();
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            if (impl_->objective_uses_affine) {
-                auto cache = std::static_pointer_cast<AffineGeometryCache>(
-                        domain.user_data);
-                if (!cache || !cache->jacobian_soa) {
-                    SFEM_ERROR("GeneratedNeoHookeanOgden affine objective requires cached geometry\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        cache->jacobian_soa->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        cache->jacobian_soa->jacobian_determinant()->data());
-            }
-            std::fill(impl_->element_values.get(),
-                      impl_->element_values.get() + nelements,
-                      0);
-            int status = SFEM_FAILURE;
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                if (impl_->objective_uses_affine) {
-                    status = neohookean_ogden_objective_2d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
-                } else {
-                    status = neohookean_ogden_objective_2d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, impl_->element_values.get());
-                }
-            }
-            else if (dim == 3) {
-                if (impl_->objective_uses_affine) {
-                    status = neohookean_ogden_objective_3d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                } else {
-                    status = neohookean_ogden_objective_3d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, impl_->element_values.get());
-                }
-            }
-            if (dim != 2 && dim != 3) {
-                SFEM_ERROR("neohookean_ogden objective does not support spatial dimension %d\n", dim);
-                return SFEM_FAILURE;
-            }
-            if (status != SFEM_SUCCESS) return status;
-            real_t sum = 0;
-#pragma omp simd reduction(+ : sum)
-            for (ptrdiff_t element = 0; element < nelements; ++element) {
-                sum += impl_->element_values[element];
-            }
-            *out += sum;
-            return SFEM_SUCCESS;
-        });
+        return value_steps(x, x, 1, &objective_step, out);
     }
 
     int GeneratedNeoHookeanOgden::value_steps(const real_t *x,
@@ -819,10 +838,10 @@ namespace sfem {
                     auto ghost_idx = packed->ghost_idx(packed_block);
                     const int dim = mesh->spatial_dimension();
                     if (dim == 2) {
-                        status = neohookean_ogden_objective_steps_packed_2d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                        status = neohookean_ogden_objective_steps_packed_2d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
                     }
                     else if (dim == 3) {
-                        status = neohookean_ogden_objective_steps_packed_3d_affine_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                        status = neohookean_ogden_objective_steps_packed_3d_affine_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
                     }
                 }
             }
@@ -837,10 +856,10 @@ namespace sfem {
                     auto ghost_idx = packed->ghost_idx(packed_block);
                     const int dim = mesh->spatial_dimension();
                     if (dim == 2) {
-                        status = neohookean_ogden_objective_steps_packed_2d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                        status = neohookean_ogden_objective_steps_packed_2d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
                     }
                     else if (dim == 3) {
-                        status = neohookean_ogden_objective_steps_packed_3d_isoparametric_mesh_soa(domain.element_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                        status = neohookean_ogden_objective_steps_packed_3d_isoparametric_mesh_soa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
                     }
                 }
             }
@@ -848,16 +867,16 @@ namespace sfem {
                 const int dim = mesh->spatial_dimension();
                 if (dim == 2) {
                     if (impl_->objective_uses_affine) {
-                        status = neohookean_ogden_objective_steps_2d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                        status = neohookean_ogden_objective_steps_2d_affine_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
                     } else {
-                        status = neohookean_ogden_objective_steps_2d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+                        status = neohookean_ogden_objective_steps_2d_isoparametric_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
                     }
                 }
                 else if (dim == 3) {
                     if (impl_->objective_uses_affine) {
-                        status = neohookean_ogden_objective_steps_3d_affine_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                        status = neohookean_ogden_objective_steps_3d_affine_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
                     } else {
-                        status = neohookean_ogden_objective_steps_3d_isoparametric_mesh_soa(domain.element_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+                        status = neohookean_ogden_objective_steps_3d_isoparametric_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
                     }
                 }
                 if (dim != 2 && dim != 3) {
@@ -920,10 +939,10 @@ namespace sfem {
         return impl_->domains->iterate([&](const OpDomain &domain) {
             const int dim = mesh->spatial_dimension();
             if (dim == 2) {
-                return neohookean_ogden_hessian_bsr_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values);
+                return neohookean_ogden_hessian_bsr_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values);
             }
             else if (dim == 3) {
-                return neohookean_ogden_hessian_bsr_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+                return neohookean_ogden_hessian_bsr_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
             }
             SFEM_ERROR("neohookean_ogden hessian_bsr does not support spatial dimension %d\n", dim);
             return SFEM_FAILURE;

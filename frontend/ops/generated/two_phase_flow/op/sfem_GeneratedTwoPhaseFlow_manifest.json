@@ -1,0 +1,832 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_c_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_jacobian_action_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_1_p_c_jacobian_action_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_c_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_c_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_jacobian_action_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_1_p_c_jacobian_action_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_c_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_1_p_c_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_1_p_c_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_c_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_residual_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT previous,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_1_p_c_residual_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_c_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_c_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_residual_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT previous,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_1_p_c_residual_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_c_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_c_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_1_p_c_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_c_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_1_p_c_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_w_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_jacobian_action_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_1_p_w_jacobian_action_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_w_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_w_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_jacobian_action_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_1_p_w_jacobian_action_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_w_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_1_p_w_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_1_p_w_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_w_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_residual_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT previous,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_1_p_w_residual_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_w_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_w_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_residual_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT previous,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_1_p_w_residual_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_1_p_w_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_1_p_w_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_1_p_w_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_1_p_w_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_1_p_w_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_c_p_c_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_c_p_c_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_residual_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_residual_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_residual_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_residual_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_c_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_c_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_c_p_c_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_c_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_c_p_c_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t m,\n        const real_t mu_c,\n        const real_t porosity,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_c_p_w_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_c_p_w_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_residual_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_residual_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_residual_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_residual_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_c_p_w_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_c_p_w_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_c_p_w_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_c_p_w_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_c_p_w_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_w_p_c_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_w_p_c_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_residual_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_residual_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_residual_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_residual_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_c_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_c_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_w_p_c_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_c_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_w_p_c_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t P_r,\n        const real_t S_res,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_w_p_w_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_w_p_w_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_residual_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_residual_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_residual_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_residual_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_form_2_p_w_p_w_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_form_2_p_w_p_w_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_w_p_w_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_form_2_p_w_p_w_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_form_2_p_w_p_w_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_c,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_jacobian_action_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_jacobian_action_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_c,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_c,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_jacobian_action_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT direction,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_jacobian_action_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_c,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT p_w_direction,\n        const void *const SFEM_RESTRICT p_c_direction,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_c,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_residual_2d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT previous,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_residual_2d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_c,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_c,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_residual_3d_isoparametric_mesh_aos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const void *const SFEM_RESTRICT parameters,\n        const void *const SFEM_RESTRICT current,\n        const void *const SFEM_RESTRICT previous,\n        void *const SFEM_RESTRICT output\n);",
+      "name": "two_phase_flow_residual_3d_isoparametric_mesh_aos"
+    },
+    {
+      "declaration": "extern \"C\" int two_phase_flow_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t C_ka1,\n        const real_t C_ka2,\n        const real_t C_kw1,\n        const real_t K_0,\n        const real_t K_1,\n        const real_t K_2,\n        const real_t K_3,\n        const real_t K_4,\n        const real_t K_5,\n        const real_t K_6,\n        const real_t K_7,\n        const real_t K_8,\n        const real_t M_c,\n        const real_t P_r,\n        const real_t R,\n        const real_t S_res,\n        const real_t T,\n        const real_t Z,\n        const real_t dt,\n        const real_t kappa_T,\n        const real_t m,\n        const real_t mu_c,\n        const real_t mu_w,\n        const real_t p_wr,\n        const real_t porosity,\n        const real_t rho_w0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT p_w,\n        const void *const SFEM_RESTRICT p_c,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT p_w_old,\n        const void *const SFEM_RESTRICT p_c_old,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT p_w_out,\n        void *const SFEM_RESTRICT p_c_out\n);",
+      "name": "two_phase_flow_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *two_phase_flow_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "two_phase_flow_residual_element_3d_soa_diagnostics"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GeneratedTwoPhaseFlow",
+    "create": "sfem::GeneratedTwoPhaseFlow::create",
+    "create_from_yaml": "sfem::GeneratedTwoPhaseFlow::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "d2",
+    "d2/proteus_quad4",
+    "d2/quad4",
+    "d2/tri3",
+    "d3",
+    "d3/hex8",
+    "d3/proteus_hex8",
+    "d3/tet4",
+    "op"
+  ],
+  "header_api": [],
+  "material": "two_phase_flow",
+  "matrix_formats": [],
+  "op_name": "GeneratedTwoPhaseFlow",
+  "registration": {
+    "function": "sfem::register_GeneratedTwoPhaseFlow_generated_op",
+    "operator_name": "GeneratedTwoPhaseFlow",
+    "source": "op/sfem_GeneratedTwoPhaseFlow_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "jacobian_action",
+      "variants": [
+        {
+          "function": "two_phase_flow_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_c_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_c_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_w_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_w_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_c_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_c_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_w_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_w_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_c_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_c_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_w_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_w_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_c_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_c_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_w_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_w_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_w",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "residual",
+      "variants": [
+        {
+          "function": "two_phase_flow_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_c_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_c_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_w_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_w_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_c_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_c_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_w_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_w_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_c_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_c_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_c",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_w_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_w_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_w",
+          "variant": "affine"
+        },
+        {
+          "function": "two_phase_flow_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_c_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_c_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_w_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_1_p_w_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_1_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_c_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_c_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_w_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_c_p_w_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_c_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_c_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_c_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_c",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_w_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_w",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "two_phase_flow_form_2_p_w_p_w_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "two_phase_flow_form_2_p_w_p_w",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "wrapper": {
+    "c_abi_header": "op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp",
+    "header": "op/sfem_GeneratedTwoPhaseFlow.hpp",
+    "source": "op/sfem_GeneratedTwoPhaseFlow.cpp"
+  }
+}

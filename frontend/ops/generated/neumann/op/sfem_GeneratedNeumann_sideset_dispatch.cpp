@@ -21,26 +21,6 @@ extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(
         const int out_stride,
         real_t *const SFEM_RESTRICT out0,
         real_t *const SFEM_RESTRICT out1);
-extern "C" int neumann_quad4_edgeshell2_boundary_residual_sideset_soa(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t1,
-        const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1);
-extern "C" int neumann_tri3_edgeshell2_boundary_residual_sideset_soa(
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t1,
-        const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1);
 extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
@@ -51,6 +31,16 @@ extern "C" int neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_fl
         const int out_stride,
         float *const SFEM_RESTRICT out0,
         float *const SFEM_RESTRICT out1);
+extern "C" int neumann_quad4_edgeshell2_boundary_residual_sideset_soa(
+        const ptrdiff_t nsides,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const element_idx_t *const SFEM_RESTRICT parent,
+        const int16_t *const SFEM_RESTRICT side_idx,
+        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t1,
+        const int out_stride,
+        real_t *const SFEM_RESTRICT out0,
+        real_t *const SFEM_RESTRICT out1);
 extern "C" int neumann_quad4_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
@@ -61,6 +51,16 @@ extern "C" int neumann_quad4_edgeshell2_boundary_residual_sideset_soa_float(
         const int out_stride,
         float *const SFEM_RESTRICT out0,
         float *const SFEM_RESTRICT out1);
+extern "C" int neumann_tri3_edgeshell2_boundary_residual_sideset_soa(
+        const ptrdiff_t nsides,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const element_idx_t *const SFEM_RESTRICT parent,
+        const int16_t *const SFEM_RESTRICT side_idx,
+        const geom_t *const *const SFEM_RESTRICT points, const real_t t0, const real_t t1,
+        const int out_stride,
+        real_t *const SFEM_RESTRICT out0,
+        real_t *const SFEM_RESTRICT out1);
 extern "C" int neumann_tri3_edgeshell2_boundary_residual_sideset_soa_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
@@ -250,6 +250,7 @@ extern "C" int neumann_tet10_trishell6_boundary_residual_sideset_soa_float(
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_edgeshell2_boundary_residual_2d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -262,48 +263,57 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_edgeshell2_boundary_residual_2d
         real_t *const SFEM_RESTRICT out0,
         real_t *const SFEM_RESTRICT out1
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
-        case smesh::QUAD4:
-            return neumann_quad4_edgeshell2_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
-        case smesh::TRI3:
-            return neumann_tri3_edgeshell2_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
+        case smesh::PROTEUS_QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, (double *)out0, (double *)out1);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, (float *)out0, (float *)out1);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_quad4_edgeshell2_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, (double *)out0, (double *)out1);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_quad4_edgeshell2_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, (float *)out0, (float *)out1);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_tri3_edgeshell2_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, (double *)out0, (double *)out1);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_tri3_edgeshell2_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, (float *)out0, (float *)out1);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_edgeshell2_boundary_residual_2d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_edgeshell2_boundary_residual_2d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return neumann_proteus_quad4_edgeshell2_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
-        case smesh::QUAD4:
-            return neumann_quad4_edgeshell2_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
-        case smesh::TRI3:
-            return neumann_tri3_edgeshell2_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, out_stride, out0, out1);
-        default:
-            std::fprintf(stderr, "neumann_edgeshell2_boundary_residual_2d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_edgeshell2_boundary_residual_2d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell16_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -318,42 +328,35 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell16_boundary_re
         real_t *const SFEM_RESTRICT out1,
         real_t *const SFEM_RESTRICT out2
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::PROTEUS_HEX64:
-            return neumann_proteus_hex64_proteus_quadshell16_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
+        case smesh::PROTEUS_HEX64: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_proteus_hex64_proteus_quadshell16_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (double *)out0, (double *)out1, (double *)out2);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_proteus_hex64_proteus_quadshell16_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (float *)out0, (float *)out1, (float *)out2);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_proteus_quadshell16_boundary_residual_3d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell16_boundary_residual_3d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const float t2,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_HEX64:
-            return neumann_proteus_hex64_proteus_quadshell16_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
-        default:
-            std::fprintf(stderr, "neumann_proteus_quadshell16_boundary_residual_3d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_proteus_quadshell16_boundary_residual_3d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell25_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -368,42 +371,35 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell25_boundary_re
         real_t *const SFEM_RESTRICT out1,
         real_t *const SFEM_RESTRICT out2
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::PROTEUS_HEX125:
-            return neumann_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
+        case smesh::PROTEUS_HEX125: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (double *)out0, (double *)out1, (double *)out2);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (float *)out0, (float *)out1, (float *)out2);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_proteus_quadshell25_boundary_residual_3d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell25_boundary_residual_3d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const float t2,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_HEX125:
-            return neumann_proteus_hex125_proteus_quadshell25_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
-        default:
-            std::fprintf(stderr, "neumann_proteus_quadshell25_boundary_residual_3d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_proteus_quadshell25_boundary_residual_3d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell4_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -418,42 +414,35 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell4_boundary_res
         real_t *const SFEM_RESTRICT out1,
         real_t *const SFEM_RESTRICT out2
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::PROTEUS_HEX8:
-            return neumann_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
+        case smesh::PROTEUS_HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (double *)out0, (double *)out1, (double *)out2);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (float *)out0, (float *)out1, (float *)out2);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_proteus_quadshell4_boundary_residual_3d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell4_boundary_residual_3d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const float t2,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_HEX8:
-            return neumann_proteus_hex8_proteus_quadshell4_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
-        default:
-            std::fprintf(stderr, "neumann_proteus_quadshell4_boundary_residual_3d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_proteus_quadshell4_boundary_residual_3d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell9_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -468,42 +457,35 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell9_boundary_res
         real_t *const SFEM_RESTRICT out1,
         real_t *const SFEM_RESTRICT out2
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::PROTEUS_HEX27:
-            return neumann_proteus_hex27_proteus_quadshell9_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
+        case smesh::PROTEUS_HEX27: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_proteus_hex27_proteus_quadshell9_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (double *)out0, (double *)out1, (double *)out2);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_proteus_hex27_proteus_quadshell9_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (float *)out0, (float *)out1, (float *)out2);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_proteus_quadshell9_boundary_residual_3d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_proteus_quadshell9_boundary_residual_3d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const float t2,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_HEX27:
-            return neumann_proteus_hex27_proteus_quadshell9_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
-        default:
-            std::fprintf(stderr, "neumann_proteus_quadshell9_boundary_residual_3d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_proteus_quadshell9_boundary_residual_3d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_quadshell4_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -518,42 +500,35 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_quadshell4_boundary_residual_3d
         real_t *const SFEM_RESTRICT out1,
         real_t *const SFEM_RESTRICT out2
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::HEX8:
-            return neumann_hex8_quadshell4_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_hex8_quadshell4_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (double *)out0, (double *)out1, (double *)out2);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_hex8_quadshell4_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (float *)out0, (float *)out1, (float *)out2);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_quadshell4_boundary_residual_3d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_quadshell4_boundary_residual_3d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const float t2,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2
-) {
-    switch (element_type) {
-        case smesh::HEX8:
-            return neumann_hex8_quadshell4_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
-        default:
-            std::fprintf(stderr, "neumann_quadshell4_boundary_residual_3d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_quadshell4_boundary_residual_3d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_quadshell9_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -568,42 +543,35 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_quadshell9_boundary_residual_3d
         real_t *const SFEM_RESTRICT out1,
         real_t *const SFEM_RESTRICT out2
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::HEX27:
-            return neumann_hex27_quadshell9_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
+        case smesh::HEX27: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_hex27_quadshell9_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (double *)out0, (double *)out1, (double *)out2);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_hex27_quadshell9_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (float *)out0, (float *)out1, (float *)out2);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_quadshell9_boundary_residual_3d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_quadshell9_boundary_residual_3d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const float t2,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return neumann_hex27_quadshell9_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
-        default:
-            std::fprintf(stderr, "neumann_quadshell9_boundary_residual_3d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_quadshell9_boundary_residual_3d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_trishell3_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -618,42 +586,35 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_trishell3_boundary_residual_3d_
         real_t *const SFEM_RESTRICT out1,
         real_t *const SFEM_RESTRICT out2
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::TET4:
-            return neumann_tet4_trishell3_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_tet4_trishell3_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (double *)out0, (double *)out1, (double *)out2);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_tet4_trishell3_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (float *)out0, (float *)out1, (float *)out2);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_trishell3_boundary_residual_3d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_trishell3_boundary_residual_3d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const float t2,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2
-) {
-    switch (element_type) {
-        case smesh::TET4:
-            return neumann_tet4_trishell3_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
-        default:
-            std::fprintf(stderr, "neumann_trishell3_boundary_residual_3d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_trishell3_boundary_residual_3d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_trishell6_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -668,36 +629,28 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_trishell6_boundary_residual_3d_
         real_t *const SFEM_RESTRICT out1,
         real_t *const SFEM_RESTRICT out2
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::TET10:
-            return neumann_tet10_trishell6_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
+        case smesh::TET10: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return neumann_tet10_trishell6_boundary_residual_sideset_soa(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (double *)out0, (double *)out1, (double *)out2);
+                case smesh::SMESH_FLOAT32:
+                    return neumann_tet10_trishell6_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, (float *)out0, (float *)out1, (float *)out2);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "neumann_trishell6_boundary_residual_3d_sideset_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neumann_trishell6_boundary_residual_3d_sideset_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float t0,
-        const float t1,
-        const float t2,
-        const int out_stride,
-        float *const SFEM_RESTRICT out0,
-        float *const SFEM_RESTRICT out1,
-        float *const SFEM_RESTRICT out2
-) {
-    switch (element_type) {
-        case smesh::TET10:
-            return neumann_tet10_trishell6_boundary_residual_sideset_soa_float(nsides, nnodes, elements, parent, side_idx, points, t0, t1, t2, out_stride, out0, out1, out2);
-        default:
-            std::fprintf(stderr, "neumann_trishell6_boundary_residual_3d_sideset_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "neumann_trishell6_boundary_residual_3d_sideset_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }

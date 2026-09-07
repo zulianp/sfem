@@ -1,0 +1,509 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_1_p_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_1_p_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_1_p_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_1_p_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_1_p_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[2],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_1_p_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_1_p_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[2],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_1_p_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_1_p_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[3],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_1_p_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_1_p_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[3],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_1_p_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_1_p_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_1_p_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_1_p_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_1_p_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_1_u_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_1_u_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_1_u_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_1_u_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_1_u_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t mu,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[2],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_1_u_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_1_u_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[2],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_1_u_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_1_u_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t mu,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[3],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_1_u_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_1_u_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[3],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_1_u_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_1_u_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_1_u_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_1_u_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_1_u_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_p_u_hessian_coo_triplet_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
+      "name": "stokes_form_2_p_u_hessian_coo_triplet_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_p_u_hessian_coo_triplet_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
+      "name": "stokes_form_2_p_u_hessian_coo_triplet_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_p_u_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_2_p_u_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_p_u_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[3],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_2_p_u_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[3],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_p_u_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_p_u_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_p_u_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_p_u_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_p_u_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_p_u_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_p_u_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_p_u_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_p_hessian_coo_triplet_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
+      "name": "stokes_form_2_u_p_hessian_coo_triplet_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_p_hessian_coo_triplet_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
+      "name": "stokes_form_2_u_p_hessian_coo_triplet_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_p_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[3],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_2_u_p_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[3],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_u_p_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_u_p_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_u_p_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_u_p_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_u_p_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_u_p_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_u_p_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_u_p_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_u_hessian_coo_triplet_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
+      "name": "stokes_form_2_u_u_hessian_coo_triplet_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_u_hessian_coo_triplet_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
+      "name": "stokes_form_2_u_u_hessian_coo_triplet_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t mu,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2]\n);",
+      "name": "stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_u_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2]\n);",
+      "name": "stokes_form_2_u_u_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_u_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t mu,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[3],\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3]\n);",
+      "name": "stokes_form_2_u_u_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[3],\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3]\n);",
+      "name": "stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_u_u_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_u_u_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_u_u_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_u_u_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_u_u_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_u_u_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_form_2_u_u_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_form_2_u_u_residual_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
+      "name": "stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_hessian_coo_triplet_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
+      "name": "stokes_hessian_coo_triplet_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t mu,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_jacobian_action_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_jacobian_action_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_jacobian_action_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_jacobian_action_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t mu,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[3],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_jacobian_action_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_jacobian_action_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[3],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_jacobian_action_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_jacobian_action_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_jacobian_action_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_jacobian_action_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_jacobian_action_element_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_residual_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t mu,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[2],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_residual_2d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_residual_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[2],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_residual_2d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_residual_3d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t mu,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[3],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_residual_3d_affine_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" int stokes_residual_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t mu,\n        const ptrdiff_t current_stride,\n        const void *const SFEM_RESTRICT u_data[3],\n        const void *const SFEM_RESTRICT p_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[3],\n        void *const SFEM_RESTRICT p_out\n);",
+      "name": "stokes_residual_3d_isoparametric_mesh_soa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_residual_element_2d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_residual_element_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *stokes_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
+      "name": "stokes_residual_element_3d_soa_diagnostics"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GeneratedStokes",
+    "create": "sfem::GeneratedStokes::create",
+    "create_from_yaml": "sfem::GeneratedStokes::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "d2",
+    "d2/tri6",
+    "d2/tri6_tri3",
+    "d3",
+    "d3/hex27",
+    "d3/hex27_hex8",
+    "d3/tet10",
+    "d3/tet10_tet4",
+    "op"
+  ],
+  "header_api": [],
+  "material": "stokes",
+  "matrix_formats": [],
+  "op_name": "GeneratedStokes",
+  "registration": {
+    "function": "sfem::register_GeneratedStokes_generated_op",
+    "operator_name": "GeneratedStokes",
+    "source": "op/sfem_GeneratedStokes_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "hessian_coo_triplet",
+      "variants": [
+        {
+          "function": "stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_hessian_coo_triplet_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_p_u_hessian_coo_triplet_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_p_u",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_p_u_hessian_coo_triplet_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_p_u",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_u_p_hessian_coo_triplet_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_p",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_u_p_hessian_coo_triplet_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_p",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_u_u_hessian_coo_triplet_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_u",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_u_u_hessian_coo_triplet_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_u",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "jacobian_action",
+      "variants": [
+        {
+          "function": "stokes_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_p_u",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_2_p_u_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_p_u",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_p",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_2_u_p_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_p",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_u",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_2_u_u_jacobian_action_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_u",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_p_u_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_p_u",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_p_u_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_p_u",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_u_p_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_p",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_u_p_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_p",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_u_u_jacobian_action_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_u",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_2_u_u_jacobian_action_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_2_u_u",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "residual",
+      "variants": [
+        {
+          "function": "stokes_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_1_p_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_1_p",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_1_p_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_1_p",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_1_u_residual_2d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_1_u",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_form_1_u_residual_3d_affine_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_1_u",
+          "variant": "affine"
+        },
+        {
+          "function": "stokes_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_1_p_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_1_p",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_1_p_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_1_p",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_1_u_residual_2d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_1_u",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "stokes_form_1_u_residual_3d_isoparametric_mesh_soa",
+          "scalar_type": "real_t",
+          "target": "stokes_form_1_u",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "wrapper": {
+    "c_abi_header": "op/sfem_GeneratedStokes_c_abi.hpp",
+    "header": "op/sfem_GeneratedStokes.hpp",
+    "source": "op/sfem_GeneratedStokes.cpp"
+  }
+}

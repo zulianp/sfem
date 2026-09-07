@@ -376,6 +376,7 @@ int test_generated_neohookean_hessian_action_matrix_formats() {
     std::vector<real_t> packed_apply(ndofs, 0);
     SFEM_TEST_ASSERT(generated_hessian_action(*function, state, direction.data(), expected_apply.data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+                                                                                    smesh::SMESH_DEFAULT,
                                                                                     1,
                                                                                     nelements,
                                                                                     nelements,
@@ -412,6 +413,7 @@ int test_generated_neohookean_hessian_action_matrix_formats() {
     std::vector<real_t> gradient_packed(ndofs, 0);
     SFEM_TEST_ASSERT(function->gradient(state.data(), gradient_reference.data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+                                                                                       smesh::SMESH_DEFAULT,
                                                                                        1,
                                                                                        nelements,
                                                                                        nelements,
@@ -451,6 +453,7 @@ int test_generated_neohookean_hessian_action_matrix_formats() {
                                            steps,
                                            value_steps_reference.data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(neohookean_ogden_objective_steps_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+                                                                                              smesh::SMESH_DEFAULT,
                                                                                               1,
                                                                                               nelements,
                                                                                               nelements,

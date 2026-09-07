@@ -6,6 +6,11 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
+#if defined(__has_include)
+#if __has_include("smesh_types.hpp")
+#include "smesh_types.hpp"
+#endif
+#endif
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0

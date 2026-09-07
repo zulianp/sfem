@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 
 
@@ -273,22 +274,7 @@ namespace sfem {
         const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
             const ptrdiff_t nelements = domain.block->n_elements();
-            if (dim == 2) {
-                {
-                    const sfem::codegen::KernelDiagnostics *const diagnostics = poro_hyperelasticity_solid_objective_2d_soa_diagnostics(domain.element_type);
-                    if (diagnostics) {
-                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
-                    }
-                }
-            }
-            if (dim == 3) {
-                {
-                    const sfem::codegen::KernelDiagnostics *const diagnostics = poro_hyperelasticity_solid_objective_3d_soa_diagnostics(domain.element_type);
-                    if (diagnostics) {
-                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
-                    }
-                }
-            }
+
             return SFEM_SUCCESS;
         });
 
@@ -304,22 +290,7 @@ namespace sfem {
         const int dim = impl_->space->mesh_ptr()->spatial_dimension();
         impl_->domains->iterate([&](const OpDomain &domain) {
             const ptrdiff_t nelements = domain.block->n_elements();
-            if (dim == 2) {
-                {
-                    const sfem::codegen::KernelDiagnostics *const diagnostics = poro_hyperelasticity_solid_objective_2d_soa_diagnostics(domain.element_type);
-                    if (diagnostics) {
-                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    }
-                }
-            }
-            if (dim == 3) {
-                {
-                    const sfem::codegen::KernelDiagnostics *const diagnostics = poro_hyperelasticity_solid_objective_3d_soa_diagnostics(domain.element_type);
-                    if (diagnostics) {
-                        total += impl_->objective_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
-                    }
-                }
-            }
+
             return SFEM_SUCCESS;
         });
 
@@ -498,9 +469,63 @@ namespace sfem {
         return total;
     }
 
+    // Establish once, at setup, that this operator's dof graph is well formed:
+    // rows in order, every column in range, each row sorted and duplicate free.
+    // The assembly kernels assume it -- they locate an entry and write to it
+    // without re-checking that it is there -- so this is where the assumption
+    // is earned.
+    //
+    // It used to be earned per element instead: every scatter walked its
+    // N_SHAPE x N_SHAPE candidates, tested each with a three-condition branch
+    // and reported through std::fprintf from inside the caller's parallel
+    // region.  That paid O(elements x N_SHAPE^2) on every assembly for a
+    // property of the mesh and the graph together, which cannot change between
+    // elements or between calls.  Here it is O(nnz), once.
+    //
+    // Raw pointers rather than the graph type, so this does not depend on which
+    // headers the generated wrapper happens to pull in.
+    static int validate_dof_graph(const count_t *const rowptr,
+                                  const idx_t *const colidx,
+                                  const ptrdiff_t n_nodes,
+                                  const ptrdiff_t nnz) {
+        if (!rowptr || !colidx || n_nodes < 0) {
+            return SFEM_FAILURE;
+        }
+        if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
+            return SFEM_FAILURE;
+        }
+        for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+            const count_t begin = rowptr[i];
+            const count_t end = rowptr[i + 1];
+            if (end < begin || (ptrdiff_t)end > nnz) {
+                return SFEM_FAILURE;
+            }
+            for (count_t k = begin; k < end; ++k) {
+                if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
+                    return SFEM_FAILURE;
+                }
+                if (k > begin && colidx[k] <= colidx[k - 1]) {
+                    return SFEM_FAILURE;
+                }
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
     int GeneratedPoroHyperelasticity::initialize(const std::vector<std::string> &block_names) {
         SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::initialize");
         impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+        {
+            auto dof_graph = impl_->space->dof_to_dof_graph();
+            if (!dof_graph ||
+                validate_dof_graph(dof_graph->rowptr()->data(),
+                                   dof_graph->colidx()->data(),
+                                   dof_graph->n_nodes(),
+                                   dof_graph->nnz()) != SFEM_SUCCESS) {
+                SFEM_ERROR("GeneratedPoroHyperelasticity::initialize: the dof graph is malformed; the assembly kernels assume it is not\n");
+                return SFEM_FAILURE;
+            }
+        }
         seed_material(*impl_->domains);
         auto mesh = impl_->space->mesh_ptr();
         const bool needs_affine_geometry =
@@ -569,33 +594,49 @@ namespace sfem {
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters, storage);
             const real_t *const previous = impl_->previous;
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 3;
-                const real_t *const SFEM_RESTRICT u_data[2] = {state + 0, state + 1};
-                const real_t *const SFEM_RESTRICT p_data = state + 2;
-                const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
-                const real_t *const SFEM_RESTRICT p_old_data = previous + 2;
-                real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                real_t *const SFEM_RESTRICT p_out = out + 2;
-                int status = impl_->gradient_uses_affine ? poro_hyperelasticity_solid_gradient_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], FIELD_STRIDE, state + 0, state + 1, FIELD_STRIDE, out + 0, out + 1) : poro_hyperelasticity_solid_gradient_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], FIELD_STRIDE, state + 0, state + 1, FIELD_STRIDE, out + 0, out + 1);
-                if (status != SFEM_SUCCESS) return status;
-                return impl_->residual_uses_affine ? poro_hyperelasticity_poro_residual_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[2], storage[4], storage[5], storage[3], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out) : poro_hyperelasticity_poro_residual_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
+            switch (domain.element_type) {
+                case smesh::TRI6: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 3;
+                    const real_t *const SFEM_RESTRICT u_data[2] = {state + 0, state + 1};
+                    const real_t *const SFEM_RESTRICT p_data = state + 2;
+                    const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
+                    const real_t *const SFEM_RESTRICT p_old_data = previous + 2;
+                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
+                    real_t *const SFEM_RESTRICT p_out = out + 2;
+                    int status = impl_->gradient_uses_affine ? poro_hyperelasticity_solid_gradient_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 3, state + 0, state + 1, 3, out + 0, out + 1) : poro_hyperelasticity_solid_gradient_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, 3, out + 0, out + 1);
+                    if (status != SFEM_SUCCESS) return status;
+                    return impl_->residual_uses_affine ? poro_hyperelasticity_poro_residual_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[2], storage[4], storage[5], storage[3], 3, (const void *const *)u_data, p_data, 3, (const void *const *)u_old_data, p_old_data, 3, (void *const *)u_out, p_out) : poro_hyperelasticity_poro_residual_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], 3, (const void *const *)u_data, p_data, 3, (const void *const *)u_old_data, p_old_data, 3, (void *const *)u_out, p_out);
+                }
+                case smesh::TET10: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 4;
+                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
+                    const real_t *const SFEM_RESTRICT p_data = state + 3;
+                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+                    const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
+                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
+                    real_t *const SFEM_RESTRICT p_out = out + 3;
+                    int status = impl_->gradient_uses_affine ? poro_hyperelasticity_solid_gradient_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 4, state + 0, state + 1, state + 2, 4, out + 0, out + 1, out + 2) : poro_hyperelasticity_solid_gradient_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 4, state + 0, state + 1, state + 2, 4, out + 0, out + 1, out + 2);
+                    if (status != SFEM_SUCCESS) return status;
+                    return impl_->residual_uses_affine ? poro_hyperelasticity_poro_residual_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[2], storage[4], storage[5], storage[3], 4, (const void *const *)u_data, p_data, 4, (const void *const *)u_old_data, p_old_data, 4, (void *const *)u_out, p_out) : poro_hyperelasticity_poro_residual_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], 4, (const void *const *)u_data, p_data, 4, (const void *const *)u_old_data, p_old_data, 4, (void *const *)u_out, p_out);
+                }
+                case smesh::HEX27:
+                case smesh::PROTEUS_HEX27: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 4;
+                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
+                    const real_t *const SFEM_RESTRICT p_data = state + 3;
+                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+                    const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
+                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
+                    real_t *const SFEM_RESTRICT p_out = out + 3;
+                    int status = impl_->gradient_uses_affine ? poro_hyperelasticity_solid_gradient_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 4, state + 0, state + 1, state + 2, 4, out + 0, out + 1, out + 2) : poro_hyperelasticity_solid_gradient_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 4, state + 0, state + 1, state + 2, 4, out + 0, out + 1, out + 2);
+                    if (status != SFEM_SUCCESS) return status;
+                    return impl_->residual_uses_affine ? poro_hyperelasticity_poro_residual_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[2], storage[4], storage[5], storage[3], 4, (const void *const *)u_data, p_data, 4, (const void *const *)u_old_data, p_old_data, 4, (void *const *)u_out, p_out) : poro_hyperelasticity_poro_residual_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], 4, (const void *const *)u_data, p_data, 4, (const void *const *)u_old_data, p_old_data, 4, (void *const *)u_out, p_out);
+                }
+                default:
+                    SFEM_ERROR("GeneratedPoroHyperelasticity does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
             }
-            if (dim == 3) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 4;
-                const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
-                const real_t *const SFEM_RESTRICT p_data = state + 3;
-                const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                const real_t *const SFEM_RESTRICT p_old_data = previous + 3;
-                real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                real_t *const SFEM_RESTRICT p_out = out + 3;
-                int status = impl_->gradient_uses_affine ? poro_hyperelasticity_solid_gradient_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], FIELD_STRIDE, state + 0, state + 1, state + 2, FIELD_STRIDE, out + 0, out + 1, out + 2) : poro_hyperelasticity_solid_gradient_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], FIELD_STRIDE, state + 0, state + 1, state + 2, FIELD_STRIDE, out + 0, out + 1, out + 2);
-                if (status != SFEM_SUCCESS) return status;
-                return impl_->residual_uses_affine ? poro_hyperelasticity_poro_residual_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[2], storage[4], storage[5], storage[3], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out) : poro_hyperelasticity_poro_residual_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], FIELD_STRIDE, u_data, p_data, FIELD_STRIDE, u_old_data, p_old_data, FIELD_STRIDE, u_out, p_out);
-            }
-            SFEM_ERROR("GeneratedPoroHyperelasticity gradient does not support spatial dimension %d\n", dim);
-            return SFEM_FAILURE;
         });
     }
 
@@ -628,78 +669,89 @@ namespace sfem {
             real_t storage[MAX_PARAMETERS];
             parameter_array(*domain.parameters, storage);
 
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 3;
-                const real_t *const SFEM_RESTRICT u_direction_data[2] = {direction + 0, direction + 1};
-                const real_t *const SFEM_RESTRICT p_direction_data = direction + 2;
-                real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                real_t *const SFEM_RESTRICT p_out = out + 2;
-                int status = impl_->apply_uses_affine ? poro_hyperelasticity_solid_apply_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], FIELD_STRIDE, current + 0, current + 1, FIELD_STRIDE, direction + 0, direction + 1, FIELD_STRIDE, out + 0, out + 1) : poro_hyperelasticity_solid_apply_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], FIELD_STRIDE, current + 0, current + 1, FIELD_STRIDE, direction + 0, direction + 1, FIELD_STRIDE, out + 0, out + 1);
-                if (status != SFEM_SUCCESS) return status;
-                return impl_->jacobian_action_uses_affine ? poro_hyperelasticity_poro_jacobian_action_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[2], storage[4], storage[5], storage[3], FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out) : poro_hyperelasticity_poro_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
+            switch (domain.element_type) {
+                case smesh::TRI6: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 3;
+                    const real_t *const SFEM_RESTRICT u_direction_data[2] = {direction + 0, direction + 1};
+                    const real_t *const SFEM_RESTRICT p_direction_data = direction + 2;
+                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
+                    real_t *const SFEM_RESTRICT p_out = out + 2;
+                    int status = impl_->apply_uses_affine ? poro_hyperelasticity_solid_apply_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 3, state + 0, state + 1, 3, direction + 0, direction + 1, 3, out + 0, out + 1) : poro_hyperelasticity_solid_apply_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, 3, direction + 0, direction + 1, 3, out + 0, out + 1);
+                    if (status != SFEM_SUCCESS) return status;
+                    return impl_->jacobian_action_uses_affine ? poro_hyperelasticity_poro_jacobian_action_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[2], storage[4], storage[5], storage[3], 3, (const void *const *)u_direction_data, p_direction_data, 3, (void *const *)u_out, p_out) : poro_hyperelasticity_poro_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], 3, (const void *const *)u_direction_data, p_direction_data, 3, (void *const *)u_out, p_out);
+                }
+                case smesh::TET10: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 4;
+                    const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
+                    const real_t *const SFEM_RESTRICT p_direction_data = direction + 3;
+                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
+                    real_t *const SFEM_RESTRICT p_out = out + 3;
+                    int status = impl_->apply_uses_affine ? poro_hyperelasticity_solid_apply_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 4, state + 0, state + 1, state + 2, 4, direction + 0, direction + 1, direction + 2, 4, out + 0, out + 1, out + 2) : poro_hyperelasticity_solid_apply_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 4, state + 0, state + 1, state + 2, 4, direction + 0, direction + 1, direction + 2, 4, out + 0, out + 1, out + 2);
+                    if (status != SFEM_SUCCESS) return status;
+                    return impl_->jacobian_action_uses_affine ? poro_hyperelasticity_poro_jacobian_action_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[2], storage[4], storage[5], storage[3], 4, (const void *const *)u_direction_data, p_direction_data, 4, (void *const *)u_out, p_out) : poro_hyperelasticity_poro_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], 4, (const void *const *)u_direction_data, p_direction_data, 4, (void *const *)u_out, p_out);
+                }
+                case smesh::HEX27:
+                case smesh::PROTEUS_HEX27: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 4;
+                    const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
+                    const real_t *const SFEM_RESTRICT p_direction_data = direction + 3;
+                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
+                    real_t *const SFEM_RESTRICT p_out = out + 3;
+                    int status = impl_->apply_uses_affine ? poro_hyperelasticity_solid_apply_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 4, state + 0, state + 1, state + 2, 4, direction + 0, direction + 1, direction + 2, 4, out + 0, out + 1, out + 2) : poro_hyperelasticity_solid_apply_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 4, state + 0, state + 1, state + 2, 4, direction + 0, direction + 1, direction + 2, 4, out + 0, out + 1, out + 2);
+                    if (status != SFEM_SUCCESS) return status;
+                    return impl_->jacobian_action_uses_affine ? poro_hyperelasticity_poro_jacobian_action_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[2], storage[4], storage[5], storage[3], 4, (const void *const *)u_direction_data, p_direction_data, 4, (void *const *)u_out, p_out) : poro_hyperelasticity_poro_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], 4, (const void *const *)u_direction_data, p_direction_data, 4, (void *const *)u_out, p_out);
+                }
+                default:
+                    SFEM_ERROR("GeneratedPoroHyperelasticity does not support element type %d\n",
+                               domain.element_type);
+                    return SFEM_FAILURE;
             }
-            if (dim == 3) {
-                static constexpr ptrdiff_t FIELD_STRIDE = 4;
-                const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
-                const real_t *const SFEM_RESTRICT p_direction_data = direction + 3;
-                real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                real_t *const SFEM_RESTRICT p_out = out + 3;
-                int status = impl_->apply_uses_affine ? poro_hyperelasticity_solid_apply_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], FIELD_STRIDE, current + 0, current + 1, current + 2, FIELD_STRIDE, direction + 0, direction + 1, direction + 2, FIELD_STRIDE, out + 0, out + 1, out + 2) : poro_hyperelasticity_solid_apply_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], FIELD_STRIDE, current + 0, current + 1, current + 2, FIELD_STRIDE, direction + 0, direction + 1, direction + 2, FIELD_STRIDE, out + 0, out + 1, out + 2);
-                if (status != SFEM_SUCCESS) return status;
-                return impl_->jacobian_action_uses_affine ? poro_hyperelasticity_poro_jacobian_action_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[2], storage[4], storage[5], storage[3], FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out) : poro_hyperelasticity_poro_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[2], storage[4], storage[5], storage[3], FIELD_STRIDE, u_direction_data, p_direction_data, FIELD_STRIDE, u_out, p_out);
-            }
-            SFEM_ERROR("GeneratedPoroHyperelasticity apply does not support spatial dimension %d\n", dim);
-            return SFEM_FAILURE;
         });
+    }
+
+
+    int GeneratedPoroHyperelasticity::value_steps(const real_t *state,
+                            const real_t *h,
+                            const int nsteps,
+                            const real_t *const steps,
+                            real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::value_steps");
+        if (nsteps <= 0) {
+            return SFEM_SUCCESS;
+        }
+        const ptrdiff_t ndofs = n_dofs_domain();
+        std::vector<real_t> stepped(ndofs);
+        std::vector<real_t> residual(ndofs);
+        for (int step = 0; step < nsteps; ++step) {
+            const real_t alpha = steps[step];
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                stepped[i] = state[i] + alpha * h[i];
+            }
+            std::fill(residual.begin(), residual.end(), real_t(0));
+            const int status = gradient(stepped.data(), residual.data());
+            if (status != SFEM_SUCCESS) {
+                return status;
+            }
+            real_t sum = 0;
+#pragma omp simd reduction(+ : sum)
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                sum += residual[i] * residual[i];
+            }
+            out[step] += real_t(0.5) * sum;
+        }
+        return SFEM_SUCCESS;
     }
 
     int GeneratedPoroHyperelasticity::value(const real_t *state, real_t *const out) {
         SFEM_TRACE_SCOPE("GeneratedPoroHyperelasticity::value");
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        // One step of length zero: `state + 0 * h` is `state` exactly, so the
+        // increment is unused and `state` can stand in for it.  One
+        // implementation, so the two cannot disagree.
+        const real_t objective_step = 0;
         *out = 0;
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const ptrdiff_t nelements = domain.block->n_elements();
-            const geom_t *const *adjugate = nullptr;
-            const geom_t *determinant = nullptr;
-            if (impl_->objective_uses_affine) {
-                auto jacobian = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(
-                        domain.user_data);
-                if (!jacobian) {
-                    SFEM_ERROR("GeneratedPoroHyperelasticity affine objective requires cached geometry\n");
-                    return SFEM_FAILURE;
-                }
-                adjugate = reinterpret_cast<const geom_t *const *>(
-                        jacobian->jacobian_adjugate_SoA()->data());
-                determinant = reinterpret_cast<const geom_t *>(
-                        jacobian->jacobian_determinant()->data());
-            }
-            std::fill(impl_->element_values.get(),
-                      impl_->element_values.get() + nelements,
-                      0);
-            real_t storage[MAX_PARAMETERS];
-            parameter_array(*domain.parameters, storage);
-            int status = SFEM_FAILURE;
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                status = impl_->objective_uses_affine ? poro_hyperelasticity_solid_objective_2d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 3, state + 0, state + 1, impl_->element_values.get()) : poro_hyperelasticity_solid_objective_2d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, impl_->element_values.get());
-            } else if (dim == 3) {
-                status = impl_->objective_uses_affine ? poro_hyperelasticity_solid_objective_3d_affine_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 4, state + 0, state + 1, state + 2, impl_->element_values.get()) : poro_hyperelasticity_solid_objective_3d_isoparametric_mesh_soa(domain.element_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 4, state + 0, state + 1, state + 2, impl_->element_values.get());
-            } else {
-                SFEM_ERROR("GeneratedPoroHyperelasticity objective does not support spatial dimension %d\n", dim);
-                return SFEM_FAILURE;
-            }
-            if (status != SFEM_SUCCESS) return status;
-            real_t sum = 0;
-#pragma omp simd reduction(+ : sum)
-            for (ptrdiff_t element = 0; element < nelements; ++element) {
-                sum += impl_->element_values[element];
-            }
-            *out += sum;
-            return SFEM_SUCCESS;
-        });
+        return value_steps(state, state, 1, &objective_step, out);
     }
+
     void GeneratedPoroHyperelasticity::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {

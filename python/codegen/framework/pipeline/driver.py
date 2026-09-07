@@ -764,10 +764,19 @@ def generate(
     matrix_mesh_layouts=None,
     matrix_packed_passes=None,
     matrix_patch_node_index_filter=None,
+    inexact_apply=None,
 ):
     vector_size = int(vector_size)
     if vector_size <= 0:
         raise ValueError("vector_size must be positive")
+
+    # Tri-state, like the matrix-format arguments above it: None keeps whatever
+    # the material declares, and either explicit value overrides it.  Without a
+    # way to ask for the split from outside the material, the only way to get it
+    # was to rewrite the material at the call site, which is how the shipped
+    # tree came to contain kernels no generator run could reproduce.
+    if inexact_apply is not None:
+        material = replace(material, inexact_apply=bool(inexact_apply))
 
     available_elements = _generation_available_elements(material.elements)
     selected = _parse_elements(elements, available_elements)
@@ -875,6 +884,19 @@ def run(material, default_out_dir, argv=None):
         action="store_true",
         help="Keep stale outputs from previous generator runs.",
     )
+    parser.add_argument(
+        "--inexact-apply",
+        dest="inexact_apply",
+        action="store_true",
+        default=None,
+        help="Emit the projected apply beside the exact one. Defaults to the material's own setting.",
+    )
+    parser.add_argument(
+        "--no-inexact-apply",
+        dest="inexact_apply",
+        action="store_false",
+        help="Suppress the projected apply even if the material asks for it.",
+    )
     args = parser.parse_args(argv)
     try:
         result = generate(
@@ -892,6 +914,7 @@ def run(material, default_out_dir, argv=None):
             matrix_mesh_layouts=args.matrix_mesh_layouts,
             matrix_packed_passes=args.matrix_packed_passes,
             matrix_patch_node_index_filter=args.patch_node_index_filter,
+            inexact_apply=args.inexact_apply,
         )
     except (TypeError, ValueError) as error:
         parser.error(str(error))

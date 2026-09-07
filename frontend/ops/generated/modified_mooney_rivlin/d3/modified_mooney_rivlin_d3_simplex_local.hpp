@@ -20,6 +20,7 @@
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
 typedef ptrdiff_t idx_t;
+typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
 namespace sfem {
@@ -204,7 +205,7 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_tet4_objective_block(
 ) {
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-        for (int q = 0; q < N_QP; ++q) {
+        { const int q = 0;  // constant-P1 simplex
             const scalar_t qw = q_weight[q];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -511,7 +512,7 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_tet4_gradient_block(
 ) {
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-        for (int q = 0; q < N_QP; ++q) {
+        { const int q = 0;  // constant-P1 simplex
             const scalar_t qw = q_weight[q];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -1255,7 +1256,7 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_tet4_apply_block(
 ) {
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-        for (int q = 0; q < N_QP; ++q) {
+        { const int q = 0;  // constant-P1 simplex
             const scalar_t qw = q_weight[q];
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {

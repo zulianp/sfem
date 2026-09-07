@@ -589,7 +589,7 @@ def _inexact_needs_affine(material):
     # cache on a 2D mesh kills the process inside `initialize` -- which is how
     # enabling the split first broke 2D linear elasticity outright.  The split
     # needs affine geometry; affine geometry exists in three dimensions.
-    return (" ||\n                (mesh->spatial_dimension() == 3"
+    return (" ||\n                (impl_->space->mesh_ptr()->spatial_dimension() == 3"
             " /* the inexact path assembles from the affine geometry,"
             " which smesh fills for 3D elements only */)")
 
@@ -1298,6 +1298,10 @@ namespace sfem {
             }
             return SFEM_SUCCESS;
         }
+
+        ptrdiff_t block_size_for_dim(const int dim) {
+%(block_size_lines)s
+        }
     }  // namespace
 
     class %(op)s::Impl {
@@ -1316,8 +1320,11 @@ namespace sfem {
     };
 
     std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
-        if (space->block_size() != space->mesh_ptr()->spatial_dimension()) {
-            SFEM_ERROR("%(op)s requires block_size=spatial_dimension\\n");
+        const ptrdiff_t expected_block_size =
+                block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+        if (space->block_size() != expected_block_size) {
+            SFEM_ERROR("%(op)s requires block_size=%%ld\\n",
+                       static_cast<long>(expected_block_size));
             return nullptr;
         }
         auto op = std::make_unique<%(op)s>(space);
@@ -1391,7 +1398,6 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
         }
-        auto mesh = impl_->space->mesh_ptr();
         const bool needs_affine_geometry =
                 impl_->objective_uses_affine ||
                 impl_->gradient_uses_affine ||
@@ -1400,25 +1406,15 @@ namespace sfem {
             seed_parameters(*entry.second.parameters);
             impl_->element_capacity =
                     std::max(impl_->element_capacity, entry.second.block->n_elements());
-            if (needs_affine_geometry) {
-                const smesh::block_idx_t block_id =
-                        block_id_for_domain(*mesh, *entry.second.block);
-                auto cache = std::make_shared<AffineGeometryCache>();
-                cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-                        mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                if (!cache->jacobian_soa) {
-                    return SFEM_FAILURE;
-                }
-                if ((impl_->gradient_uses_affine && %(gradient_affine_uses_jacobian_aos)s) ||
-                    (impl_->apply_uses_affine && %(apply_affine_uses_jacobian_aos)s)) {
-                    cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
-                            mesh, smesh::MEMORY_SPACE_HOST, block_id);
-                    if (!cache->jacobian_aos) {
-                        return SFEM_FAILURE;
-                    }
-                }
-                entry.second.user_data = std::static_pointer_cast<void>(cache);
-            }
+        }
+        // One cache builder, shared with set_option.  This used to be a second
+        // copy of the loop inlined here, and the copies drifted: the inlined
+        // one never built the metric, so an operator whose affine kernels read
+        // it worked when the option was set after initialize and failed when it
+        // was set before.
+        if (needs_affine_geometry &&
+            cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
         }
         impl_->element_values.reset(new real_t[impl_->element_capacity]);
 %(packed_scratch_prealloc)s
@@ -1742,6 +1738,11 @@ namespace sfem {
         "apply_affine_uses_jacobian_aos": _cpp_bool(any(apply_affine_aos_flags)),
         "metric_cache_field": _metric_cache_field(any(affine_metric_flags)),
         "metric_cache_setup": _metric_cache_setup(any(affine_metric_flags)),
+        # The Op's block size is the field's component count, which is `dim`
+        # only for a displacement.  Laplace-as-an-energy has one component in
+        # every dimension, and the hard-coded `spatial_dimension` rejected
+        # every space it could legitimately be built on.
+        "block_size_lines": _residual_block_size_lines(n_field_components_by_dim),
         "metric_declaration": _metric_declaration(any(affine_metric_flags)),
         "gradient_metric_binding": _metric_binding(
             any(affine_metric_flags), material.op_name, "gradient"
@@ -4958,7 +4959,7 @@ def _residual_block_size_lines(block_size_by_dim):
     lines.extend(
         [
             "                default:",
-            '                    SFEM_ERROR("unsupported spatial dimension %d for generated residual block size\\n", dim);',
+            '                    SFEM_ERROR("unsupported spatial dimension %d for generated block size\\n", dim);',
             "                    return 0;",
             "            }",
         ]

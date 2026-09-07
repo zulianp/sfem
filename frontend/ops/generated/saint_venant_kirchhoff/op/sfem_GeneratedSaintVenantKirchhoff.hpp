@@ -54,6 +54,8 @@ namespace sfem {
                           const count_t *const rowptr,
                           const idx_t *const colidx,
                           real_t *const values);
+        int hessian_block_diag_sym(const real_t *const x,
+                                   real_t *const values) override;
         void set_option(const std::string &name, bool val) override;
         void set_value_in_block(const std::string &block_name,
                                 const std::string &var_name,
@@ -62,6 +64,16 @@ namespace sfem {
         std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                              const ryml::ConstNodeRef             &node) override;
 #endif  // SFEM_ENABLE_RYAML
+
+        //! The scalar type the kernels are asked for at run time.
+        //!
+        //! Mirrors GPULaplacian, which declares the same member with the same
+        //! default and hands it to every kernel call.  SMESH_DEFAULT resolves
+        //! to the build's real_t, so the default costs a caller nothing and is
+        //! the common path rather than a fallback.  The Op interface itself is
+        //! unchanged: its methods still take real_t*, which converts to void*
+        //! at the call, exactly as gpu_laplacian_block_vector relies on.
+        enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
 
     private:
         class Impl;
