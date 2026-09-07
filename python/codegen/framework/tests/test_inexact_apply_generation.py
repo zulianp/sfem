@@ -44,34 +44,67 @@ class InexactApplyGenerationTest(unittest.TestCase):
             emitted, ["d3/tet4/linear_elasticity_tet4_inexact_apply_inline.hpp"]
         )
 
-    def test_it_takes_the_arguments_the_exact_apply_takes(self):
-        """Same arguments, plus the state the exact linear kernel does not need.
+    def test_it_publishes_the_split_pair(self):
+        """Assembly and apply, and the apply free of everything but the store.
 
-        A linear material's tangent does not depend on the state, so its exact
-        apply takes only the increment.  The inexact kernel builds its tangent
-        from the state, so it always takes one -- and passing zero recovers the
-        exact operator, which is how the comparison in the spike is set up.
+        The point of the split is that `Sbar` absorbs the geometry, the state
+        and the material, so the apply reads only the tangent and the vector.
+        That is what makes it cheaper than the exact apply, so it is worth
+        pinning rather than leaving to inspection.
         """
         files = self._generate("linear_elasticity", "TET4", opt_in=True)
         source = files["d3/tet4/linear_elasticity_tet4_inexact_apply_inline.hpp"]
-        self.assertIn("linear_elasticity_tet4_apply_inexact_affine_mesh_soa_impl", source)
+
+        assembly = "linear_elasticity_tet4_inexact_apply_tangent_affine_mesh_soa_impl"
+        stored = "linear_elasticity_tet4_inexact_apply_stored_affine_mesh_soa_impl"
+        compressed = "linear_elasticity_tet4_inexact_apply_compressed_affine_mesh_soa_impl"
+        for name in (assembly, stored, compressed):
+            with self.subTest(kernel=name):
+                self.assertIn(name, source)
+
+        # The assembly takes the geometry, the material and the state, and
+        # writes the tangent.
+        body = source[source.index(assembly):source.index(stored)]
         for expected in (
-            "const ptrdiff_t nelements",
-            "idx_t **const SFEM_RESTRICT elements",
             "g_jacobian_adjugate8",
             "g_jacobian_determinant0",
             "const scalar_t mu",
             "const scalar_t lmbda",
-            "const ptrdiff_t u_stride",
+            "tangent_t *const SFEM_RESTRICT tangent",
+        ):
+            with self.subTest(assembly=expected):
+                self.assertIn(expected, body)
+
+        # The apply takes neither, and no state either.
+        body = source[source.index(stored):source.index(compressed)]
+        for absent in (
+            "g_jacobian_adjugate",
+            "g_jacobian_determinant",
+            "const scalar_t mu",
+            "const scalar_t lmbda",
+            "u_stride",
+        ):
+            with self.subTest(absent_from_apply=absent):
+                self.assertNotIn(absent, body)
+        for expected in (
+            "const tangent_t *const SFEM_RESTRICT tangent",
             "const ptrdiff_t h_stride",
             "scalar_t *const SFEM_RESTRICT outz",
         ):
-            with self.subTest(expected=expected):
-                self.assertIn(expected, source)
-        # No quadrature loop and no reference tables: that is the whole point.
-        self.assertNotIn("N_QP", source)
-        self.assertNotIn("q_weight", source)
-        self.assertNotIn("grad_ref", source)
+            with self.subTest(apply=expected):
+                self.assertIn(expected, body)
+
+    def test_the_fused_kernel_is_gone(self):
+        """The fused apply was scaffolding and is not emitted.
+
+        It rebuilt the tangent on every apply, which is strictly more work than
+        the exact apply it was compared against.  Its job was to be driven with
+        the exact kernel's arguments while the split was built; the stored apply
+        gates correctness now.
+        """
+        files = self._generate("linear_elasticity", "TET4", opt_in=True)
+        source = files["d3/tet4/linear_elasticity_tet4_inexact_apply_inline.hpp"]
+        self.assertNotIn("apply_inexact_affine_mesh_soa", source)
 
     @staticmethod
     def _generate(name, element, opt_in):
