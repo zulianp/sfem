@@ -192,6 +192,7 @@ namespace sfem {
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
+            SharedBuffer<metric_tensor_t> inexact_tangent;
         };
 
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
@@ -501,7 +502,8 @@ namespace sfem {
         const bool needs_affine_geometry =
                 impl_->objective_uses_affine ||
                 impl_->gradient_uses_affine ||
-                impl_->apply_uses_affine;
+                impl_->apply_uses_affine ||
+                true /* the inexact path assembles from the affine geometry */;
         for (auto &entry : impl_->domains->domains()) {
             seed_parameters(*entry.second.parameters);
             impl_->element_capacity =
@@ -1121,4 +1123,102 @@ namespace sfem {
         return ret;
     }
 #endif  // SFEM_ENABLE_RYAML
+
+    int GeneratedLinearElasticity::inexact_update(const real_t *const x) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::inexact_update");
+        auto mesh = impl_->space->mesh_ptr();
+        const int dim = mesh->spatial_dimension();
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+            if (!cache || !cache->jacobian_soa) {
+                SFEM_ERROR("GeneratedLinearElasticity::inexact_update requires cached affine geometry\n");
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (!cache->inexact_tangent) {
+                // Sized by the mesh's dimension: the tangent is 10 numbers per
+                // element in two dimensions and 45 in three, and a material that
+                // generates both would overflow one store if sized from the other.
+                const ptrdiff_t components = (dim == 2) ? 10 : (dim == 3) ? 45 : 0;
+                if (components == 0) {
+                    SFEM_ERROR("GeneratedLinearElasticity::inexact_update has no tangent size for dimension %d\n", dim);
+                    return SFEM_FAILURE;
+                }
+                cache->inexact_tangent =
+                        sfem::create_host_buffer<metric_tensor_t>(nelements * components);
+            }
+            auto adjugate = reinterpret_cast<const geom_t *const *>(
+                    cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            auto determinant = reinterpret_cast<const geom_t *>(
+                    cache->jacobian_soa->jacobian_determinant()->data());
+            if (dim == 2) {
+                return linear_elasticity_inexact_apply_tangent_2d_affine_mesh_soa(
+                        domain.element_type,
+                        real_type,
+                        nelements,
+                        domain.block->elements()->data(),
+                        adjugate[0], adjugate[1], adjugate[2], adjugate[3],
+                        determinant,
+                        domain.parameters->require_real_value("lmbda"),
+                        domain.parameters->require_real_value("mu"),
+                        2, x + 0, x + 1,
+                        1, nelements,
+                        cache->inexact_tangent->data());
+            }
+            else if (dim == 3) {
+                return linear_elasticity_inexact_apply_tangent_3d_affine_mesh_soa(
+                        domain.element_type,
+                        real_type,
+                        nelements,
+                        domain.block->elements()->data(),
+                        adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8],
+                        determinant,
+                        domain.parameters->require_real_value("lmbda"),
+                        domain.parameters->require_real_value("mu"),
+                        3, x + 0, x + 1, x + 2,
+                        1, nelements,
+                        cache->inexact_tangent->data());
+            }
+            SFEM_ERROR("GeneratedLinearElasticity::inexact_update has no kernel for dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
+
+    int GeneratedLinearElasticity::inexact_apply(const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("GeneratedLinearElasticity::inexact_apply");
+        auto mesh = impl_->space->mesh_ptr();
+        const int dim = mesh->spatial_dimension();
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+            if (!cache || !cache->inexact_tangent) {
+                SFEM_ERROR("GeneratedLinearElasticity::inexact_apply requires inexact_update first\n");
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (dim == 2) {
+                return linear_elasticity_inexact_apply_stored_2d_affine_mesh_soa(
+                        domain.element_type,
+                        real_type,
+                        nelements,
+                        domain.block->elements()->data(),
+                        1, nelements,
+                        cache->inexact_tangent->data(),
+                        2, h + 0, h + 1,
+                        2, out + 0, out + 1);
+            }
+            else if (dim == 3) {
+                return linear_elasticity_inexact_apply_stored_3d_affine_mesh_soa(
+                        domain.element_type,
+                        real_type,
+                        nelements,
+                        domain.block->elements()->data(),
+                        1, nelements,
+                        cache->inexact_tangent->data(),
+                        3, h + 0, h + 1, h + 2,
+                        3, out + 0, out + 1, out + 2);
+            }
+            SFEM_ERROR("GeneratedLinearElasticity::inexact_apply has no kernel for dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
 }  // namespace sfem

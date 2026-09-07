@@ -20,13 +20,10 @@
 #include "sfem_API.hpp"
 #include "sfem_base.hpp"
 #include "smesh_env.hpp"
-#include "sfem_GeneratedLinearElasticitySplit.hpp"
+#include "sfem_GeneratedLinearElasticity.hpp"
 
-// The Op is generated under its own name so it coexists with the
-// linear_elasticity already compiled into libsfem rather than colliding with it.
-// Regenerating that one in place would also migrate its other kernels to the
-// runtime-typed ABI, which the hand-written sfem_LinearElasticity.cpp does not
-// yet call that way -- a separate migration, and not what this check is about.
+// This drives the Op that libsfem actually carries, now that linear_elasticity
+// is generated in-tree with the split enabled.
 //
 // This worktree registers a generated Op whose sources it does not carry:
 // sfem_generated_ops_registration.cpp calls
@@ -49,7 +46,7 @@ int main(int argc, char *argv[]) {
         auto m = sfem::Mesh::create_cube(comm, smesh::TET4, n, n, n, 0, 0, 0, 1, 1, 1);
         auto fs = sfem::FunctionSpace::create(m, 3);
 
-        auto op = sfem::GeneratedLinearElasticitySplit::create(fs);
+        auto op = sfem::GeneratedLinearElasticity::create(fs);
         if (!op) { std::printf("FAIL: could not create the Op\n"); return 1; }
 
         std::printf("inexact_supported() = %s\n", op->inexact_supported() ? "true" : "false");

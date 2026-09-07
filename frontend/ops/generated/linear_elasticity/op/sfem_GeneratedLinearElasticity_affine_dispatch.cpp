@@ -1267,6 +1267,506 @@ extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_quad4_inexact_apply_compressed_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_quad4_inexact_apply_compressed_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_tri3_inexact_apply_compressed_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_tri3_inexact_apply_compressed_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet10_inexact_apply_compressed_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet10_inexact_apply_compressed_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet4_inexact_apply_compressed_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet4_inexact_apply_compressed_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_quad4_inexact_apply_stored_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_quad4_inexact_apply_stored_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_tri3_inexact_apply_stored_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_tri3_inexact_apply_stored_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet10_inexact_apply_stored_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet10_inexact_apply_stored_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet4_inexact_apply_stored_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy,
+        double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet4_inexact_apply_stored_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_quad4_inexact_apply_tangent_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_quad4_inexact_apply_tangent_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_tri3_inexact_apply_tangent_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_tri3_inexact_apply_tangent_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_tet10_inexact_apply_tangent_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_tet10_inexact_apply_tangent_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_tet4_inexact_apply_tangent_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
+extern "C" int linear_elasticity_tet4_inexact_apply_tangent_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+);
 extern "C" int linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2465,6 +2965,371 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_affine_me
     }
     std::fprintf(stderr,
             "linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_inexact_apply_compressed_2d_affine_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_quad4_inexact_apply_compressed_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_quad4_inexact_apply_compressed_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri3_inexact_apply_compressed_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri3_inexact_apply_compressed_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "linear_elasticity_inexact_apply_compressed_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_inexact_apply_compressed_3d_affine_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const compressed_t *const SFEM_RESTRICT tangent,
+        const scaling_t *const SFEM_RESTRICT scaling,
+        const ptrdiff_t h_stride,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
+        const void *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy,
+        void *const SFEM_RESTRICT outz
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex8_inexact_apply_compressed_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET10: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet10_inexact_apply_compressed_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet10_inexact_apply_compressed_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet4_inexact_apply_compressed_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet4_inexact_apply_compressed_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, scaling, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "linear_elasticity_inexact_apply_compressed_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_inexact_apply_stored_2d_affine_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_quad4_inexact_apply_stored_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_quad4_inexact_apply_stored_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri3_inexact_apply_stored_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri3_inexact_apply_stored_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "linear_elasticity_inexact_apply_stored_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_inexact_apply_stored_3d_affine_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        const metric_tensor_t *const SFEM_RESTRICT tangent,
+        const ptrdiff_t h_stride,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
+        const void *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy,
+        void *const SFEM_RESTRICT outz
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex8_inexact_apply_stored_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET10: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet10_inexact_apply_stored_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet10_inexact_apply_stored_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet4_inexact_apply_stored_affine_mesh_soa(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet4_inexact_apply_stored_affine_mesh_soa_float(nelements, elements, tangent_element_stride, tangent_component_stride, tangent, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "linear_elasticity_inexact_apply_stored_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_inexact_apply_tangent_2d_affine_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const SFEM_RESTRICT ux,
+        const void *const SFEM_RESTRICT uy,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_quad4_inexact_apply_tangent_affine_mesh_soa(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, tangent_element_stride, tangent_component_stride, tangent);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_quad4_inexact_apply_tangent_affine_mesh_soa_float(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, tangent_element_stride, tangent_component_stride, tangent);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri3_inexact_apply_tangent_affine_mesh_soa(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, tangent_element_stride, tangent_component_stride, tangent);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri3_inexact_apply_tangent_affine_mesh_soa_float(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, tangent_element_stride, tangent_component_stride, tangent);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "linear_elasticity_inexact_apply_tangent_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_inexact_apply_tangent_3d_affine_mesh_soa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const SFEM_RESTRICT ux,
+        const void *const SFEM_RESTRICT uy,
+        const void *const SFEM_RESTRICT uz,
+        const ptrdiff_t tangent_element_stride,
+        const ptrdiff_t tangent_component_stride,
+        metric_tensor_t *const SFEM_RESTRICT tangent
+) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
+    switch (element_type) {
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, tangent_element_stride, tangent_component_stride, tangent);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex8_inexact_apply_tangent_affine_mesh_soa_float(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, tangent_element_stride, tangent_component_stride, tangent);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET10: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet10_inexact_apply_tangent_affine_mesh_soa(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, tangent_element_stride, tangent_component_stride, tangent);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet10_inexact_apply_tangent_affine_mesh_soa_float(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, tangent_element_stride, tangent_component_stride, tangent);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet4_inexact_apply_tangent_affine_mesh_soa(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, tangent_element_stride, tangent_component_stride, tangent);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet4_inexact_apply_tangent_affine_mesh_soa_float(nelements, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, tangent_element_stride, tangent_component_stride, tangent);
+                default:
+                    break;
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    std::fprintf(stderr,
+            "linear_elasticity_inexact_apply_tangent_3d_affine_mesh_soa does not support element type %d with real type %d\n",
             (int)element_type,
             (int)real_type);
     return SFEM_FAILURE;

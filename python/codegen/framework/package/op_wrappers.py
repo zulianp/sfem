@@ -603,30 +603,38 @@ def _inexact_cache_field(material):
 
 
 def _inexact_tangent_components(material, form_collections, elements):
-    """How many numbers the stored tangent takes per element.
+    """How many numbers the stored tangent takes per element, by dimension.
 
-    A property of the dimension and of whether the tangent is symmetric, both
-    fixed for a material, so it is resolved here at generation time rather than
-    queried at run time.  An energy's tangent is a Hessian and folds to
-    `d^2 (d^2 + 1) / 2`; a residual's is a Jacobian and generally does not fold
-    at all.
+    It is `d^2` squared, halved when the tangent is symmetric -- 10 in two
+    dimensions against 45 in three, for an energy material.  So it is a property
+    of the dimension, and a material that generates both needs both: sizing the
+    store from one of them overflows the other, silently, since the kernels write
+    what their own dimension requires.  Returned as a mapping for that reason.
+
+    An energy's tangent is a Hessian and folds; a residual's is a Jacobian and
+    generally does not.
     """
     from codegen.framework.plans.inexact_apply import (
         flux_form_for_collection,
         flux_tangent_is_symmetric,
     )
 
+    components = {}
     for collection in (form_collections or {}).values():
         for dim in sorted({_element_dim(element) for element in elements}):
+            if dim in components:
+                continue
             built = flux_form_for_collection(collection, dim)
             if built is None:
                 continue
             flux_form, _is_deformation_gradient = built
             order = dim * dim
-            if flux_tangent_is_symmetric(flux_form):
-                return order * (order + 1) // 2
-            return order * order
-    return 0
+            components[dim] = (
+                order * (order + 1) // 2
+                if flux_tangent_is_symmetric(flux_form)
+                else order * order
+            )
+    return components
 
 
 def _inexact_definitions(
@@ -698,6 +706,9 @@ def _inexact_definitions(
     if not reachable:
         return ""
 
+    components_by_dim = " : ".join(
+        "(dim == %d) ? %d" % (dim, count) for dim, count in sorted(components.items())
+    ) + " : 0"
     return """
 
     int %%(op)s::inexact_update(const real_t *const x) {
@@ -712,8 +723,16 @@ def _inexact_definitions(
             }
             const ptrdiff_t nelements = domain.block->n_elements();
             if (!cache->inexact_tangent) {
-                cache->inexact_tangent = sfem::create_host_buffer<metric_tensor_t>(
-                        nelements * %(components)d);
+                // Sized by the mesh's dimension: the tangent is 10 numbers per
+                // element in two dimensions and 45 in three, and a material that
+                // generates both would overflow one store if sized from the other.
+                const ptrdiff_t components = %(components_by_dim)s;
+                if (components == 0) {
+                    SFEM_ERROR("%%(op)s::inexact_update has no tangent size for dimension %%%%d\\n", dim);
+                    return SFEM_FAILURE;
+                }
+                cache->inexact_tangent =
+                        sfem::create_host_buffer<metric_tensor_t>(nelements * components);
             }
             auto adjugate = reinterpret_cast<const geom_t *const *>(
                     cache->jacobian_soa->jacobian_adjugate_SoA()->data());
@@ -741,7 +760,7 @@ def _inexact_definitions(
             return SFEM_FAILURE;
         });
     }""" % {
-        "components": components,
+        "components_by_dim": components_by_dim,
         "update_body": "\n".join(update_lines),
         "apply_body": "\n".join(apply_lines),
     }
