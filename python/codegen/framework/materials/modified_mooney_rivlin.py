@@ -19,11 +19,26 @@ def _modified_mooney_rivlin_energy(F, dim):
     J = gen.det(F_value)
     I1 = gen.inner(F_value, F_value)
     I2 = sp.Rational(1, 2) * (I1 * I1 - gen.inner(C, C))
-    I2_reference = sp.Rational(dim * (dim - 1), 2)
+
+    if dim == 2:
+        # Plane-strain embedding: F is 2×2 but represents a 3D body with F_33=1.
+        # J is unchanged (det(F_3D) = det(F_2D)·1 = J).
+        # I1_3D = I1_2D + 1  (F_33=1 contributes F_33:F_33 = 1)
+        # I2_3D = I2_2D + I1_2D  (derived from C_33=1, C_i3=0)
+        # dim_phys = 3, I2_ref = 3
+        I1_phys = I1 + sp.Integer(1)
+        I2_phys = I2 + I1
+        dim_phys = 3
+        I2_reference = sp.Integer(3)
+    else:
+        I1_phys = I1
+        I2_phys = I2
+        dim_phys = dim
+        I2_reference = sp.Rational(dim * (dim - 1), 2)  # = 3 for dim=3
 
     return (
-        c1 * (J ** sp.Rational(-2, 3) * I1 - dim)
-        + c2 * (J ** sp.Rational(-4, 3) * I2 - I2_reference)
+        c1 * (J ** sp.Rational(-2, 3) * I1_phys - dim_phys)
+        + c2 * (J ** sp.Rational(-4, 3) * I2_phys - I2_reference)
         + kappa * sp.log(J) ** 2 / 2
     )
 
