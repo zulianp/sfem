@@ -8,20 +8,30 @@
 \newlabel{eq:tangentsym}{{5}{2}{}{equation.5}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {3}Compression of the reference tensor}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}What it contains}{2}{}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces The symbolically integrated reference tensor. At most ten distinct rationals for any element.}}{2}{}\protected@file@percent }
-\newlabel{tab:reference}{{1}{2}{}{table.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Rank, which is where the structure really is}{2}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces The symbolically integrated reference tensor. At most ten distinct rationals for any element.}}{3}{}\protected@file@percent }
+\newlabel{tab:reference}{{1}{3}{}{table.1}{}}
 \@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Rank of the reference tensor, which equals the dimension of the span of the element's gradient functions exactly.}}{3}{}\protected@file@percent }
 \newlabel{tab:rank}{{2}{3}{}{table.2}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {4}The generated kernel}{3}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Staging}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Fold the constants, do not tabulate them}{3}{}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Operations in the element apply, counted after common-subexpression elimination. Preliminary: these are symbolic operation counts, not measured run times.}}{4}{}\protected@file@percent }
-\newlabel{tab:cost}{{3}{4}{}{table.3}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5}Vectorisation}{4}{}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Live intermediates per element in each stage. In a blocked kernel each is one vector register, so these are the register-pressure figures.}}{5}{}\protected@file@percent }
-\newlabel{tab:stages}{{4}{5}{}{table.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Choosing the contraction}{4}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Operations for the two contraction orderings. HEX8's rank is high enough that the factorisation stops paying.}}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Fold the constants, do not tabulate them}{4}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Operations in the element apply, counted after common-subexpression elimination. Preliminary: these are symbolic operation counts, not measured run times.}}{4}{}\protected@file@percent }
+\newlabel{tab:cost}{{4}{4}{}{table.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Vectorisation}{5}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Live intermediates per element in each stage. In a blocked kernel each is one vector register, so these are the register-pressure figures.}}{5}{}\protected@file@percent }
+\newlabel{tab:stages}{{5}{5}{}{table.5}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {6}Verification}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Status}{5}{}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces MDOF/s for the exact and projected apply. The projection is exact wherever the tangent does not vary over the element, and the only genuinely inexact row -- neohookean on HEX8 -- converges under refinement, from 8.9e-4 to 3.6e-5 across five levels.}}{6}{}\protected@file@percent }
-\gdef \@abspage@last{6}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Relative error of the projected apply against the exact one, $n=16$. The $w=0$ column is the control: it recovers the exactness proof of Section~3 and shows the sweep is measuring curvature and not the harness. TET4 is flat across the sweep, as it must be.}}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Methodology}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Time the kernel, not the harness.}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{A ratio can be flat while the thing it measures converges.}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Do not measure at a convenient mesh size.}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{A conclusion from one machine is a conclusion about that machine.}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Measured performance}{7}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces MDOF/s for the apply. ``Hand-written PA'' is \texttt  {NeoHookeanOgden}, which enables partial assembly by hand for HEX8 and TET10 and not for TET4 --- which is exactly where the generated kernels were ahead and behind before this work.}}{8}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces MDOF/s at $206{,}763$~dof, Mooney--Rivlin with Kelvin--Voigt viscosity. Grace scales $69\times $ on $72$ cores for the exact apply and $73\times $ for the stored one. The Apple figures peak at eight threads, not ten.}}{8}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Status}{8}{}\protected@file@percent }
+\gdef \@abspage@last{9}

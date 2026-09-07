@@ -124,6 +124,22 @@ error, and it is invisible to any test that compares the construction against
 itself.  Under \eqref{eq:tangentsym}, $\Sbar^0$ has $45$ independent components
 in three dimensions and $10$ in two.
 
+The derivation above assumed the element matrix is symmetric, and that is a
+property of the \emph{formulation}, not of the method.  A material written as an
+energy has a flux that is a gradient, so its tangent is a Hessian and
+\eqref{eq:tangentsym} holds by equality of mixed partials.  A material written
+as a residual has no such guarantee: its flux is not a gradient, its tangent is a
+Jacobian, and it need not be symmetric at all.  Kelvin--Voigt viscosity is not
+--- measured, $\max_{ijkl}|A_{ijkl}-A_{klij}| = 0.25$ --- so folding it into $45$
+components averages its antisymmetric part away and yields a \emph{different
+operator}: $5.3\times 10^{-2}$ relative error on TET4, an element where the
+projection is provably exact.
+
+The generator therefore decides symmetry per material, symbolically, and stores
+$45$ or $81$ accordingly.  It defaults to unsymmetric, because the two errors are
+not comparable: storing a full square for a symmetric tangent wastes memory,
+while storing half of an unsymmetric one is silently wrong.
+
 \section{Compression of the reference tensor}
 
 \subsection{What it contains}
@@ -211,6 +227,46 @@ The staging is the point and not an implementation detail.  Expanding the four
 stages into one expression per output and letting common-subexpression
 elimination rediscover the structure returns the dense operation count exactly;
 the saving lives in keeping the intermediates named.
+
+\subsection{Choosing the contraction}
+
+Section~5 stages the action through the rank factorisation.  That is not always
+the cheaper arrangement.  The factorisation has to compress the increment and
+expand the result, and where $\Wbar$'s rank is a large fraction of its order,
+those stages cost more than they save.  The alternative contracts $\Wbar$ against
+the increment directly,
+\begin{align}
+  G_{kmpn} &= \sum_j \Wbar_{jmpn}\, h_{k,j} \\
+  \text{out}_{ip} &= \sum_{k,m,n} \Sbar^0_{ikmn}\, G_{kmpn} ,
+\end{align}
+in which $\Sbar^0$ appears once, in a single $27$-term contraction per output,
+and there is nothing to compress or expand.
+
+Which wins is a property of the element, so the generator measures both and
+emits the cheaper.  Counted after common-subexpression elimination:
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrl}
+\toprule
+element & staged & gradient-first & rank & chosen \\
+\midrule
+TET4  &  207 &  342 &  1 of 12 & staged \\
+TET10 & 1380 & 1605 &  4 of 30 & staged \\
+HEX8  & 2610 & 1731 &  7 of 24 & gradient-first \\
+\bottomrule
+\end{tabular}
+\caption{Operations for the two contraction orderings.  HEX8's rank is high
+enough that the factorisation stops paying.}
+\end{table}
+
+On HEX8 this takes the emitted apply from $2732$ operations to $1801$, against a
+hand-written \texttt{hex8\_SdotHdotG} at $1558$, and lifts its measured rate from
+about $100$ to about $132$~MDOF/s.
+
+The counting has to be done \emph{after} elimination.  Measured on the
+unsimplified expressions, gradient-first looks worse on every element, which is
+how it was first dismissed.
 
 \subsection{Fold the constants, do not tabulate them}
 
@@ -308,119 +364,225 @@ is one vector register, so these are the register-pressure figures.}
 
 A consequence worth drawing out: on the elements where the projection is exact
 the register pressure is also lowest, and on HEX8 --- where the projection is an
-approximation whose error is not yet measured --- it is highest.  The two
-difficulties arrive together, and a rank-truncated factorisation (keeping
-$r' < r$ modes) is the natural knob for both, at the price of a second and
-larger approximation.
+approximation --- it is highest.  The two difficulties arrive together, and they
+are the same difficulty: rank controls both.  This is why HEX8 is also the
+element on which the staged form loses to the direct contraction, which needs no
+intermediates at all.  A rank-truncated factorisation (keeping $r' < r$ modes)
+remains the knob for elements where staging still wins, at the price of a second
+and larger approximation.
 
 \section{Verification}
 
-The construction is checked at three independent points, since each stage can
-be wrong in a way the next cannot see.
+Each stage can be wrong in a way the next cannot see, so the construction is
+checked at four independent points.
 
 \begin{enumerate}[leftmargin=1.5em]
 \item \textbf{The symbolic integration}, against four-point Gauss--Legendre
   quadrature on QUAD4 and HEX8, entry by entry: agreement to $10^{-16}$.
 \item \textbf{The factorisation}, against the tensor it factors:
   $C^{\mathsf T} X C = \Wbar$ exactly, over the rationals.
-\item \textbf{The action itself}, against \eqref{eq:exact} integrated directly
-  on a concrete tetrahedron, for linear elasticity and for neohookean Ogden:
-  agreement is exact, a rational zero rather than round-off, for the dense and
-  the staged form alike.  The second material also demonstrates the claim of
-  Section~2, that on an affine simplex the projection is lossless even when the
-  material is nonlinear.
+\item \textbf{The action}, against \eqref{eq:exact} integrated directly on a
+  concrete tetrahedron, for linear elasticity and for neohookean Ogden.
+\item \textbf{The generated operator}, inside SFEM, driven as a solver drives it:
+  \texttt{initialize}, \texttt{apply}, \texttt{inexact\_update},
+  \texttt{inexact\_apply}.
 \end{enumerate}
 
-Only the third of these can catch a wrong index convention, and it did: the
-symmetry \eqref{eq:tangentsym} had been implemented as $(i,k)$ against $(m,n)$,
-which the first two checks and a comparison of the staged form against the dense
-form all pass, because they share the error.
+Only the third can catch a wrong index convention, and it did: the symmetry
+\eqref{eq:tangentsym} had been implemented as $(i,k)$ against $(m,n)$, which the
+first two checks and any comparison of the staged form against the dense form
+all pass, because they share the error.
 
-\section{Status}
+Only the fourth can catch anything about integration.  It found that the emitted
+operator source omitted the C~ABI header, leaving every kernel signature
+unparseable; that the affine geometry cache the split reads was not built unless
+some \emph{other} path had asked for it; and that \texttt{inexact\_supported()}
+reported support on meshes where the geometry cache cannot exist.  None of these
+is visible in the emitted text.
 
-Implemented in the code generator's planning layer as
-\texttt{plans/inexact\_apply.py}, with the reference bases in
-\texttt{fem/reference\_basis.py}.  The plan is consulted by nothing: generated
-output is byte-identical, and generation of the kernel is intended to be opt-in
-when it is wired.
+\subsection*{How large is the projection error where it is not zero}
 
-Not yet done, in order:
-\begin{enumerate}[leftmargin=1.5em]
-\item the opt-in flag, threaded from the material through the pipeline;
-\item a kernel computing $\Sbar^0$ per element from the state --- for an affine
-  simplex this is \eqref{eq:pullback} evaluated once, and for a curved element
-  it is the average, which is where the projection is actually taken;
-\item the staged apply as its own entry point;
-\item a gate that compares against the exact apply: bit-parity on TRI3 and TET4,
-  where the projection is exact, and a \emph{measured relative error} on HEX8
-  and TET10, where a digest comparison is meaningless because the kernel is
-  deliberately a different operator.
-\end{enumerate}
-
-The numbers in Tables~\ref{tab:cost} and~\ref{tab:stages} are symbolic operation
-and register counts, not timings.
-
-\subsection*{Measured throughput, and what it refutes}
-
-With the opt-in wiring in place the kernel can be timed.  Single-threaded,
-\texttt{-O3 -march=native}, best of five, at and above the saturation point of
-roughly 47k degrees of freedom:
+Section~3 leaves the curved case open: on TET10 and HEX8 the projection is an
+approximation and its error has to be measured.  It is measured by warping the
+displacement --- an increasing perturbation of the reference configuration,
+checked at each step to keep $\det F > 0$ --- and comparing the projected
+neohookean apply against the exact one at each severity.
 
 \begin{table}[ht]
 \centering
-\begin{tabular}{llrrrrl}
+\begin{tabular}{lrrrr}
 \toprule
-material & element & ndof & exact & projected & ratio & rel.\ difference \\
+warp $w$ & 0 & 0.4 & 1.0 & 1.6 \\
 \midrule
-linear elasticity & TET4 &  46875 & 18.65 & 16.61 & 0.89$\times$ & 1.5e-16 \\
-linear elasticity & TET4 & 206763 & 17.79 & 15.24 & 0.86$\times$ & 1.7e-16 \\
-linear elasticity & HEX8 &  46875 & 26.11 & 17.01 & 0.65$\times$ & 4.8e-15 \\
-linear elasticity & HEX8 & 206763 & 23.24 & 14.98 & 0.64$\times$ & 1.1e-14 \\
-neohookean Ogden  & TET4 &  46875 &  5.26 &  4.83 & 0.92$\times$ & 1.8e-15 \\
-neohookean Ogden  & TET4 & 206763 &  4.91 &  4.44 & 0.90$\times$ & 3.8e-15 \\
-neohookean Ogden  & HEX8 &  46875 &  7.60 &  3.41 & 0.45$\times$ & 1.0e-04 \\
-neohookean Ogden  & HEX8 & 206763 &  6.97 &  3.27 & 0.47$\times$ & 3.6e-05 \\
+TET4  & 1e-15 & 1e-15 & 1e-15 & 1e-15 \\
+TET10 & 2.4e-14 & 1.0e-02 & --- & 4.3e-02 \\
+HEX8  & 2.7e-15 & --- & --- & 3.7e-04 \\
 \bottomrule
 \end{tabular}
-\caption{MDOF/s for the exact and projected apply.  The projection is exact
-wherever the tangent does not vary over the element, and the only genuinely
-inexact row -- neohookean on HEX8 -- converges under refinement, from 8.9e-4 to
-3.6e-5 across five levels.}
+\caption{Relative error of the projected apply against the exact one, $n=16$.
+The $w=0$ column is the control: it recovers the exactness proof of Section~3
+and shows the sweep is measuring curvature and not the harness.  TET4 is flat
+across the sweep, as it must be.}
 \end{table}
 
-Two claims of Section~2 hold: the projection is exact at round-off wherever the
-tangent is constant over the element, including on HEX8 where the kernel really
-does average over eight points; and where it is an approximation, it converges.
+TET10 is two orders worse than HEX8 at comparable warp.  Both are quadratic in
+the geometry, but TET10 carries a quadratic \emph{displacement} whose gradient
+varies linearly over the cell, and it is that variation the projection onto the
+constants discards.  The error is a real property of the approximation, not a
+defect: it falls under refinement at $O(h^{1.07})$ (see Methodology for why the
+first measurement of this appeared not to converge), so the projected operator
+converges to the exact one at the rate the discretisation itself does.
 
-The claim of Section~4 does not.  \textbf{The projected apply is slower
-everywhere}, from $0.90\times$ on TET4 to $0.45\times$ on HEX8, and worst
-exactly where it was supposed to pay.
+\section{Methodology}
 
-Table~\ref{tab:cost} is not wrong, but it counts only the contraction.  It does
-not count forming the tangent, and the projected kernel must \emph{materialise}
-$\Sbar$ --- forty-five independent components --- at every quadrature point in
-order to average it.  The exact kernel never forms the tangent at all: it
-computes the directional linearisation $P'(F)[\nabla h]$ at each point, a
-vector-sized quantity rather than a rank-four one.  On HEX8 that trades eight
-cheap linearisations for eight full tangent evaluations, and the saved
-contraction does not come close to paying for it.
+Several of the numbers in earlier drafts of this note were wrong.  The errors
+were not in the kernels, and they are worth recording, because each is a way of
+measuring the wrong thing while appearing to measure the right one.
 
-So the fused kernel --- the one wired here, which rebuilds the tangent on every
-apply --- cannot win, and tuning the contraction will not change that.
+\paragraph{Time the kernel, not the harness.}  The first throughput figures put a
+serial \texttt{std::fill} of the output arrays inside the timed region, and
+wrapped a single call per sample so that each paid OpenMP team startup and a cold
+cache.  Neither is part of the operator.  The distortion is invisible at one
+thread and grows with the thread count --- the worst possible shape for a scaling
+study: the single-thread figures barely moved when it was fixed ($2.52$ to
+$2.68$~MDOF/s) while the eight-thread figures moved by half ($13.04$ to
+$18.75$).  Reported scaling was $5.4\times$ where it is really $7.0\times$.
 
-\subsection*{Where the technique can still pay}
+\paragraph{A ratio can be flat while the thing it measures converges.}
+Measured against a \emph{smooth} increment, the TET10 projection error sat at
+$1.0\times10^{-2}$ across an eightfold refinement and looked like a defect.  It
+is not.  For a smooth field the assembled $(Hh)_p$ is a discrete second
+derivative, so neighbouring elements cancel and the denominator collapses by an
+extra order, while the per-element projection errors carry independent signs and
+do not cancel at all.  Against a white-noise increment the same kernel converges
+at $O(h^{1.07})$.  Before concluding that an approximation fails to converge,
+re-measure it with a random vector.
 
-Partial assembly pays when the tangent is formed once and \emph{reused}.  In a
-Newton step the tangent is fixed while the Krylov solve applies the operator
-tens or hundreds of times.  Writing $\Sbar$ into storage once per Newton
-iteration and applying it thereafter costs, per apply, only the staged
-contraction --- which is the quantity Table~\ref{tab:cost} does measure.
+\paragraph{Do not measure at a convenient mesh size.}  The stored tangent is
+\texttt{metric\_tensor\_t}, which is \texttt{float}.  On a mesh whose spacing is
+a power of two the tangent entries are exactly representable and the difference
+from the exact apply collapses to $10^{-14}$, which looks like proof of something
+far stronger than is true.  The same kernels at resolution $12$:
 
-That is the measurement worth taking next, and it needs the split kernels: one
-writing $\Sbar$ per element, one reading it.  Its break-even is the number of
-applies per tangent, which the fused form fixes at one and a Krylov solve makes
-large.  Until it is measured, the honest summary of this note is that the
-mathematics is verified, the compression is real, and the fused kernel is a
-demonstration rather than an optimisation.
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+element & $n=8$ & $n=12$ & $n=16$ \\
+\midrule
+TET4  & 6.1e-16 & 1.2e-07 & 1.8e-15 \\
+TET10 & 1.4e-14 & 1.0e-05 & 4.8e-14 \\
+HEX8  & --      & 6.8e-07 & --      \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+So the split reproduces the exact apply to the precision of its store, and that
+precision is element-dependent: TET10's quadratic basis gives its tangent a wider
+dynamic range and costs about two more digits than TET4 for the same
+\texttt{float} store.  That is an input to choosing a store precision, not a
+tolerance to widen.
+
+\paragraph{A conclusion from one machine is a conclusion about that machine.}
+On an Apple laptop every column fell by a fifth past eight threads, and the
+atomic scatter looked like the scalability limit.  It is not: the laptop has
+eight performance cores and two efficiency cores, \texttt{schedule(static)} hands
+them equal chunks, and the loop waits for the slow ones.  On $72$ homogeneous
+Grace cores the same kernels scale essentially linearly.
+
+\section{Measured performance}
+
+Two frames, and they are not interchangeable.  The first calls the generated
+kernels directly with the geometry precomputed; the second goes through
+\texttt{Op::apply}, which is the path a solve actually takes.  At $170{,}373$
+degrees of freedom the same kernel reads about $5$~MDOF/s in the first and
+$1.46$ in the second.  Only the second is comparable with the library.
+
+\subsection*{Against the library's own operators}
+
+Measured with SFEM's \texttt{bench\_op}, a spike copy of which reports setup and
+application separately.  \texttt{build64}, eight threads, ${\sim}10.4$M~dof.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+element & hand-written PA & exact generated & generated split & vs.\ hand-written \\
+\midrule
+TET10 & 137.4 & 27.2 & 219.6 & $1.60\times$ faster \\
+HEX8  & 162.9 & 47.5 & 100.2 & $1.63\times$ behind \\
+TET4  & (none) & 47.9 & 116.9 & --- \\
+\bottomrule
+\end{tabular}
+\caption{MDOF/s for the apply.  ``Hand-written PA'' is
+\texttt{NeoHookeanOgden}, which enables partial assembly by hand for HEX8 and
+TET10 and not for TET4 --- which is exactly where the generated kernels were
+ahead and behind before this work.}
+\end{table}
+
+The assemblies, measured separately: TET10 $0.392$\,s for the generated split
+against $0.653$\,s hand-written; HEX8 level at $0.414$ against $0.427$.  So on
+TET10 the generated split beats hand-written partial assembly on both halves.
+On HEX8 it doubles the exact generated kernel but remains behind the
+hand-written one, and since the assemblies are level the whole gap is the
+contraction.
+
+Break-even needs a reference that performs no setup of its own.  The
+hand-written operator assembles too, so the exact generated apply is the honest
+denominator: against it, TET10 breaks even at $1.03$ applies per tangent.
+
+\subsection*{Threads}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+ & 1 & 8 & 32 & 64 & 72 \\
+\midrule
+Apple, exact      &  2.68 & 18.75 & --- & --- & --- \\
+Apple, stored f16 &  7.61 & 55.15 & --- & --- & --- \\
+Grace, exact      &  1.33 & 10.68 & 41.65 &  82.13 &  92.28 \\
+Grace, stored f16 &  2.85 & 25.30 & 97.67 & 191.62 & 209.60 \\
+\bottomrule
+\end{tabular}
+\caption{MDOF/s at $206{,}763$~dof, Mooney--Rivlin with Kelvin--Voigt viscosity.
+Grace scales $69\times$ on $72$ cores for the exact apply and $73\times$ for the
+stored one.  The Apple figures peak at eight threads, not ten.}
+\end{table}
+
+On Grace \texttt{fp16} is not worth carrying: at one thread it is slower than
+both \texttt{fp32} and \texttt{fp64}, and at $72$ threads it is within two per
+cent of \texttt{fp32} while costing four decimal digits.  \texttt{fp32} is the
+default on both machines.
+
+\section{Status}
+
+The split is implemented and reachable from SFEM.  \texttt{Op} carries
+\texttt{inexact\_supported()}, \texttt{inexact\_update()} and
+\texttt{inexact\_apply()}, with defaults that refuse, so no existing operator or
+caller changes behaviour.  \texttt{inexact\_update} is explicit by design: the
+stored tangent stays valid until the next call, which is the reuse the split
+exists for, and \texttt{inexact\_apply} takes no state at all, so it cannot
+silently use a stale one.
+
+Three runtime-typed C~ABI entry points per material --- assemble, apply from a
+\texttt{metric\_tensor\_t} store, apply from a compressed one --- dispatch on
+\texttt{smesh::ElemType} with the scalar type as a \texttt{smesh::PrimitiveType}.
+\texttt{linear\_elasticity} is generated in-tree with the split enabled, and its
+operator reproduces its own exact apply to the store's precision on TET4, TET10
+and HEX8.
+
+Open:
+\begin{enumerate}[leftmargin=1.5em]
+\item The 2D kernels are generated but unreachable: smesh's adjugate fill has no
+  TRI3 or QUAD4 case, so the affine geometry cache the split reads cannot be
+  built.  The operator reports \texttt{inexact\_supported() == false} there
+  rather than failing at run time, and will start working by itself if smesh
+  gains 2D support.
+\item HEX8's contraction is still behind the hand-written kernel by about
+  $1.6\times$, entirely in the contraction rather than the assembly.
+\item The 2D store size is emitted and has never executed.
+\item A permanent test belongs in \texttt{frontend/tests/}, beside
+  \texttt{sfem\_PartialAssemblyTest.cpp}, rather than in a spike.
+\end{enumerate}
 
 \end{document}
