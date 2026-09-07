@@ -5118,7 +5118,7 @@ static SFEM_INLINE void laplace_tri6_hessian_isoparametric_mesh_soa_scatter_bsr(
         const count_t *const SFEM_RESTRICT rowptr,
         const idx_t *const SFEM_RESTRICT colidx,
         scalar_t *const SFEM_RESTRICT values) {
-    static constexpr int N_FIELD_COMPONENTS = 2;
+    static constexpr int N_FIELD_COMPONENTS = 1;
     static constexpr int N_SHAPE = 6;
     count_t entries[N_SHAPE * N_SHAPE];
     idx_t ks[N_SHAPE];

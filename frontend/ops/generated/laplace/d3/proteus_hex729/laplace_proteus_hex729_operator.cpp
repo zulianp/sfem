@@ -5024,7 +5024,7 @@ static SFEM_INLINE void laplace_proteus_hex729_hessian_isoparametric_mesh_soa_sc
         const count_t *const SFEM_RESTRICT rowptr,
         const idx_t *const SFEM_RESTRICT colidx,
         scalar_t *const SFEM_RESTRICT values) {
-    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int N_FIELD_COMPONENTS = 1;
     static constexpr int N_SHAPE = 729;
     count_t entries[N_SHAPE * N_SHAPE];
     idx_t ks[N_SHAPE];

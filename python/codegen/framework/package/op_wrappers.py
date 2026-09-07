@@ -953,19 +953,17 @@ def _hyperelastic_op(
         gradient_affine_args = ", ".join(
             _nonempty(
                 gradient_common_affine_args,
-                *_energy_field_args(
-                    gradient_dependencies, dim, components, current="x"
+                *_energy_field_args(gradient_dependencies, components, current="x"
                 ),
-                *_energy_output_args(dim, components),
+                *_energy_output_args(components),
             )
         )
         gradient_isoparametric_args = ", ".join(
             _nonempty(
                 gradient_common_isoparametric_args,
-                *_energy_field_args(
-                    gradient_dependencies, dim, components, current="x"
+                *_energy_field_args(gradient_dependencies, components, current="x"
                 ),
-                *_energy_output_args(dim, components),
+                *_energy_output_args(components),
             )
         )
         if gradient_affine_uses_aos:
@@ -977,10 +975,9 @@ def _hyperelastic_op(
                     ", ".join(
                         _nonempty(
                             gradient_common_affine_aos_args,
-                            *_energy_field_args(
-                                gradient_dependencies, dim, components, current="x"
+                            *_energy_field_args(gradient_dependencies, components, current="x"
                             ),
-                            *_energy_output_args(dim, components),
+                            *_energy_output_args(components),
                         )
                     ),
                     "%s_gradient_affine_mesh_soa" % stem,
@@ -1003,27 +1000,21 @@ def _hyperelastic_op(
         apply_affine_args = ", ".join(
             _nonempty(
                 apply_common_affine_args,
-                *_energy_field_args(
-                    apply_dependencies,
-                    dim,
-                    components,
+                *_energy_field_args(apply_dependencies, components,
                     current="x",
                     direction="h",
                 ),
-                *_energy_output_args(dim, components),
+                *_energy_output_args(components),
             )
         )
         apply_isoparametric_args = ", ".join(
             _nonempty(
                 apply_common_isoparametric_args,
-                *_energy_field_args(
-                    apply_dependencies,
-                    dim,
-                    components,
+                *_energy_field_args(apply_dependencies, components,
                     current="x",
                     direction="h",
                 ),
-                *_energy_output_args(dim, components),
+                *_energy_output_args(components),
             )
         )
         if apply_affine_uses_aos:
@@ -1035,14 +1026,11 @@ def _hyperelastic_op(
                     ", ".join(
                         _nonempty(
                             apply_common_affine_aos_args,
-                            *_energy_field_args(
-                                apply_dependencies,
-                                dim,
-                                components,
+                            *_energy_field_args(apply_dependencies, components,
                                 current="x",
                                 direction="h",
                             ),
-                            *_energy_output_args(dim, components),
+                            *_energy_output_args(components),
                         )
                     ),
                     "%s_apply_affine_mesh_soa" % stem,
@@ -1076,14 +1064,14 @@ def _hyperelastic_op(
                         ),
                         objective_args,
                     ),
-                    *_energy_field_args(objective_dependencies, dim, components, current="x"),
+                    *_energy_field_args(objective_dependencies, components, current="x"),
                     "impl_->element_values.get()",
                 )),
                 "%s_objective_isoparametric_mesh_soa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
                     % objective_args,
-                    *_energy_field_args(objective_dependencies, dim, components, current="x"),
+                    *_energy_field_args(objective_dependencies, components, current="x"),
                     "impl_->element_values.get()",
                 )),
             )
@@ -1102,7 +1090,7 @@ def _hyperelastic_op(
                         ),
                         objective_args,
                     ),
-                    *_energy_field_args(objective_dependencies, dim, components, current="x"),
+                    *_energy_field_args(objective_dependencies, components, current="x"),
                     dim,
                     _offsets("h", components),
                     "nsteps",
@@ -1113,7 +1101,7 @@ def _hyperelastic_op(
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
                     % objective_args,
-                    *_energy_field_args(objective_dependencies, dim, components, current="x"),
+                    *_energy_field_args(objective_dependencies, components, current="x"),
                     dim,
                     _offsets("h", components),
                     "nsteps",
@@ -1125,10 +1113,7 @@ def _hyperelastic_op(
         hessian_state_args = ", ".join(
             _nonempty(
                 apply_common_isoparametric_args,
-                *_energy_field_args(
-                    apply_dependencies,
-                    dim,
-                    components,
+                *_energy_field_args(apply_dependencies, components,
                     current="current",
                 ),
             )
@@ -1811,6 +1796,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("rowptr", "colidx", "values"),
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_crs_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
@@ -1824,6 +1810,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("rowptr", "colidx", "values"),
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_bsr_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
@@ -1837,6 +1824,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("diag_offsets", "ndiag", "values"),
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_dia_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
@@ -1850,6 +1838,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("nnz", "rows", "cols", "values"),
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_coo_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
@@ -1863,6 +1852,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("rowptr", "colidx", "values"),
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_patch_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
@@ -1876,6 +1866,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
             ("values",),
             indent="            ",
+            n_field_components_by_dim=n_field_components_by_dim,
         ),
         "hessian_block_diag_sym_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
@@ -6795,21 +6786,21 @@ def _affine_option_entries(*flags, owner="impl_"):
     return "\n".join(lines)
 
 
-def _energy_field_args(dependencies, dim, components, current=None, direction=None):
+def _energy_field_args(dependencies, components, current=None, direction=None):
     args = []
     if current is not None and (
         getattr(dependencies, "current", False) if dependencies is not None else True
     ):
-        args.extend((dim, _offsets(current, components)))
+        args.extend((len(components), _offsets(current, components)))
     if direction is not None and (
         getattr(dependencies, "direction", False) if dependencies is not None else True
     ):
-        args.extend((dim, _offsets(direction, components)))
+        args.extend((len(components), _offsets(direction, components)))
     return tuple(args)
 
 
-def _energy_output_args(dim, components):
-    return (dim, _offsets("out", components))
+def _energy_output_args(components):
+    return (len(components), _offsets("out", components))
 
 
 def _energy_declaration_field_args(dependencies, dim, components, current=False, direction=False):
@@ -7656,8 +7647,8 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
         prefix = "if" if not emitted else "else if"
         emitted = True
         components = _components((n_field_components_by_dim or {}).get(dim, dim))
-        current_args = [str(arg) for arg in _energy_field_args(dependencies, dim, components, current="x")]
-        output_args = [str(arg) for arg in _energy_output_args(dim, components)]
+        current_args = [str(arg) for arg in _energy_field_args(dependencies, components, current="x")]
+        output_args = [str(arg) for arg in _energy_output_args(components)]
         affine = "%s_gradient_%dd_affine_mesh_soa" % (material_name, dim)
         affine_aos_unit = "%s_gradient_%dd_affine_mesh_soa_aos_unit" % (material_name, dim)
         isop = "%s_gradient_%dd_isoparametric_mesh_soa" % (material_name, dim)
@@ -7781,7 +7772,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
         emitted_dims.append(dim)
         components = _components((n_field_components_by_dim or {}).get(dim, dim))
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
-        current_args = [str(arg) for arg in _energy_field_args(dependencies, dim, components, current="x")]
+        current_args = [str(arg) for arg in _energy_field_args(dependencies, components, current="x")]
         affine = "%s_objective_%dd_affine_mesh_soa" % (material_name, dim)
         isop = "%s_objective_%dd_isoparametric_mesh_soa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
@@ -7862,7 +7853,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
         emitted_dims.append(dim)
         components = _components((n_field_components_by_dim or {}).get(dim, dim))
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
-        current_args = [str(arg) for arg in _energy_field_args(dependencies, dim, components, current="x")]
+        current_args = [str(arg) for arg in _energy_field_args(dependencies, components, current="x")]
         direction_args = [str(dim), _offsets("h", components)]
         affine = "%s_objective_steps_%dd_affine_mesh_soa" % (material_name, dim)
         isop = "%s_objective_steps_%dd_isoparametric_mesh_soa" % (material_name, dim)
@@ -8360,7 +8351,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
     return "\n".join(packed_blocks)
 
 
-def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources, apply_dependencies_by_dim, tail_args, indent):
+def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources, apply_dependencies_by_dim, tail_args, indent, n_field_components_by_dim=None):
     lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
     for dim in (2, 3):
         prefix = "if" if dim == 2 else "else if"
@@ -8371,8 +8362,13 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
         )
         dependencies = apply_dependencies_by_dim.get(dim)
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
+        # The stride and the offsets are the field's component count, not the
+        # spatial dimension.  They coincide for a displacement, which is every
+        # energy this dispatch had until a scalar field reached it and read
+        # two streams past the end of its own.
+        n_components = _packed_n_components(n_field_components_by_dim, dim)
         current_args = (
-            [str(dim)] + ["current + %d" % d for d in range(dim)]
+            [str(n_components)] + ["current + %d" % d for d in range(n_components)]
             if getattr(dependencies, "current", True)
             else []
         )

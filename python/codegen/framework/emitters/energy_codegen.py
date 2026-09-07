@@ -7638,18 +7638,18 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_fiel
         )
         lines.extend(find_cols_lines)
     if "bsr" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes))
+        lines.extend(_sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     if "crs" in formats:
         lines.extend(_sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     if "dia" in formats:
         lines.extend(_sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     if "coo" in formats:
         lines.extend(_sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
-        lines.extend(_sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes))
+        lines.extend(_sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     if "patch" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes))
+        lines.extend(_sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     if "block_diag_sym" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes))
+        lines.extend(_sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     return lines
 
 
@@ -7711,7 +7711,7 @@ def _assembly_reduction_is_atomic(reduction_policy, format_name):
     return True
 
 
-def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=None):
+def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=None, n_field_components=None):
     """Scatter one element block into a BSR matrix.
 
     The stream names and the reduction come from ``BSRAssemblyPlan``, which is
@@ -7745,6 +7745,8 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     fold a status -- which is the arrangement ``_scatter_block_diag_sym`` has
     always had.
     """
+    # The block is the field's components, not the spatial dimension.
+    n_field_components = dim if n_field_components is None else n_field_components
     assembly = BSRAssemblyPlan() if assembly is None else assembly
     row_pointer = assembly.row_pointer
     column_index = assembly.column_index
@@ -7772,7 +7774,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
         ),
     ]
     body = [
-        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(n_field_components))),
         BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
         BufferDeclNode("count_t", "entries", ("N_SHAPE * N_SHAPE",)),
         BufferDeclNode("idx_t", "ks", ("N_SHAPE",)),
@@ -8083,8 +8085,10 @@ def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, assembly=No
     ]
 
 
-def _sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes):
+def _sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes, n_field_components=None):
     """Write one element's matrix out as (row, col, value) triplets."""
+    # The block is the field's components, not the spatial dimension.
+    n_field_components = dim if n_field_components is None else n_field_components
     inner = [
         BufferDeclNode("const int", "col", (), expr_ref("bj * N_SHAPE + j")),
         BufferDeclNode(
@@ -8100,7 +8104,7 @@ def _sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes):
         ),
     ]
     body = [
-        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(n_field_components))),
         BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
         BufferDeclNode("static constexpr int", "NDOFS", (), expr_ref("N_FIELD_COMPONENTS * N_SHAPE")),
         BufferDeclNode(
@@ -8151,7 +8155,7 @@ def _sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes):
     )
 
 
-def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=None):
+def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=None, n_field_components=None):
     """Scatter into a patch-local CRS block.
 
     Graph and value stream names and the reduction come from
@@ -8165,6 +8169,8 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=
     machinery is what OP 10 is about removing -- see the note in
     ``RawLinesRatchetTest``.
     """
+    # The block is the field's components, not the spatial dimension.
+    n_field_components = dim if n_field_components is None else n_field_components
     assembly = PatchAssemblyPlan() if assembly is None else assembly
     row_pointer = assembly.row_pointer
     column_index = assembly.column_index
@@ -8180,7 +8186,7 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=
         ),
     ]
     body = [
-        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(n_field_components))),
         BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
         BufferDeclNode("count_t", "entries", ("N_SHAPE * N_SHAPE",)),
         BufferDeclNode("idx_t", "ks", ("N_SHAPE",)),
@@ -8278,7 +8284,7 @@ def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=
 
 
 def _sfem_soa_hessian_scatter_block_diag_sym_lines(
-    function_base, dim, n_nodes, assembly=None
+    function_base, dim, n_nodes, assembly=None, n_field_components=None
 ):
     """Accumulate only the symmetric block diagonal.
 
@@ -8286,11 +8292,13 @@ def _sfem_soa_hessian_scatter_block_diag_sym_lines(
     ``BlockDiagSymAssemblyPlan``, and no index structure of its own because the
     node index is the block index.
     """
+    # The block is the field's components, not the spatial dimension.
+    n_field_components = dim if n_field_components is None else n_field_components
     assembly = BlockDiagSymAssemblyPlan() if assembly is None else assembly
     value_stream = assembly.value_stream
     _assembly_reduction_is_atomic(assembly.reduction_policy, "block-diagonal-symmetric")
     body = [
-        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(dim))),
+        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(n_field_components))),
         BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
         BufferDeclNode("static constexpr int", "NDOFS", (), expr_ref("N_FIELD_COMPONENTS * N_SHAPE")),
         BufferDeclNode(
