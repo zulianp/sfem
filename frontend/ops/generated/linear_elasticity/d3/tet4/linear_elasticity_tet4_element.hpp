@@ -55,10 +55,10 @@ static SFEM_INLINE int linear_elasticity_tet4_energy_element_geometry_soa(
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const SFEM_RESTRICT values
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -81,7 +81,8 @@ static SFEM_INLINE int linear_elasticity_tet4_energy_element_geometry_soa(
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        for (int q = 0; q < N_QP; ++q) {
+        {
+            const int q = 0;  // TET4 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = jacobian_adjugate[0][q * nelements + evbegin + lane];
@@ -110,10 +111,11 @@ static SFEM_INLINE int linear_elasticity_tet4_energy_element_coords_soa(
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const SFEM_RESTRICT values
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -146,8 +148,9 @@ static SFEM_INLINE int linear_elasticity_tet4_energy_element_coords_soa(
         const scalar_t *const grad_ref_x = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_x();
         const scalar_t *const grad_ref_y = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_y();
         const scalar_t *const grad_ref_z = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_z();
-        for (int q = 0; q < N_QP; ++q) {
-            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        {
+            const int q = 0;  // TET4 evaluates in closed form
+            scalar_t *block_jacobian_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
             scalar_t J00_values[VECTOR_SIZE];
             scalar_t J01_values[VECTOR_SIZE];
             scalar_t J02_values[VECTOR_SIZE];
@@ -264,10 +267,11 @@ static SFEM_INLINE int linear_elasticity_tet4_energy_element_soa(
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const SFEM_RESTRICT values
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -300,8 +304,9 @@ static SFEM_INLINE int linear_elasticity_tet4_energy_element_soa(
         const scalar_t *const grad_ref_x = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_x();
         const scalar_t *const grad_ref_y = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_y();
         const scalar_t *const grad_ref_z = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_z();
-        for (int q = 0; q < N_QP; ++q) {
-            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        {
+            const int q = 0;  // TET4 evaluates in closed form
+            scalar_t *block_jacobian_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
             scalar_t J00_values[VECTOR_SIZE];
             scalar_t J01_values[VECTOR_SIZE];
             scalar_t J02_values[VECTOR_SIZE];
@@ -420,10 +425,10 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_element_geometry_soa(
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -449,7 +454,8 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_element_geometry_soa(
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        for (int q = 0; q < N_QP; ++q) {
+        {
+            const int q = 0;  // TET4 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = jacobian_adjugate[0][q * nelements + evbegin + lane];
@@ -478,10 +484,11 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_element_coords_soa(
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -517,8 +524,9 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_element_coords_soa(
         const scalar_t *const grad_ref_x = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_x();
         const scalar_t *const grad_ref_y = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_y();
         const scalar_t *const grad_ref_z = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_z();
-        for (int q = 0; q < N_QP; ++q) {
-            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        {
+            const int q = 0;  // TET4 evaluates in closed form
+            scalar_t *block_jacobian_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
             scalar_t J00_values[VECTOR_SIZE];
             scalar_t J01_values[VECTOR_SIZE];
             scalar_t J02_values[VECTOR_SIZE];
@@ -635,10 +643,11 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_element_soa(
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -674,8 +683,9 @@ static SFEM_INLINE int linear_elasticity_tet4_gradient_element_soa(
         const scalar_t *const grad_ref_x = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_x();
         const scalar_t *const grad_ref_y = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_y();
         const scalar_t *const grad_ref_z = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_z();
-        for (int q = 0; q < N_QP; ++q) {
-            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        {
+            const int q = 0;  // TET4 evaluates in closed form
+            scalar_t *block_jacobian_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
             scalar_t J00_values[VECTOR_SIZE];
             scalar_t J01_values[VECTOR_SIZE];
             scalar_t J02_values[VECTOR_SIZE];
@@ -793,10 +803,10 @@ static SFEM_INLINE int linear_elasticity_tet4_hessian_element_geometry_soa(
         const scalar_t mu,
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -810,7 +820,8 @@ static SFEM_INLINE int linear_elasticity_tet4_hessian_element_geometry_soa(
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        for (int q = 0; q < N_QP; ++q) {
+        {
+            const int q = 0;  // TET4 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
                 block_jacobian_adjugate0[q * VECTOR_SIZE + lane] = jacobian_adjugate[0][q * nelements + evbegin + lane];
@@ -862,10 +873,11 @@ static SFEM_INLINE int linear_elasticity_tet4_hessian_element_coords_soa(
         const scalar_t mu,
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -889,8 +901,9 @@ static SFEM_INLINE int linear_elasticity_tet4_hessian_element_coords_soa(
         const scalar_t *const grad_ref_x = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_x();
         const scalar_t *const grad_ref_y = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_y();
         const scalar_t *const grad_ref_z = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_z();
-        for (int q = 0; q < N_QP; ++q) {
-            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        {
+            const int q = 0;  // TET4 evaluates in closed form
+            scalar_t *block_jacobian_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
             scalar_t J00_values[VECTOR_SIZE];
             scalar_t J01_values[VECTOR_SIZE];
             scalar_t J02_values[VECTOR_SIZE];
@@ -1030,10 +1043,11 @@ static SFEM_INLINE int linear_elasticity_tet4_hessian_element_soa(
         const scalar_t mu,
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 4;
     static constexpr int N_QP = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -1057,8 +1071,9 @@ static SFEM_INLINE int linear_elasticity_tet4_hessian_element_soa(
         const scalar_t *const grad_ref_x = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_x();
         const scalar_t *const grad_ref_y = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_y();
         const scalar_t *const grad_ref_z = sfem::codegen::linear_elasticity_tet4_isoparametric_reference_data<scalar_t>::grad_ref_z();
-        for (int q = 0; q < N_QP; ++q) {
-            scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        {
+            const int q = 0;  // TET4 evaluates in closed form
+            scalar_t *block_jacobian_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
             scalar_t J00_values[VECTOR_SIZE];
             scalar_t J01_values[VECTOR_SIZE];
             scalar_t J02_values[VECTOR_SIZE];

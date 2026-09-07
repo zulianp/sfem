@@ -255,35 +255,24 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
             const geom_t *const *pts = const_cast<const geom_t *const *>(points);
-            if constexpr (std::is_same<Scalar, double>::value) {
-                return linear_elasticity_apply_2d_isoparametric_mesh_soa(smesh::QUAD4,
-                                                                         nmicro,
-                                                                         nnodes,
-                                                                         q4->data(),
-                                                                         pts,
-                                                                         lambda,
-                                                                         mu,
-                                                                         2,
-                                                                         &u[0],
-                                                                         &u[1],
-                                                                         2,
-                                                                         &values[0],
-                                                                         &values[1]);
-            } else {
-                return linear_elasticity_apply_2d_isoparametric_mesh_soa_float(smesh::QUAD4,
-                                                                              nmicro,
-                                                                              nnodes,
-                                                                              q4->data(),
-                                                                              pts,
-                                                                              lambda,
-                                                                              mu,
-                                                                              2,
-                                                                              &u[0],
-                                                                              &u[1],
-                                                                              2,
-                                                                              &values[0],
-                                                                              &values[1]);
-            }
+            // One entry point, told at run time which scalar it is handed.  It
+            // used to be two symbols chosen by `if constexpr`; the generated C
+            // ABI now carries the type as a `smesh::PrimitiveType` and takes the
+            // buffers as `void *`, so the branch is gone rather than hidden.
+            return linear_elasticity_apply_2d_isoparametric_mesh_soa(smesh::QUAD4,
+                                                                     smesh::TypeToEnum<Scalar>::value(),
+                                                                     nmicro,
+                                                                     nnodes,
+                                                                     q4->data(),
+                                                                     pts,
+                                                                     lambda,
+                                                                     mu,
+                                                                     2,
+                                                                     &u[0],
+                                                                     &u[1],
+                                                                     2,
+                                                                     &values[0],
+                                                                     &values[1]);
         }
 
         template <typename Scalar>
@@ -301,13 +290,16 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
             const geom_t *const *pts = const_cast<const geom_t *const *>(points);
-            if constexpr (std::is_same<Scalar, double>::value) {
-                return linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(
-                        smesh::QUAD4, nmicro, nnodes, q4->data(), pts, lambda, mu, values);
-            } else {
-                return linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa_float(
-                        smesh::QUAD4, nmicro, nnodes, q4->data(), pts, lambda, mu, values);
-            }
+            return linear_elasticity_hessian_block_diag_sym_2d_isoparametric_mesh_soa(
+                    smesh::QUAD4,
+                    smesh::TypeToEnum<Scalar>::value(),
+                    nmicro,
+                    nnodes,
+                    q4->data(),
+                    pts,
+                    lambda,
+                    mu,
+                    values);
         }
 
         int linear_elasticity_dispatch_domain_vector(const OpDomain     &domain,

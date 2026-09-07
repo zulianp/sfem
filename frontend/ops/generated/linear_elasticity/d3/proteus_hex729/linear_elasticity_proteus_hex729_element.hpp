@@ -32,7 +32,7 @@ struct linear_elasticity_proteus_hex729_isoparametric_reference_data {
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[10] = {scalar_t(0.03333567215434368), scalar_t(0.074725674575290224), scalar_t(0.10954318125799124), scalar_t(0.13463335965499829), scalar_t(0.14776211235737652), scalar_t(0.14776211235737652), scalar_t(0.13463335965499829), scalar_t(0.10954318125799124), scalar_t(0.074725674575290224), scalar_t(0.03333567215434368)};
+        static const scalar_t data[10] = {scalar_t(0.033335672154343646), scalar_t(0.074725674575290252), scalar_t(0.10954318125799113), scalar_t(0.13463335965499842), scalar_t(0.14776211235737652), scalar_t(0.14776211235737652), scalar_t(0.13463335965499842), scalar_t(0.10954318125799113), scalar_t(0.074725674575290252), scalar_t(0.033335672154343646)};
         return data;
     }
 };
@@ -47,10 +47,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_energy_element_geometry_
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const SFEM_RESTRICT values
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -102,10 +102,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_energy_element_coords_so
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const SFEM_RESTRICT values
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -135,12 +136,12 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_energy_element_coords_so
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+        scalar_t coordinate_grad_ref[SPATIAL_DIM * N_QP * SPATIAL_DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        scalar_t *coordinate_grad_ref_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, SPATIAL_DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
         linear_elasticity_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_value);
     }
     return SFEM_SUCCESS;
@@ -155,10 +156,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_energy_element_soa(
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const SFEM_RESTRICT values
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -188,12 +190,12 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_energy_element_soa(
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+        scalar_t coordinate_grad_ref[SPATIAL_DIM * N_QP * SPATIAL_DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        scalar_t *coordinate_grad_ref_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, SPATIAL_DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
         linear_elasticity_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_value);
     }
     return SFEM_SUCCESS;
@@ -210,10 +212,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_gradient_element_geometr
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -268,10 +270,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_gradient_element_coords_
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -304,12 +307,12 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_gradient_element_coords_
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+        scalar_t coordinate_grad_ref[SPATIAL_DIM * N_QP * SPATIAL_DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        scalar_t *coordinate_grad_ref_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, SPATIAL_DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
         linear_elasticity_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_out_streams);
     }
     return SFEM_SUCCESS;
@@ -324,10 +327,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_gradient_element_soa(
         const scalar_t *const *const SFEM_RESTRICT u_streams,
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -360,12 +364,12 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_gradient_element_soa(
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+        scalar_t coordinate_grad_ref[SPATIAL_DIM * N_QP * SPATIAL_DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        scalar_t *coordinate_grad_ref_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, SPATIAL_DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
         linear_elasticity_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_out_streams);
     }
     return SFEM_SUCCESS;
@@ -381,10 +385,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_hessian_element_geometry
         const scalar_t mu,
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -450,10 +454,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_hessian_element_coords_s
         const scalar_t mu,
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -474,12 +479,12 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_hessian_element_coords_s
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+        scalar_t coordinate_grad_ref[SPATIAL_DIM * N_QP * SPATIAL_DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        scalar_t *coordinate_grad_ref_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, SPATIAL_DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
         scalar_t block_h_data[NDOFS][VECTOR_SIZE];
         scalar_t block_out_data[NDOFS][VECTOR_SIZE];
         const scalar_t *block_h_streams[NDOFS];
@@ -517,10 +522,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_hessian_element_soa(
         const scalar_t mu,
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
-    static constexpr int DIM = 3;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
     static constexpr int N_SHAPE = 729;
     static constexpr int N_QP = 1000;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -541,12 +547,12 @@ static SFEM_INLINE int linear_elasticity_proteus_hex729_hessian_element_soa(
         scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+        scalar_t coordinate_grad_ref[SPATIAL_DIM * N_QP * SPATIAL_DIM * VECTOR_SIZE];
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::linear_elasticity_proteus_hex729_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * SPATIAL_DIM * VECTOR_SIZE);
+        scalar_t *coordinate_grad_ref_adjugate_streams[SPATIAL_DIM * SPATIAL_DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
+        geometry_jacobian_adjugate_and_determinant<scalar_t, SPATIAL_DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
         scalar_t block_h_data[NDOFS][VECTOR_SIZE];
         scalar_t block_out_data[NDOFS][VECTOR_SIZE];
         const scalar_t *block_h_streams[NDOFS];

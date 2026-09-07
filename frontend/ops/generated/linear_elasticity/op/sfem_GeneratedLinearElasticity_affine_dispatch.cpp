@@ -29,60 +29,6 @@ extern "C" int linear_elasticity_proteus_quad4_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy
 );
-extern "C" int linear_elasticity_quad4_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int linear_elasticity_tri3_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int linear_elasticity_tri6_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
 extern "C" int linear_elasticity_proteus_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -100,6 +46,24 @@ extern "C" int linear_elasticity_proteus_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_quad4_apply_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
 );
 extern "C" int linear_elasticity_quad4_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
@@ -119,6 +83,24 @@ extern "C" int linear_elasticity_quad4_apply_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
+extern "C" int linear_elasticity_tri3_apply_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+);
 extern "C" int linear_elasticity_tri3_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -136,6 +118,24 @@ extern "C" int linear_elasticity_tri3_apply_affine_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_tri6_apply_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
 );
 extern "C" int linear_elasticity_tri6_apply_affine_mesh_soa_float(
         const ptrdiff_t nelements,
@@ -180,6 +180,31 @@ extern "C" int linear_elasticity_hex27_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_hex27_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_hex8_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -204,6 +229,31 @@ extern "C" int linear_elasticity_hex8_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_hex8_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 extern "C" int linear_elasticity_proteus_hex125_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -230,6 +280,31 @@ extern "C" int linear_elasticity_proteus_hex125_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_proteus_hex125_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_proteus_hex27_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -254,6 +329,31 @@ extern "C" int linear_elasticity_proteus_hex27_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_proteus_hex27_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 extern "C" int linear_elasticity_proteus_hex64_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -280,6 +380,31 @@ extern "C" int linear_elasticity_proteus_hex64_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_proteus_hex64_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_proteus_hex729_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -304,6 +429,31 @@ extern "C" int linear_elasticity_proteus_hex729_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_proteus_hex729_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 extern "C" int linear_elasticity_proteus_hex8_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -330,6 +480,31 @@ extern "C" int linear_elasticity_proteus_hex8_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_proteus_hex8_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_tet10_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -355,6 +530,31 @@ extern "C" int linear_elasticity_tet10_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_tet10_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -379,6 +579,31 @@ extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t h_stride,
+        const float *const SFEM_RESTRICT hx,
+        const float *const SFEM_RESTRICT hy,
+        const float *const SFEM_RESTRICT hz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit(
         const ptrdiff_t nelements,
@@ -414,286 +639,7 @@ extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_hex27_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_hex8_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex125_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex27_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex64_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex729_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex8_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_tet10_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_tet4_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
 extern "C" int linear_elasticity_proteus_quad4_gradient_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int linear_elasticity_quad4_gradient_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int linear_elasticity_tri3_gradient_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int linear_elasticity_tri6_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -729,6 +675,24 @@ extern "C" int linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
+extern "C" int linear_elasticity_quad4_gradient_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+);
 extern "C" int linear_elasticity_quad4_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -747,6 +711,24 @@ extern "C" int linear_elasticity_quad4_gradient_affine_mesh_soa_float(
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
 );
+extern "C" int linear_elasticity_tri3_gradient_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
+);
 extern "C" int linear_elasticity_tri3_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -764,6 +746,24 @@ extern "C" int linear_elasticity_tri3_gradient_affine_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx,
         float *const SFEM_RESTRICT outy
+);
+extern "C" int linear_elasticity_tri6_gradient_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t out_stride,
+        double *const SFEM_RESTRICT outx,
+        double *const SFEM_RESTRICT outy
 );
 extern "C" int linear_elasticity_tri6_gradient_affine_mesh_soa_float(
         const ptrdiff_t nelements,
@@ -808,6 +808,31 @@ extern "C" int linear_elasticity_hex27_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_hex27_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_hex8_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -832,6 +857,31 @@ extern "C" int linear_elasticity_hex8_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_hex8_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 extern "C" int linear_elasticity_proteus_hex125_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -858,6 +908,31 @@ extern "C" int linear_elasticity_proteus_hex125_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_proteus_hex125_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_proteus_hex27_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -882,6 +957,31 @@ extern "C" int linear_elasticity_proteus_hex27_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_proteus_hex27_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 extern "C" int linear_elasticity_proteus_hex64_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -908,6 +1008,31 @@ extern "C" int linear_elasticity_proteus_hex64_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_proteus_hex64_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_proteus_hex729_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -932,6 +1057,31 @@ extern "C" int linear_elasticity_proteus_hex729_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_proteus_hex729_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 extern "C" int linear_elasticity_proteus_hex8_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -958,6 +1108,31 @@ extern "C" int linear_elasticity_proteus_hex8_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_tet10_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -983,6 +1158,31 @@ extern "C" int linear_elasticity_tet10_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
 );
+extern "C" int linear_elasticity_tet10_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
+);
 extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1007,6 +1207,31 @@ extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa(
         double *const SFEM_RESTRICT outx,
         double *const SFEM_RESTRICT outy,
         double *const SFEM_RESTRICT outz
+);
+extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_float(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const float lmbda,
+        const float mu,
+        const ptrdiff_t u_stride,
+        const float *const SFEM_RESTRICT ux,
+        const float *const SFEM_RESTRICT uy,
+        const float *const SFEM_RESTRICT uz,
+        const ptrdiff_t out_stride,
+        float *const SFEM_RESTRICT outx,
+        float *const SFEM_RESTRICT outy,
+        float *const SFEM_RESTRICT outz
 );
 extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit(
         const ptrdiff_t nelements,
@@ -1042,819 +1267,7 @@ extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_float(
         float *const SFEM_RESTRICT outy,
         float *const SFEM_RESTRICT outz
 );
-extern "C" int linear_elasticity_hex27_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_hex8_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex125_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex27_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex64_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex729_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_tet10_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_tet4_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int linear_elasticity_proteus_quad4_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_quad4_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tri3_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tri6_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_quad4_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_quad4_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tri3_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tri6_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_hex27_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_hex8_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex125_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex27_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex64_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex729_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex8_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tet10_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tet4_objective_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_hex27_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_hex8_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex125_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex27_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex64_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex729_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex8_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tet10_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tet4_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
 extern "C" int linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_quad4_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tri3_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tri6_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1896,6 +1309,27 @@ extern "C" int linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa_f
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+extern "C" int linear_elasticity_quad4_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
 extern "C" int linear_elasticity_quad4_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1917,6 +1351,27 @@ extern "C" int linear_elasticity_quad4_objective_steps_affine_mesh_soa_float(
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+extern "C" int linear_elasticity_tri3_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
 extern "C" int linear_elasticity_tri3_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1937,6 +1392,27 @@ extern "C" int linear_elasticity_tri3_objective_steps_affine_mesh_soa_float(
         const int nsteps,
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
+);
+extern "C" int linear_elasticity_tri6_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
 );
 extern "C" int linear_elasticity_tri6_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
@@ -1960,230 +1436,6 @@ extern "C" int linear_elasticity_tri6_objective_steps_affine_mesh_soa_float(
         float *const SFEM_RESTRICT value
 );
 extern "C" int linear_elasticity_hex27_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_hex8_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex125_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex27_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex64_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex729_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tet10_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int linear_elasticity_tet4_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2239,6 +1491,34 @@ extern "C" int linear_elasticity_hex27_objective_steps_affine_mesh_soa_float(
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+extern "C" int linear_elasticity_hex8_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
 extern "C" int linear_elasticity_hex8_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2266,6 +1546,34 @@ extern "C" int linear_elasticity_hex8_objective_steps_affine_mesh_soa_float(
         const int nsteps,
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
+);
+extern "C" int linear_elasticity_proteus_hex125_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
 );
 extern "C" int linear_elasticity_proteus_hex125_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
@@ -2295,6 +1603,34 @@ extern "C" int linear_elasticity_proteus_hex125_objective_steps_affine_mesh_soa_
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+extern "C" int linear_elasticity_proteus_hex27_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
 extern "C" int linear_elasticity_proteus_hex27_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2322,6 +1658,34 @@ extern "C" int linear_elasticity_proteus_hex27_objective_steps_affine_mesh_soa_f
         const int nsteps,
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
+);
+extern "C" int linear_elasticity_proteus_hex64_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
 );
 extern "C" int linear_elasticity_proteus_hex64_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
@@ -2351,6 +1715,34 @@ extern "C" int linear_elasticity_proteus_hex64_objective_steps_affine_mesh_soa_f
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+extern "C" int linear_elasticity_proteus_hex729_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
 extern "C" int linear_elasticity_proteus_hex729_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2378,6 +1770,34 @@ extern "C" int linear_elasticity_proteus_hex729_objective_steps_affine_mesh_soa_
         const int nsteps,
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
+);
+extern "C" int linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
 );
 extern "C" int linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
@@ -2407,6 +1827,34 @@ extern "C" int linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa_fl
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
+extern "C" int linear_elasticity_tet10_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
+);
 extern "C" int linear_elasticity_tet10_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -2434,6 +1882,34 @@ extern "C" int linear_elasticity_tet10_objective_steps_affine_mesh_soa_float(
         const int nsteps,
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
+);
+extern "C" int linear_elasticity_tet4_objective_steps_affine_mesh_soa(
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const SFEM_RESTRICT elements,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
+        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
+        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
+        const double lmbda,
+        const double mu,
+        const ptrdiff_t u_stride,
+        const double *const SFEM_RESTRICT ux,
+        const double *const SFEM_RESTRICT uy,
+        const double *const SFEM_RESTRICT uz,
+        const ptrdiff_t h_stride,
+        const double *const SFEM_RESTRICT hx,
+        const double *const SFEM_RESTRICT hy,
+        const double *const SFEM_RESTRICT hz,
+        const int nsteps,
+        const double *const SFEM_RESTRICT steps,
+        double *const SFEM_RESTRICT value
 );
 extern "C" int linear_elasticity_tet4_objective_steps_affine_mesh_soa_float(
         const ptrdiff_t nelements,
@@ -2466,6 +1942,7 @@ extern "C" int linear_elasticity_tet4_objective_steps_affine_mesh_soa_float(
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2474,66 +1951,77 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_2d_affine_mesh_
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return linear_elasticity_proteus_quad4_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::QUAD4:
-            return linear_elasticity_quad4_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::TRI3:
-            return linear_elasticity_tri3_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::TRI6:
-            return linear_elasticity_tri6_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+        case smesh::PROTEUS_QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_quad4_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_quad4_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_quad4_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_quad4_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri3_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri3_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI6: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri6_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri6_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "linear_elasticity_apply_2d_affine_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_2d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return linear_elasticity_proteus_quad4_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::QUAD4:
-            return linear_elasticity_quad4_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::TRI3:
-            return linear_elasticity_tri3_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::TRI6:
-            return linear_elasticity_tri6_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
-        default:
-            std::fprintf(stderr, "linear_elasticity_apply_2d_affine_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "linear_elasticity_apply_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2547,149 +2035,179 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_affine_mesh_
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
+        const void *const SFEM_RESTRICT hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy,
+        void *const SFEM_RESTRICT outz
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::HEX27:
-            return linear_elasticity_hex27_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::HEX8:
-            return linear_elasticity_hex8_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX125:
-            return linear_elasticity_proteus_hex125_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX27:
-            return linear_elasticity_proteus_hex27_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX64:
-            return linear_elasticity_proteus_hex64_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX729:
-            return linear_elasticity_proteus_hex729_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX8:
-            return linear_elasticity_proteus_hex8_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::TET10:
-            return linear_elasticity_tet10_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::TET4:
-            return linear_elasticity_tet4_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        case smesh::HEX27: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex27_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex27_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex8_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex8_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX125: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex125_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex125_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX27: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex27_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex27_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX64: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex64_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex64_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX729: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex729_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex729_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex8_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex8_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET10: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet10_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet10_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet4_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet4_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "linear_elasticity_apply_3d_affine_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
+    std::fprintf(stderr,
+            "linear_elasticity_apply_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_affine_mesh_soa_aos_unit(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
+        const real_t mu,
+        const real_t lmbda,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
+        const void *const SFEM_RESTRICT hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy,
+        void *const SFEM_RESTRICT outz
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::TET4:
-            return linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_float(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "linear_elasticity_apply_3d_affine_mesh_soa_aos_unit does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_affine_mesh_soa_aos_unit_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    switch (element_type) {
-        case smesh::TET4:
-            return linear_elasticity_tet4_apply_affine_mesh_soa_aos_unit_float(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        default:
-            std::fprintf(stderr, "linear_elasticity_apply_3d_affine_mesh_soa_aos_unit_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return linear_elasticity_hex27_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::HEX8:
-            return linear_elasticity_hex8_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX125:
-            return linear_elasticity_proteus_hex125_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX27:
-            return linear_elasticity_proteus_hex27_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX64:
-            return linear_elasticity_proteus_hex64_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX729:
-            return linear_elasticity_proteus_hex729_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX8:
-            return linear_elasticity_proteus_hex8_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::TET10:
-            return linear_elasticity_tet10_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::TET4:
-            return linear_elasticity_tet4_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        default:
-            std::fprintf(stderr, "linear_elasticity_apply_3d_affine_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "linear_elasticity_apply_3d_affine_mesh_soa_aos_unit does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2698,66 +2216,77 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_2d_affine_me
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const SFEM_RESTRICT ux,
+        const void *const SFEM_RESTRICT uy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return linear_elasticity_proteus_quad4_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::QUAD4:
-            return linear_elasticity_quad4_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::TRI3:
-            return linear_elasticity_tri3_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::TRI6:
-            return linear_elasticity_tri6_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
+        case smesh::PROTEUS_QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_quad4_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_quad4_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri3_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri3_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI6: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri6_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri6_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "linear_elasticity_gradient_2d_affine_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_2d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return linear_elasticity_proteus_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::QUAD4:
-            return linear_elasticity_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::TRI3:
-            return linear_elasticity_tri3_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::TRI6:
-            return linear_elasticity_tri6_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy);
-        default:
-            std::fprintf(stderr, "linear_elasticity_gradient_2d_affine_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "linear_elasticity_gradient_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -2771,309 +2300,179 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_affine_me
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const SFEM_RESTRICT ux,
+        const void *const SFEM_RESTRICT uy,
+        const void *const SFEM_RESTRICT uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy,
+        void *const SFEM_RESTRICT outz
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::HEX27:
-            return linear_elasticity_hex27_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::HEX8:
-            return linear_elasticity_hex8_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX125:
-            return linear_elasticity_proteus_hex125_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX27:
-            return linear_elasticity_proteus_hex27_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX64:
-            return linear_elasticity_proteus_hex64_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX729:
-            return linear_elasticity_proteus_hex729_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX8:
-            return linear_elasticity_proteus_hex8_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::TET10:
-            return linear_elasticity_tet10_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::TET4:
-            return linear_elasticity_tet4_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        case smesh::HEX27: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex27_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex27_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex8_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex8_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX125: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex125_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex125_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX27: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex27_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex27_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX64: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex64_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex64_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX729: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex729_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex729_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex8_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET10: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet10_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet10_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet4_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet4_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "linear_elasticity_gradient_3d_affine_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
+    std::fprintf(stderr,
+            "linear_elasticity_gradient_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double mu,
-        const double lmbda,
+        const real_t mu,
+        const real_t lmbda,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const SFEM_RESTRICT ux,
+        const void *const SFEM_RESTRICT uy,
+        const void *const SFEM_RESTRICT uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const SFEM_RESTRICT outx,
+        void *const SFEM_RESTRICT outy,
+        void *const SFEM_RESTRICT outz
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::TET4:
-            return linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_float(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate_aos,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float mu,
-        const float lmbda,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    switch (element_type) {
-        case smesh::TET4:
-            return linear_elasticity_tet4_gradient_affine_mesh_soa_aos_unit_float(nelements, nnodes, elements, g_jacobian_adjugate_aos, g_jacobian_determinant0, mu, lmbda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        default:
-            std::fprintf(stderr, "linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_gradient_3d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return linear_elasticity_hex27_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::HEX8:
-            return linear_elasticity_hex8_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX125:
-            return linear_elasticity_proteus_hex125_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX27:
-            return linear_elasticity_proteus_hex27_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX64:
-            return linear_elasticity_proteus_hex64_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX729:
-            return linear_elasticity_proteus_hex729_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX8:
-            return linear_elasticity_proteus_hex8_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::TET10:
-            return linear_elasticity_tet10_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::TET4:
-            return linear_elasticity_tet4_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        default:
-            std::fprintf(stderr, "linear_elasticity_gradient_3d_affine_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_2d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return linear_elasticity_proteus_quad4_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-        case smesh::QUAD4:
-            return linear_elasticity_quad4_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-        case smesh::TRI3:
-            return linear_elasticity_tri3_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-        case smesh::TRI6:
-            return linear_elasticity_tri6_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-        default:
-            std::fprintf(stderr, "linear_elasticity_objective_2d_affine_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_2d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return linear_elasticity_proteus_quad4_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-        case smesh::QUAD4:
-            return linear_elasticity_quad4_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-        case smesh::TRI3:
-            return linear_elasticity_tri3_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-        case smesh::TRI6:
-            return linear_elasticity_tri6_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, value);
-        default:
-            std::fprintf(stderr, "linear_elasticity_objective_2d_affine_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_3d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return linear_elasticity_hex27_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::HEX8:
-            return linear_elasticity_hex8_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX125:
-            return linear_elasticity_proteus_hex125_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX27:
-            return linear_elasticity_proteus_hex27_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX64:
-            return linear_elasticity_proteus_hex64_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX729:
-            return linear_elasticity_proteus_hex729_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX8:
-            return linear_elasticity_proteus_hex8_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::TET10:
-            return linear_elasticity_tet10_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::TET4:
-            return linear_elasticity_tet4_objective_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        default:
-            std::fprintf(stderr, "linear_elasticity_objective_3d_affine_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_3d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return linear_elasticity_hex27_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::HEX8:
-            return linear_elasticity_hex8_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX125:
-            return linear_elasticity_proteus_hex125_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX27:
-            return linear_elasticity_proteus_hex27_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX64:
-            return linear_elasticity_proteus_hex64_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX729:
-            return linear_elasticity_proteus_hex729_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX8:
-            return linear_elasticity_proteus_hex8_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::TET10:
-            return linear_elasticity_tet10_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        case smesh::TET4:
-            return linear_elasticity_tet4_objective_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, value);
-        default:
-            std::fprintf(stderr, "linear_elasticity_objective_3d_affine_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "linear_elasticity_gradient_3d_affine_mesh_soa_aos_unit does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_2d_affine_mesh_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3082,72 +2481,80 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_2d_af
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const SFEM_RESTRICT ux,
+        const void *const SFEM_RESTRICT uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const void *const SFEM_RESTRICT steps,
+        void *const SFEM_RESTRICT value
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::QUAD4:
-            return linear_elasticity_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::TRI3:
-            return linear_elasticity_tri3_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::TRI6:
-            return linear_elasticity_tri6_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+        case smesh::PROTEUS_QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::QUAD4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI3: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri3_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri3_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TRI6: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tri6_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tri6_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "linear_elasticity_objective_steps_2d_affine_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_2d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return linear_elasticity_proteus_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::QUAD4:
-            return linear_elasticity_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::TRI3:
-            return linear_elasticity_tri3_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::TRI6:
-            return linear_elasticity_tri6_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        default:
-            std::fprintf(stderr, "linear_elasticity_objective_steps_2d_affine_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "linear_elasticity_objective_steps_2d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_3d_affine_mesh_soa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -3161,95 +2568,130 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_3d_af
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
         const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
         const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double lmbda,
-        const double mu,
+        const real_t lmbda,
+        const real_t mu,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const SFEM_RESTRICT ux,
+        const void *const SFEM_RESTRICT uy,
+        const void *const SFEM_RESTRICT uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const void *const SFEM_RESTRICT hx,
+        const void *const SFEM_RESTRICT hy,
+        const void *const SFEM_RESTRICT hz,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const void *const SFEM_RESTRICT steps,
+        void *const SFEM_RESTRICT value
 ) {
+    const enum smesh::PrimitiveType resolved_real_type =
+            (real_type == smesh::SMESH_DEFAULT)
+                    ? smesh::TypeToEnum<real_t>::value()
+                    : real_type;
     switch (element_type) {
-        case smesh::HEX27:
-            return linear_elasticity_hex27_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::HEX8:
-            return linear_elasticity_hex8_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX125:
-            return linear_elasticity_proteus_hex125_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX27:
-            return linear_elasticity_proteus_hex27_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX64:
-            return linear_elasticity_proteus_hex64_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX729:
-            return linear_elasticity_proteus_hex729_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX8:
-            return linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::TET10:
-            return linear_elasticity_tet10_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::TET4:
-            return linear_elasticity_tet4_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+        case smesh::HEX27: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex27_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex27_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_hex8_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_hex8_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX125: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex125_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex125_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX27: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex27_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex27_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX64: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex64_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex64_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX729: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex729_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex729_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::PROTEUS_HEX8: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET10: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet10_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet10_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
+        case smesh::TET4: {
+            switch (resolved_real_type) {
+                case smesh::SMESH_FLOAT64:
+                    return linear_elasticity_tet4_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+                case smesh::SMESH_FLOAT32:
+                    return linear_elasticity_tet4_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+                default:
+                    break;
+            }
+            break;
+        }
         default:
-            std::fprintf(stderr, "linear_elasticity_objective_steps_3d_affine_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
+            break;
     }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_objective_steps_3d_affine_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float lmbda,
-        const float mu,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return linear_elasticity_hex27_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::HEX8:
-            return linear_elasticity_hex8_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX125:
-            return linear_elasticity_proteus_hex125_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX27:
-            return linear_elasticity_proteus_hex27_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX64:
-            return linear_elasticity_proteus_hex64_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX729:
-            return linear_elasticity_proteus_hex729_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX8:
-            return linear_elasticity_proteus_hex8_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::TET10:
-            return linear_elasticity_tet10_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::TET4:
-            return linear_elasticity_tet4_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        default:
-            std::fprintf(stderr, "linear_elasticity_objective_steps_3d_affine_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+    std::fprintf(stderr,
+            "linear_elasticity_objective_steps_3d_affine_mesh_soa does not support element type %d with real type %d\n",
+            (int)element_type,
+            (int)real_type);
+    return SFEM_FAILURE;
 }

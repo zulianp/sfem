@@ -47,8 +47,9 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tenso
     static_assert(N_QP > 0, "N_QP must be positive");
     static_assert(N_SHAPE > 0, "N_SHAPE must be positive");
     static_assert(VECTOR_SIZE > 0, "VECTOR_SIZE must be positive");
-    static constexpr int DIM = 3;
-    static constexpr int NDOFS = DIM * N_SHAPE;
+    static constexpr int N_FIELD_COMPONENTS = 3;
+    static constexpr int SPATIAL_DIM = 3;
+    static constexpr int NDOFS = N_FIELD_COMPONENTS * N_SHAPE;
     static constexpr int N_QP_1D = integer_root(N_QP, 3);
     static constexpr int N_SHAPE_1D = integer_root(N_SHAPE, 3);
     static_assert(ipow(N_QP_1D, 3) == N_QP, "N_QP must be tensor-product compatible");
@@ -74,7 +75,7 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tenso
         const scalar_t jacobian_adjugate_lane8 = block_jacobian_adjugate8[geometry_offset];
         const scalar_t jacobian_determinant_lane0 = block_jacobian_determinant0[geometry_offset];
         const scalar_t inv_jacobian_determinant = scalar_t(1) / jacobian_determinant_lane0;
-        for (int trial_component = 0; trial_component < DIM; ++trial_component) {
+        for (int trial_component = 0; trial_component < N_FIELD_COMPONENTS; ++trial_component) {
             for (int trial_shape = 0; trial_shape < N_SHAPE; ++trial_shape) {
                 const int trial_sx = trial_shape % N_SHAPE_1D;
                 const int trial_sy = (trial_shape / N_SHAPE_1D) % N_SHAPE_1D;
@@ -82,14 +83,14 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tenso
                 const scalar_t trial_grad_ref0 = grad_1d[qx * N_SHAPE_1D + trial_sx] * shape_1d[qy * N_SHAPE_1D + trial_sy] * shape_1d[qz * N_SHAPE_1D + trial_sz];
                 const scalar_t trial_grad_ref1 = shape_1d[qx * N_SHAPE_1D + trial_sx] * grad_1d[qy * N_SHAPE_1D + trial_sy] * shape_1d[qz * N_SHAPE_1D + trial_sz];
                 const scalar_t trial_grad_ref2 = shape_1d[qx * N_SHAPE_1D + trial_sx] * shape_1d[qy * N_SHAPE_1D + trial_sy] * grad_1d[qz * N_SHAPE_1D + trial_sz];
-                scalar_t trial_grad[DIM * DIM];
-                for (int i = 0; i < DIM * DIM; ++i) {
+                scalar_t trial_grad[N_FIELD_COMPONENTS * SPATIAL_DIM];
+                for (int i = 0; i < N_FIELD_COMPONENTS * SPATIAL_DIM; ++i) {
                     trial_grad[i] = scalar_t(0);
                 }
-                trial_grad[trial_component * DIM + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane3 + trial_grad_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
-                trial_grad[trial_component * DIM + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane4 + trial_grad_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
-                trial_grad[trial_component * DIM + 2] = (trial_grad_ref0 * jacobian_adjugate_lane2 + trial_grad_ref1 * jacobian_adjugate_lane5 + trial_grad_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
-                scalar_t material[DIM * DIM];
+                trial_grad[trial_component * SPATIAL_DIM + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane3 + trial_grad_ref2 * jacobian_adjugate_lane6) * inv_jacobian_determinant;
+                trial_grad[trial_component * SPATIAL_DIM + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane4 + trial_grad_ref2 * jacobian_adjugate_lane7) * inv_jacobian_determinant;
+                trial_grad[trial_component * SPATIAL_DIM + 2] = (trial_grad_ref0 * jacobian_adjugate_lane2 + trial_grad_ref1 * jacobian_adjugate_lane5 + trial_grad_ref2 * jacobian_adjugate_lane8) * inv_jacobian_determinant;
+                scalar_t material[N_FIELD_COMPONENTS * SPATIAL_DIM];
                 const scalar_t weak_hess_tmp0 = scalar_t(2)*trial_grad[0];
                 const scalar_t weak_hess_tmp1 = scalar_t(2)*trial_grad[4];
                 const scalar_t weak_hess_tmp2 = scalar_t(2)*trial_grad[8];
@@ -106,7 +107,7 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tenso
                 material[6] = weak_hess_tmp5;
                 material[7] = weak_hess_tmp6;
                 material[8] = mu*weak_hess_tmp2 + weak_hess_tmp3;
-                for (int test_component = 0; test_component < DIM; ++test_component) {
+                for (int test_component = 0; test_component < N_FIELD_COMPONENTS; ++test_component) {
                     for (int test_shape = 0; test_shape < N_SHAPE; ++test_shape) {
                         const int test_sx = test_shape % N_SHAPE_1D;
                         const int test_sy = (test_shape / N_SHAPE_1D) % N_SHAPE_1D;
@@ -115,9 +116,9 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_direct_hessian_tenso
                         const scalar_t test_grad_ref1 = shape_1d[qx * N_SHAPE_1D + test_sx] * grad_1d[qy * N_SHAPE_1D + test_sy] * shape_1d[qz * N_SHAPE_1D + test_sz];
                         const scalar_t test_grad_ref2 = shape_1d[qx * N_SHAPE_1D + test_sx] * shape_1d[qy * N_SHAPE_1D + test_sy] * grad_1d[qz * N_SHAPE_1D + test_sz];
                         scalar_t entry = scalar_t(0);
-                        entry += test_grad_ref0 * qw * (material[test_component * DIM + 0] * jacobian_adjugate_lane0 + material[test_component * DIM + 1] * jacobian_adjugate_lane1 + material[test_component * DIM + 2] * jacobian_adjugate_lane2);
-                        entry += test_grad_ref1 * qw * (material[test_component * DIM + 0] * jacobian_adjugate_lane3 + material[test_component * DIM + 1] * jacobian_adjugate_lane4 + material[test_component * DIM + 2] * jacobian_adjugate_lane5);
-                        entry += test_grad_ref2 * qw * (material[test_component * DIM + 0] * jacobian_adjugate_lane6 + material[test_component * DIM + 1] * jacobian_adjugate_lane7 + material[test_component * DIM + 2] * jacobian_adjugate_lane8);
+                        entry += test_grad_ref0 * qw * (material[test_component * SPATIAL_DIM + 0] * jacobian_adjugate_lane0 + material[test_component * SPATIAL_DIM + 1] * jacobian_adjugate_lane1 + material[test_component * SPATIAL_DIM + 2] * jacobian_adjugate_lane2);
+                        entry += test_grad_ref1 * qw * (material[test_component * SPATIAL_DIM + 0] * jacobian_adjugate_lane3 + material[test_component * SPATIAL_DIM + 1] * jacobian_adjugate_lane4 + material[test_component * SPATIAL_DIM + 2] * jacobian_adjugate_lane5);
+                        entry += test_grad_ref2 * qw * (material[test_component * SPATIAL_DIM + 0] * jacobian_adjugate_lane6 + material[test_component * SPATIAL_DIM + 1] * jacobian_adjugate_lane7 + material[test_component * SPATIAL_DIM + 2] * jacobian_adjugate_lane8);
                         const int row = test_component * N_SHAPE + test_shape;
                         const int col = trial_component * N_SHAPE + trial_shape;
                         element_matrix[row * NDOFS + col] += entry;
