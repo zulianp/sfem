@@ -471,28 +471,6 @@ namespace cvfem_ss {
             std::vector<int>          loc_of((size_t)d.nnodes, -1);
             std::vector<smesh::idx_t> lg((size_t)nxe);
             std::vector<scalar_t>     rl((size_t)nxe * N_FIELDS), zl((size_t)nxe * N_FIELDS);
-            // Element-local column map, built once per macro-element and reused by every
-            // cell in it.
-            //
-            // The cell loop needs, for each nonzero of a node's row, that column's slot
-            // within this element -- or a marker that it lies outside. That mapping is a
-            // property of the element, not of the cell, but it was being recomputed as
-            // loc_of[colidx[k]] for every corner of every cell: at L = 8 that is
-            // 512 cells * 8 corners * ~27 nonzeros, about 110k random probes into an
-            // nnodes-sized array per element per sweep, when nxe * 27 (about 20k) suffices.
-            // Hoisting it makes the inner loop a sequential read of lcol instead of a
-            // dependent random load, and leaves the arithmetic and its order untouched.
-            std::vector<int>       lcol;
-            std::vector<ptrdiff_t> lrow((size_t)nxe + 1);
-            // Which local slots hold a correction yet.
-            //
-            // A multiplicative sweep only couples a cell to the colours already swept, so zl
-            // is exactly zero everywhere else -- identically so on the first colour, where the
-            // whole coupling term is a product with zero. Averaged over the eight colours
-            // slightly more than half of the block-vector products in the acc loop multiply a
-            // zero vector. Skipping them is exact, not an approximation: the additions being
-            // dropped contribute nothing.
-            std::vector<uint8_t> touched((size_t)nxe);
 
 #pragma omp for schedule(static)
             for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
@@ -504,26 +482,6 @@ namespace cvfem_ss {
                         rl[(size_t)a * N_FIELDS + (size_t)t] = r[(size_t)g * N_FIELDS + (size_t)t];
                 }
                 std::fill(zl.begin(), zl.end(), scalar_t(0));
-                std::fill(touched.begin(), touched.end(), (uint8_t)0);
-
-                // Resolve every row of this element once. loc_of is fully populated above,
-                // so the answers are final for the whole element.
-                {
-                    ptrdiff_t tot = 0;
-                    for (int a = 0; a < nxe; ++a) {
-                        const size_t gn = (size_t)lg[(size_t)a];
-                        lrow[(size_t)a] = tot;
-                        tot += (ptrdiff_t)(v.rowptr[gn + 1] - v.rowptr[gn]);
-                    }
-                    lrow[(size_t)nxe] = tot;
-                    if ((ptrdiff_t)lcol.size() < tot) lcol.resize((size_t)tot);
-                    for (int a = 0; a < nxe; ++a) {
-                        const size_t gn = (size_t)lg[(size_t)a];
-                        ptrdiff_t    w  = lrow[(size_t)a];
-                        for (sfem::count_t k = v.rowptr[gn]; k < v.rowptr[gn + 1]; ++k)
-                            lcol[(size_t)w++] = loc_of[(size_t)v.colidx[(size_t)k]];
-                    }
-                }
 
                 for (int colour = 0; colour < 8; ++colour) {
                     const int cx = colour & 1, cy = (colour >> 1) & 1, cz = (colour >> 2) & 1;
@@ -539,11 +497,9 @@ namespace cvfem_ss {
                                     const int    la = base + off[a];
                                     scalar_t     acc[N_FIELDS] = {0, 0, 0, 0};
                                     const size_t gn            = (size_t)lg[(size_t)la];
-                                    ptrdiff_t    w             = lrow[(size_t)la];
-                                    for (sfem::count_t k = v.rowptr[gn]; k < v.rowptr[gn + 1]; ++k, ++w) {
-                                        const int lj = lcol[(size_t)w];
-                                        if (lj < 0) continue;      // outside this element: additive
-                                        if (!touched[(size_t)lj]) continue;  // zl still zero there
+                                    for (sfem::count_t k = v.rowptr[gn]; k < v.rowptr[gn + 1]; ++k) {
+                                        const int lj = loc_of[(size_t)v.colidx[(size_t)k]];
+                                        if (lj < 0) continue;  // outside this element: additive
                                         const real_t *const blk = v.values + (size_t)k * 16;
                                         const scalar_t *const zz = &zl[(size_t)lj * N_FIELDS];
                                         for (int rr = 0; rr < N_FIELDS; ++rr)
@@ -567,7 +523,6 @@ namespace cvfem_ss {
 
                                 for (int a = 0; a < 8; ++a) {
                                     const size_t lo = (size_t)(base + off[a]) * N_FIELDS;
-                                    touched[(size_t)(base + off[a])] = 1;
                                     for (int t = 0; t < 3; ++t) {
                                         const int jj = a * 3 + t;
                                         scalar_t  sv = c.invdF[jj] * ru[jj];
