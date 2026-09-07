@@ -59,6 +59,17 @@ else
     echo "Generated-source snapshot gate: skipped; set SFEM_CODEGEN_SNAPSHOT=1 to run it (~3 min)"
 fi
 
+# Not the same question as the manifest gate above.  That one asks whether the
+# generator still agrees with a record of itself; this asks whether
+# frontend/ops/generated -- the tree CMake compiles into libsfem -- is what the
+# generator produces today.  CI runs this one.
+if [[ "${SFEM_CODEGEN_TREE:-0}" == "1" ]]; then
+    echo "Shipped-tree gate: comparing frontend/ops/generated against a fresh generation"
+    "$PYTHON_BIN" -m codegen.framework.tools.codegen_snapshot check-tree --quiet
+else
+    echo "Shipped-tree gate: skipped; set SFEM_CODEGEN_TREE=1 to run it (~6 min)"
+fi
+
 if [[ "${SFEM_REPRODUCIBILITY:-0}" == "1" ]]; then
     echo "Input-output reproducibility gate: every kernel's answers against the baseline"
     "$PYTHON_BIN" -m codegen.framework.tools.reproducibility --all --refine 3
