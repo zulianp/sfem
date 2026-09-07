@@ -242,8 +242,8 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
 
     #: file -> literal pragmas remaining.  Lower these; never raise them.
     BUDGET = {
-        "residual_codegen.py": 17,
-        "energy_codegen.py": 11,
+        "residual_codegen.py": 15,
+        "energy_codegen.py": 9,
     }
 
     def _literal_pragmas(self, name):

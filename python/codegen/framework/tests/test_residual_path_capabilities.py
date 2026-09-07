@@ -46,8 +46,6 @@ CAPABILITIES = {
     "packed_apply": "packed_jacobian_action",
     "packed_affine_apply": "packed_affine_jacobian",
     "crs_assembly": "crs_matrix_assembly",
-    "coo_assembly": "coo_triplet_matrix_assembly",
-    "dia_assembly": "dia_matrix_assembly",
 }
 
 #: The matrix as it stands.  Each False is a kernel a Taylor-Hood formulation
@@ -57,8 +55,6 @@ EXPECTED = {
     "packed_apply": (True, False),
     "packed_affine_apply": (True, False),
     "crs_assembly": (True, False),
-    "coo_assembly": (True, True),
-    "dia_assembly": (True, False),
 }
 
 

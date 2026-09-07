@@ -38,9 +38,6 @@ STRUCTURAL_PLAN_TYPES = (
     "MeshKernelPlan",
     "CRSAssemblyPlan",
     "BSRAssemblyPlan",
-    "DIAAssemblyPlan",
-    "COOAssemblyPlan",
-    "PatchAssemblyPlan",
     "BlockDiagSymAssemblyPlan",
 )
 
@@ -108,15 +105,9 @@ UNCONSUMED_PLAN_TYPES = frozenset(
         "MeshPhasePlan",
         # The last four assembly formats.  Each scatter takes its stream names
         # and its reduction policy from its plan, the same arrangement CRS and
-        # BSR have.  Connecting them found that two of the plans had drifted
-        # from the kernels they describe: DIA said its offsets were called
-        # "diagonal_offsets" and COO said "rowidx"/"colidx", where the kernels
-        # write diag_offsets, rows and cols.  Those names are also the
-        # diagnostics index policy, so the plans keep them and carry the C
-        # names separately -- see ARCHITECTURE.html OP 13.
-        "DIAAssemblyPlan",
-        "COOAssemblyPlan",
-        "PatchAssemblyPlan",
+        # BSR have.  DIA, COO and patch were connected the same way and have
+        # since been removed from the framework, so only this one is left of
+        # that group.
         "BlockDiagSymAssemblyPlan",
     }
 )

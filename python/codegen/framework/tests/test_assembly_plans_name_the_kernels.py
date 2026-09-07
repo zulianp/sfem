@@ -28,10 +28,7 @@ from codegen.framework.emitters import energy_codegen, residual_codegen
 from codegen.framework.plans.matrix_formats import (
     BlockDiagSymAssemblyPlan,
     BSRAssemblyPlan,
-    COOAssemblyPlan,
     CRSAssemblyPlan,
-    DIAAssemblyPlan,
-    PatchAssemblyPlan,
 )
 
 
@@ -62,35 +59,6 @@ SCATTERS = (
         "BSR",
         BSRAssemblyPlan,
         lambda a: energy_codegen._sfem_soa_hessian_scatter_bsr_lines(
-            "probe", 3, 4, assembly=a
-        ),
-        ("row_pointer", "column_index", "value_stream"),
-    ),
-    Scatter(
-        "DIA",
-        DIAAssemblyPlan,
-        lambda a: energy_codegen._sfem_soa_hessian_scatter_dia_lines(
-            "probe", 3, 4, assembly=a
-        ),
-        ("diagonal_offset_stream", "value_stream"),
-    ),
-    Scatter(
-        "COO",
-        COOAssemblyPlan,
-        lambda a: energy_codegen._sfem_soa_hessian_scatter_coo_lines(
-            "probe", 3, 4, assembly=a
-        ),
-        ("row_stream", "column_stream", "value_stream"),
-        # This plan has no reduction_policy.  Its reduction_phase and
-        # accumulation_policy describe the *triplet* scatter, which defers the
-        # reduction; the kernel here locates its entry and accumulates
-        # atomically in the hot loop.  One plan, two kernels.
-        has_reduction_policy=False,
-    ),
-    Scatter(
-        "patch",
-        PatchAssemblyPlan,
-        lambda a: energy_codegen._sfem_soa_hessian_scatter_patch_lines(
             "probe", 3, 4, assembly=a
         ),
         ("row_pointer", "column_index", "value_stream"),

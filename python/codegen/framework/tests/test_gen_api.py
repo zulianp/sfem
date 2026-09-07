@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import dataclasses
 import unittest
 from contextlib import redirect_stdout
 from dataclasses import replace
@@ -1954,8 +1955,15 @@ int main() {
                 for context in stage.element_contexts
             }
 
+        # The shipped materials generate for a narrow element set; the
+        # framework still supports the rest, and the quadrature choice per
+        # element is a property of the framework.  Widen the material here so
+        # the coverage survives the scope reduction.
+        full_element_material = dataclasses.replace(
+            neohookean_ogden, elements=gen.sfem_supported_element_types()
+        )
         neo = context_orders(
-            neohookean_ogden,
+            full_element_material,
             (
                 "TRI3",
                 "TRI6",
@@ -1983,7 +1991,7 @@ int main() {
         self.assertEqual(neo["PROTEUS_HEX64"], (5, 125))
 
         neo_affine = affine_context_orders(
-            neohookean_ogden,
+            full_element_material,
             (
                 "TRI3",
                 "TRI6",
@@ -2088,8 +2096,11 @@ int main() {
 
     def test_hyperelastic_affine_and_isoparametric_mesh_use_separate_quadrature(self):
         with tempfile.TemporaryDirectory() as out_dir:
+            # TRI6 is still supported, just not in the shipped element set.
             gen.generate(
-                neohookean_ogden,
+                dataclasses.replace(
+                    neohookean_ogden, elements=gen.sfem_supported_element_types()
+                ),
                 out_dir,
                 elements=("TRI6",),
             )
@@ -4717,7 +4728,12 @@ int main() {
 
     def test_generates_neumann_boundary_integral_kernel(self):
         with tempfile.TemporaryDirectory() as out_dir:
-            result = gen.generate(neumann, out_dir, elements=("QUAD4", "HEX8", "PROTEUS_HEX27"))
+            # PROTEUS_HEX27 is supported but outside the shipped set.
+            result = gen.generate(
+                dataclasses.replace(neumann, elements=gen.sfem_supported_element_types()),
+                out_dir,
+                elements=("QUAD4", "HEX8", "PROTEUS_HEX27"),
+            )
             names = _relative_sources(result, out_dir)
             self.assertIn(
                 os.path.join("d2", "quad4", "neumann_quad4_boundary_operator.cpp"),
