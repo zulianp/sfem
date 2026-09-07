@@ -72,6 +72,50 @@ namespace sfem {
         }
 
         /**
+         * @brief Whether this operator can apply from a stored linearization
+         * @return false unless the operator implements the inexact path
+         *
+         * An operator that supports it can have its tangent assembled once, at
+         * a state, and then applied many times without touching the state or
+         * the geometry again -- partial assembly.  The apply that follows is
+         * inexact wherever the tangent varies within an element, and exact
+         * where it does not, which for a linear simplex is everywhere.
+         */
+        virtual bool inexact_supported() const { return false; }
+
+        /**
+         * @brief Assemble the stored tangent at x, for the applies that follow
+         * @param x State to linearize about
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * Explicit, and deliberately so.  The stored tangent stays valid until
+         * the next call, so the caller says when it is rebuilt rather than
+         * having the operator guess: a Newton step assembles once and then
+         * applies for every Krylov iteration, which is the whole reason the
+         * split pays.  Nothing invalidates it implicitly, so an operator whose
+         * state has moved without a call returns a tangent for the old state --
+         * which is why this is the caller's decision to make and not a cache
+         * that silently refreshes itself.
+         *
+         * `apply` continues to mean the exact operator.  The inexact apply is
+         * reached only through this path, so no existing caller changes
+         * behaviour by an operator gaining support for it.
+         */
+        virtual int inexact_update(const real_t *const /*x*/) { return SFEM_FAILURE; }
+
+        /**
+         * @brief Apply the stored tangent assembled by inexact_update
+         * @param h Input vector
+         * @param out Output vector (accumulated into)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * Takes no state: the state was consumed by `inexact_update` and lives
+         * in the store.  That is the property the split exists for, and the
+         * signature says so.
+         */
+        virtual int inexact_apply(const real_t *const /*h*/, real_t *const /*out*/) { return SFEM_FAILURE; }
+
+        /**
          * @brief Assemble the Hessian matrix in CRS format
          * @param x Current solution vector
          * @param rowptr Row pointer array for CRS format

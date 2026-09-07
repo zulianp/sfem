@@ -432,6 +432,21 @@ def _equation_form_orders(equation):
     raise ValueError("unsupported equation form")
 
 
+def _inexact_declarations(material):
+    """The inexact methods, where the material generates the kernels for them.
+
+    `Op` declares them with defaults that refuse, so an Op that does not
+    generate the split simply does not override them and callers see
+    `inexact_supported() == false`.  Nothing else changes shape.
+    """
+    if not getattr(material, "inexact_apply", False):
+        return ""
+    return """
+        bool inexact_supported() const override { return true; }
+        int inexact_update(const real_t *const x) override;
+        int inexact_apply(const real_t *const h, real_t *const out) override;"""
+
+
 def _header(material, residual, publishes_value_steps=None):
     """The Op's declared interface.
 
@@ -520,7 +535,7 @@ namespace sfem {
         int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;
-        int value(const real_t *x, real_t *const out) override;%(value_steps)s
+        int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s
         int hessian_crs(const real_t *const x,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
@@ -554,6 +569,167 @@ namespace sfem {
         "extra": extra,
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
+        "inexact_methods": _inexact_declarations(material),
+    }
+
+
+def _inexact_cache_field(material):
+    """The stored tangent, declared only where the material generates one.
+
+    It sits with the cached geometry because it has the same lifetime and the
+    same owner: assembled from a state, valid until the caller says otherwise,
+    and read by every apply in between.  Empty until `inexact_update` is called,
+    which is what makes calling it a precondition of the inexact apply rather
+    than a hint.
+    """
+    if not getattr(material, "inexact_apply", False):
+        return ""
+    return """            SharedBuffer<metric_tensor_t> inexact_tangent;
+"""
+
+
+def _inexact_tangent_components(material, form_collections, elements):
+    """How many numbers the stored tangent takes per element.
+
+    A property of the dimension and of whether the tangent is symmetric, both
+    fixed for a material, so it is resolved here at generation time rather than
+    queried at run time.  An energy's tangent is a Hessian and folds to
+    `d^2 (d^2 + 1) / 2`; a residual's is a Jacobian and generally does not fold
+    at all.
+    """
+    from codegen.framework.plans.inexact_apply import (
+        flux_form_for_collection,
+        flux_tangent_is_symmetric,
+    )
+
+    for collection in (form_collections or {}).values():
+        for dim in sorted({_element_dim(element) for element in elements}):
+            built = flux_form_for_collection(collection, dim)
+            if built is None:
+                continue
+            flux_form, _is_deformation_gradient = built
+            order = dim * dim
+            if flux_tangent_is_symmetric(flux_form):
+                return order * (order + 1) // 2
+            return order * order
+    return 0
+
+
+def _inexact_definitions(
+    material, form_collections, elements, kernel_sources,
+    apply_dependencies_by_dim, n_field_components_by_dim,
+):
+    """`inexact_update` and `inexact_apply`, where the material has them.
+
+    Both dispatch on the spatial dimension the way every other method here
+    does, and both go through the same public C ABI the exact kernels use.
+    Only the affine SoA variant exists for this path, so the body is a good
+    deal smaller than `apply`'s: there is no packed or isoparametric case to
+    choose between.
+
+    `inexact_update` owns the store.  It sizes it on first use and refills it in
+    place afterwards, because a Newton solve calls it once per step for the life
+    of the operator, and reallocating each time would dominate a kernel whose
+    whole purpose is to be cheap.
+    """
+    if not getattr(material, "inexact_apply", False):
+        return ""
+    components = _inexact_tangent_components(material, form_collections, elements)
+    if not components:
+        return ""
+
+    update_lines = []
+    apply_lines = []
+    reachable = False
+    for dim in (2, 3):
+        tangent_abi = "%s_inexact_apply_tangent_%dd_affine_mesh_soa" % (material.name, dim)
+        stored_abi = "%s_inexact_apply_stored_%dd_affine_mesh_soa" % (material.name, dim)
+        if not _c_abi_function_exists(kernel_sources, tangent_abi, public_only=True):
+            continue
+        if not _c_abi_function_exists(kernel_sources, stored_abi, public_only=True):
+            continue
+        reachable = True
+        prefix = "if" if not update_lines else "else if"
+        n_components = (n_field_components_by_dim or {}).get(dim, dim)
+        parameter_args = list(
+            _dependency_domain_parameter_args(apply_dependencies_by_dim.get(dim))
+        )
+        adjugate = ", ".join("adjugate[%d]" % index for index in range(dim * dim))
+        state = ", ".join(["%d" % n_components] + ["x + %d" % d for d in range(n_components)])
+        increment = ", ".join(["%d" % n_components] + ["h + %d" % d for d in range(n_components)])
+        output = ", ".join(["%d" % n_components] + ["out + %d" % d for d in range(n_components)])
+        arguments = ["domain.element_type", "real_type", "nelements",
+                     "domain.block->elements()->data()", adjugate, "determinant"]
+        arguments.extend(parameter_args)
+        arguments.append(state)
+        arguments.append("1, nelements")
+        arguments.append("cache->inexact_tangent->data()")
+        update_lines.extend([
+            "            %s (dim == %d) {" % (prefix, dim),
+            "                return %s(" % tangent_abi,
+            "                        %s);" % ",\n                        ".join(arguments),
+            "            }",
+        ])
+        apply_arguments = ["domain.element_type", "real_type", "nelements",
+                           "domain.block->elements()->data()",
+                           "1, nelements",
+                           "cache->inexact_tangent->data()",
+                           increment, output]
+        apply_lines.extend([
+            "            %s (dim == %d) {" % (prefix, dim),
+            "                return %s(" % stored_abi,
+            "                        %s);" % ",\n                        ".join(apply_arguments),
+            "            }",
+        ])
+    if not reachable:
+        return ""
+
+    return """
+
+    int %%(op)s::inexact_update(const real_t *const x) {
+        SFEM_TRACE_SCOPE("%%(op)s::inexact_update");
+        auto mesh = impl_->space->mesh_ptr();
+        const int dim = mesh->spatial_dimension();
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+            if (!cache || !cache->jacobian_soa) {
+                SFEM_ERROR("%%(op)s::inexact_update requires cached affine geometry\\n");
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t nelements = domain.block->n_elements();
+            if (!cache->inexact_tangent) {
+                cache->inexact_tangent = sfem::create_host_buffer<metric_tensor_t>(
+                        nelements * %(components)d);
+            }
+            auto adjugate = reinterpret_cast<const geom_t *const *>(
+                    cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+            auto determinant = reinterpret_cast<const geom_t *>(
+                    cache->jacobian_soa->jacobian_determinant()->data());
+%(update_body)s
+            SFEM_ERROR("%%(op)s::inexact_update has no kernel for dimension %%%%d\\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
+
+    int %%(op)s::inexact_apply(const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("%%(op)s::inexact_apply");
+        auto mesh = impl_->space->mesh_ptr();
+        const int dim = mesh->spatial_dimension();
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            auto cache = std::static_pointer_cast<AffineGeometryCache>(domain.user_data);
+            if (!cache || !cache->inexact_tangent) {
+                SFEM_ERROR("%%(op)s::inexact_apply requires inexact_update first\\n");
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t nelements = domain.block->n_elements();
+%(apply_body)s
+            SFEM_ERROR("%%(op)s::inexact_apply has no kernel for dimension %%%%d\\n", dim);
+            return SFEM_FAILURE;
+        });
+    }""" % {
+        "components": components,
+        "update_body": "\n".join(update_lines),
+        "apply_body": "\n".join(apply_lines),
     }
 
 
@@ -1037,7 +1213,7 @@ namespace sfem {
         struct AffineGeometryCache {
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
             std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
-%(metric_cache_field)s        };
+%(metric_cache_field)s%(inexact_cache_field)s        };
 
         int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
                                   MultiDomainOp &domains) {
@@ -1648,6 +1824,7 @@ namespace sfem {
             "hessian_block_diag_sym",
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
+        "inexact_cache_field": _inexact_cache_field(material),
         "performance_methods": _performance_methods(material.op_name, material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
@@ -1661,6 +1838,26 @@ namespace sfem {
             owner="ret->impl_",
         ),
     }
+    # The inexact methods are appended rather than woven into the template: they
+    # are additive, reached only through their own entry points, and absent
+    # entirely for a material that does not ask for them.
+    inexact = _inexact_definitions(
+        material,
+        form_collections,
+        elements,
+        kernel_sources,
+        apply_dependencies_by_dim={
+            dim: deps[2] for dim, deps in dependencies_by_dim.items()
+        },
+        n_field_components_by_dim=n_field_components_by_dim,
+    )
+    if inexact:
+        marker = "\n}  // namespace sfem"
+        source = source.replace(
+            marker,
+            inexact % {"op": material.op_name} + marker,
+            1,
+        )
     return _header(material, False), source
 
 
@@ -2841,6 +3038,7 @@ namespace sfem {
         "laplace_packed_helpers": laplace_packed_helpers,
         "laplace_packed_member": laplace_packed_member,
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
+        "inexact_cache_field": _inexact_cache_field(material),
         "performance_methods": _performance_methods(material.op_name, material.name, elements, performance_cases),
         # Only the merit uses std::vector, so only the merit brings its header.
         "merit_include": "\n#include <vector>" if emits_merit else "",
