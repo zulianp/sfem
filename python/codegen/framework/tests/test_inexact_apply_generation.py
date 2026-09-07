@@ -41,7 +41,11 @@ class InexactApplyGenerationTest(unittest.TestCase):
         files = self._generate("linear_elasticity", "TET4", opt_in=True)
         emitted = [name for name in files if "inexact" in name]
         self.assertEqual(
-            emitted, ["d3/tet4/linear_elasticity_tet4_inexact_apply_inline.hpp"]
+            emitted,
+            [
+                "d3/tet4/linear_elasticity_tet4_inexact_apply_inline.hpp",
+                "d3/tet4/linear_elasticity_tet4_inexact_apply_operator.cpp",
+            ],
         )
 
     def test_it_publishes_the_split_pair(self):
@@ -128,3 +132,43 @@ class InexactApplyGenerationTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InexactApplyAbiTest(InexactApplyGenerationTest):
+    """The split has to be reachable from SFEM, not only from a spike.
+
+    The templated kernels live in the header; the symbols the library links
+    against live in the operator source.  Each is emitted once per scalar type,
+    because the dispatch layer collapses a `<name>`/`<name>_float` pair into one
+    public entry point taking `smesh::PrimitiveType` -- which is the shape the
+    rest of SFEM's C ABI already has.
+    """
+
+    def _operator_source(self):
+        files = self._generate("linear_elasticity", "TET4", opt_in=True)
+        return files["d3/tet4/linear_elasticity_tet4_inexact_apply_operator.cpp"]
+
+    def test_each_kernel_crosses_the_abi_at_both_precisions(self):
+        source = self._operator_source()
+        for kernel in ("tangent", "stored", "compressed"):
+            for suffix in ("", "_float"):
+                name = ("linear_elasticity_tet4_inexact_apply_%s"
+                        "_affine_mesh_soa%s" % (kernel, suffix))
+                with self.subTest(kernel=kernel, precision=suffix or "double"):
+                    self.assertIn('extern "C" int %s(' % name, source)
+
+    def test_the_store_uses_sfem_types(self):
+        """`metric_tensor_t` and `compressed_t` are what the library stores."""
+        source = self._operator_source()
+        self.assertIn("metric_tensor_t *const SFEM_RESTRICT tangent", source)
+        self.assertIn("const compressed_t *const SFEM_RESTRICT tangent", source)
+        self.assertIn("const scaling_t *const SFEM_RESTRICT scaling", source)
+
+    def test_the_apply_still_takes_no_geometry_or_state(self):
+        """The ABI must not reintroduce what the split exists to remove."""
+        source = self._operator_source()
+        start = source.index("linear_elasticity_tet4_inexact_apply_stored_affine_mesh_soa(")
+        body = source[start:source.index("}", start)]
+        for absent in ("g_jacobian", "u_stride", "mu", "lmbda"):
+            with self.subTest(absent=absent):
+                self.assertNotIn(absent, body)
