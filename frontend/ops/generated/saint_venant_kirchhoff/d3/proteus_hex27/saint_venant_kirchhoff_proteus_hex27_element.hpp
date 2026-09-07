@@ -1,8 +1,8 @@
-#ifndef NEOHOOKEAN_OGDEN_PROTEUS_HEX125_ELEMENT_API_HPP
-#define NEOHOOKEAN_OGDEN_PROTEUS_HEX125_ELEMENT_API_HPP
+#ifndef SAINT_VENANT_KIRCHHOFF_PROTEUS_HEX27_ELEMENT_API_HPP
+#define SAINT_VENANT_KIRCHHOFF_PROTEUS_HEX27_ELEMENT_API_HPP
 
 #include <stddef.h>
-#include "../neohookean_ogden_d3_tensor_product_local.hpp"
+#include "../saint_venant_kirchhoff_d3_tensor_product_local.hpp"
 #include "../../../geometry_kernels.hpp"
 
 #ifndef SFEM_SUCCESS
@@ -22,23 +22,23 @@ namespace codegen {
 
 
 template <typename scalar_t>
-struct neohookean_ogden_proteus_hex125_isoparametric_reference_data {
+struct saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data {
     static const scalar_t *shape_1d() {
-        static const scalar_t data[30] = {scalar_t(0.74421243257482506), scalar_t(0.46483764017848167), scalar_t(-0.3233801835384143), scalar_t(0.14033674464838758), scalar_t(-0.02600663386327997), scalar_t(0.1370796510851644), scalar_t(1.1523224574482651), scalar_t(-0.42142141395480076), scalar_t(0.15997562415667735), scalar_t(-0.027956318735306136), scalar_t(-0.038040498051401792), scalar_t(0.44323536887287845), scalar_t(0.72827267187338052), scalar_t(-0.15685108599339564), scalar_t(0.02338354329853843), scalar_t(0.023383543298538433), scalar_t(-0.1568510859933957), scalar_t(0.7282726718733803), scalar_t(0.44323536887287873), scalar_t(-0.038040498051401805), scalar_t(-0.02795631873530614), scalar_t(0.15997562415667732), scalar_t(-0.42142141395480076), scalar_t(1.1523224574482653), scalar_t(0.1370796510851644), scalar_t(-0.02600663386327997), scalar_t(0.14033674464838758), scalar_t(-0.3233801835384143), scalar_t(0.46483764017848161), scalar_t(0.74421243257482506)};
+        static const scalar_t data[12] = {scalar_t(0.80134602936993082), scalar_t(0.25844425285419081), scalar_t(-0.059790282224121687), scalar_t(0.22778407679095203), scalar_t(0.88441289000295209), scalar_t(-0.11219696679390417), scalar_t(-0.11219696679390401), scalar_t(0.88441289000295198), scalar_t(0.22778407679095214), scalar_t(-0.05979028222412186), scalar_t(0.25844425285419081), scalar_t(0.80134602936993082)};
         return data;
     }
     static const scalar_t *grad_1d() {
-        static const scalar_t data[30] = {scalar_t(-6.847186854894237), scalar_t(11.639662813272302), scalar_t(-7.2956234240766964), scalar_t(3.0610058279134376), scalar_t(-0.55785836221480534), scalar_t(-2.5164082145971007), scalar_t(-0.054958388683796322), scalar_t(3.9736493619038797), scalar_t(-1.716790699367966), scalar_t(0.31450794074498367), scalar_t(0.19219357747626689), scalar_t(-4.4665740596400347), scalar_t(4.3376072253969262), scalar_t(-0.044266581778818759), scalar_t(-0.01896016145434104), scalar_t(0.018960161454340804), scalar_t(0.044266581778820424), scalar_t(-4.3376072253969298), scalar_t(4.4665740596400356), scalar_t(-0.19219357747626675), scalar_t(-0.31450794074498367), scalar_t(1.716790699367966), scalar_t(-3.9736493619038806), scalar_t(0.05495838868379721), scalar_t(2.5164082145971007), scalar_t(0.55785836221480523), scalar_t(-3.0610058279134367), scalar_t(7.2956234240766964), scalar_t(-11.639662813272302), scalar_t(6.8471868548942378)};
+        static const scalar_t data[12] = {scalar_t(-2.7222726231881049), scalar_t(3.4445452463762103), scalar_t(-0.72227262318810515), scalar_t(-1.6799620871697125), scalar_t(1.359924174339425), scalar_t(0.32003791283028749), scalar_t(-0.32003791283028749), scalar_t(-1.359924174339425), scalar_t(1.6799620871697125), scalar_t(0.72227262318810492), scalar_t(-3.4445452463762098), scalar_t(2.7222726231881049)};
         return data;
     }
     static const scalar_t *q_weight_1d() {
-        static const scalar_t data[6] = {scalar_t(0.085662246189585178), scalar_t(0.18038078652406936), scalar_t(0.23395696728634555), scalar_t(0.23395696728634555), scalar_t(0.18038078652406936), scalar_t(0.085662246189585178)};
+        static const scalar_t data[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
         return data;
     }
 };
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_geometry_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_energy_element_geometry_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant,
@@ -48,8 +48,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_geometry_s
         scalar_t *const SFEM_RESTRICT values
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -88,13 +88,13 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_geometry_s
                 block_jacobian_determinant0[q * VECTOR_SIZE + lane] = jacobian_determinant[q * nelements + evbegin + lane];
             }
         }
-        neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_value);
+        saint_venant_kirchhoff_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_value);
     }
     return SFEM_SUCCESS;
 }
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_coords_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_energy_element_coords_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT coords,
         const scalar_t lmbda,
@@ -103,8 +103,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_coords_soa
         scalar_t *const SFEM_RESTRICT values
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -136,18 +136,18 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_coords_soa
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-        neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_value);
+        saint_venant_kirchhoff_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_value);
     }
     return SFEM_SUCCESS;
 }
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_energy_element_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT coords,
         const scalar_t lmbda,
@@ -156,8 +156,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_soa(
         scalar_t *const SFEM_RESTRICT values
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -189,19 +189,19 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_energy_element_soa(
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-        neohookean_ogden_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_value);
+        saint_venant_kirchhoff_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_value);
     }
     return SFEM_SUCCESS;
 }
 
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_geometry_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_gradient_element_geometry_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant,
@@ -211,8 +211,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_geometry
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -254,13 +254,13 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_geometry
                 block_jacobian_determinant0[q * VECTOR_SIZE + lane] = jacobian_determinant[q * nelements + evbegin + lane];
             }
         }
-        neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_out_streams);
+        saint_venant_kirchhoff_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_out_streams);
     }
     return SFEM_SUCCESS;
 }
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_coords_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_gradient_element_coords_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT coords,
         const scalar_t lmbda,
@@ -269,8 +269,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_coords_s
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -305,18 +305,18 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_coords_s
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-        neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_out_streams);
+        saint_venant_kirchhoff_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_out_streams);
     }
     return SFEM_SUCCESS;
 }
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_gradient_element_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT coords,
         const scalar_t lmbda,
@@ -325,8 +325,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_soa(
         scalar_t *const *const SFEM_RESTRICT out_streams
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -361,19 +361,19 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_gradient_element_soa(
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-        neohookean_ogden_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_out_streams);
+        saint_venant_kirchhoff_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_out_streams);
     }
     return SFEM_SUCCESS;
 }
 
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_geometry_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_hessian_element_geometry_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT jacobian_adjugate,
         const scalar_t *const SFEM_RESTRICT jacobian_determinant,
@@ -383,8 +383,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_geometry_
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -432,7 +432,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_geometry_
                     block_out_data[stream][lane] = scalar_t(0);
                 }
             }
-            neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
+            saint_venant_kirchhoff_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 scalar_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evbegin;
                 #pragma omp simd
@@ -446,7 +446,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_geometry_
 }
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_coords_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_hessian_element_coords_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT coords,
         const scalar_t lmbda,
@@ -455,8 +455,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_coords_so
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -481,9 +481,9 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_coords_so
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
         scalar_t block_h_data[NDOFS][VECTOR_SIZE];
@@ -502,7 +502,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_coords_so
                     block_out_data[stream][lane] = scalar_t(0);
                 }
             }
-            neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
+            saint_venant_kirchhoff_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 scalar_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evbegin;
                 #pragma omp simd
@@ -516,7 +516,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_coords_so
 }
 
 template <typename scalar_t, int VECTOR_SIZE = 16>
-static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_soa(
+static SFEM_INLINE int saint_venant_kirchhoff_proteus_hex27_hessian_element_soa(
         const ptrdiff_t nelements,
         const scalar_t *const *const SFEM_RESTRICT coords,
         const scalar_t lmbda,
@@ -525,8 +525,8 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_soa(
         scalar_t *const *const SFEM_RESTRICT matrix_streams
 ) {
     static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 125;
-    static constexpr int N_QP = 216;
+    static constexpr int N_SHAPE = 27;
+    static constexpr int N_QP = 64;
     static constexpr int NDOFS = DIM * N_SHAPE;
     if (nelements <= 0) return SFEM_SUCCESS;
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
@@ -551,9 +551,9 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_soa(
         scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
         scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
         scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 0, coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 1, coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(nelems, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), block_coordinate_data, 2, coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
         scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
         geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
         scalar_t block_h_data[NDOFS][VECTOR_SIZE];
@@ -572,7 +572,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_hex125_hessian_element_soa(
                     block_out_data[stream][lane] = scalar_t(0);
                 }
             }
-            neohookean_ogden_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::neohookean_ogden_proteus_hex125_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
+            saint_venant_kirchhoff_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d(), sfem::codegen::saint_venant_kirchhoff_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d(), lmbda, mu, block_u_streams, block_h_streams, block_out_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 scalar_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evbegin;
                 #pragma omp simd

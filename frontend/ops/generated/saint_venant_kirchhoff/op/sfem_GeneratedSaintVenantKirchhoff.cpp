@@ -1012,6 +1012,31 @@ namespace sfem {
         });
     }
 
+    int GeneratedSaintVenantKirchhoff::hessian_block_diag_sym(const real_t *const x,
+                                       real_t *const values) {
+        SFEM_TRACE_SCOPE("GeneratedSaintVenantKirchhoff::hessian_block_diag_sym");
+        const real_t *const current = x;
+        if (!current) {
+            SFEM_ERROR("GeneratedSaintVenantKirchhoff::hessian_block_diag_sym requires a current state\n");
+            return SFEM_FAILURE;
+        }
+        auto mesh = impl_->space->mesh_ptr();
+        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+        return impl_->domains->iterate([&](const OpDomain &domain) {
+            const int dim = mesh->spatial_dimension();
+            if (dim == 2) {
+                SFEM_ERROR("saint_venant_kirchhoff hessian_block_diag_sym 2d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            else if (dim == 3) {
+                SFEM_ERROR("saint_venant_kirchhoff hessian_block_diag_sym 3d dispatch was not generated\n");
+                return SFEM_FAILURE;
+            }
+            SFEM_ERROR("saint_venant_kirchhoff hessian_block_diag_sym does not support spatial dimension %d\n", dim);
+            return SFEM_FAILURE;
+        });
+    }
+
     void GeneratedSaintVenantKirchhoff::set_option(const std::string &name, const bool val) {
         SFEM_TRACE_SCOPE("GeneratedSaintVenantKirchhoff::set_option");
         if (name == "PACKED_TWO_PASS" || name == "two_pass") {
