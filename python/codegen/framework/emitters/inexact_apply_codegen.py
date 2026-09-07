@@ -49,6 +49,7 @@ _TANGENT_ADDRESS = "element * tangent_element_stride + %d * tangent_component_st
 
 def inexact_apply_kernel_source(
     material_name,
+    op_name,
     element_type,
     dim,
     n_nodes,
@@ -68,6 +69,7 @@ def inexact_apply_kernel_source(
     return _KERNEL_BY_APPLICABILITY[plan is not None](
         plan,
         material_name,
+        op_name,
         element_type,
         dim,
         n_nodes,
@@ -81,6 +83,7 @@ def inexact_apply_kernel_source(
 def _inexact_apply_kernel_source(
     plan,
     material_name,
+    op_name,
     element_type,
     dim,
     n_nodes,
@@ -160,7 +163,14 @@ def _inexact_apply_kernel_source(
     # The extern "C" definitions go in their own translation unit, the way the
     # rest of the generated operators are laid out: the header carries the
     # templates, the source carries the symbols the library links against.
+    # The c_abi header first, exactly as the other generated operator sources
+    # do it: it is what brings in idx_t, geom_t, SFEM_RESTRICT and the storage
+    # types.  Including only the inline header leaves the kernel signatures
+    # unparseable, which a spike driver hides by including sfem_base.hpp itself
+    # before it -- and which the library build does not.
     operator_lines = [
+        '#include "../../op/sfem_%s_c_abi.hpp"' % op_name,
+        "",
         '#include "%s_inexact_apply_inline.hpp"' % prefix,
         "",
     ]
@@ -597,6 +607,7 @@ def inexact_apply_files(material, unit, context):
     rule = context.specialization.quadrature_rule
     emitted = inexact_apply_kernel_source(
         _unit_name(material, unit),
+        material.op_name,
         context.element_type,
         dim,
         int(rule.n_shape),

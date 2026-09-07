@@ -100,6 +100,12 @@ namespace sfem {
          * `apply` continues to mean the exact operator.  The inexact apply is
          * reached only through this path, so no existing caller changes
          * behaviour by an operator gaining support for it.
+         *
+         * An implementation may treat a missing or stale precondition as fatal
+         * rather than returning: the generated Ops use SFEM_ERROR, which aborts,
+         * as they already do for a missing geometry cache.  Calling the inexact
+         * apply without having assembled a tangent is a programming error, not a
+         * condition to probe for.
          */
         virtual int inexact_update(const real_t *const /*x*/) { return SFEM_FAILURE; }
 
