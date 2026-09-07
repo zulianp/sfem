@@ -54,6 +54,23 @@ if(CVFEM_ENABLE_BLAS)
     endif()
 endif()
 
+# Tracing is compiled into SFEM and smesh but the define does not reach consumers: neither
+# package exports SMESH_ENABLE_TRACE as an INTERFACE_COMPILE_DEFINITIONS, so every
+# SFEM_TRACE_SCOPE in this spike's own translation units expands to nothing and the kernels
+# are invisible in the trace. The scopes are already there -- and already name the variant
+# (apply_macro_local_hoisted vs apply_macro_local_affine vs apply_naive, residual vs
+# residual_naive, block_diag vs block_diag_naive) -- so switching the define on is all that
+# is needed to see which kernel runs and for how long.
+#
+# On by default, matching SFEM_ENABLE_TRACE and SMESH_ENABLE_TRACE upstream. The tracer keeps
+# a map of name -> (calls, total) and writes it at exit; the per-scope cost is a clock read.
+option(CVFEM_ENABLE_TRACE "Compile SFEM_TRACE_SCOPE in this spike's own sources" ON)
+function(cvfem_trace_target tgt)
+    if(CVFEM_ENABLE_TRACE)
+        target_compile_definitions(${tgt} PRIVATE SMESH_ENABLE_TRACE SFEM_ENABLE_TRACE)
+    endif()
+endfunction()
+
 function(cvfem_blas_target tgt)
     if(CVFEM_ENABLE_BLAS)
         target_compile_definitions(${tgt} PRIVATE SFEM_ENABLE_BLAS)
@@ -136,6 +153,7 @@ foreach(_cvfem_tgt cvfem_tet4_ns_upwind_bench cvfem_tet4_ns_upwind_bench_baselin
     target_compile_options(${_cvfem_tgt} PRIVATE ${_cvfem_perf_opts})
     target_include_directories(${_cvfem_tgt} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     cvfem_subpar_target(${_cvfem_tgt})
+    cvfem_trace_target(${_cvfem_tgt})
 endforeach()
 
 # How much of the matrix the velocity-dependent half ever touches.
@@ -145,6 +163,7 @@ target_link_libraries(nlcover PRIVATE SFEM::sfem
 target_compile_options(nlcover PRIVATE ${_cvfem_perf_opts})
 target_include_directories(nlcover PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 cvfem_subpar_target(nlcover)
+cvfem_trace_target(nlcover)
 
 # Guards the guards. Built with exactly the solver's flags, so it fails if the
 # build's floating-point options have folded cvfem_hex8_ns_steady.cpp's
@@ -166,6 +185,7 @@ target_include_directories(cvfem_hex8_ns_steady PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
 cvfem_subpar_target(cvfem_hex8_ns_steady)
+cvfem_trace_target(cvfem_hex8_ns_steady)
 
 # The sfem::Op face of the same kernels, for the semi-structured GMG work. Kept as a
 # library so the Op compiles and is gated on its own before any driver depends on it.
@@ -180,6 +200,7 @@ target_include_directories(cvfem_ns_op PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
     ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
 cvfem_subpar_target(cvfem_ns_op)
+cvfem_trace_target(cvfem_ns_op)
 
 # Proves the Op reproduces the standalone driver on the same mesh and state. Cheap
 # enough to be a ctest, and it is the gate everything downstream of the Op rests on.
@@ -187,6 +208,7 @@ add_executable(cvfem_ns_op_gate cvfem_ns_op_gate.cpp)
 target_link_libraries(cvfem_ns_op_gate PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_ns_op_gate PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_op_gate)
+cvfem_trace_target(cvfem_ns_op_gate)
 add_test(NAME cvfem_ns_op_gate COMMAND cvfem_ns_op_gate)
 
 # Compile-time proof that the operator header is usable from any driver: it leaks none
@@ -196,6 +218,7 @@ add_executable(cvfem_ns_op_isolation cvfem_ns_op_isolation.cpp)
 target_link_libraries(cvfem_ns_op_isolation PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_ns_op_isolation PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_op_isolation)
+cvfem_trace_target(cvfem_ns_op_isolation)
 add_test(NAME cvfem_ns_op_isolation COMMAND cvfem_ns_op_isolation)
 
 # The frontend-driven solver: same channel problem through sfem::Function, on the way to
@@ -204,6 +227,7 @@ add_executable(cvfem_hex8_ns_ssgmg cvfem_hex8_ns_ssgmg.cpp)
 target_link_libraries(cvfem_hex8_ns_ssgmg PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_hex8_ns_ssgmg PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_hex8_ns_ssgmg)
+cvfem_trace_target(cvfem_hex8_ns_ssgmg)
 
 # Throughput of the operator kernels on their own, swept across sizes so the saturated
 # figure is a plateau rather than an assumption. Baseline for the semi-structured work.
@@ -211,6 +235,7 @@ add_executable(cvfem_ns_apply_bench cvfem_ns_apply_bench.cpp)
 target_link_libraries(cvfem_ns_apply_bench PRIVATE cvfem_ns_op)
 target_compile_options(cvfem_ns_apply_bench PRIVATE ${_cvfem_perf_opts})
 cvfem_subpar_target(cvfem_ns_apply_bench)
+cvfem_trace_target(cvfem_ns_apply_bench)
 
 # T3: the macro-local gather on a semi-structured mesh, against the flat gather on the
 # same mesh. Doubles as a correctness test -- the two must agree to round-off.
@@ -221,6 +246,7 @@ target_include_directories(cvfem_sshex8_bench PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../operators)
 cvfem_subpar_target(cvfem_sshex8_bench)
+cvfem_trace_target(cvfem_sshex8_bench)
 cvfem_blas_target(cvfem_sshex8_bench)
 add_test(NAME cvfem_sshex8_agree COMMAND cvfem_sshex8_bench)
 set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0")
@@ -272,6 +298,7 @@ if(CVFEM_ENABLE_CUDA)
         target_include_directories(${tgt} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
         cvfem_subpar_target(${tgt})
+        cvfem_trace_target(${tgt})
         target_compile_options(${tgt} PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:${_cvfem_perf_opts}>
             $<$<COMPILE_LANGUAGE:CUDA>:${_cvfem_cuda_opts}>)

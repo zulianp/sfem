@@ -19,6 +19,7 @@
 // belongs next to sfem_bcgs.hpp with the rest of the solvers.
 
 #include "sfem_Operator.hpp"
+#include "smesh_env.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -155,7 +156,12 @@ namespace sfem {
                     H.push_back(std::move(h));
 
                     const T resid = std::fabs(g[(size_t)j + 1]);
-                    if (verbose && (iterations_ % 50 == 0))
+                    // Print interval, settable. On a very large problem each iteration is
+                    // minutes of work, so a fixed stride of 50 means a job can run its whole
+                    // wall-clock allocation without emitting a single convergence line.
+                    static const int print_every =
+                            std::max(1, smesh::Env::read<int>("SFEM_LIN_PRINT_EVERY", 50));
+                    if (verbose && (iterations_ % print_every == 0))
                         std::printf("%d: residual abs: %g, rel: %g\n", iterations_, (double)resid,
                                     (double)(resid / bnorm));
 
