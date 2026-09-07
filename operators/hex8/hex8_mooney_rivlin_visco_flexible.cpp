@@ -13,7 +13,7 @@
 #include "sortreduce.hpp"
 
 #include "hex8_inline_cpu.hpp"
-#include "hex8_history_diagnostics.hpp"
+#include "hex8_history_scaling.hpp"
 #include "line_quadrature.hpp"
 
 #include "hex8_mooney_rivlin_visco_unique_Hi_local.hpp"  // Unimodular form
@@ -56,24 +56,6 @@ static int dispatch_history_update(const smesh::PrimitiveType storage,
 
     SFEM_ERROR("Unsupported Mooney-Rivlin history storage: %s\n", smesh::to_string(storage).data());
     return SFEM_FAILURE;
-}
-
-static inline float fp16_history_scale(const scalar_t *const H, const int n, const bool check_history,
-                                       const ptrdiff_t element, const ptrdiff_t qp, const int prony) {
-    scalar_t max_abs = 0;
-    for (int i = 0; i < n; ++i) {
-        max_abs = fmax(max_abs, fabs(H[i]));
-    }
-
-    if (max_abs == 0) return 1;
-
-    int exponent;
-    const double mantissa = frexp(max_abs, &exponent);
-    const double scale64 = ldexp(1.0, exponent - 15);
-    const float scale32 = (float)scale64;
-    if (check_history) sfem_check_history_scale(max_abs, mantissa, exponent, scale64, scale32,
-                                              element, qp, prony);
-    return scale32;
 }
 
 // ============================================================================

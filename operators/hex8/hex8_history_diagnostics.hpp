@@ -26,7 +26,8 @@ inline bool sfem_history_finite(const double value) {
 inline void sfem_check_history_scale(const double max_abs, const double mantissa, const int exponent,
                                      const double scale64, const float scale32,
                                      const ptrdiff_t element, const ptrdiff_t qp, const int prony) {
-    if (sfem_history_finite(scale64) && scale64 > 0 &&
+    // A raw double scale may underflow too; the applied FP32 floor must remain positive.
+    if (sfem_history_finite(scale64) && scale64 >= 0 &&
         sfem_history_finite(scale32) && scale32 > 0) return;
 
 #pragma omp critical(sfem_history_diagnostic)
