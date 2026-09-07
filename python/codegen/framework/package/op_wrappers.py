@@ -573,6 +573,20 @@ namespace sfem {
     }
 
 
+def _inexact_needs_affine(material):
+    """The split always needs the affine geometry, whatever the apply chose.
+
+    `initialize` builds the cache only when one of the affine options is on, and
+    the inexact path is not one of them: its tangent is assembled from the
+    adjugate and the determinant, so without this an Op whose exact apply runs
+    isoparametrically would offer `inexact_update` and then fail in it for want
+    of a cache the caller has no way to ask for.
+    """
+    if not getattr(material, "inexact_apply", False):
+        return ""
+    return " ||\n                true /* the inexact path assembles from the affine geometry */"
+
+
 def _inexact_cache_field(material):
     """The stored tangent, declared only where the material generates one.
 
@@ -1338,7 +1352,7 @@ namespace sfem {
         const bool needs_affine_geometry =
                 impl_->objective_uses_affine ||
                 impl_->gradient_uses_affine ||
-                impl_->apply_uses_affine;
+                impl_->apply_uses_affine%(inexact_needs_affine)s;
         for (auto &entry : impl_->domains->domains()) {
             seed_parameters(*entry.second.parameters);
             impl_->element_capacity =
@@ -1825,6 +1839,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "inexact_cache_field": _inexact_cache_field(material),
+        "inexact_needs_affine": _inexact_needs_affine(material),
         "performance_methods": _performance_methods(material.op_name, material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
@@ -3039,6 +3054,7 @@ namespace sfem {
         "laplace_packed_member": laplace_packed_member,
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
         "inexact_cache_field": _inexact_cache_field(material),
+        "inexact_needs_affine": _inexact_needs_affine(material),
         "performance_methods": _performance_methods(material.op_name, material.name, elements, performance_cases),
         # Only the merit uses std::vector, so only the merit brings its header.
         "merit_include": "\n#include <vector>" if emits_merit else "",
