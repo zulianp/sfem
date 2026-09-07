@@ -100,7 +100,7 @@ Both at ~10.4M dof, 8 threads, `build64` libraries, MDOF/s.
 | | setup [s] | apply [s] | rate |
 |---|---|---|---|
 | library `NeoHookeanOgden`, hand-written partial assembly | 0.6525 | 7.643e-02 | 137.37 |
-| library `GeneratedNeoHookeanOgden`, fused                | --     | 3.854e-01 |  27.24 |
+| library `GeneratedNeoHookeanOgden`, exact apply           | --     | 3.854e-01 |  27.24 |
 | generated split, assembly                                 | 0.3922 | --        |  --    |
 | generated split, stored apply f64                         | 0.3922 | 4.927e-02 | 213.09 |
 | generated split, stored apply f32                         | 0.3922 | 4.781e-02 | 219.61 |
@@ -111,7 +111,7 @@ Both at ~10.4M dof, 8 threads, `build64` libraries, MDOF/s.
 | | setup [s] | apply [s] | rate |
 |---|---|---|---|
 | library `NeoHookeanOgden`, hand-written partial assembly | 0.4273 | 6.341e-02 | 162.90 |
-| library `GeneratedNeoHookeanOgden`, fused                | --     | 2.174e-01 |  47.52 |
+| library `GeneratedNeoHookeanOgden`, exact apply           | --     | 2.174e-01 |  47.52 |
 | generated split, assembly                                 | 0.4143 | --        |  --    |
 | generated split, stored apply f32                         | 0.4143 | 1.031e-01 | 100.21 |
 
@@ -120,7 +120,7 @@ Both at ~10.4M dof, 8 threads, `build64` libraries, MDOF/s.
 | | setup [s] | apply [s] | rate |
 |---|---|---|---|
 | library `NeoHookeanOgden`, no partial assembly           | --     | 1.187e-02 |  33.59 |
-| library `GeneratedNeoHookeanOgden`, fused                | --     | 8.319e-03 |  47.93 |
+| library `GeneratedNeoHookeanOgden`, exact apply           | --     | 8.319e-03 |  47.93 |
 | generated split, assembly                                 | 0.0129 | --        |  --    |
 | generated split, stored apply f16                         | 0.0129 | 3.410e-03 | 116.95 |
 
@@ -131,14 +131,14 @@ The apply is 1.60x faster (219.61 against 137.37) and the assembly is 1.66x
 cheaper (0.392 s against 0.653 s).  The baseline had the generated kernel 5.86x
 behind on this element; the split turns that deficit into a lead.
 
-**HEX8: the split doubles the generated kernel but stays 1.63x behind the
+**HEX8: the split doubles the exact generated kernel but stays 1.63x behind the
 hand-written one** (100.21 against 162.90, from 47.52).  The assembly times are
 level -- 0.414 s against 0.427 s -- so the whole remaining gap is the
 contraction: `hex8_SdotHdotG` beats the staged rank-factored contraction, which
 is expensive precisely on HEX8, where `Wbar` has high rank.  That is the next
 thing to fix, and it is a contraction problem rather than a partial-assembly one.
 
-**TET4: 2.44x over the fused kernel**, on the element where the library does not
+**TET4: 2.44x over the exact generated kernel**, on the element where the library does not
 use partial assembly at all.  There is nothing hand-written to catch here; this
 is new throughput.
 
@@ -149,7 +149,7 @@ operator that performs no setup of its own.  The hand-written `NeoHookeanOgden`
 enables partial assembly for HEX8 and TET10 and pays for it in its own setup
 column, so charging the split for an assembly the reference also performs would
 be wrong -- the first version of this spike did exactly that and reported 15.1
-applies for TET10 where the honest figure against the fused kernel is 1.16.  The
+applies for TET10 where the honest figure against the exact generated kernel is 1.16.  The
 tool now prints both framings and names which reference each applies to.  Against
 an operator that also assembles, compare apply to apply and setup to setup.
 
@@ -161,3 +161,17 @@ Reaching the full baseline size on TET4 needs the precisions allocated and freed
 one at a time.  In a solver only one precision is ever resident, so this is a
 property of the benchmark; the underlying per-element cost -- 45 numbers, 180
 bytes at f32 -- is what a real use pays.
+
+## A note on the word "fused"
+
+Earlier revisions of this file and of the spike labelled
+`GeneratedNeoHookeanOgden` "fused".  That was wrong and is corrected above.  It
+is the ordinary generated matrix-free apply: it evaluates the exact material
+tangent at every quadrature point on every call, performs no projection, and
+stores nothing.
+
+The name came from a projected apply that *did* rebuild `Sbar` inline on every
+call.  That kernel was scaffolding for the original comparison and was removed
+from the emitter; `test_the_fused_kernel_is_gone` keeps it removed.  Reusing its
+name for an unrelated operator suggested the library was doing a projection it
+has never done.

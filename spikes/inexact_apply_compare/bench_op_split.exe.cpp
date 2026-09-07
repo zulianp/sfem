@@ -239,28 +239,32 @@ int main(int argc, char *argv[]) {
         // its own.  The hand-written NeoHookeanOgden turns partial assembly on
         // for HEX8 and TET10 and pays for it in its own setup column, so
         // comparing a stored apply's break-even against that one would charge
-        // the split for an assembly the reference also performs.  The fused
-        // generated kernel is the honest reference: it rebuilds the tangent
-        // every apply and stores nothing.
+        // the split for an assembly the reference also performs.
+        //
+        // GeneratedNeoHookeanOgden is the honest reference: it is the ordinary
+        // generated matrix-free apply, which evaluates the exact tangent at
+        // every quadrature point on every call and stores nothing.  It is not a
+        // projected apply -- the projected kernel that rebuilt `Sbar` inline was
+        // scaffolding and has been removed from the emitter.
         //
         // Against an operator that also assembles, the comparison to make is
         // simply apply against apply and setup against setup, both printed
         // above.
-        double fused = -1.0, best_any = 1e30;
+        double exact = -1.0, best_any = 1e30;
         std::string best_any_name;
         for (const auto &row : rows) {
-            if (row.what == "library: GeneratedNeoHookeanOgden") fused = row.apply;
+            if (row.what == "library: GeneratedNeoHookeanOgden") exact = row.apply;
             if (row.what.rfind("library:", 0) == 0 && row.apply < best_any) {
                 best_any = row.apply;
                 best_any_name = row.what;
             }
         }
-        if (fused > 0) {
-            std::printf("\n  break-even applies per tangent, against the fused generated apply (%.4e s,\n"
-                        "  which performs no assembly of its own):\n", fused);
+        if (exact > 0) {
+            std::printf("\n  break-even applies per tangent, against the exact generated apply (%.4e s,\n"
+                        "  which performs no assembly of its own):\n", exact);
             for (const auto &row : rows) {
                 if (row.what.rfind("split: stored", 0) != 0) continue;
-                const double gain = fused - row.apply;
+                const double gain = exact - row.apply;
                 if (gain <= 0) {
                     std::printf("    %-30s never (apply is not faster)\n", row.what.c_str());
                 } else {
