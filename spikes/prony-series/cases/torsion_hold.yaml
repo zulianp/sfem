@@ -1,0 +1,77 @@
+# Control case: the same beam and the same twist, held for the whole run.
+#
+# This is pure stress relaxation with no release. Read against torsion_release.yaml it
+# separates what the Prony series does on its own from what the release does: the torque
+# histories must coincide up to the release time and diverge after it.
+#
+# Paths are relative to this file's directory. The inline `dirichlet_conditions` block is
+# handed to SFEM verbatim, and SFEM resolves the paths in it against the working directory,
+# so run this case from the directory that holds it (run_torsion_release.sh does).
+
+mesh: mesh
+verbose: true
+
+material:
+  # Mooney-Rivlin backbone: C10 (I1), C01 (I2), K (bulk).
+  C10: 0.3
+  C01: 0.05
+  K: 50.0
+
+  # Relaxation function G(t) = g_inf + sum_i g_i exp(-t / tau_i), with g_inf = 1 - sum_i g_i.
+  # Two decades apart, so the hold phase shows both: the fast term has all but relaxed by
+  # t ~ 5 while the slow one is still going at t ~ 20.
+  prony:
+    - {g: 0.40, tau: 1.0}
+    - {g: 0.30, tau: 10.0}
+  # g_inf = 0.30: the beam keeps 30% of its instantaneous stiffness in the long run.
+
+  wlf:
+    enabled: false
+
+time:
+  dt: 0.2
+  t_end: 40.0
+
+dynamics:
+  # A relaxation experiment is quasi-static: the interesting time scales are the tau_i, not
+  # the transit time of an elastic wave. Set to bdf2 to bring the inertia back.
+  type: quasi_static
+
+torsion:
+  sideset: mesh/surface/sidesets/right
+  axis: x
+  rotation_center: [0.0, 0.1, 0.1]
+  angle: 0.6           # total twist in radians (about 34 degrees)
+  ramp_time: 1.0       # linear ramp 0 -> angle
+  release:
+    mode: hold         # never released
+
+solver:
+  newton:
+    # The release step is the expensive one by a wide margin: the constraint disappears and
+    # quasi-static equilibrium demands the whole elastic springback inside a single step, from
+    # an initial guess that is the twisted configuration. Backtracking creeps through it in a
+    # few tens of iterations where every other step needs a handful, so the budget is sized for
+    # that step rather than for the typical one.
+    max_it: 300
+    tol: 1.0e-8
+    alpha: 1.0
+    line_search: true
+  linear:
+    type: cg
+    rtol: 1.0e-10
+    max_it: 4000
+    preconditioner: true
+
+output:
+  path: results_hold
+  export_freq: 2
+  control_point: [1.0, 0.2, 0.2]   # a corner of the twisted face
+  history_csv: history.csv
+
+dirichlet_conditions:
+  - type: sideset
+    format: file
+    path: mesh/surface/sidesets/left
+    value: [0, 0, 0]
+    component: [0, 1, 2]

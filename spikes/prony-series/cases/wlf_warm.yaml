@@ -1,0 +1,79 @@
+# Time-temperature superposition at T = -50.0 C (a_T = 23.9, so the same series relaxes about 24x faster).
+#
+# WLF shifts the relaxation times: log10(a_T) = C1 (T - T_ref) / (C2 + T - T_ref), and
+# tau_eff = tau / a_T. Read against its partner case, the warmer run must relax visibly
+# faster -- same material, same twist, temperature the only difference.
+#
+# The temperatures are close to T_ref on purpose. These EPDM constants are steep: by
+# T = -45 C the shift is already 526, every term satisfies dt/tau_eff > 30, and
+# MooneyRivlinVisco filters all of them out as fully relaxed within one step. Two runs
+# above that threshold are literally the same problem, which is correct behaviour and a
+# useless measurement.
+#
+# This exercises the wlf block of the case schema, which the main scenario parses but
+# never switches on.
+
+mesh: mesh
+verbose: false
+material:
+  C10: 0.3
+  C01: 0.05
+  K: 50.0
+  prony:
+  - g: 0.4
+    tau: 1.0
+  - g: 0.3
+    tau: 10.0
+  wlf:
+    enabled: true
+    C1: 16.6253
+    C2: 47.4781
+    T_ref: -54.29
+    temperature: -50.0
+time:
+  dt: 0.05
+  t_end: 20.0
+dynamics:
+  type: quasi_static
+torsion:
+  sideset: mesh/surface/sidesets/right
+  axis: x
+  rotation_center:
+  - 0.0
+  - 0.1
+  - 0.1
+  angle: 0.6
+  ramp_time: 1.0
+  release:
+    mode: hold
+solver:
+  newton:
+    max_it: 300
+    tol: 1.0e-08
+    alpha: 1.0
+    line_search: true
+  linear:
+    type: cg
+    rtol: 1.0e-10
+    max_it: 4000
+    preconditioner: true
+output:
+  path: results_wlf_warm
+  export_freq: 1000
+  control_point:
+  - 1.0
+  - 0.2
+  - 0.2
+  history_csv: history.csv
+dirichlet_conditions:
+- type: sideset
+  format: file
+  path: mesh/surface/sidesets/left
+  value:
+  - 0
+  - 0
+  - 0
+  component:
+  - 0
+  - 1
+  - 2

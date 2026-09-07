@@ -1,0 +1,90 @@
+# Creep: the structure adapting to a torsion it is held under, rather than to one it is
+# held at.
+#
+# The relaxation cases prescribe the twist, and under a prescribed twist the structure does
+# not visibly adapt at all -- measured on this beam, the reaction torque decays 63% over the
+# hold while the interior displacement drifts 0.33%. That is not a parameter choice: at
+# fixed boundary displacement, relaxation scales the deviatoric stress nearly uniformly and
+# the displacement field satisfying equilibrium is essentially unchanged. The residual drift
+# is only the deviatoric/volumetric split, since the bulk modulus is not relaxed.
+#
+# Under a prescribed torque the structure genuinely keeps turning. For a linear viscoelastic
+# solid the twist creeps from its instantaneous value towards 1/g_inf times it -- with
+# g_inf = 0.3 that is a factor of 3.3, spread over the relaxation spectrum. The geometric
+# stiffening of the Mooney-Rivlin backbone pulls the realised factor below that.
+#
+# The twist is now the unknown: the driver wraps the nonlinear solve in a scalar secant
+# iteration on the angle, driving the reaction torque onto the target. It is warm-started
+# from the previous step, so it costs one or two extra solves per step.
+
+mesh: mesh
+verbose: false
+#
+# The torque is ramped over a single step, not over a second. The creep factor is measured
+# against the INSTANTANEOUS twist, and a ramp comparable to tau_fast lets the fast mode creep
+# before that reference is taken -- which understates the factor badly. Measured on this
+# beam: a 1 s ramp reads 2.72 where a 0.05 s ramp reads 3.19. It is the same trap as reading
+# a relaxation curve as if the ramp were a step.
+#
+# t_end is long because the creep RETARDATION time is not the relaxation time: it is longer
+# by roughly 1/g_inf, so tau_slow = 10 s here means the structure is still turning at t = 60.
+
+material:
+  C10: 0.3
+  C01: 0.05
+  K: 50.0
+  prony:
+  - g: 0.4
+    tau: 1.0
+  - g: 0.3
+    tau: 10.0
+  wlf:
+    enabled: false
+time:
+  dt: 0.2
+  t_end: 120.0
+dynamics:
+  type: quasi_static
+torsion:
+  sideset: mesh/surface/sidesets/right
+  axis: x
+  rotation_center:
+  - 0.0
+  - 0.1
+  - 0.1
+  ramp_time: 0.2
+  release:
+    mode: hold
+  control: torque
+  torque: 8.0e-05
+solver:
+  newton:
+    max_it: 300
+    tol: 1.0e-08
+    alpha: 1.0
+    line_search: true
+  linear:
+    type: cg
+    rtol: 1.0e-10
+    max_it: 4000
+    preconditioner: true
+output:
+  path: results_creep
+  export_freq: 10
+  control_point:
+  - 1.0
+  - 0.2
+  - 0.2
+  history_csv: history.csv
+dirichlet_conditions:
+- type: sideset
+  format: file
+  path: mesh/surface/sidesets/left
+  value:
+  - 0
+  - 0
+  - 0
+  component:
+  - 0
+  - 1
+  - 2
