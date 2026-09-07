@@ -63,7 +63,7 @@ result = gen.generate(
     material,
     "/tmp/sfem_laplace_matrix_formats",
     elements=("TRI3",),
-    matrix_formats=("crs", "bsr", "dia", "coo", "patch"),
+    matrix_formats=("crs", "bsr", "block_diag_sym"),
     matrix_mesh_layouts=("standard", "packed"),
     matrix_packed_passes=("one_pass", "two_pass"),
     dump_plan=True,
@@ -82,7 +82,7 @@ result = gen.generate(
     material,
     "/tmp/sfem_neohookean_matrix_formats",
     elements=("HEX8",),
-    matrix_formats="crs,bsr,dia,coo,patch",
+    matrix_formats="crs,bsr,block_diag_sym",
     compile=True,
 )
 ```
