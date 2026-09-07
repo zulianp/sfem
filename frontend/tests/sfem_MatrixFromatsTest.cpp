@@ -538,6 +538,7 @@ int test_generated_linear_elasticity_packed_gradient_value_steps() {
     std::vector<real_t> gradient_packed(ndofs, 0);
     SFEM_TEST_ASSERT(function->gradient(state.data(), gradient_reference.data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(linear_elasticity_gradient_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+                                                                                         smesh::SMESH_DEFAULT,
                                                                                          1,
                                                                                          nelements,
                                                                                          nelements,
@@ -577,6 +578,7 @@ int test_generated_linear_elasticity_packed_gradient_value_steps() {
                                            steps,
                                            value_steps_reference.data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+                                                                                               smesh::SMESH_DEFAULT,
                                                                                                1,
                                                                                                nelements,
                                                                                                nelements,
