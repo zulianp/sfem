@@ -65,14 +65,6 @@
       "name": "navier_stokes_form_1_u_residual_element_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int navier_stokes_form_2_p_u_hessian_coo_triplet_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "navier_stokes_form_2_p_u_hessian_coo_triplet_2d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int navier_stokes_form_2_p_u_hessian_coo_triplet_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "navier_stokes_form_2_p_u_hessian_coo_triplet_3d_isoparametric_mesh_soa"
-    },
-    {
       "declaration": "extern \"C\" int navier_stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
       "name": "navier_stokes_form_2_p_u_jacobian_action_2d_affine_mesh_soa"
     },
@@ -103,14 +95,6 @@
     {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_p_u_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_p_u_residual_element_3d_soa_diagnostics"
-    },
-    {
-      "declaration": "extern \"C\" int navier_stokes_form_2_u_p_hessian_coo_triplet_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "navier_stokes_form_2_u_p_hessian_coo_triplet_2d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int navier_stokes_form_2_u_p_hessian_coo_triplet_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "navier_stokes_form_2_u_p_hessian_coo_triplet_3d_isoparametric_mesh_soa"
     },
     {
       "declaration": "extern \"C\" int navier_stokes_form_2_u_p_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
@@ -145,14 +129,6 @@
       "name": "navier_stokes_form_2_u_p_residual_element_3d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int navier_stokes_form_2_u_u_hessian_coo_triplet_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t convection_scale,\n        const real_t dt,\n        const real_t nu,\n        const real_t rho,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT u_old_data[2],\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "navier_stokes_form_2_u_u_hessian_coo_triplet_2d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int navier_stokes_form_2_u_u_hessian_coo_triplet_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t convection_scale,\n        const real_t dt,\n        const real_t nu,\n        const real_t rho,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT u_old_data[3],\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "navier_stokes_form_2_u_u_hessian_coo_triplet_3d_isoparametric_mesh_soa"
-    },
-    {
       "declaration": "extern \"C\" int navier_stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t convection_scale,\n        const real_t dt,\n        const real_t nu,\n        const real_t rho,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT u_old_data[2],\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2]\n);",
       "name": "navier_stokes_form_2_u_u_jacobian_action_2d_affine_mesh_soa"
     },
@@ -183,14 +159,6 @@
     {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *navier_stokes_form_2_u_u_residual_element_3d_soa_diagnostics(\n        const smesh::ElemType element_type);",
       "name": "navier_stokes_form_2_u_u_residual_element_3d_soa_diagnostics"
-    },
-    {
-      "declaration": "extern \"C\" int navier_stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t convection_scale,\n        const real_t dt,\n        const real_t nu,\n        const real_t rho,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT u_old_data[2],\n        const void *const SFEM_RESTRICT p_old_data,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "navier_stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int navier_stokes_hessian_coo_triplet_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t convection_scale,\n        const real_t dt,\n        const real_t nu,\n        const real_t rho,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT u_old_data[3],\n        const void *const SFEM_RESTRICT p_old_data,\n        const ptrdiff_t out_stride,\n        idx_t *const SFEM_RESTRICT rows,\n        idx_t *const SFEM_RESTRICT cols,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "navier_stokes_hessian_coo_triplet_3d_isoparametric_mesh_soa"
     },
     {
       "declaration": "extern \"C\" int navier_stokes_jacobian_action_2d_affine_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,\n        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,\n        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,\n        const real_t convection_scale,\n        const real_t dt,\n        const real_t nu,\n        const real_t rho,\n        const ptrdiff_t previous_stride,\n        const void *const SFEM_RESTRICT u_old_data[2],\n        const void *const SFEM_RESTRICT p_old_data,\n        const ptrdiff_t direction_stride,\n        const void *const SFEM_RESTRICT u_direction_data[2],\n        const void *const SFEM_RESTRICT p_direction_data,\n        const ptrdiff_t out_stride,\n        void *const SFEM_RESTRICT u_out[2],\n        void *const SFEM_RESTRICT p_out\n);",
@@ -268,59 +236,6 @@
     "source": "op/sfem_GeneratedNavierStokes_registration.cpp"
   },
   "runtime_operations": [
-    {
-      "name": "hessian_coo_triplet",
-      "variants": [
-        {
-          "function": "navier_stokes_hessian_coo_triplet_2d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "navier_stokes",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "navier_stokes_hessian_coo_triplet_3d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "navier_stokes",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "navier_stokes_form_2_p_u_hessian_coo_triplet_2d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "navier_stokes_form_2_p_u",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "navier_stokes_form_2_p_u_hessian_coo_triplet_3d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "navier_stokes_form_2_p_u",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "navier_stokes_form_2_u_p_hessian_coo_triplet_2d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "navier_stokes_form_2_u_p",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "navier_stokes_form_2_u_p_hessian_coo_triplet_3d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "navier_stokes_form_2_u_p",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "navier_stokes_form_2_u_u_hessian_coo_triplet_2d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "navier_stokes_form_2_u_u",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "navier_stokes_form_2_u_u_hessian_coo_triplet_3d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "navier_stokes_form_2_u_u",
-          "variant": "isoparametric"
-        }
-      ]
-    },
     {
       "name": "jacobian_action",
       "variants": [

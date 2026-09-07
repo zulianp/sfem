@@ -959,38 +959,6 @@ extern "C" int laplace_hessian_crs_3d_isoparametric_mesh_soa(
         void *const SFEM_RESTRICT values
 );
 
-extern "C" int laplace_hessian_dia_2d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        void *const SFEM_RESTRICT values
-);
-
-extern "C" int laplace_hessian_dia_3d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        void *const SFEM_RESTRICT values
-);
-
-extern "C" void laplace_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_hex27_matrix_assembly_variant(const int variant);
-
-extern "C" int laplace_hex27_matrix_assembly_variant_count();
-
 extern "C" void laplace_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_hex8_matrix_assembly_variant(const int variant);
@@ -1289,30 +1257,6 @@ extern "C" int laplace_objective_steps_packed_3d_isoparametric_mesh_soa(
         void *const SFEM_RESTRICT value
 );
 
-extern "C" void laplace_proteus_hex125_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex125_matrix_assembly_variant(const int variant);
-
-extern "C" int laplace_proteus_hex125_matrix_assembly_variant_count();
-
-extern "C" void laplace_proteus_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex27_matrix_assembly_variant(const int variant);
-
-extern "C" int laplace_proteus_hex27_matrix_assembly_variant_count();
-
-extern "C" void laplace_proteus_hex64_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex64_matrix_assembly_variant(const int variant);
-
-extern "C" int laplace_proteus_hex64_matrix_assembly_variant_count();
-
-extern "C" void laplace_proteus_hex729_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex729_matrix_assembly_variant(const int variant);
-
-extern "C" int laplace_proteus_hex729_matrix_assembly_variant_count();
-
 extern "C" void laplace_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex8_matrix_assembly_variant(const int variant);
@@ -1348,9 +1292,3 @@ extern "C" void laplace_tri3_matrix_assembly_print_variant(const int variant, co
 extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_tri3_matrix_assembly_variant(const int variant);
 
 extern "C" int laplace_tri3_matrix_assembly_variant_count();
-
-extern "C" void laplace_tri6_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_tri6_matrix_assembly_variant(const int variant);
-
-extern "C" int laplace_tri6_matrix_assembly_variant_count();

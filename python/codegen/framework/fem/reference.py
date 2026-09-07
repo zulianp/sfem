@@ -696,6 +696,29 @@ def sfem_supported_element_types():
     )
 
 
+def sfem_default_element_types():
+    """The elements the maintained materials generate for.
+
+    Deliberately narrower than `sfem_supported_element_types`, which stays the
+    full capability: anything in that list can still be asked for with
+    `--element`, and nothing here removes the ability to generate it.  This is
+    the set the shipped tree carries, kept small on purpose while the framework
+    is being reworked -- every element multiplies the generated surface by the
+    whole variant cross-product of forms, geometries, mesh layouts and
+    precisions, and that surface is what has to be read, compiled and trusted.
+
+    `PROTEUS_HEX8` is not listed because `_generation_available_elements` adds
+    it wherever `HEX8` appears; the two are generated together.
+    """
+    return (
+        "TRI3",
+        "QUAD4",
+        "TET4",
+        "TET10",
+        "HEX8",
+    )
+
+
 def sfem_taylor_hood_element_types():
     return (
         SfemCompatibleElement(

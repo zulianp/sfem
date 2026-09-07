@@ -137,18 +137,6 @@
       "name": "linear_elasticity_hessian_bsr_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" void linear_elasticity_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "linear_elasticity_hex27_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_hex27_matrix_assembly_variant(const int variant);",
-      "name": "linear_elasticity_hex27_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int linear_elasticity_hex27_matrix_assembly_variant_count();",
-      "name": "linear_elasticity_hex27_matrix_assembly_variant_count"
-    },
-    {
       "declaration": "extern \"C\" void linear_elasticity_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
       "name": "linear_elasticity_hex8_matrix_assembly_print_variant"
     },
@@ -225,54 +213,6 @@
       "name": "linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" void linear_elasticity_proteus_hex125_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "linear_elasticity_proteus_hex125_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex125_matrix_assembly_variant(const int variant);",
-      "name": "linear_elasticity_proteus_hex125_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int linear_elasticity_proteus_hex125_matrix_assembly_variant_count();",
-      "name": "linear_elasticity_proteus_hex125_matrix_assembly_variant_count"
-    },
-    {
-      "declaration": "extern \"C\" void linear_elasticity_proteus_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "linear_elasticity_proteus_hex27_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex27_matrix_assembly_variant(const int variant);",
-      "name": "linear_elasticity_proteus_hex27_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int linear_elasticity_proteus_hex27_matrix_assembly_variant_count();",
-      "name": "linear_elasticity_proteus_hex27_matrix_assembly_variant_count"
-    },
-    {
-      "declaration": "extern \"C\" void linear_elasticity_proteus_hex64_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "linear_elasticity_proteus_hex64_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex64_matrix_assembly_variant(const int variant);",
-      "name": "linear_elasticity_proteus_hex64_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int linear_elasticity_proteus_hex64_matrix_assembly_variant_count();",
-      "name": "linear_elasticity_proteus_hex64_matrix_assembly_variant_count"
-    },
-    {
-      "declaration": "extern \"C\" void linear_elasticity_proteus_hex729_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "linear_elasticity_proteus_hex729_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex729_matrix_assembly_variant(const int variant);",
-      "name": "linear_elasticity_proteus_hex729_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int linear_elasticity_proteus_hex729_matrix_assembly_variant_count();",
-      "name": "linear_elasticity_proteus_hex729_matrix_assembly_variant_count"
-    },
-    {
       "declaration": "extern \"C\" void linear_elasticity_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
       "name": "linear_elasticity_proteus_hex8_matrix_assembly_print_variant"
     },
@@ -343,18 +283,6 @@
     {
       "declaration": "extern \"C\" int linear_elasticity_tri3_matrix_assembly_variant_count();",
       "name": "linear_elasticity_tri3_matrix_assembly_variant_count"
-    },
-    {
-      "declaration": "extern \"C\" void linear_elasticity_tri6_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "linear_elasticity_tri6_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_tri6_matrix_assembly_variant(const int variant);",
-      "name": "linear_elasticity_tri6_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int linear_elasticity_tri6_matrix_assembly_variant_count();",
-      "name": "linear_elasticity_tri6_matrix_assembly_variant_count"
     }
   ],
   "factory": {
@@ -368,14 +296,8 @@
     "d2/proteus_quad4",
     "d2/quad4",
     "d2/tri3",
-    "d2/tri6",
     "d3",
-    "d3/hex27",
     "d3/hex8",
-    "d3/proteus_hex125",
-    "d3/proteus_hex27",
-    "d3/proteus_hex64",
-    "d3/proteus_hex729",
     "d3/proteus_hex8",
     "d3/tet10",
     "d3/tet4",
@@ -405,49 +327,7 @@
     },
     {
       "gather_scatter": "external",
-      "header": "d2/tri6/linear_elasticity_tri6_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/hex27/linear_elasticity_hex27_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
       "header": "d3/hex8/linear_elasticity_hex8_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/proteus_hex125/linear_elasticity_proteus_hex125_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/proteus_hex27/linear_elasticity_proteus_hex27_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/proteus_hex64/linear_elasticity_proteus_hex64_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/proteus_hex729/linear_elasticity_proteus_hex729_element.hpp",
       "kind": "dense_element",
       "layout": "soa_streams",
       "scope": "element_local"
@@ -497,31 +377,7 @@
     },
     {
       "header": "matrix_formats.hpp",
-      "source": "d2/tri6/linear_elasticity_tri6_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/hex27/linear_elasticity_hex27_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
       "source": "d3/hex8/linear_elasticity_hex8_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/proteus_hex125/linear_elasticity_proteus_hex125_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/proteus_hex27/linear_elasticity_proteus_hex27_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/proteus_hex64/linear_elasticity_proteus_hex64_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/proteus_hex729/linear_elasticity_proteus_hex729_matrix_format_operator.cpp"
     },
     {
       "header": "matrix_formats.hpp",

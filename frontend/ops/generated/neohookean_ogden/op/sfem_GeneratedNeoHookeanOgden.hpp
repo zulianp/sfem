@@ -41,19 +41,6 @@ namespace sfem {
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override;
-        int hessian_dia(const real_t *const x,
-                        const int *const diag_offsets,
-                        const ptrdiff_t ndiag,
-                        real_t *const values) override;
-        int hessian_coo(const real_t *const x,
-                        const ptrdiff_t nnz,
-                        const idx_t *const rows,
-                        const idx_t *const cols,
-                        real_t *const values);
-        int hessian_patch(const real_t *const x,
-                          const count_t *const rowptr,
-                          const idx_t *const colidx,
-                          real_t *const values);
         int hessian_block_diag_sym(const real_t *const x,
                                    real_t *const values) override;
         void set_option(const std::string &name, bool val) override;

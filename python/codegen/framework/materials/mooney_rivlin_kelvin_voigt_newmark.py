@@ -73,7 +73,7 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "mooney_rivlin_kelvin_voigt_newmark",
     systems,
-    elements=gen.sfem_supported_element_types(),
+    elements=gen.sfem_default_element_types(),
     op_name="GeneratedMooneyRivlinKelvinVoigtNewmark",
     parameter_defaults=(
         ("lmbda", 1.0),

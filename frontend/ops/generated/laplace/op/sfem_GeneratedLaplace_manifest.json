@@ -177,26 +177,6 @@
       "name": "laplace_hessian_crs_3d_isoparametric_mesh_soa"
     },
     {
-      "declaration": "extern \"C\" int laplace_hessian_dia_2d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t kappa,\n        const int *const SFEM_RESTRICT diag_offsets,\n        const ptrdiff_t ndiag,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "laplace_hessian_dia_2d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" int laplace_hessian_dia_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const SFEM_RESTRICT elements,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t kappa,\n        const int *const SFEM_RESTRICT diag_offsets,\n        const ptrdiff_t ndiag,\n        void *const SFEM_RESTRICT values\n);",
-      "name": "laplace_hessian_dia_3d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" void laplace_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "laplace_hex27_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *laplace_hex27_matrix_assembly_variant(const int variant);",
-      "name": "laplace_hex27_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int laplace_hex27_matrix_assembly_variant_count();",
-      "name": "laplace_hex27_matrix_assembly_variant_count"
-    },
-    {
       "declaration": "extern \"C\" void laplace_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
       "name": "laplace_hex8_matrix_assembly_print_variant"
     },
@@ -263,54 +243,6 @@
     {
       "declaration": "extern \"C\" int laplace_objective_steps_packed_3d_isoparametric_mesh_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const SFEM_RESTRICT elements,\n        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,\n        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,\n        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,\n        const idx_t *const SFEM_RESTRICT ghost_idx,\n        const geom_t *const *const SFEM_RESTRICT points,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const SFEM_RESTRICT ux,\n        const ptrdiff_t h_stride,\n        const void *const SFEM_RESTRICT hx,\n        const int nsteps,\n        const void *const SFEM_RESTRICT steps,\n        void *const SFEM_RESTRICT value\n);",
       "name": "laplace_objective_steps_packed_3d_isoparametric_mesh_soa"
-    },
-    {
-      "declaration": "extern \"C\" void laplace_proteus_hex125_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "laplace_proteus_hex125_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex125_matrix_assembly_variant(const int variant);",
-      "name": "laplace_proteus_hex125_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int laplace_proteus_hex125_matrix_assembly_variant_count();",
-      "name": "laplace_proteus_hex125_matrix_assembly_variant_count"
-    },
-    {
-      "declaration": "extern \"C\" void laplace_proteus_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "laplace_proteus_hex27_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex27_matrix_assembly_variant(const int variant);",
-      "name": "laplace_proteus_hex27_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int laplace_proteus_hex27_matrix_assembly_variant_count();",
-      "name": "laplace_proteus_hex27_matrix_assembly_variant_count"
-    },
-    {
-      "declaration": "extern \"C\" void laplace_proteus_hex64_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "laplace_proteus_hex64_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex64_matrix_assembly_variant(const int variant);",
-      "name": "laplace_proteus_hex64_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int laplace_proteus_hex64_matrix_assembly_variant_count();",
-      "name": "laplace_proteus_hex64_matrix_assembly_variant_count"
-    },
-    {
-      "declaration": "extern \"C\" void laplace_proteus_hex729_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "laplace_proteus_hex729_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *laplace_proteus_hex729_matrix_assembly_variant(const int variant);",
-      "name": "laplace_proteus_hex729_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int laplace_proteus_hex729_matrix_assembly_variant_count();",
-      "name": "laplace_proteus_hex729_matrix_assembly_variant_count"
     },
     {
       "declaration": "extern \"C\" void laplace_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
@@ -383,18 +315,6 @@
     {
       "declaration": "extern \"C\" int laplace_tri3_matrix_assembly_variant_count();",
       "name": "laplace_tri3_matrix_assembly_variant_count"
-    },
-    {
-      "declaration": "extern \"C\" void laplace_tri6_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
-      "name": "laplace_tri6_matrix_assembly_print_variant"
-    },
-    {
-      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *laplace_tri6_matrix_assembly_variant(const int variant);",
-      "name": "laplace_tri6_matrix_assembly_variant"
-    },
-    {
-      "declaration": "extern \"C\" int laplace_tri6_matrix_assembly_variant_count();",
-      "name": "laplace_tri6_matrix_assembly_variant_count"
     }
   ],
   "factory": {
@@ -408,14 +328,8 @@
     "d2/proteus_quad4",
     "d2/quad4",
     "d2/tri3",
-    "d2/tri6",
     "d3",
-    "d3/hex27",
     "d3/hex8",
-    "d3/proteus_hex125",
-    "d3/proteus_hex27",
-    "d3/proteus_hex64",
-    "d3/proteus_hex729",
     "d3/proteus_hex8",
     "d3/tet10",
     "d3/tet4",
@@ -445,49 +359,7 @@
     },
     {
       "gather_scatter": "external",
-      "header": "d2/tri6/laplace_tri6_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/hex27/laplace_hex27_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
       "header": "d3/hex8/laplace_hex8_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/proteus_hex125/laplace_proteus_hex125_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/proteus_hex27/laplace_proteus_hex27_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/proteus_hex64/laplace_proteus_hex64_element.hpp",
-      "kind": "dense_element",
-      "layout": "soa_streams",
-      "scope": "element_local"
-    },
-    {
-      "gather_scatter": "external",
-      "header": "d3/proteus_hex729/laplace_proteus_hex729_element.hpp",
       "kind": "dense_element",
       "layout": "soa_streams",
       "scope": "element_local"
@@ -537,31 +409,7 @@
     },
     {
       "header": "matrix_formats.hpp",
-      "source": "d2/tri6/laplace_tri6_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/hex27/laplace_hex27_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
       "source": "d3/hex8/laplace_hex8_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/proteus_hex125/laplace_proteus_hex125_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/proteus_hex27/laplace_proteus_hex27_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/proteus_hex64/laplace_proteus_hex64_matrix_format_operator.cpp"
-    },
-    {
-      "header": "matrix_formats.hpp",
-      "source": "d3/proteus_hex729/laplace_proteus_hex729_matrix_format_operator.cpp"
     },
     {
       "header": "matrix_formats.hpp",
@@ -765,23 +613,6 @@
         },
         {
           "function": "laplace_hessian_crs_3d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "laplace",
-          "variant": "isoparametric"
-        }
-      ]
-    },
-    {
-      "name": "hessian_dia",
-      "variants": [
-        {
-          "function": "laplace_hessian_dia_2d_isoparametric_mesh_soa",
-          "scalar_type": "real_t",
-          "target": "laplace",
-          "variant": "isoparametric"
-        },
-        {
-          "function": "laplace_hessian_dia_3d_isoparametric_mesh_soa",
           "scalar_type": "real_t",
           "target": "laplace",
           "variant": "isoparametric"

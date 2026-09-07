@@ -25,9 +25,6 @@ TENSOR_PRODUCT_DIA_ELEMENTS = frozenset(
 class MatrixFormat(Enum):
     CRS = "crs"
     BSR = "bsr"
-    DIA = "dia"
-    COO = "coo"
-    PATCH = "patch"
     BLOCK_DIAG_SYM = "block_diag_sym"
 
 
@@ -131,151 +128,6 @@ class BSRAssemblyPlan:
             "block_columns_per_element": self.block_columns_per_element,
             "block_entries_per_element": self.block_entries_per_element,
             "compatible_block_size": self.compatible_block_size,
-        }
-
-
-@dataclass(frozen=True)
-class DIAAssemblyPlan:
-    #: The indexing policy reported in the assembly diagnostics.  For CRS, BSR
-    #: and patch this is the kernel's parameter names joined, but here it is
-    #: not: the scatter reads ``diag_offsets``.  The two were free to disagree
-    #: for as long as nothing read this plan, and reconciling them changes the
-    #: published ``index_policy`` string, so it is a deliberate output change
-    #: rather than part of connecting the plan.  See ARCHITECTURE.html OP 13.
-    diagonal_offsets: str = "diagonal_offsets"
-    #: The C parameter the scatter reads its offsets from.
-    diagonal_offset_stream: str = "diag_offsets"
-    value_stream: str = "values"
-    element_connectivity: str = "elements"
-    mesh_access: str = "standard_block_elements"
-    pack_index_type: str = "idx_t"
-    pack_partition: str = "none"
-    packed_node_partition: str = "none"
-    value_mapping: str = "identity"
-    stride: str = "nnodes"
-    value_layout: str = "diagonal_node_block_row_major"
-    stencil_compatibility: str = "requires_stable_diagonal_structure"
-    accumulation_policy: str = "fill_diagonal_values"
-    structural_compatibility: str = "runtime_validated_diagonal_offsets"
-    reduction_policy: str = "atomic_add"
-    row_dofs_per_element: int = 0
-    values_per_element: int = 0
-
-    def to_dict(self):
-        return {
-            "kind": "dia",
-            "diagonal_offsets": self.diagonal_offsets,
-            "diagonal_offset_stream": self.diagonal_offset_stream,
-            "value_stream": self.value_stream,
-            "element_connectivity": self.element_connectivity,
-            "mesh_access": self.mesh_access,
-            "pack_index_type": self.pack_index_type,
-            "pack_partition": self.pack_partition,
-            "packed_node_partition": self.packed_node_partition,
-            "value_mapping": self.value_mapping,
-            "stride": self.stride,
-            "value_layout": self.value_layout,
-            "stencil_compatibility": self.stencil_compatibility,
-            "accumulation_policy": self.accumulation_policy,
-            "structural_compatibility": self.structural_compatibility,
-            "reduction_policy": self.reduction_policy,
-            "row_dofs_per_element": self.row_dofs_per_element,
-            "values_per_element": self.values_per_element,
-        }
-
-
-@dataclass(frozen=True)
-class COOAssemblyPlan:
-    #: The two halves of the diagnostics indexing policy.  As with DIA these
-    #: are not the kernel's parameter names -- the scatter writes ``rows`` and
-    #: ``cols`` -- and the mismatch survived because the plan had no reader.
-    row_index_stream: str = "rowidx"
-    column_index_stream: str = "colidx"
-    #: The C parameters the triplet scatter writes.
-    row_stream: str = "rows"
-    column_stream: str = "cols"
-    value_stream: str = "values"
-    element_connectivity: str = "elements"
-    mesh_access: str = "standard_block_elements"
-    pack_index_type: str = "idx_t"
-    pack_partition: str = "none"
-    packed_node_partition: str = "none"
-    value_mapping: str = "identity"
-    duplicate_policy: str = "deterministic_element_order_external_reduction"
-    sort_policy: str = "external_stable_sort_or_existing_sfem_coo_reduce"
-    reduction_phase: str = "non_hot_setup_phase"
-    accumulation_policy: str = "emit_triplets"
-    structural_compatibility: str = "allows_duplicates"
-    entries_per_element: int = 0
-
-    def to_dict(self):
-        return {
-            "kind": "coo",
-            "row_index_stream": self.row_index_stream,
-            "column_index_stream": self.column_index_stream,
-            "row_stream": self.row_stream,
-            "column_stream": self.column_stream,
-            "value_stream": self.value_stream,
-            "element_connectivity": self.element_connectivity,
-            "mesh_access": self.mesh_access,
-            "pack_index_type": self.pack_index_type,
-            "pack_partition": self.pack_partition,
-            "packed_node_partition": self.packed_node_partition,
-            "value_mapping": self.value_mapping,
-            "duplicate_policy": self.duplicate_policy,
-            "sort_policy": self.sort_policy,
-            "reduction_phase": self.reduction_phase,
-            "accumulation_policy": self.accumulation_policy,
-            "structural_compatibility": self.structural_compatibility,
-            "entries_per_element": self.entries_per_element,
-        }
-
-
-@dataclass(frozen=True)
-class PatchAssemblyPlan:
-    #: The diagnostics indexing policy.  Here it does agree with the kernel:
-    #: the scatter reads ``rowptr`` and ``colidx``, which the two fields below
-    #: name individually so the scatter can be spelled from the plan.
-    patch_graph: str = "rowptr_colidx"
-    row_pointer: str = "rowptr"
-    column_index: str = "colidx"
-    value_stream: str = "values"
-    element_connectivity: str = "elements"
-    mesh_access: str = "standard_block_elements"
-    pack_index_type: str = "idx_t"
-    pack_partition: str = "none"
-    packed_node_partition: str = "none"
-    value_mapping: str = "identity"
-    patch_value_layout: str = "node_block_crs_block_row_major"
-    node_index_filter: bool = False
-    accumulation_policy: str = "add_scatter"
-    structural_compatibility: str = "requires_full_graph"
-    reduction_policy: str = "atomic_add"
-    row_dofs_per_patch: int = 0
-    column_dofs_per_patch: int = 0
-    entries_per_patch: int = 0
-
-    def to_dict(self):
-        return {
-            "kind": "patch",
-            "patch_graph": self.patch_graph,
-            "row_pointer": self.row_pointer,
-            "column_index": self.column_index,
-            "value_stream": self.value_stream,
-            "element_connectivity": self.element_connectivity,
-            "mesh_access": self.mesh_access,
-            "pack_index_type": self.pack_index_type,
-            "pack_partition": self.pack_partition,
-            "packed_node_partition": self.packed_node_partition,
-            "value_mapping": self.value_mapping,
-            "patch_value_layout": self.patch_value_layout,
-            "node_index_filter": self.node_index_filter,
-            "accumulation_policy": self.accumulation_policy,
-            "structural_compatibility": self.structural_compatibility,
-            "reduction_policy": self.reduction_policy,
-            "row_dofs_per_patch": self.row_dofs_per_patch,
-            "column_dofs_per_patch": self.column_dofs_per_patch,
-            "entries_per_patch": self.entries_per_patch,
         }
 
 
@@ -611,8 +463,6 @@ def _matrix_fields(unit):
 
 
 def _value_writes_per_element(variant, row_layouts, column_layouts, row_dofs, entries):
-    if variant.matrix_format is MatrixFormat.DIA:
-        return max(1, row_dofs)
     if variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
         block_size = _component_block_size(row_layouts)
         if (
@@ -634,9 +484,7 @@ def _expected_bytes_per_element(variant, row_layouts, column_layouts, row_dofs, 
     scalar_bytes = 8
     index_bytes = 4
     pass_multiplier = 2 if variant.packed_pass is PackedAssemblyPass.TWO_PASS else 1
-    if variant.matrix_format is MatrixFormat.DIA:
-        output_entries = max(1, row_dofs)
-    elif variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
+    if variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
         output_entries = _value_writes_per_element(
             variant,
             row_layouts,
@@ -686,24 +534,6 @@ def _assembly_plan_for_variant(
                 * _block_count(column_dofs, column_block_size)
             ),
             compatible_block_size=compatible,
-        )
-    if variant.matrix_format is MatrixFormat.DIA:
-        dia_contract = _dia_structure_contract(row_layouts, column_layouts)
-        return DIAAssemblyPlan(
-            **mesh_contract,
-            **dia_contract,
-            row_dofs_per_element=row_dofs,
-            values_per_element=max(1, row_dofs),
-        )
-    if variant.matrix_format is MatrixFormat.COO:
-        return COOAssemblyPlan(**mesh_contract, entries_per_element=entries)
-    if variant.matrix_format is MatrixFormat.PATCH:
-        return PatchAssemblyPlan(
-            **mesh_contract,
-            node_index_filter=variant.node_index_filter,
-            row_dofs_per_patch=row_dofs,
-            column_dofs_per_patch=column_dofs,
-            entries_per_patch=entries,
         )
     if variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
         block_size = _component_block_size(row_layouts)
@@ -766,31 +596,6 @@ def _block_count(dofs, block_size):
     if dofs % block_size != 0:
         return dofs
     return dofs // block_size
-
-
-def _dia_structure_contract(row_layouts, column_layouts):
-    if not _single_matching_field_layout(row_layouts, column_layouts):
-        return {
-            "stencil_compatibility": "unsupported_mixed_or_asymmetric_diagonal_structure",
-            "structural_compatibility": "unsupported_mixed_or_asymmetric_diagonal_structure",
-            "reduction_policy": "not_emitted",
-        }
-
-    element_type = row_layouts[0]["element_type"].upper()
-    if element_type in SIMPLEX_AFFINE_DIA_ELEMENTS:
-        return {
-            "stencil_compatibility": "stable_simplex_affine_diagonal_offsets",
-            "structural_compatibility": "stable_simplex_affine_diagonal_offsets",
-        }
-    if element_type in TENSOR_PRODUCT_DIA_ELEMENTS:
-        return {
-            "stencil_compatibility": "stable_tensor_product_diagonal_offsets",
-            "structural_compatibility": "stable_tensor_product_diagonal_offsets",
-        }
-    return {
-        "stencil_compatibility": "runtime_validated_diagonal_offsets",
-        "structural_compatibility": "runtime_validated_diagonal_offsets",
-    }
 
 
 def _single_matching_field_layout(row_layouts, column_layouts):

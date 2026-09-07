@@ -77,50 +77,6 @@ extern "C" int laplace_tri3_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx
 );
-extern "C" int laplace_tri6_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_tri6_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_hex27_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_hex27_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
 extern "C" int laplace_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -133,94 +89,6 @@ extern "C" int laplace_hex8_apply_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outx
 );
 extern "C" int laplace_hex8_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex125_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex125_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex27_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex27_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex64_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex64_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex729_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex729_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -363,50 +231,6 @@ extern "C" int laplace_tri3_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx
 );
-extern "C" int laplace_tri6_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_tri6_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_hex27_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_hex27_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
 extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -419,94 +243,6 @@ extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outx
 );
 extern "C" int laplace_hex8_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex125_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex125_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex27_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex27_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex64_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex64_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex729_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_hex729_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -643,46 +379,6 @@ extern "C" int laplace_tri3_hessian_bsr_isoparametric_mesh_soa_float(
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 );
-extern "C" int laplace_tri6_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tri6_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_hex27_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_hex27_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
 extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -694,86 +390,6 @@ extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT values
 );
 extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex125_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex125_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex64_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex64_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex729_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex729_hessian_bsr_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -903,46 +519,6 @@ extern "C" int laplace_tri3_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 );
-extern "C" int laplace_tri6_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tri6_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_hex27_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_hex27_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
 extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -954,86 +530,6 @@ extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT values
 );
 extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex125_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex125_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex27_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex27_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex64_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex64_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex729_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex729_hessian_crs_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1101,266 +597,6 @@ extern "C" int laplace_tet4_hessian_crs_isoparametric_mesh_soa_float(
         const float kappa,
         const count_t *const SFEM_RESTRICT rowptr,
         const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_quad4_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_quad4_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tri3_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tri3_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tri6_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tri6_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_hex27_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_hex27_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_hex8_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_hex8_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex125_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex125_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex27_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex27_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex64_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex64_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex729_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex729_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tet10_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tet10_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tet4_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_tet4_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
         float *const SFEM_RESTRICT values
 );
 extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(
@@ -1447,62 +683,6 @@ extern "C" int laplace_tri3_objective_steps_isoparametric_mesh_soa_float(
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int laplace_tri6_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_tri6_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int laplace_hex27_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_hex27_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
 extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -1518,118 +698,6 @@ extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT value
 );
 extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_hex125_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_hex125_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_hex27_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_hex64_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_hex64_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_hex729_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_hex729_objective_steps_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -1779,17 +847,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa
             }
             break;
         }
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri6_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri6_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
         default:
             break;
     }
@@ -1818,67 +875,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_isoparametric_mesh_soa
                     ? smesh::TypeToEnum<real_t>::value()
                     : real_type;
     switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_hex27_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_hex27_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
         case smesh::HEX8: {
             switch (resolved_real_type) {
                 case smesh::SMESH_FLOAT64:
                     return laplace_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
                 case smesh::SMESH_FLOAT32:
                     return laplace_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX125: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex125_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex125_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex27_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex27_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX64: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex64_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex64_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX729: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex729_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex729_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
                 default:
                     break;
             }
@@ -1978,17 +980,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_isoparametric_mesh_
             }
             break;
         }
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri6_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri6_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
         default:
             break;
     }
@@ -2017,67 +1008,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_isoparametric_mesh_
                     ? smesh::TypeToEnum<real_t>::value()
                     : real_type;
     switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_hex27_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_hex27_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
         case smesh::HEX8: {
             switch (resolved_real_type) {
                 case smesh::SMESH_FLOAT64:
                     return laplace_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
                 case smesh::SMESH_FLOAT32:
                     return laplace_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX125: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex125_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex125_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex27_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex27_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX64: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex64_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex64_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX729: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex729_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex729_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
                 default:
                     break;
             }
@@ -2176,17 +1112,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_isoparametric_me
             }
             break;
         }
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri6_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri6_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
         default:
             break;
     }
@@ -2214,67 +1139,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_isoparametric_me
                     ? smesh::TypeToEnum<real_t>::value()
                     : real_type;
     switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
         case smesh::HEX8: {
             switch (resolved_real_type) {
                 case smesh::SMESH_FLOAT64:
                     return laplace_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
                 case smesh::SMESH_FLOAT32:
                     return laplace_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX125: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex125_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex125_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX64: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex64_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex64_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX729: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex729_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex729_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
                 default:
                     break;
             }
@@ -2373,17 +1243,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_2d_isoparametric_me
             }
             break;
         }
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri6_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri6_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
         default:
             break;
     }
@@ -2411,67 +1270,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_me
                     ? smesh::TypeToEnum<real_t>::value()
                     : real_type;
     switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_hex27_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_hex27_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
         case smesh::HEX8: {
             switch (resolved_real_type) {
                 case smesh::SMESH_FLOAT64:
                     return laplace_hex8_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
                 case smesh::SMESH_FLOAT32:
                     return laplace_hex8_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX125: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex125_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex125_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex27_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex27_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX64: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex64_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex64_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX729: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex729_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex729_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values);
                 default:
                     break;
             }
@@ -2515,203 +1319,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_crs_3d_isoparametric_me
     }
     std::fprintf(stderr,
             "laplace_hessian_crs_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_dia_2d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        void *const SFEM_RESTRICT values
-) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_quad4_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_quad4_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TRI3: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri3_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri3_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri6_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri6_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-    std::fprintf(stderr,
-            "laplace_hessian_dia_2d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_dia_3d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        void *const SFEM_RESTRICT values
-) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_hex27_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_hex27_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_hex8_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_hex8_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX125: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex125_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex125_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex27_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex27_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX64: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex64_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex64_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX729: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex729_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex729_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX8: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET10: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tet10_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tet10_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tet4_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (double *)values);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tet4_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, (float *)values);
-                default:
-                    break;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-    std::fprintf(stderr,
-            "laplace_hessian_dia_3d_isoparametric_mesh_soa does not support element type %d with real type %d\n",
             (int)element_type,
             (int)real_type);
     return SFEM_FAILURE;
@@ -2771,17 +1378,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_isoparametri
             }
             break;
         }
-        case smesh::TRI6: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri6_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri6_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
         default:
             break;
     }
@@ -2813,67 +1409,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_isoparametri
                     ? smesh::TypeToEnum<real_t>::value()
                     : real_type;
     switch (element_type) {
-        case smesh::HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_hex27_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_hex27_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
         case smesh::HEX8: {
             switch (resolved_real_type) {
                 case smesh::SMESH_FLOAT64:
                     return laplace_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
                 case smesh::SMESH_FLOAT32:
                     return laplace_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX125: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex125_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex125_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX27: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex27_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX64: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex64_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex64_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::PROTEUS_HEX729: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_hex729_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_hex729_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
                 default:
                     break;
             }

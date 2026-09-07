@@ -50,60 +50,6 @@ extern "C" int neumann_general_edgeshell2_boundary_residual_2d_sideset_soa(
         real_t *const SFEM_RESTRICT out1
 );
 
-extern "C" int neumann_general_proteus_quadshell16_boundary_residual_3d_sideset_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t t0,
-        const real_t t0_001,
-        const real_t t0_010,
-        const real_t t0_100,
-        const real_t t1,
-        const real_t t1_001,
-        const real_t t1_010,
-        const real_t t1_100,
-        const real_t t2,
-        const real_t t2_001,
-        const real_t t2_010,
-        const real_t t2_100,
-        const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2
-);
-
-extern "C" int neumann_general_proteus_quadshell25_boundary_residual_3d_sideset_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t t0,
-        const real_t t0_001,
-        const real_t t0_010,
-        const real_t t0_100,
-        const real_t t1,
-        const real_t t1_001,
-        const real_t t1_010,
-        const real_t t1_100,
-        const real_t t2,
-        const real_t t2_001,
-        const real_t t2_010,
-        const real_t t2_100,
-        const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2
-);
-
 extern "C" int neumann_general_proteus_quadshell4_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -131,61 +77,7 @@ extern "C" int neumann_general_proteus_quadshell4_boundary_residual_3d_sideset_s
         real_t *const SFEM_RESTRICT out2
 );
 
-extern "C" int neumann_general_proteus_quadshell9_boundary_residual_3d_sideset_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t t0,
-        const real_t t0_001,
-        const real_t t0_010,
-        const real_t t0_100,
-        const real_t t1,
-        const real_t t1_001,
-        const real_t t1_010,
-        const real_t t1_100,
-        const real_t t2,
-        const real_t t2_001,
-        const real_t t2_010,
-        const real_t t2_100,
-        const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2
-);
-
 extern "C" int neumann_general_quadshell4_boundary_residual_3d_sideset_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nsides,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const real_t t0,
-        const real_t t0_001,
-        const real_t t0_010,
-        const real_t t0_100,
-        const real_t t1,
-        const real_t t1_001,
-        const real_t t1_010,
-        const real_t t1_100,
-        const real_t t2,
-        const real_t t2_001,
-        const real_t t2_010,
-        const real_t t2_100,
-        const int out_stride,
-        real_t *const SFEM_RESTRICT out0,
-        real_t *const SFEM_RESTRICT out1,
-        real_t *const SFEM_RESTRICT out2
-);
-
-extern "C" int neumann_general_quadshell9_boundary_residual_3d_sideset_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nsides,

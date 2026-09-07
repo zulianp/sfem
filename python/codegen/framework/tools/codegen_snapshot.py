@@ -54,16 +54,11 @@ MATERIALS = (
     "linear_elasticity",
     "laplace",
     "neohookean_ogden",
-    "saint_venant_kirchhoff",
-    "modified_mooney_rivlin",
     "mooney_rivlin_kelvin_voigt_newmark",
     "neumann",
     "neumann_general",
-    "poro_hyperelasticity",
-    "stokes",
     "two_phase_flow",
     "navier_stokes",
-    "scalar_potential",
 )
 
 # Byte-for-byte comparison would otherwise trip over editor and interpreter

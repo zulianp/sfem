@@ -59,46 +59,17 @@ static const MatrixAssemblyDiagnostics laplace_tri3_bsr_standard_matrix_assembly
     size_t(168),
 };
 
-static const MatrixAssemblyDiagnostics laplace_tri3_dia_standard_matrix_assembly_diagnostics_data = {
-    "dia",
-    "standard",
-    "none",
-    "standard_block_elements",
-    "dia",
-    "diagonal_offsets",
-    "diagonal_node_block_row_major",
-    "fill_diagonal_values",
-    "stable_simplex_affine_diagonal_offsets",
-    "atomic_add",
-    0,
-    1,
-    1,
-    1,
-    3,
-    1,
-    3,
-    1,
-    3,
-    3,
-    9,
-    6,
-    3,
-    18,
-    size_t(120),
-};
-
-static const MatrixAssemblyDiagnostics *const laplace_tri3_matrix_assembly_variants[3] = {
+static const MatrixAssemblyDiagnostics *const laplace_tri3_matrix_assembly_variants[2] = {
     &laplace_tri3_crs_standard_matrix_assembly_diagnostics_data,
     &laplace_tri3_bsr_standard_matrix_assembly_diagnostics_data,
-    &laplace_tri3_dia_standard_matrix_assembly_diagnostics_data,
 };
 
 int laplace_tri3_matrix_assembly_variant_count() {
-    return 3;
+    return 2;
 }
 
 const MatrixAssemblyDiagnostics *laplace_tri3_matrix_assembly_variant(const int variant) {
-    return (variant >= 0 && variant < 3) ? laplace_tri3_matrix_assembly_variants[variant] : nullptr;
+    return (variant >= 0 && variant < 2) ? laplace_tri3_matrix_assembly_variants[variant] : nullptr;
 }
 
 void laplace_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements) {

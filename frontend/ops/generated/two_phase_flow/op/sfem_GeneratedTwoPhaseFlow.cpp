@@ -948,14 +948,6 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int GeneratedTwoPhaseFlow::hessian_dia(const real_t *const state,
-                            const int *const diag_offsets,
-                            const ptrdiff_t ndiag,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::hessian_dia");
-        return SFEM_FAILURE;
-    }
-
 
     int GeneratedTwoPhaseFlow::value_steps(const real_t *state,
                             const real_t *h,

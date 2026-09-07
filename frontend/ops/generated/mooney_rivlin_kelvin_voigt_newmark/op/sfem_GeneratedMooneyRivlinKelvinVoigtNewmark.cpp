@@ -553,25 +553,6 @@ namespace sfem {
                     if (status != SFEM_SUCCESS) return status;
                     return impl_->residual_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1]) : mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1]);
                 }
-                case smesh::TRI6: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT u_data[2] = {state + 0, state + 1};
-                    const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
-                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                    int status = impl_->gradient_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 2, state + 0, state + 1, 2, out + 0, out + 1) : mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 2, state + 0, state + 1, 2, out + 0, out + 1);
-                    if (status != SFEM_SUCCESS) return status;
-                    return impl_->residual_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1]) : mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1]);
-                }
-                case smesh::QUAD4:
-                case smesh::PROTEUS_QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT u_data[2] = {state + 0, state + 1};
-                    const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
-                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                    int status = impl_->gradient_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 2, state + 0, state + 1, 2, out + 0, out + 1) : mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 2, state + 0, state + 1, 2, out + 0, out + 1);
-                    if (status != SFEM_SUCCESS) return status;
-                    return impl_->residual_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1]) : mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1]);
-                }
                 case smesh::TET4: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
@@ -590,27 +571,18 @@ namespace sfem {
                     if (status != SFEM_SUCCESS) return status;
                     return impl_->residual_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2]) : mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2]);
                 }
+                case smesh::QUAD4:
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT u_data[2] = {state + 0, state + 1};
+                    const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
+                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
+                    int status = impl_->gradient_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 2, state + 0, state + 1, 2, out + 0, out + 1) : mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 2, state + 0, state + 1, 2, out + 0, out + 1);
+                    if (status != SFEM_SUCCESS) return status;
+                    return impl_->residual_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1]) : mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1]);
+                }
                 case smesh::HEX8:
                 case smesh::PROTEUS_HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 3;
-                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
-                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                    int status = impl_->gradient_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2) : mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2);
-                    if (status != SFEM_SUCCESS) return status;
-                    return impl_->residual_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2]) : mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2]);
-                }
-                case smesh::HEX27:
-                case smesh::PROTEUS_HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 3;
-                    const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
-                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                    int status = impl_->gradient_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2) : mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2);
-                    if (status != SFEM_SUCCESS) return status;
-                    return impl_->residual_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2]) : mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2]);
-                }
-                case smesh::PROTEUS_HEX64: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     const real_t *const SFEM_RESTRICT u_data[3] = {state + 0, state + 1, state + 2};
                     const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
@@ -667,27 +639,6 @@ namespace sfem {
                     if (status != SFEM_SUCCESS) return status;
                     return impl_->jacobian_action_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1]) : mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1]);
                 }
-                case smesh::TRI6: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT u_data[2] = {current + 0, current + 1};
-                    const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
-                    const real_t *const SFEM_RESTRICT u_direction_data[2] = {direction + 0, direction + 1};
-                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                    int status = impl_->apply_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 2, state + 0, state + 1, 2, direction + 0, direction + 1, 2, out + 0, out + 1) : mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 2, state + 0, state + 1, 2, direction + 0, direction + 1, 2, out + 0, out + 1);
-                    if (status != SFEM_SUCCESS) return status;
-                    return impl_->jacobian_action_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1]) : mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1]);
-                }
-                case smesh::QUAD4:
-                case smesh::PROTEUS_QUAD4: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
-                    const real_t *const SFEM_RESTRICT u_data[2] = {current + 0, current + 1};
-                    const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
-                    const real_t *const SFEM_RESTRICT u_direction_data[2] = {direction + 0, direction + 1};
-                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
-                    int status = impl_->apply_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 2, state + 0, state + 1, 2, direction + 0, direction + 1, 2, out + 0, out + 1) : mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 2, state + 0, state + 1, 2, direction + 0, direction + 1, 2, out + 0, out + 1);
-                    if (status != SFEM_SUCCESS) return status;
-                    return impl_->jacobian_action_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1]) : mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1]);
-                }
                 case smesh::TET4: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     const real_t *const SFEM_RESTRICT u_data[3] = {current + 0, current + 1, current + 2};
@@ -708,29 +659,19 @@ namespace sfem {
                     if (status != SFEM_SUCCESS) return status;
                     return impl_->jacobian_action_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2]) : mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2]);
                 }
+                case smesh::QUAD4:
+                case smesh::PROTEUS_QUAD4: {
+                    static constexpr ptrdiff_t FIELD_STRIDE = 2;
+                    const real_t *const SFEM_RESTRICT u_data[2] = {current + 0, current + 1};
+                    const real_t *const SFEM_RESTRICT u_old_data[2] = {previous + 0, previous + 1};
+                    const real_t *const SFEM_RESTRICT u_direction_data[2] = {direction + 0, direction + 1};
+                    real_t *const SFEM_RESTRICT u_out[2] = {out + 0, out + 1};
+                    int status = impl_->apply_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 2, state + 0, state + 1, 2, direction + 0, direction + 1, 2, out + 0, out + 1) : mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 2, state + 0, state + 1, 2, direction + 0, direction + 1, 2, out + 0, out + 1);
+                    if (status != SFEM_SUCCESS) return status;
+                    return impl_->jacobian_action_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1]) : mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1]);
+                }
                 case smesh::HEX8:
                 case smesh::PROTEUS_HEX8: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 3;
-                    const real_t *const SFEM_RESTRICT u_data[3] = {current + 0, current + 1, current + 2};
-                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                    const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
-                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                    int status = impl_->apply_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2) : mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2);
-                    if (status != SFEM_SUCCESS) return status;
-                    return impl_->jacobian_action_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2]) : mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2]);
-                }
-                case smesh::HEX27:
-                case smesh::PROTEUS_HEX27: {
-                    static constexpr ptrdiff_t FIELD_STRIDE = 3;
-                    const real_t *const SFEM_RESTRICT u_data[3] = {current + 0, current + 1, current + 2};
-                    const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
-                    const real_t *const SFEM_RESTRICT u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
-                    real_t *const SFEM_RESTRICT u_out[3] = {out + 0, out + 1, out + 2};
-                    int status = impl_->apply_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2) : mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2);
-                    if (status != SFEM_SUCCESS) return status;
-                    return impl_->jacobian_action_uses_affine ? mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2]) : mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2]);
-                }
-                case smesh::PROTEUS_HEX64: {
                     static constexpr ptrdiff_t FIELD_STRIDE = 3;
                     const real_t *const SFEM_RESTRICT u_data[3] = {current + 0, current + 1, current + 2};
                     const real_t *const SFEM_RESTRICT u_old_data[3] = {previous + 0, previous + 1, previous + 2};
@@ -918,14 +859,6 @@ namespace sfem {
                             const idx_t *const,
                             real_t *const) {
         SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_bsr");
-        return SFEM_FAILURE;
-    }
-
-    int GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_dia(const real_t *const,
-                            const int *const,
-                            const ptrdiff_t,
-                            real_t *const) {
-        SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_dia");
         return SFEM_FAILURE;
     }
 }  // namespace sfem

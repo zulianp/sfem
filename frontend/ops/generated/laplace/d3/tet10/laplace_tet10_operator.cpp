@@ -6265,41 +6265,6 @@ static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_scatter_crs
     }
 }
 
-template <typename scalar_t>
-static SFEM_INLINE void laplace_tet10_hessian_isoparametric_mesh_soa_scatter_dia(
-        const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t *const SFEM_RESTRICT element_matrix,
-        const ptrdiff_t nnodes,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        scalar_t *const SFEM_RESTRICT values) {
-    static constexpr int N_FIELD_COMPONENTS = 1;
-    static constexpr int N_SHAPE = 10;
-    ptrdiff_t diagonals[N_SHAPE * N_SHAPE];
-    for (int i = 0; i < N_SHAPE; ++i) {
-        for (int j = 0; j < N_SHAPE; ++j) {
-            const int offset = (int)(ev[j] - ev[i]);
-            ptrdiff_t diagonal = 0;
-            while (diagonal < ndiag && diag_offsets[diagonal] != offset) ++diagonal;
-            diagonals[i * N_SHAPE + j] = diagonal;
-        }
-    }
-    for (int i = 0; i < N_SHAPE; ++i) {
-        for (int j = 0; j < N_SHAPE; ++j) {
-            const ptrdiff_t diagonal = diagonals[i * N_SHAPE + j];
-            scalar_t *const block = &values[(diagonal * nnodes + ev[i]) * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];
-            for (int bi = 0; bi < N_FIELD_COMPONENTS; ++bi) {
-                const int row = bi * N_SHAPE + i;
-                for (int bj = 0; bj < N_FIELD_COMPONENTS; ++bj) {
-                    const int col = bj * N_SHAPE + j;
-#pragma omp atomic update
-                    block[bi * N_FIELD_COMPONENTS + bj] += element_matrix[row * (N_FIELD_COMPONENTS * N_SHAPE) + col];
-                }
-            }
-        }
-    }
-}
-
 template <typename scalar_t, typename geometry_t, int FORMAT>
 static int laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
         const ptrdiff_t nelements,
@@ -6481,8 +6446,6 @@ static int laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
             laplace_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
         } else if constexpr (FORMAT == 0) {
             laplace_tet10_hessian_isoparametric_mesh_soa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
-        } else if constexpr (FORMAT == 2) {
-            laplace_tet10_hessian_isoparametric_mesh_soa_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values);
         } else {
             unsupported_matrix_format |= 1;
         }
@@ -6544,30 +6507,4 @@ extern "C" int laplace_tet10_hessian_bsr_isoparametric_mesh_soa_float(
         float *const SFEM_RESTRICT values
 ) {
     return sfem::codegen::laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int laplace_tet10_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 2>(nelements, nnodes, elements, points, kappa, nullptr, nullptr, values, diag_offsets, ndiag, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int laplace_tet10_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 2>(nelements, nnodes, elements, points, kappa, nullptr, nullptr, values, diag_offsets, ndiag, 0, nullptr, nullptr, nullptr, nullptr);
 }

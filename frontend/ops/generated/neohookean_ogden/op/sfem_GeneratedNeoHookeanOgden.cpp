@@ -949,87 +949,8 @@ namespace sfem {
         });
     }
 
-    int GeneratedNeoHookeanOgden::hessian_dia(const real_t *const x,
-                            const int *const diag_offsets,
-                            const ptrdiff_t ndiag,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::hessian_dia");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("GeneratedNeoHookeanOgden::hessian_dia requires a current state\n");
-            return SFEM_FAILURE;
-        }
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                SFEM_ERROR("neohookean_ogden hessian_dia 2d dispatch was not generated\n");
-                return SFEM_FAILURE;
-            }
-            else if (dim == 3) {
-                SFEM_ERROR("neohookean_ogden hessian_dia 3d dispatch was not generated\n");
-                return SFEM_FAILURE;
-            }
-            SFEM_ERROR("neohookean_ogden hessian_dia does not support spatial dimension %d\n", dim);
-            return SFEM_FAILURE;
-        });
-    }
 
-    int GeneratedNeoHookeanOgden::hessian_coo(const real_t *const x,
-                            const ptrdiff_t nnz,
-                            const idx_t *const rows,
-                            const idx_t *const cols,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::hessian_coo");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("GeneratedNeoHookeanOgden::hessian_coo requires a current state\n");
-            return SFEM_FAILURE;
-        }
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                SFEM_ERROR("neohookean_ogden hessian_coo 2d dispatch was not generated\n");
-                return SFEM_FAILURE;
-            }
-            else if (dim == 3) {
-                SFEM_ERROR("neohookean_ogden hessian_coo 3d dispatch was not generated\n");
-                return SFEM_FAILURE;
-            }
-            SFEM_ERROR("neohookean_ogden hessian_coo does not support spatial dimension %d\n", dim);
-            return SFEM_FAILURE;
-        });
-    }
 
-    int GeneratedNeoHookeanOgden::hessian_patch(const real_t *const x,
-                              const count_t *const rowptr,
-                              const idx_t *const colidx,
-                              real_t *const values) {
-        SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::hessian_patch");
-        const real_t *const current = x;
-        if (!current) {
-            SFEM_ERROR("GeneratedNeoHookeanOgden::hessian_patch requires a current state\n");
-            return SFEM_FAILURE;
-        }
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-            const int dim = mesh->spatial_dimension();
-            if (dim == 2) {
-                SFEM_ERROR("neohookean_ogden hessian_patch 2d dispatch was not generated\n");
-                return SFEM_FAILURE;
-            }
-            else if (dim == 3) {
-                SFEM_ERROR("neohookean_ogden hessian_patch 3d dispatch was not generated\n");
-                return SFEM_FAILURE;
-            }
-            SFEM_ERROR("neohookean_ogden hessian_patch does not support spatial dimension %d\n", dim);
-            return SFEM_FAILURE;
-        });
-    }
 
     int GeneratedNeoHookeanOgden::hessian_block_diag_sym(const real_t *const x,
                                        real_t *const values) {

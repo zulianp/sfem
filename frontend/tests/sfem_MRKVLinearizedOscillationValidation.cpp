@@ -208,12 +208,10 @@ namespace {
 
 int test_linearized_shear_oscillator_hex8() { return check_linearized_shear_oscillator(smesh::HEX8); }
 
-int test_linearized_shear_oscillator_hex27() { return check_linearized_shear_oscillator(smesh::HEX27); }
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_linearized_shear_oscillator_hex8);
-    SFEM_RUN_TEST(test_linearized_shear_oscillator_hex27);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

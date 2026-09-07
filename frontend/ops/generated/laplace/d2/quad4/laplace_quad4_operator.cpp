@@ -84,26 +84,6 @@ extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(
         const idx_t *const SFEM_RESTRICT colidx,
         float *const SFEM_RESTRICT values
 );
-extern "C" int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
 extern "C" int laplace_proteus_quad4_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -852,44 +832,6 @@ extern "C" int laplace_quad4_hessian_crs_isoparametric_mesh_soa_float(
         elements[2]
     };
     return laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_quad4_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, diag_offsets, ndiag, values);
-}
-
-extern "C" int laplace_quad4_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[4] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2]
-    };
-    return laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, diag_offsets, ndiag, values);
 }
 
 extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa(

@@ -44,7 +44,7 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "neohookean_ogden",
     systems,
-    elements=gen.sfem_supported_element_types() + ("PROTEUS_HEX125", "PROTEUS_HEX729"),
+    elements=gen.sfem_default_element_types(),
     op_name="GeneratedNeoHookeanOgden",
     parameter_defaults=(("mu", 1.0), ("lmbda", 1.0)),
     matrix_formats=("bsr",),
