@@ -35,6 +35,7 @@ import sympy as sp
 from codegen.framework.emitters.cprinter import _sfem_ccode
 from codegen.framework.plans.inexact_apply import (
     emittable_inexact_apply_plan,
+    flux_form_for_collection,
     projected_tangent,
     staged_action,
 )
@@ -96,6 +97,13 @@ def _inexact_apply_kernel_source(
         [sp.Symbol("u%s_%d" % (component[c], j)) for j in range(n_nodes)]
         for c in range(dim)
     ]
+    # A rate-dependent material also reads the previous state.  It is gathered
+    # like the current one and absorbed into the tangent, so only the assembly
+    # kernel grows an argument; the apply kernels are untouched.
+    previous_state = [
+        [sp.Symbol("z%s_%d" % (component[c], j)) for j in range(n_nodes)]
+        for c in range(dim)
+    ]
     increment = [
         [sp.Symbol("h%s_%d" % (component[c], j)) for j in range(n_nodes)]
         for c in range(dim)
@@ -113,12 +121,14 @@ def _inexact_apply_kernel_source(
         determinant,
         state,
         is_deformation_gradient,
+        previous_state,
     )
     # Which state values the tangent actually reads.  A state-independent
     # material -- linear elasticity, whose tangent is constant -- reads none,
     # and then the kernel must not gather a state it will not use.  The plan
     # answers this; emission spells the answer.
     used_state = plan.state_dependence(packed, state)
+    used_previous = plan.state_dependence(packed, previous_state)
 
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
@@ -139,7 +149,8 @@ def _inexact_apply_kernel_source(
     ]
     lines.extend(
         _tangent_lines(
-            prefix, dim, n_nodes, component, parameters, used_state, packed, plan,
+            prefix, dim, n_nodes, component, parameters, used_state,
+            used_previous, packed, plan,
         )
     )
     lines.extend(_stored_lines(prefix, n_nodes, component, plan, action_body))
@@ -267,14 +278,20 @@ def _scatter_body(component, n_nodes, scale=""):
 
 
 def _tangent_lines(
-    prefix, dim, n_nodes, component, parameters, used_state, packed, plan
+    prefix, dim, n_nodes, component, parameters, used_state, used_previous,
+    packed, plan,
 ):
-    """The partial assembly: `Sbar` computed once and stored."""
+    """The partial assembly: `Sbar` computed once and stored.
+
+    Takes the previous state only when the material reads one, so a
+    rate-independent material keeps the shorter signature.
+    """
     tangent_symbols = [
         sp.Symbol("tangent%d" % slot) for slot in range(plan.tangent_components)
     ]
     body = _element_lines(n_nodes)
     body.extend(_gather_lines("u", component, n_nodes, used_state))
+    body.extend(_gather_lines("z", component, n_nodes, used_previous))
     body.extend(_geometry_lines(dim))
     body.extend(_assignment_lines(list(zip(tangent_symbols, packed)), "tangent"))
     body.extend(
@@ -286,6 +303,7 @@ def _tangent_lines(
     signature.extend(_geometry_arguments(dim))
     signature.extend("        const scalar_t %s," % name for name in parameters)
     signature.extend(_stream_arguments("u", component))
+    signature.extend(_PREVIOUS_STREAMS_BY_USE[bool(used_previous)](component))
     signature.extend(
         [
             "        const ptrdiff_t tangent_element_stride,",
@@ -368,6 +386,16 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
     )
 
 
+#: Whether the material reads a previous state decides whether the assembly
+#: kernel takes one.  A table rather than a branch, for the reason the rest of
+#: this emitter is: the decision belongs to the plan, which already made it in
+#: `state_dependence`, and emission spells the answer.
+_PREVIOUS_STREAMS_BY_USE = {
+    True: lambda component: _stream_arguments("z", component),
+    False: lambda component: [],
+}
+
+
 def _all_names(role, component, n_nodes):
     return frozenset(
         sp.Symbol("%s%s_%d" % (role, name, node))
@@ -388,38 +416,29 @@ def _function_lines(name, template, signature, body):
 
 
 def inexact_apply_files(material, unit, context):
-    """The opt-in header for one element, or ``()`` when the path does not apply.
+    """The opt-in header for one unit, or ``()`` when the path does not apply.
 
-    Reads what it needs off the unit's lowered form collection, so it sees the
-    same object every other emitter does rather than re-deriving the material.
+    The header is named for the unit rather than the material, because a
+    material with several units would otherwise have them collide on one path.
     """
-    from codegen.framework.symbolic.weak_forms import (
-        flux_form_from_energy,
-        sfem_soa_weak_form,
-    )
-
     collection = getattr(unit, "form_collection", None)
-    if collection is None or collection.kind.value != "energy":
+    if collection is None:
         return ()
-    variables = tuple(collection.variables)
     dim = int(unit.dim)
-    if not variables or len(variables) % dim:
+    built = flux_form_for_collection(collection, dim)
+    if built is None:
         return ()
-    weak_form = sfem_soa_weak_form(
-        collection.forms[0].expression,
-        sp.Matrix(len(variables) // dim, dim, list(variables)),
-    )
-    flux_form = flux_form_from_energy(weak_form)
+    flux_form, is_deformation_gradient = built
     rule = context.specialization.quadrature_rule
     emitted = inexact_apply_kernel_source(
-        material.name,
+        _unit_name(material, unit),
         context.element_type,
         dim,
         int(rule.n_shape),
         flux_form,
         rule,
         flux_form.parameters,
-        weak_form.is_deformation_gradient,
+        is_deformation_gradient,
     )
     if emitted is None:
         return ()
@@ -427,7 +446,12 @@ def inexact_apply_files(material, unit, context):
     return (
         (
             "%s_%s_inexact_apply_inline.hpp"
-            % (material.name, str(context.element_type).lower()),
+            % (_unit_name(material, unit), str(context.element_type).lower()),
             source,
         ),
     )
+
+
+def _unit_name(material, unit):
+    """What this unit's kernels are called, matching the other emitters."""
+    return str(getattr(unit, "name", None) or material.name)

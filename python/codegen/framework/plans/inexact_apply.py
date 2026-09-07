@@ -62,6 +62,7 @@ generation time, where a rational that appears ninety-six times costs nothing
 to repeat and a zero costs nothing at all.
 """
 
+import dataclasses
 from dataclasses import dataclass
 from functools import lru_cache
 import itertools
@@ -167,8 +168,16 @@ class InexactApplyPlan:
     """What an inexact apply kernel emits.
 
     `tangent_components` is how many numbers the projected tangent takes per
-    element, using its major symmetry: a `dim^2` square, so 45 in three
-    dimensions and 10 in two.
+    element.  A tangent that came from an energy is a Hessian and carries the
+    major symmetry `A[i,j,k,l] == A[k,l,i,j]`, which halves the store to 45
+    numbers in three dimensions.  A tangent that came from a residual is a
+    Jacobian and need not be symmetric at all -- Kelvin-Voigt viscosity is not
+    -- and then all 81 are independent.
+
+    `symmetric` defaults to False because that is the safe direction to be
+    wrong in: storing 81 numbers for a symmetric tangent wastes memory, while
+    storing 45 for a non-symmetric one silently averages away its antisymmetric
+    part and returns a different operator.
     """
 
     element_type: str
@@ -176,11 +185,14 @@ class InexactApplyPlan:
     n_nodes: int
     reference: ReferenceGradientProduct
     exact: bool
+    symmetric: bool = False
 
     @property
     def tangent_components(self):
         order = self.dim * self.dim
-        return order * (order + 1) // 2
+        if self.symmetric:
+            return order * (order + 1) // 2
+        return order * order
 
     def tangent_index(self, i, k, m, n):
         """Where `S_{ikmn}` sits in the packed tangent, by major symmetry.
@@ -199,11 +211,16 @@ class InexactApplyPlan:
         no test comparing the staged form against the dense form can catch,
         because both would share it.  It was caught by evaluating the action
         against a directly integrated one on a concrete tetrahedron.
+
+        Without the symmetry the same two indices simply address a full square,
+        and nothing is folded together.
         """
         row, column = i * self.dim + n, k * self.dim + m
+        order = self.dim * self.dim
+        if not self.symmetric:
+            return row * order + column
         if row > column:
             row, column = column, row
-        order = self.dim * self.dim
         return row * order - row * (row - 1) // 2 + (column - row)
 
     def state_dependence(self, packed, state):
@@ -449,6 +466,32 @@ def staged_action(plan, tangent, increment, output_names):
     )
 
 
+def flux_tangent_is_symmetric(flux_form):
+    """Whether the flux's tangent carries the major symmetry `A[ijkl] == A[klij]`.
+
+    An energy's flux is a gradient, so its tangent is a Hessian and this holds
+    by equality of mixed partials.  A residual's flux is not, and its tangent is
+    a Jacobian that generally does not: the Kelvin-Voigt viscous tangent is
+    genuinely unsymmetric.
+
+    Answered conservatively.  Only a difference that expands to exactly zero
+    counts as symmetric; anything else is reported unsymmetric and costs memory
+    rather than correctness.
+    """
+    dim = int(flux_form.dim)
+    if int(flux_form.n_field_components) != dim:
+        return False
+    variables = list(flux_form.gradient)
+    flux = list(flux_form.flux)
+    tangent = {}
+    for i, j, k, l in itertools.product(range(dim), repeat=4):
+        tangent[(i, j, k, l)] = sp.diff(flux[i * dim + j], variables[k * dim + l])
+    for i, j, k, l in itertools.product(range(dim), repeat=4):
+        if sp.expand(tangent[(i, j, k, l)] - tangent[(k, l, i, j)]) != 0:
+            return False
+    return True
+
+
 def emittable_inexact_apply_plan(element_type, dim, n_nodes, flux_form, rule):
     """The plan when this element and form can take the projected apply.
 
@@ -472,7 +515,7 @@ def emittable_inexact_apply_plan(element_type, dim, n_nodes, flux_form, rule):
         return None
     if not tuple(getattr(rule, "weights", ()) or ()):
         return None
-    return plan
+    return dataclasses.replace(plan, symmetric=flux_tangent_is_symmetric(flux_form))
 
 
 def projected_tangent(
@@ -483,6 +526,7 @@ def projected_tangent(
     determinant,
     state,
     is_deformation_gradient,
+    previous_state=None,
 ):
     """`Sbar` packed, as expressions in the adjugate, determinant and state.
 
@@ -491,6 +535,13 @@ def projected_tangent(
     builds `Sbar` and immediately consumes it, and the partial assembly, which
     builds it and stores it.  Emitting it twice from two places is how the two
     would drift apart.
+
+    A rate-dependent material -- Kelvin-Voigt viscosity, say -- reads the
+    *previous* state as well as the current one.  It enters exactly as the
+    current state does, through its own physical gradient, and it is not
+    linearized: the tangent is the derivative with respect to the current state
+    alone, with the previous one held as the data it is.  Both are absorbed
+    into `Sbar` here, which is why the apply kernel below never sees either.
 
     `Sbar` is the material tangent pulled back through the geometry,
 
@@ -516,17 +567,33 @@ def projected_tangent(
     # rather than `grad u`.  It shifts the diagonal and nothing else.
     shift = {True: sp.Integer(1), False: sp.Integer(0)}[bool(is_deformation_gradient)]
 
+    previous = tuple(flux_form.previous_gradient)
     weights = tuple(sp.nsimplify(weight) for weight in rule.weights)
     measure = sum(weights, sp.Integer(0))
     packed = [sp.Integer(0)] * plan.tangent_components
+
+    def physical(nodal, point, c, axis):
+        return sum(
+            nodal[c][j]
+            * sum(gradients[point][j][m] * inverse[m, axis] for m in range(dim))
+            for j in range(n_nodes)
+        )
+
     for point, weight in enumerate(weights):
         substitution = {}
         for c in range(dim):
             for axis in range(dim):
-                substitution[variables[c * dim + axis]] = shift * int(c == axis) + sum(
-                    state[c][j]
-                    * sum(gradients[point][j][m] * inverse[m, axis] for m in range(dim))
-                    for j in range(n_nodes)
+                substitution[variables[c * dim + axis]] = shift * int(c == axis) + (
+                    physical(state, point, c, axis)
+                )
+        # The previous state is data, not a variable: it is substituted, never
+        # differentiated against.
+        for c in range(dim):
+            for axis in range(dim):
+                if not previous:
+                    continue
+                substitution[previous[c * dim + axis]] = physical(
+                    previous_state, point, c, axis
                 )
         seen = set()
         for i, k, m, n in itertools.product(range(dim), repeat=4):
@@ -564,3 +631,46 @@ def reference_gradients_by_point(rule, n_nodes, dim):
         )
         for point in range(points)
     )
+
+
+def flux_form_for_collection(collection, dim):
+    """The flux form a lowered unit implies, or ``None`` when it implies none.
+
+    Both front ends land here.  An energy unit differentiates its density into a
+    flux; a residual unit differentiates the weak form against the test symbols,
+    which is exact because a weak form is linear in its test function.  A
+    material that mixes them -- Mooney-Rivlin elasticity with Kelvin-Voigt
+    viscosity -- has one unit of each, and the split has to cover both or it
+    does not cover the material.
+
+    Returns ``(flux_form, is_deformation_gradient)``.  Whether a unit is
+    eligible at all is decided here rather than in the emitter: it is a question
+    about the lowered form, and an emitter that answered it would be choosing
+    what to emit rather than printing it.
+    """
+    from codegen.framework.symbolic.weak_forms import (
+        flux_form_from_energy,
+        flux_form_from_residual,
+        sfem_soa_weak_form,
+    )
+
+    dim = int(dim)
+    kind = getattr(getattr(collection, "kind", None), "value", None)
+    if kind == "energy":
+        variables = tuple(collection.variables)
+        if not variables or len(variables) % dim:
+            return None
+        weak_form = sfem_soa_weak_form(
+            collection.forms[0].expression,
+            sp.Matrix(len(variables) // dim, dim, list(variables)),
+        )
+        return flux_form_from_energy(weak_form), weak_form.is_deformation_gradient
+    if kind == "residual":
+        expressions = tuple(getattr(collection, "residual_expressions", ()) or ())
+        fields = tuple(getattr(collection, "residual_fields", ()) or ())
+        if not expressions or len(expressions) != len(fields):
+            return None
+        # A residual differentiates against true test gradients, so its gradient
+        # is `grad(u)` and never `I + grad(u)`.
+        return flux_form_from_residual(expressions, fields, dim), False
+    return None

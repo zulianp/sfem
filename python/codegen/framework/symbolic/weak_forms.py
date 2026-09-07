@@ -183,6 +183,14 @@ class SfemSoAFluxForm:
     #: the flux depends on the gradient has to know.  A residual formulation
     #: differentiates against true test gradients and is never this.
     is_deformation_gradient: bool = False
+    #: The gradient of the *previous* state, where the form has one -- a rate
+    #: dependent material such as Kelvin-Voigt reads it.  Laid out like
+    #: ``gradient``, and empty when the form does not.  It is field data, one
+    #: value per element per component per direction, and keeping it here is
+    #: what stops it being mistaken for a material parameter: a uniform and a
+    #: per-element field need different kernel arguments, and the difference is
+    #: not recoverable from the symbol name.
+    previous_gradient: Tuple[sp.Expr, ...] = ()
 
     def __post_init__(self):
         dim = int(self.dim)
@@ -195,6 +203,11 @@ class SfemSoAFluxForm:
         object.__setattr__(
             self, "is_deformation_gradient", bool(self.is_deformation_gradient)
         )
+        object.__setattr__(self, "previous_gradient", tuple(self.previous_gradient))
+        if self.previous_gradient and len(self.previous_gradient) != n_field_components * dim:
+            raise ValueError(
+                "previous_gradient must be empty or have n_field_components * dim entries"
+            )
         if dim <= 0:
             raise ValueError("flux form dim must be positive")
         if n_field_components <= 0:
@@ -217,7 +230,8 @@ class SfemSoAFluxForm:
         `free_symbols` to find out what a kernel's signature needs -- which is
         a planning question and one an emitter must not be answering.
         """
-        gradient = {str(symbol) for symbol in self.gradient}
+        state = {str(symbol) for symbol in self.gradient}
+        state |= {str(symbol) for symbol in self.previous_gradient}
         return tuple(
             sorted(
                 {
@@ -225,7 +239,7 @@ class SfemSoAFluxForm:
                     for entry in tuple(self.flux) + tuple(self.source)
                     for symbol in entry.free_symbols
                 }
-                - gradient
+                - state
             )
         )
 
@@ -311,6 +325,7 @@ def flux_form_from_residual(residual_expressions, fields, dim):
     flux = []
     source = []
     gradient = []
+    previous_gradient = []
     for expression, field in zip(residual_expressions, fields):
         test_gradient = tuple(field.test_gradient)
         if len(test_gradient) != dim:
@@ -332,8 +347,18 @@ def flux_form_from_residual(residual_expressions, fields, dim):
             sp.diff(expression, test_value) if test_value is not None else sp.Integer(0)
         )
         gradient.extend(field.gradient)
+        previous_gradient.extend(field.previous_gradient)
+    # A field records its previous gradient whether or not the form reads it;
+    # carry it only when the flux actually does, so a rate-independent material
+    # is not handed an unused state stream.
+    mentioned = set()
+    for entry in flux + source:
+        mentioned |= entry.free_symbols
+    if not mentioned.intersection(previous_gradient):
+        previous_gradient = []
     return SfemSoAFluxForm(
-        tuple(flux), tuple(source), tuple(gradient), dim, len(fields)
+        tuple(flux), tuple(source), tuple(gradient), dim, len(fields),
+        previous_gradient=tuple(previous_gradient),
     )
 
 

@@ -8,6 +8,7 @@ specific way, and on an affine simplex the projection loses nothing at all --
 which is the case the whole construction can be checked against.
 """
 
+import dataclasses
 import itertools
 import unittest
 
@@ -123,10 +124,10 @@ class ProjectionTest(unittest.TestCase):
         be written directly.  The plan is built by symbolic integration instead
         and must land on the same expression.
         """
-        plan = inexact_apply_plan("TET4")
+        plan = _symmetric(inexact_apply_plan("TET4"))
         basis = reference_basis("TET4")
         gradients = basis.gradients()
-        tangent = sp.symbols("S0:45")
+        tangent = sp.symbols("S0:%d" % plan.tangent_components)
         increment = [
             [sp.Symbol("h%d_%d" % (component, node)) for node in range(plan.n_nodes)]
             for component in range(plan.dim)
@@ -166,7 +167,7 @@ class CompressionTest(unittest.TestCase):
         code.  Folded, TET4's action is a third of the operations.
         """
         plan = inexact_apply_plan("TET4")
-        tangent = sp.symbols("S0:45")
+        tangent = sp.symbols("S0:%d" % plan.tangent_components)
         increment = [
             [sp.Symbol("h%d_%d" % (component, node)) for node in range(plan.n_nodes)]
             for component in range(plan.dim)
@@ -260,7 +261,7 @@ class StagedActionTest(unittest.TestCase):
         it is only allowed to do that if it computes the same thing.
         """
         for element in ("TRI3", "TET4", "QUAD4"):
-            plan = inexact_apply_plan(element)
+            plan = _symmetric(inexact_apply_plan(element))
             tangent, increment, names = _symbols(plan)
             stages = staged_action(plan, tangent, increment, names)
             substitution = {}
@@ -278,6 +279,10 @@ class StagedActionTest(unittest.TestCase):
     #: element -> (dense operations, staged operations).  Recorded, because
     #: the staging is worth carrying only where the rank is small against the
     #: order, and these are the numbers that say where that is.
+    #: Measured on the symmetric packing, which is what a material written as an
+    #: energy has: its tangent is a Hessian.  A residual's tangent is a Jacobian
+    #: and need not be symmetric, and then the store is the full square -- see
+    #: `UNSYMMETRIC_COST` below.
     COST = {
         "TET4": (486, 207),
         "TRI3": (96, 52),
@@ -288,7 +293,7 @@ class StagedActionTest(unittest.TestCase):
 
     def test_the_staged_cost_is_what_was_measured(self):
         for element, (dense_expected, staged_expected) in sorted(self.COST.items()):
-            plan = inexact_apply_plan(element)
+            plan = _symmetric(inexact_apply_plan(element))
             tangent, increment, names = _symbols(plan)
             dense = _operations(plan.action(tangent, increment))
             staged = sum(
@@ -316,6 +321,82 @@ class StagedActionTest(unittest.TestCase):
             with self.subTest(element=element):
                 self.assertLess(staged * 3, dense * 2)
         self.assertEqual(self.COST["QUAD4"][0], self.COST["QUAD4"][1])
+
+
+class UnsymmetricTangentTest(unittest.TestCase):
+    """The packing when the tangent is a Jacobian rather than a Hessian.
+
+    An energy's flux is a gradient, so its tangent carries
+    `A[i,j,k,l] == A[k,l,i,j]` and the store folds to half a square.  A
+    residual's flux is not a gradient: the Kelvin-Voigt viscous tangent is
+    genuinely unsymmetric, and folding it averaged its antisymmetric part away
+    and returned a different operator.  Nothing tested the unsymmetric packing
+    when that happened, which is why it took a real material to find it.
+    """
+
+    def test_the_store_is_a_full_square_without_the_symmetry(self):
+        for element in ("TRI3", "TET4"):
+            plan = inexact_apply_plan(element)
+            order = plan.dim * plan.dim
+            with self.subTest(element=element):
+                self.assertFalse(plan.symmetric)
+                self.assertEqual(plan.tangent_components, order * order)
+                self.assertEqual(
+                    _symmetric(plan).tangent_components, order * (order + 1) // 2
+                )
+
+    def test_every_index_is_distinct_without_the_symmetry(self):
+        """No two tangent entries may share a slot, or one of them is lost."""
+        for element in ("TRI3", "TET4"):
+            plan = inexact_apply_plan(element)
+            dim = plan.dim
+            seen = {}
+            for i, k, m, n in itertools.product(range(dim), repeat=4):
+                slot = plan.tangent_index(i, k, m, n)
+                self.assertNotIn(slot, seen, "%s: (%d,%d,%d,%d) collides with %s"
+                                 % (element, i, k, m, n, seen.get(slot)))
+                seen[slot] = (i, k, m, n)
+            with self.subTest(element=element):
+                self.assertEqual(len(seen), plan.tangent_components)
+
+    def test_a_symmetric_tangent_gives_the_same_action_either_way(self):
+        """The two packings agree exactly where the symmetry actually holds.
+
+        This is what makes the symmetric packing an optimisation rather than a
+        different operator: fed a tangent that really is symmetric, the folded
+        store and the full square must produce the same action.
+        """
+        plan = inexact_apply_plan("TET4")
+        folded = _symmetric(plan)
+        dim = plan.dim
+        entry = {}
+        for i, k, m, n in itertools.product(range(dim), repeat=4):
+            key = tuple(sorted(((i, n), (k, m))))
+            entry.setdefault(key, sp.Symbol("A_%d%d_%d%d" % (key[0] + key[1])))
+        full = [sp.Integer(0)] * plan.tangent_components
+        half = [sp.Integer(0)] * folded.tangent_components
+        for i, k, m, n in itertools.product(range(dim), repeat=4):
+            value = entry[tuple(sorted(((i, n), (k, m))))]
+            full[plan.tangent_index(i, k, m, n)] = value
+            half[folded.tangent_index(i, k, m, n)] = value
+        increment = [
+            [sp.Symbol("h%d_%d" % (c, j)) for j in range(plan.n_nodes)]
+            for c in range(dim)
+        ]
+        for a, b in zip(plan.action(full, increment), folded.action(half, increment)):
+            self.assertEqual(sp.expand(a - b), 0)
+
+
+def _symmetric(plan):
+    """That plan with the major symmetry asserted.
+
+    `inexact_apply_plan` leaves `symmetric` false, because that is the safe
+    default for a plan whose flux has not been examined: storing the full square
+    for a symmetric tangent costs memory, storing half of an unsymmetric one
+    silently returns a different operator.  Tests that measure the symmetric
+    packing have to ask for it.
+    """
+    return dataclasses.replace(plan, symmetric=True)
 
 
 def _symbols(plan):
