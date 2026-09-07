@@ -19,7 +19,10 @@ tag=$1; shift
 bin=$1; shift
 : ${CVRUN_FILTER:="^newton |^stage |^continuation|^ *upwind |band eps|smoother|sweep |^[0-9]+\	|highest Re SOLVED|newton_converged|lin_it_total|t_solve|u_l|sum of continuity|active set|fd_at_it|eps "}
 echo ">>> START $tag  $(date +%H:%M:%S)  raw: $CVRUN_DIR/$tag.log"
-env "$@" "$bin" "${CVRUN_OUT:-/tmp/cvrun_$tag}" 2>&1 \
+# stdbuf on the BINARY as well as the filter. Line-buffering only the filter is not enough:
+# the program's own stdout is block-buffered when it is a pipe, so its output reaches the raw
+# log up to 4 KB late and a running job still looks silent. Both ends need it.
+stdbuf -oL -eL env "$@" "$bin" "${CVRUN_OUT:-/tmp/cvrun_$tag}" 2>&1 \
   | tee "$CVRUN_DIR/$tag.log" \
   | stdbuf -oL grep -E "$CVRUN_FILTER"
 echo "<<< END   $tag  $(date +%H:%M:%S)  raw: $CVRUN_DIR/$tag.log"
