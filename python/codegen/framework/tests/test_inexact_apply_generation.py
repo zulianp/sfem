@@ -172,3 +172,54 @@ class InexactApplyAbiTest(InexactApplyGenerationTest):
         for absent in ("g_jacobian", "u_stride", "mu", "lmbda"):
             with self.subTest(absent=absent):
                 self.assertNotIn(absent, body)
+
+
+class InexactApplyOpWrapperTest(InexactApplyGenerationTest):
+    """The generated Op has to offer the split, or SFEM cannot reach it.
+
+    `Op` declares `inexact_supported`, `inexact_update` and `inexact_apply` with
+    defaults that refuse, so an Op that generates nothing overrides nothing and
+    every existing caller is unaffected.  These pin the other half: that a
+    material which asks for the split says so, owns the store, and cannot apply
+    from one that was never assembled.
+    """
+
+    def _op_files(self, opt_in):
+        files = self._generate("linear_elasticity", "TET4", opt_in=opt_in)
+        header = files["op/sfem_GeneratedLinearElasticity.hpp"]
+        source = files["op/sfem_GeneratedLinearElasticity.cpp"]
+        return header, source
+
+    def test_the_op_declares_the_inexact_methods(self):
+        header, _source = self._op_files(opt_in=True)
+        self.assertIn("bool inexact_supported() const override { return true; }", header)
+        self.assertIn("int inexact_update(const real_t *const x) override;", header)
+        self.assertIn(
+            "int inexact_apply(const real_t *const h, real_t *const out) override;", header
+        )
+
+    def test_an_op_without_the_split_declares_nothing(self):
+        """The default `inexact_supported() == false` has to survive."""
+        header, source = self._op_files(opt_in=False)
+        self.assertNotIn("inexact_supported", header)
+        self.assertNotIn("inexact_update", header)
+        self.assertNotIn("inexact_tangent", source)
+
+    def test_the_op_owns_the_store_and_refuses_a_stale_apply(self):
+        _header, source = self._op_files(opt_in=True)
+        self.assertIn("SharedBuffer<metric_tensor_t> inexact_tangent;", source)
+        # sized once, refilled in place
+        self.assertIn("if (!cache->inexact_tangent) {", source)
+        # and an apply before an update is an error, not an empty answer
+        start = source.index("::inexact_apply(")
+        body = source[start:source.index("\n    }", start)]
+        self.assertIn("requires inexact_update first", body)
+
+    def test_the_op_apply_takes_no_state(self):
+        """The whole point, restated where SFEM will see it."""
+        _header, source = self._op_files(opt_in=True)
+        start = source.index("::inexact_apply(")
+        body = source[start:source.index("\n    }", start)]
+        for absent in ("jacobian_soa", "require_real_value", "x + 0"):
+            with self.subTest(absent=absent):
+                self.assertNotIn(absent, body)
