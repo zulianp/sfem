@@ -43,7 +43,8 @@
 #ifndef STATE_AMPLITUDE
 #define STATE_AMPLITUDE 0.02
 #endif
-typedef __fp16 half_t;
+// `half_t` comes from sfem_config.h: __fp16 on some targets, _Float16 on
+// others.  Declaring it here would conflict on whichever one it is not.
 
 extern "C" int EXACT_APPLY(
         const ptrdiff_t, const ptrdiff_t, idx_t **const,
