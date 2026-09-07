@@ -59,13 +59,29 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a
     const ptrdiff_t, double *const, double *const, double *const);
 
 template <typename F> static double best_mdof(int repeats, ptrdiff_t ndof, F &&fn) {
+    // The timed region is the kernel and nothing else.
+    //
+    // Two things used to sit inside it and both distorted the result, badly at
+    // high thread counts.  Zeroing the output arrays is a serial `std::fill` of
+    // several megabytes that is not part of the operator and does not
+    // parallelise, so it charged Amdahl's tax to the kernel.  And timing a
+    // single call charged that call for the OpenMP team startup and a cold
+    // cache, which is a large fraction of a kernel that runs for a few
+    // milliseconds on ten cores.  Together they understated throughput by three
+    // to five times and compressed the measured scaling.
+    //
+    // So: the outputs are not cleared between repetitions.  The apply
+    // accumulates, so the values grow -- which does not affect what is being
+    // measured, and correctness is checked separately, with clearing, outside
+    // any timed region.
+    fn();
     double top = 0;
-    fn();                                  // untimed: page faults, cold cache
-    for (int r = 0; r < repeats; ++r) {
+    for (int attempt = 0; attempt < 3; ++attempt) {
         auto t0 = std::chrono::steady_clock::now();
-        fn();
+        for (int r = 0; r < repeats; ++r) fn();
         auto t1 = std::chrono::steady_clock::now();
-        top = std::max(top, (double)ndof / std::chrono::duration<double>(t1 - t0).count() * 1e-6);
+        const double seconds = std::chrono::duration<double>(t1 - t0).count();
+        top = std::max(top, (double)ndof * repeats / seconds * 1e-6);
     }
     return top;
 }
@@ -132,7 +148,6 @@ int main(int argc, char **argv) {
 
         // The exact action is the sum of the two units' exact kernels.
         auto run_exact = [&] {
-            z3(ax,ay,az);
             mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_affine_mesh_soa(
                 EC, N, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
                 lmbda, mu, 1, ux.data(),uy.data(),uz.data(), 1, hx.data(),hy.data(),hz.data(),
@@ -144,7 +159,6 @@ int main(int argc, char **argv) {
                 1, ax.data(),ay.data(),az.data());
         };
         auto run_stored = [&](auto *ep, auto *vp) {
-            z3(bx,by,bz);
             ELASTIC_STORED<double, typename std::remove_const<typename std::remove_pointer<decltype(ep)>::type>::type>(
                 EC, m.evp.data(), 1, CS, ep, 1, hx.data(),hy.data(),hz.data(),
                 1, bx.data(),by.data(),bz.data());
@@ -153,7 +167,6 @@ int main(int argc, char **argv) {
                 1, bx.data(),by.data(),bz.data());
         };
         auto run_compressed = [&] {
-            z3(bx,by,bz);
             ELASTIC_COMPRESS<double, half_t, float>(EC, m.evp.data(), 1, CS, E16.data(), ES.data(),
                 1, hx.data(),hy.data(),hz.data(), 1, bx.data(),by.data(),bz.data());
             VISCOUS_COMPRESS<double, half_t, float>(EC, m.evp.data(), 1, CS, V16.data(), VS.data(),
@@ -163,10 +176,11 @@ int main(int argc, char **argv) {
                 num+=std::fabs(ax[i]-bx[i])+std::fabs(ay[i]-by[i])+std::fabs(az[i]-bz[i]);
                 den+=std::fabs(ax[i])+std::fabs(ay[i])+std::fabs(az[i]); } return num/den; };
 
-        run_exact();
-        run_stored(E64.data(), V64.data()); const double d64 = rel();
-        run_stored(E32.data(), V32.data()); const double d32 = rel();
-        run_compressed();                   const double d16 = rel();
+        // Correctness first, each from a cleared output.  Outside any timing.
+        z3(ax,ay,az); run_exact();
+        z3(bx,by,bz); run_stored(E64.data(), V64.data()); const double d64 = rel();
+        z3(bx,by,bz); run_stored(E32.data(), V32.data()); const double d32 = rel();
+        z3(bx,by,bz); run_compressed();                   const double d16 = rel();
 
         const double e   = best_mdof(repeats, ndof, run_exact);
         const double s64 = best_mdof(repeats, ndof, [&]{ run_stored(E64.data(), V64.data()); });

@@ -61,18 +61,29 @@ extern "C" int EXACT_APPLY(
 #include "element_mesh.inc"
 
 template <typename F> static double best_mdof(int repeats, ptrdiff_t ndof, F &&fn) {
-    double top = 0;
-    // One untimed pass first.  The stored tangent is tens of megabytes at the
-    // sizes that saturate, so the first touch of it pays for page faults and a
-    // cold cache, and timing that measures the allocator rather than the
-    // kernel.  Without this the same kernel reads 6 MDOF/s at one size and 15
-    // at the next.
+    // The timed region is the kernel and nothing else.
+    //
+    // Two things used to sit inside it and both distorted the result, badly at
+    // high thread counts.  Zeroing the output arrays is a serial `std::fill` of
+    // several megabytes that is not part of the operator and does not
+    // parallelise, so it charged Amdahl's tax to the kernel.  And timing a
+    // single call charged that call for the OpenMP team startup and a cold
+    // cache, which is a large fraction of a kernel that runs for a few
+    // milliseconds on ten cores.  Together they understated throughput by three
+    // to five times and compressed the measured scaling.
+    //
+    // So: the outputs are not cleared between repetitions.  The apply
+    // accumulates, so the values grow -- which does not affect what is being
+    // measured, and correctness is checked separately, with clearing, outside
+    // any timed region.
     fn();
-    for (int r = 0; r < repeats; ++r) {
+    double top = 0;
+    for (int attempt = 0; attempt < 3; ++attempt) {
         auto t0 = std::chrono::steady_clock::now();
-        fn();
+        for (int r = 0; r < repeats; ++r) fn();
         auto t1 = std::chrono::steady_clock::now();
-        top = std::max(top, (double)ndof / std::chrono::duration<double>(t1 - t0).count() * 1e-6);
+        const double seconds = std::chrono::duration<double>(t1 - t0).count();
+        top = std::max(top, (double)ndof * repeats / seconds * 1e-6);
     }
     return top;
 }

@@ -61,120 +61,29 @@ writing `Sbar` per element, one reading it. Its break-even is the number of
 applies per tangent, which the fused form fixes at one and a Krylov solve makes
 large.
 
-# A material with more than one unit
-
-`bench_mixed.cpp`.  Mooney-Rivlin elasticity plus Kelvin-Voigt viscosity is an
-energy unit and a residual unit in one material.  The operator's action is the
-sum of the two, so the split carries both -- two tangents assembled, two applies
-summed -- and is compared against the sum of the two exact kernels.
-
-It broke two assumptions that every single-unit material had quietly satisfied.
-
-**The tangent's state is not only the current state.**  The viscous flux reads
-`grad(old(u))`.  The flux form was folding those nine symbols in with `eta_s`
-and `eta_b`, which would have emitted per-element field data as scalar uniforms.
-`SfemSoAFluxForm` now carries `previous_gradient` separately, taken from the
-residual field records that already model it.
-
-**The tangent is not always symmetric.**  An energy's flux is a gradient, so its
-tangent is a Hessian and `A[ijkl] == A[klij]` holds by equality of mixed
-partials; that symmetry is what folds 81 stored numbers into 45.  A residual's
-flux is not a gradient, its tangent is a Jacobian, and the Kelvin-Voigt viscous
-tangent violates the symmetry by 0.25 in absolute terms.  Packing it into 45
-averaged away its antisymmetric part and returned a different operator: 5.3e-2
-relative error on TET4, an element where the projection is provably exact.  The
-plan now decides symmetry symbolically and stores 45 or 81 accordingly, and it
-defaults to *unsymmetric*, because storing 81 for a symmetric tangent wastes
-memory while storing 45 for an unsymmetric one is silently wrong.
-
-With that fixed both units reproduce their exact kernels to round-off on TET4:
-
-| unit | front end | tangent | stored numbers | split vs exact |
-|---|---|---|---|---|
-| elastic (Mooney-Rivlin) | energy   | symmetric Hessian    | 45 | 7.27e-16 |
-| viscous (Kelvin-Voigt)  | residual | unsymmetric Jacobian | 81 | 7.29e-16 |
-
-The apply kernels are unchanged by any of this.  The viscous apply takes the
-tangent and the increment -- no geometry, no state, no previous state, no
-viscosity parameters.  However many state fields a material reads, they are all
-absorbed into `Sbar` at assembly time, so extra state costs one argument on the
-once-per-tangent kernel and nothing at all per Krylov iteration.
-
-## Measured, single-threaded, 206763 dof
-
-| | exact | st. f64 | st. f32 | st. f16 | assembly |
-|---|---|---|---|---|---|
-| MDOF/s | 2.39 | 6.80 | 8.07 | 9.92 | 1.32 |
-| speed-up | -- | 2.85x | 3.38x | 4.15x | -- |
-
-Correctness 4.44e-15 against the summed exact kernels.  Store 1008 / 504 / 260
-bytes per element (45 elastic + 81 viscous), against 360 / 180 / 94 for a single
-hyperelastic material.
-
-The larger store costs bandwidth and the technique still wins by more here than
-on any single-unit material, because the exact side has to evaluate *two*
-expensive tangents per apply and the split evaluates neither.
-
-## Threads, and what OpenMP costs the split
-
-Same problem, 206763 dof, on 8 performance plus 2 efficiency cores.
-
-| threads | exact | st. f64 | st. f32 | st. f16 | assembly | f16 speed-up |
-|---|---|---|---|---|---|---|
-|  1 |  2.52 |  4.89 |  5.87 |  7.01 | 1.38 | 2.78x |
-|  2 |  5.25 |  9.79 | 11.44 | 13.50 | 2.76 | 2.57x |
-|  4 | 10.48 | 19.46 | 24.17 | 28.84 | 5.58 | 2.75x |
-|  8 | 13.04 | 23.00 | 27.11 | 32.58 | 6.26 | 2.50x |
-| 10 | 13.53 | 24.05 | 29.65 | 36.05 | 7.92 | 2.66x |
-
-Break-even stays near three applies per tangent throughout (2.7 to 3.5).
-
-**The atomic scatter is what changes between the two builds, and it costs the
-split disproportionately.**  Compare the single-thread rows above with the
-single-threaded table before them, which was built without OpenMP: the exact
-kernel is unaffected (2.39 against 2.52), while the f16 stored apply falls from
-9.92 to 7.01, 29 per cent, purely from compiling with `-fopenmp`.  With OpenMP
-the scatter is a real `#pragma omp atomic update` even on one thread; without it
-the pragma disappears and the scatter is a plain `+=`.  The split does much less
-arithmetic per scatter than the exact kernel does, so the same per-scatter cost
-is a far larger share of its total, and the advantage falls from 4.15x to about
-2.7x.
-
-Parallel scaling itself is not the problem and is nearly identical for both:
-5.4x for the exact apply on ten cores against 5.1x for the stored one.  The
-split does not scale worse, it pays a constant tax.  That makes the scatter --
-not the contraction, and not the store -- the first place to look for more
-speed on this path.
-
-## Reproducing
-
-`bench.cpp` (TET4) and `bench_hex8.cpp` (HEX8) take the material through
-`-DEXACT_APPLY=`, `-DPROJECTED_APPLY=`, `-DMATERIAL_INEXACT_HEADER=` and
-`-DEXACT_TAKES_STATE` for a material whose exact apply takes one. Generate with
-`inexact_apply=True`, then compile the bench against the element operator (and
-the PROTEUS_HEX8 unit, which HEX8 aliases into).
 
 # The split form: measured
 
 `bench_split.cpp`, driven by `run_split.sh`, generates the split kernels, builds
-`Sbar` once into a store, and applies it at three storage precisions.  Single
-threaded, `-O3 -march=native`, Apple M-series laptop, best of 7 after one untimed
-warm-up pass.  All figures MDOF/s.
+`Sbar` once into a store, and applies it at three storage precisions.
 
-At 206763 degrees of freedom:
+Single-threaded, `-O3 -march=native`, Apple M-series laptop, twenty repetitions
+inside each timing window, at 206763 degrees of freedom.  All figures MDOF/s.
+TET10 is swept over n = 4..20 rather than 8..40 because it carries `(2n+1)^3`
+nodes; the dof counts are matched across elements.
 
 | material | element | exact | st. f64 | st. f32 | st. f16 | assembly | speed-up (f16) | break-even f64/f32/f16 |
 |---|---|---|---|---|---|---|---|---|
-| neohookean Ogden  | TET4  |  5.14 | 23.25 | 26.45 | 30.55 |  4.25 | 5.94x | 1.6 / 1.5 / 1.5 |
-| neohookean Ogden  | TET10 | 12.14 | 42.26 | 44.15 | 46.69 |  3.94 | 3.85x | 4.3 / 4.3 / 4.2 |
-| neohookean Ogden  | HEX8  |  6.84 | 16.92 | 17.62 | 17.85 |  3.92 | 2.61x | 2.9 / 2.8 / 2.8 |
-| linear elasticity | TET4  | 18.15 | 23.22 | 26.72 | 30.24 | 17.08 | 1.67x | 4.9 / 3.3 / 2.7 |
-| linear elasticity | TET10 | 26.72 | 43.25 | 45.03 | 46.82 | 149.84 | 1.75x | 0.5 / 0.4 / 0.4 |
-| linear elasticity | HEX8  | 24.80 | 17.26 | 17.58 | 17.98 | 112.90 | 0.72x | never |
+| neohookean Ogden  | TET4  |  5.12 | 22.79 | 26.15 | 30.26 |   4.22 | 5.91x | 1.6 / 1.5 / 1.5 |
+| neohookean Ogden  | TET10 | 12.01 | 42.66 | 44.47 | 46.15 |   3.89 | 3.84x | 4.3 / 4.2 / 4.2 |
+| neohookean Ogden  | HEX8  |  7.10 | 17.22 | 17.40 | 17.80 |   3.95 | 2.51x | 3.1 / 3.0 / 3.0 |
+| linear elasticity | TET4  | 17.41 | 22.47 | 25.39 | 30.26 |  17.08 | 1.74x | 4.5 / 3.2 / 2.4 |
+| linear elasticity | TET10 | 26.31 | 42.21 | 44.15 | 45.79 | 146.33 | 1.74x | 0.5 / 0.4 / 0.4 |
+| linear elasticity | HEX8  | 23.94 | 16.95 | 17.15 | 17.59 | 110.22 | 0.73x | never |
 
 Break-even is how many applies must share one tangent before the split has repaid
-its assembly: `(1/a) / (1/e - 1/s)`.  Five of six pairs win, by 1.7x to 5.9x, at
-between 0.4 and 4.3 applies per tangent -- well inside one Krylov solve.
+its assembly: `(1/a) / (1/e - 1/s)`.  Five of six win, by 1.7x to 5.9x, at between
+0.4 and 4.3 applies per tangent -- well inside one Krylov solve.
 
 **HEX8 linear elasticity never pays.**  Its break-even is negative at every
 precision: the stored apply is slower than the exact one, so no amount of reuse
@@ -183,15 +92,37 @@ repays the assembly.  Twenty-four degrees of freedom per element against a
 make the store pure added bandwidth.  That is the boundary of the technique.
 
 **Precision buys less than the byte count suggests.**  f64 to f16 is a 3.8x
-reduction in the store for 1.07x to 1.31x throughput, and on HEX8 almost nothing.
+reduction in the store for 1.03x to 1.33x throughput, and on HEX8 almost nothing.
 These kernels are not purely bandwidth-bound on the tangent: the gather of the
 increment, the scatter of the output and the contraction all cost.  f32 is the
 sensible default -- half the bytes of f64, most of the speed of f16, and seven
 digits of accuracy instead of three.
 
+The projection is exact wherever the tangent does not vary over the element: both
+materials on TET4, and linear elasticity everywhere, including on TET10 and HEX8
+where the *basis* varies but the tangent does not.
+
 There is no fused variant.  An earlier revision emitted one, which rebuilt `Sbar`
 on every apply; it was scaffolding for the comparison and is gone.  The stored
 apply gates correctness now, and did so identically while both existed.
+
+## Accuracy of the store
+
+| store | bytes/element | rel. difference from exact |
+|---|---|---|
+| f64                          | 360 | 3.8e-15 |
+| f32 (`metric_tensor_t`)      | 180 | 1.7e-07 |
+| f16 + scale (`compressed_t`) |  94 | 1.4e-03 |
+
+For a single hyperelastic material, whose tangent is symmetric and takes 45
+numbers.  The f64 store reproduces the exact apply to round-off, which is the
+gate: on an affine simplex the projection loses nothing, so any difference would
+be a bug in the split rather than an approximation.
+
+The scale is applied to the outputs rather than to the stored components.  The
+action is linear in `Sbar`, so it is the same number, reached with
+`dim * n_nodes` multiplies instead of 45 and without a decompressed copy of the
+tangent in registers.
 
 ## Warp sweep: deviation against severity
 
@@ -267,6 +198,105 @@ is first order in both the mesh size and the warp, and whether that is acceptabl
 is a question about the solver that consumes it -- it is an inexact Newton
 operator -- not about the kernel.
 
+
+# A material with more than one unit
+
+`bench_mixed.cpp`.  Mooney-Rivlin elasticity plus Kelvin-Voigt viscosity is an
+energy unit and a residual unit in one material.  The operator's action is the sum
+of the two, so the split carries both -- two tangents assembled, two applies
+summed -- and is compared against the sum of the two exact kernels.
+
+It broke two assumptions that every single-unit material had quietly satisfied.
+
+**The tangent's state is not only the current state.**  The viscous flux reads
+`grad(old(u))`.  The flux form was folding those nine symbols in with `eta_s` and
+`eta_b`, which would have emitted per-element field data as scalar uniforms.
+`SfemSoAFluxForm` now carries `previous_gradient` separately, taken from the
+residual field records that already model it.
+
+**The tangent is not always symmetric.**  An energy's flux is a gradient, so its
+tangent is a Hessian and `A[ijkl] == A[klij]` holds by equality of mixed partials;
+that is what folds 81 stored numbers into 45.  A residual's flux is not a
+gradient, its tangent is a Jacobian, and the Kelvin-Voigt viscous tangent violates
+the symmetry by 0.25.  Packing it into 45 averaged away its antisymmetric part and
+returned a different operator: 5.3e-2 relative error on TET4, an element where the
+projection is provably exact.  The plan now decides symmetry symbolically and
+stores 45 or 81 accordingly, defaulting to *unsymmetric*, because storing 81 for a
+symmetric tangent wastes memory while storing 45 for an unsymmetric one is
+silently wrong.
+
+With that fixed both units reproduce their exact kernels to round-off on TET4:
+
+| unit | front end | tangent | stored numbers | split vs exact |
+|---|---|---|---|---|
+| elastic (Mooney-Rivlin) | energy   | symmetric Hessian    | 45 | 7.27e-16 |
+| viscous (Kelvin-Voigt)  | residual | unsymmetric Jacobian | 81 | 7.29e-16 |
+
+The apply kernels are unchanged by any of this.  The viscous apply takes the
+tangent and the increment -- no geometry, no state, no previous state, no
+viscosity parameters.  However many state fields a material reads, they are all
+absorbed into `Sbar` at assembly time, so extra state costs one argument on the
+once-per-tangent kernel and nothing at all per Krylov iteration.
+
+## Threads
+
+206763 dof, on 8 performance plus 2 efficiency cores, twenty repetitions inside
+each timing window.  Store is 126 numbers per element (45 elastic + 81 viscous),
+so 1008 / 504 / 260 bytes at f64 / f32 / f16.
+
+| threads | exact | st. f64 | st. f32 | st. f16 | assembly | f16 speed-up |
+|---|---|---|---|---|---|---|
+|  1 |  2.68 |  5.32 |  6.37 |  7.61 |  1.45 | 2.84x |
+|  2 |  5.40 | 10.50 | 12.63 | 15.19 |  2.94 | 2.81x |
+|  4 | 10.70 | 19.63 | 23.91 | 28.95 |  5.59 | 2.71x |
+|  8 | 18.75 | 34.00 | 42.35 | 55.15 | 10.61 | 2.94x |
+| 10 | 14.84 | 27.09 | 31.76 | 38.72 |  7.79 | 2.61x |
+
+Correctness 4.44e-15 against the summed exact kernels, at every thread count.
+Both paths scale about sevenfold on eight threads -- 7.0x exact, 7.2x stored --
+and the advantage holds near 2.8x throughout.  Break-even stays close to three.
+
+**Eight threads is the operating point, not ten.**  Every column falls by about a
+fifth when the two efficiency cores join: `schedule(static)` hands them chunks the
+size the performance cores get, and the loop waits for them.  A schedule aware of
+heterogeneous cores would recover it; nothing here does yet.
+
+This is the strongest case for the split, and structurally so: the exact side
+evaluates two expensive tangents per apply -- a Mooney-Rivlin Hessian and a
+Kelvin-Voigt Jacobian that reconstructs `F`, `F^-1`, the velocity gradient and its
+symmetric part from two states -- and the split evaluates neither.
+
+## What the first version of these measurements got wrong
+
+The throughput figures above replace an earlier set that was wrong, and the way it
+was wrong is worth keeping, because the kernels were genuinely running in parallel
+the whole time -- the pragmas were emitted, `libomp` was linked, CPU time exceeded
+wall time -- and the *measurement* was still not a multithreaded result.
+
+Two pieces of serial work sat inside the timed region.  The output arrays were
+cleared with a serial `std::fill` on every timed call: several megabytes that are
+no part of the operator and do not parallelise.  And each timing sample wrapped a
+single call, charging it for OpenMP team startup and a cold cache -- a large share
+of a kernel that runs a few milliseconds on ten cores.
+
+The effect is invisible at one thread and grows with the thread count, which is
+the worst possible shape for a scaling study: the single-thread figures barely
+moved when it was fixed (2.52 to 2.68), while the eight-thread figures moved by
+half (13.04 to 18.75, and 32.58 to 55.15).  Measured scaling was 5.4x where it is
+really 7.0x, and the peak appeared to be at ten threads where it is really eight.
+The single-threaded tables were understated too, most on TET4, whose kernels are
+short enough for per-call overhead to dominate.
+
+The speed-up *ratios* barely moved, because both paths paid the same overhead.
+That is exactly why the flaw was easy to miss: the conclusion looked stable while
+the numbers under it were not.
+
+The timed region now holds the kernel and nothing else, over many repetitions.
+The outputs are not cleared between them -- the apply accumulates, so the values
+grow, which does not affect what is being timed, and correctness is checked
+separately with clearing, outside any timed region.  `scale_probe.cpp` isolates a
+single kernel with no harness at all and confirms the corrected figures.
+
 ## Reproducing
 
     spikes/inexact_apply_compare/run_split.sh <material> <element> [repeats]
@@ -275,3 +305,6 @@ operator -- not about the kernel.
 Elements are TET4, HEX8 and TET10.  `WARP_EXTRA_FLAGS=-DRANDOM_INCREMENT` selects
 the white-noise increment.  `SFEM_MAIN_CHECKOUT`, `SFEM_BUILD`, `SFEM_PYTHON` and
 `SFEM_SPIKE_WORK` override the paths.  Both keep a full unfiltered log.
+
+For OpenMP on macOS, add
+`-Xpreprocessor -fopenmp -I$(brew --prefix libomp)/include -L$(brew --prefix libomp)/lib -lomp`.
