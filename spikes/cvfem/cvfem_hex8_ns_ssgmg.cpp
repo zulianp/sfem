@@ -2896,6 +2896,24 @@ int main(int argc, char **argv) {
     // the multiplicative one's 7.3x -- so a locally convergent smoother is not by itself
     // buying a convergent cycle here, and that tension is unresolved.
     //
+    // The gate matters in both directions, and cost is not the reason for it. Measured on
+    // closed domains -- the side that keeps the multiplicative sweep -- everything else equal:
+    //
+    //     Poiseuille  5,508 dof   mult  Re 3200 reached,    25 its,   0.233 s, sweep 0.263 ms
+    //                             add   Re 0,            12000 its,  67.6 s,   sweep 0.090 ms
+    //     cavity     19,652 dof   mult  Re 50 reached,     100 its,   1.53 s,  sweep 0.554 ms
+    //                             add   Re 0,            12000 its, 101.8 s,   sweep 0.157 ms
+    //
+    // The additive sweep is about three times cheaper per call and still loses by two orders
+    // of magnitude in time to solution, needing 480 times the iterations and converging on
+    // neither case. Per-sweep cost is the wrong figure of merit; only its product with the
+    // iteration count decides anything.
+    //
+    // So this is not a cheap-versus-expensive trade with a happy side benefit. Each variant
+    // is unusable where the other belongs -- multiplicative diverges at an open outlet,
+    // additive cannot solve a closed domain -- which is why the choice is gated on the
+    // geometry rather than offered as a tuning knob.
+    //
     // An explicit SFEM_VANKA_MULT still wins: setenv's overwrite flag is 0.
     if (want_natural_outlet) setenv("SFEM_VANKA_MULT", "0", 0);
     if (want_natural_outlet && outflow_mode == "donothing") {
