@@ -2874,6 +2874,30 @@ int main(int argc, char **argv) {
     // contribution that the Vanka patch solve degenerates on.
     const std::string outflow_mode =
             smesh::Env::read_string("SFEM_OUTFLOW_MODE", std::string("donothing"));
+    // An open outlet switches the Vanka sweep to the additive form.
+    //
+    // The multiplicative 8-colour sweep is the better smoother on a closed box -- the
+    // measurements recorded in this file give it 0.63 at omega = 1 against the additive
+    // form's 0.883 -- and that ranking reverses once the outlet opens. Brandt's regime
+    // diagnostic (SFEM_GMG_CHECK=7) localises it: on the backward-facing step the
+    // multiplicative sweep decays error healthily through the whole upstream half, including
+    // the recirculation bubble, and then amplifies it through the last third of the channel,
+    // reaching a local rate of 1.99 at the outlet plane. The additive sweep is convergent
+    // everywhere on the same problem, worst local rate 1.0013.
+    //
+    // The mechanism is ordering. A multiplicative sweep propagates information in colour
+    // order, which roughly follows the characteristics where the flow is unidirectional --
+    // which is why it wins on a box. At an outlet with more than half its faces reversed (24
+    // of 45 on this case) colour order and characteristic direction disagree and the sweep
+    // carries error against the flow. The additive form has no ordering to get wrong.
+    //
+    // Recorded honestly: this is a smoother measurement. Applied as a solver on the box with
+    // an open outlet the additive V-cycle is *worse* -- diverging about 20x per cycle against
+    // the multiplicative one's 7.3x -- so a locally convergent smoother is not by itself
+    // buying a convergent cycle here, and that tension is unresolved.
+    //
+    // An explicit SFEM_VANKA_MULT still wins: setenv's overwrite flag is 0.
+    if (want_natural_outlet) setenv("SFEM_VANKA_MULT", "0", 0);
     if (want_natural_outlet && outflow_mode == "donothing") {
         // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
         // the pressure gauge -- so the pin must come off with it, or the system is
@@ -3748,6 +3772,99 @@ int main(int argc, char **argv) {
                 // different remedies, and none of them can be told apart from the count. Both
                 // matrices are recovered by probing with unit vectors, which is O(n) applies
                 // and so only sensible for the small meshes used for this.
+                // SFEM_GMG_CHECK=7: Brandt's regime diagnostic, localised.
+                //
+                // TME (NASA/CR-1998-207647) suggests running the relaxation of a non-elliptic
+                // factor on its own to "produce a scalar sigma ~ 1 in regions of open
+                // characteristics and sigma << 1 on closed characteristics (such as separated
+                // flow zones)". The point is that the two regimes need different cures --
+                // downstream-ordered marching for open, defect-correction or semicoarsening
+                // for closed -- and the backward-facing step has both, so building either
+                // without knowing which region is which is guesswork.
+                //
+                // What is computed here is the local decay of the error under the smoother
+                // alone: set b = 0, start from a random error, relax, and measure per node
+                //
+                //     rate_i = ( |e_i^N| / |e_i^0| )^(1/N)
+                //
+                // Error is swept out of open-characteristic regions and lingers where the
+                // characteristics close, so a rate near 1 marks the regions the smoother
+                // cannot clear -- exactly the regions a coarse grid then has to handle, and
+                // exactly what lam_min was telling us globally. This is that measurement
+                // resolved in space rather than as one number. It is the local decay, not
+                // Brandt's normalisation, so it is reported as a rate and not called sigma.
+                if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 7 && newton_it == 0) {
+                    const int nsweep = smesh::Env::read<int>("SFEM_SIGMA_SWEEPS", 20);
+                    const std::string kind = smesh::Env::read<std::string>("SFEM_SMOOTHER", "vanka");
+                    const real_t om = (kind == "vanka")
+                                              ? smoother_omega()
+                                              : smesh::Env::read<real_t>("SFEM_GMG_OMEGA", real_t(0.35));
+                    std::shared_ptr<sfem::Operator<real_t>> prec;
+                    if (kind == "vanka") {
+                        std::vector<uint8_t> cb((size_t)ndof, 0);
+                        for (ptrdiff_t k = 0; k < ndof; ++k)
+                            cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                        prec = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om);
+                    } else {
+                        prec = make_block_jacobi(*op, x, cmask.data(), nnodes, om);
+                    }
+
+                    std::vector<real_t> e((size_t)ndof), r((size_t)ndof), z((size_t)ndof);
+                    std::mt19937                           g3(20260907u);
+                    std::uniform_real_distribution<real_t> d3(real_t(-1), real_t(1));
+                    for (ptrdiff_t k = 0; k < ndof; ++k) e[(size_t)k] = d3(g3);
+                    f->apply_zero_constraints(e.data());
+                    std::vector<real_t> e0((size_t)nnodes, 0);
+                    for (ptrdiff_t i = 0; i < nnodes; ++i)
+                        for (int c = 0; c < 3; ++c)
+                            e0[(size_t)i] += e[(size_t)i * 4 + c] * e[(size_t)i * 4 + c];
+                    for (auto &v : e0) v = std::sqrt(v);
+
+                    for (int it = 0; it < nsweep; ++it) {
+                        std::fill(r.begin(), r.end(), real_t(0));
+                        linop->apply(e.data(), r.data());
+                        for (ptrdiff_t k = 0; k < ndof; ++k) r[(size_t)k] = -r[(size_t)k];
+                        std::fill(z.begin(), z.end(), real_t(0));
+                        prec->apply(r.data(), z.data());
+                        for (ptrdiff_t k = 0; k < ndof; ++k) e[(size_t)k] += z[(size_t)k];
+                        f->apply_zero_constraints(e.data());
+                    }
+
+                    const auto *const pxs = mesh->points()->data()[0];
+                    const auto *const pys = mesh->points()->data()[1];
+                    // Bin the local rate by streamwise position; the recirculation sits just
+                    // behind the step and the outlet is at the far end, so a rate profile
+                    // along x separates them without needing a field dump.
+                    const int    NB = 10;
+                    std::vector<double> rsum(NB, 0), rmax(NB, 0);
+                    std::vector<ptrdiff_t> cnt(NB, 0);
+                    double slow_x = 0, slow_y = 0, slow_r = -1;
+                    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                        if (e0[(size_t)i] <= 0) continue;
+                        double en = 0;
+                        for (int c = 0; c < 3; ++c)
+                            en += (double)e[(size_t)i * 4 + c] * (double)e[(size_t)i * 4 + c];
+                        en = std::sqrt(en);
+                        const double rate = std::pow(en / (double)e0[(size_t)i], 1.0 / (double)nsweep);
+                        int b = (int)((double)pxs[i] / std::max(Lx, real_t(1e-30)) * NB);
+                        b = std::min(NB - 1, std::max(0, b));
+                        rsum[b] += rate; ++cnt[b];
+                        rmax[b] = std::max(rmax[b], rate);
+                        if (rate > slow_r) { slow_r = rate; slow_x = pxs[i]; slow_y = pys[i]; }
+                    }
+                    std::printf("regime diagnostic: %d smoother sweeps, local error decay by "
+                                "streamwise band\n", nsweep);
+                    std::printf("   x-band        nodes   mean rate   max rate\n");
+                    for (int b = 0; b < NB; ++b) {
+                        if (!cnt[b]) continue;
+                        std::printf("   [%5.2f,%5.2f) %7td   %9.4f  %9.4f\n",
+                                    (double)Lx * b / NB, (double)Lx * (b + 1) / NB,
+                                    cnt[b], rsum[b] / (double)cnt[b], rmax[b]);
+                    }
+                    std::printf("   slowest node at (x %.3f, y %.3f) rate %.4f\n",
+                                slow_x, slow_y, slow_r);
+                }
+
                 if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) == 6 && newton_it == 0) {
                     const std::string base =
                             smesh::Env::read_string("SFEM_DUMP_OP", std::string("/tmp/op"));
