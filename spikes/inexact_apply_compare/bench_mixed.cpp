@@ -29,7 +29,8 @@
 
 #define TC_ELASTIC 45
 #define TC_VISCOUS 81
-typedef __fp16 half_t;
+// `half_t` comes from sfem_config.h: __fp16 on some targets, _Float16 on
+// others.  Declaring it here would conflict on whichever one it is not.
 
 #define ELASTIC_TANGENT  sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_tangent_affine_mesh_soa_impl
 #define ELASTIC_STORED   sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_stored_affine_mesh_soa_impl

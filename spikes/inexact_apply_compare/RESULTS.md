@@ -266,6 +266,55 @@ evaluates two expensive tangents per apply -- a Mooney-Rivlin Hessian and a
 Kelvin-Voigt Jacobian that reconstructs `F`, `F^-1`, the velocity gradient and its
 symmetric part from two states -- and the split evaluates neither.
 
+## Grace
+
+The same benchmark on one socket of a CSCS Alps GH200 node (`nid006544`): 72
+Neoverse-V2 cores, one thread per core, 9 NUMA domains per socket, GCC 13.3 from
+`prgenv-gnu/24.11`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores`.  206763 dof,
+twenty repetitions inside each timing window.
+
+| threads | exact | st. f64 | st. f32 | st. f16 | assembly | f16 speed-up |
+|---|---|---|---|---|---|---|
+|  1 |  1.33 |   2.91 |   3.10 |   2.85 |  0.64 | 2.14x |
+|  2 |  2.67 |   5.90 |   6.17 |   5.84 |  1.27 | 2.19x |
+|  4 |  5.33 |  11.54 |  12.12 |  12.26 |  2.53 | 2.30x |
+|  8 | 10.68 |  22.84 |  24.33 |  25.30 |  5.04 | 2.37x |
+| 16 | 21.27 |  44.49 |  47.97 |  50.01 | 10.13 | 2.35x |
+| 32 | 41.65 |  85.62 |  93.52 |  97.67 | 20.25 | 2.35x |
+| 64 | 82.13 | 165.29 | 185.34 | 191.62 | 39.30 | 2.33x |
+| 72 | 92.28 | 180.18 | 205.81 | 209.60 | 44.35 | 2.27x |
+
+Correctness 1.78e-14 at every thread count -- round-off, differing from the
+laptop's 4.44e-15 only in floating-point ordering and FMA contraction.
+
+**Scaling is essentially linear all the way to 72 cores**: 69.4x for the exact
+apply, 73.5x for the stored one, against a perfect 72x.  There is no ceiling in
+the sweep and no NUMA cliff at 64 or 72 threads.
+
+That retracts something the laptop measurements suggested.  On the laptop every
+column fell by a fifth past eight threads, and the atomic scatter looked like the
+scalability limit.  It is not: the laptop has eight performance cores and two
+efficiency cores, `schedule(static)` gives them equal chunks, and the loop waits
+for the slow ones.  On homogeneous cores the scatter costs a constant factor,
+not scalability.  A conclusion about a kernel drawn from a heterogeneous laptop
+needed a homogeneous machine to check, and did not survive it.
+
+**fp16 is not worth carrying on this machine.**  At one thread it is *slower*
+than both f32 and f64 (2.85 against 3.10 and 2.91), and at 72 threads it is
+within two per cent of f32 (209.60 against 205.81) while costing four decimal
+digits.  `half_t` is `_Float16` here and `__fp16` on the laptop, and the
+conversion appears to cost more than the bandwidth it saves.  f32 is the default
+on both machines, and on Grace it is the only sensible choice.
+
+Per core Grace is about half the laptop -- 1.33 against 2.68 MDOF/s exact,
+single-threaded, Neoverse-V2 against an Apple performance core -- and reaches
+five times the aggregate because there are 72 of them rather than eight.
+
+Reproducing: the generated tree has to keep its directory structure, because the
+emitted headers include across it (`../../kernel_math.hpp`), and `half_t` must be
+taken from `sfem_config.h` rather than declared locally, since it is `__fp16` on
+one target and `_Float16` on the other.
+
 ## What the first version of these measurements got wrong
 
 The throughput figures above replace an earlier set that was wrong, and the way it
