@@ -83,7 +83,7 @@ MATERIALS = (
     "neohookean_ogden",
     "saint_venant_kirchhoff",
     "modified_mooney_rivlin",
-    "poro_elasticity",
+    "poro_hyperelasticity",
     "stokes",
     "two_phase_flow",
     "scalar_potential",
@@ -99,7 +99,7 @@ ALIAS_TARGETS = ("PROTEUS_HEX8",)
 #: mesh on the same cells, so the grid is the HEX27 one and the pressure nodes
 #: are its corners.
 ELEMENT_BY_MATERIAL = {
-    "poro_elasticity": ("HEX27_HEX8", ()),
+    "poro_hyperelasticity": ("HEX27_HEX8", ()),
     "stokes": ("HEX27_HEX8", ()),
 }
 

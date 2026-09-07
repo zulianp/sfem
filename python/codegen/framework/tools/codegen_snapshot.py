@@ -51,9 +51,10 @@ MATERIALS = (
     "mooney_rivlin_kelvin_voigt_newmark",
     "neumann",
     "neumann_general",
-    "poro_elasticity",
+    "poro_hyperelasticity",
     "stokes",
     "two_phase_flow",
+    "navier_stokes",
     "scalar_potential",
 )
 

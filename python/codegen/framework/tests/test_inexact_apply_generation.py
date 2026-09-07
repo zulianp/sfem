@@ -31,7 +31,17 @@ def _material(name):
 
 class InexactApplyGenerationTest(unittest.TestCase):
     def test_it_is_off_by_default(self):
-        self.assertFalse(_material("linear_elasticity").inexact_apply)
+        """The mechanism refuses unless asked, whatever the shipped materials ask for.
+
+        This used to read `linear_elasticity`'s own flag, which stopped being a
+        statement about the default the moment that material started shipping
+        the split.  The default belongs to `CodeGenerator`.
+        """
+        from sfem import gen
+
+        defaults = {f.name: f.default for f in dataclasses.fields(gen.CodeGenerator)}
+        self.assertFalse(defaults["inexact_apply"])
+        self.assertFalse(_material("laplace").inexact_apply)
 
     def test_nothing_is_emitted_unless_asked(self):
         files = self._generate("linear_elasticity", "TET4", opt_in=False)
@@ -116,9 +126,7 @@ class InexactApplyGenerationTest(unittest.TestCase):
 
         from sfem import gen
 
-        material = _material(name)
-        if opt_in:
-            material = dataclasses.replace(material, inexact_apply=True)
+        material = dataclasses.replace(_material(name), inexact_apply=opt_in)
         with tempfile.TemporaryDirectory() as out_dir:
             result = gen.generate(
                 material, out_dir, elements=(element,), clean=True

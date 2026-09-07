@@ -621,7 +621,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 subprocess.run(
                     [
                         compiler,
-                        "-std=c++14",
+                        "-std=c++17",
                         "-O3",
                         "-fopenmp-simd",
                         "-Werror",
@@ -649,7 +649,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 report = subprocess.run(
                     [
                         compiler,
-                        "-std=c++14",
+                        "-std=c++17",
                         "-O3",
                         "-fopenmp-simd",
                         "-Rpass=loop-vectorize",
@@ -720,7 +720,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fopenmp-simd",
                     "-Werror",
@@ -765,7 +765,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 )
                 command = [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fPIC",
                     os.path.join(

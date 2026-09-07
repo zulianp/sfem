@@ -427,7 +427,7 @@ def compile_generated_shared_library(compiler, tmpdir, generated_files, operator
     if sys.platform == "darwin":
         command = [
             compiler,
-            "-std=c++11",
+            "-std=c++17",
             "-O3",
             "-fPIC",
             "-dynamiclib",
@@ -438,7 +438,7 @@ def compile_generated_shared_library(compiler, tmpdir, generated_files, operator
     else:
         command = [
             compiler,
-            "-std=c++11",
+            "-std=c++17",
             "-O3",
             "-fPIC",
             "-shared",
@@ -697,7 +697,7 @@ def assert_generated_lane_loops_vectorized(
     completed = subprocess.run(
         [
             compiler,
-            "-std=c++11",
+            "-std=c++17",
             *flags,
             "-c",
             source_path,
@@ -931,7 +931,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++11",
+                    "-std=c++17",
                     "-O3",
                     "-c",
                     os.path.join(tmpdir, "generated_quad4_tensor_product_operator.cpp"),
@@ -1020,7 +1020,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++11",
+                    "-std=c++17",
                     "-O3",
                     "-c",
                     os.path.join(tmpdir, "generated_hex8_tensor_product_operator.cpp"),
@@ -1113,7 +1113,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++11",
+                    "-std=c++17",
                     "-O3",
                     "-c",
                     os.path.join(tmpdir, "generated_weak_neohookean_operator.cpp"),
@@ -1310,7 +1310,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++11",
+                    "-std=c++17",
                     "-O3",
                     "-c",
                     os.path.join(tmpdir, "generated_hex27_weak_neohookean_operator.cpp"),
@@ -1948,7 +1948,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++11",
+                    "-std=c++17",
                     "-O2",
                     "-c",
                     source_path,
@@ -2012,7 +2012,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++11",
+                    "-std=c++17",
                     "-O2",
                     "-c",
                     source_path,
