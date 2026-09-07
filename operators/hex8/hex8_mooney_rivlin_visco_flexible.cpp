@@ -13,6 +13,7 @@
 #include "sortreduce.hpp"
 
 #include "hex8_inline_cpu.hpp"
+#include "hex8_history_diagnostics.hpp"
 #include "line_quadrature.hpp"
 
 #include "hex8_mooney_rivlin_visco_unique_Hi_local.hpp"  // Unimodular form
@@ -106,6 +107,9 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const real_t *const SFEM_RESTRICT ux,
     const real_t *const SFEM_RESTRICT uy,
     const real_t *const SFEM_RESTRICT uz) {
+    const bool check_history = sfem_history_checks_enabled();
+    if (check_history) fprintf(stderr, "[history-check] update begin: elements=%td history_stride=%td scale_stride=%td\n",
+                               nelements, history_stride, history_scale_stride);
     auto run = [&](const auto *const history, auto *const new_history) -> int {
     SFEM_UNUSED(nnodes);
     
@@ -127,22 +131,34 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
         auto *H_new = new_history + hist_offset + p * 6;
         const scalar_t old_scale = history_scale_data ? history_scale_data[scale_offset + p] : 1;
         scalar_t updated[6];
+        const ptrdiff_t element = check_history ? hist_offset / history_stride : 0;
+        const ptrdiff_t qp = check_history ? (hist_offset % history_stride) / history_per_qp : 0;
 
         for (int c = 0; c < 6; ++c) {
+            if (check_history) {
+                sfem_check_history("old", element, qp, p, c, H_old[c], old_scale);
+                sfem_check_history("delta_S", element, qp, p, c, delta_S[c]);
+            }
             const scalar_t old_value = old_scale * static_cast<scalar_t>(H_old[c]);
             updated[c] = alpha[p] * old_value + beta[p] * delta_S[c];
+            if (check_history) sfem_check_history("updated", element, qp, p, c, updated[c]);
         }
 
         if (new_history_scale_data) {
             const float new_scale = fp16_history_scale(updated, 6);
+            if (check_history) sfem_check_history("scale", element, qp, p, -1, 0, new_scale);
             const scalar_t inv_scale = 1.0 / new_scale;
             new_history_scale_data[scale_offset + p] = new_scale;
             for (int c = 0; c < 6; ++c) {
+                if (check_history) sfem_check_history("normalized", element, qp, p, c,
+                                                     updated[c] * inv_scale, new_scale, true);
                 H_new[c] = updated[c] * inv_scale;
+                if (check_history) sfem_check_history("stored", element, qp, p, c, H_new[c], new_scale);
             }
         } else {
             for (int c = 0; c < 6; ++c) {
                 H_new[c] = updated[c];
+                if (check_history) sfem_check_history("stored", element, qp, p, c, H_new[c]);
             }
         }
     };
@@ -255,18 +271,28 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
                     for (int qp = 0; qp < history_n_qp; ++qp) {
                         const ptrdiff_t hist_offset = i * history_stride + qp * history_per_qp + p * 6;
                         for (int c = 0; c < 6; ++c) {
+                            if (check_history) {
+                                sfem_check_history("old", i, qp, p, c, history[hist_offset + c], old_scale);
+                                sfem_check_history("delta_S", i, qp, p, c, delta_S[qp][c]);
+                            }
                             const scalar_t old_value = old_scale * static_cast<scalar_t>(history[hist_offset + c]);
                             updated[qp][c] = alpha[p] * old_value + beta[p] * delta_S[qp][c];
+                            if (check_history) sfem_check_history("updated", i, qp, p, c, updated[qp][c]);
                         }
                     }
 
                     const float new_scale = fp16_history_scale(&updated[0][0], history_n_qp * 6);
+                    if (check_history) sfem_check_history("scale", i, -1, p, -1, 0, new_scale);
                     const scalar_t inv_scale = 1.0 / new_scale;
                     new_history_scale_data[scale_offset] = new_scale;
                     for (int qp = 0; qp < history_n_qp; ++qp) {
                         const ptrdiff_t hist_offset = i * history_stride + qp * history_per_qp + p * 6;
                         for (int c = 0; c < 6; ++c) {
+                            if (check_history) sfem_check_history("normalized", i, qp, p, c,
+                                                                 updated[qp][c] * inv_scale, new_scale, true);
                             new_history[hist_offset + c] = updated[qp][c] * inv_scale;
+                            if (check_history) sfem_check_history("stored", i, qp, p, c,
+                                                                 new_history[hist_offset + c], new_scale);
                         }
                     }
                 }
@@ -330,6 +356,7 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
     real_t *const SFEM_RESTRICT       outz) {
     auto run = [&](const auto *const history) -> int {
     SFEM_UNUSED(nnodes);
+    const bool check_history = sfem_history_checks_enabled();
     
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
@@ -397,7 +424,9 @@ int hex8_mooney_rivlin_visco_gradient_unique_hi(
                         const auto *H_i = history + hist_offset + p * 6;
                         const scalar_t H_scale = history_scale_data ? history_scale_data[scale_offset + p] : 1;
                         for (int c = 0; c < 6; ++c) {
+                            if (check_history) sfem_check_history("gradient_read", i, qp_idx, p, c, H_i[c], H_scale);
                             S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
+                            if (check_history) sfem_check_history("gradient_S_hist", i, qp_idx, p, c, S_hist[c]);
                         }
                     }
 
@@ -474,6 +503,7 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
     auto run = [&](const auto *const history) -> int {
     SFEM_UNUSED(nnodes);
     SFEM_UNUSED(out_stride);
+    const bool check_history = sfem_history_checks_enabled();
     
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
@@ -541,7 +571,9 @@ int hex8_mooney_rivlin_visco_bsr_unique_hi(
                         const auto *H_i = history + hist_offset + p * 6;
                         const scalar_t H_scale = history_scale_data ? history_scale_data[scale_offset + p] : 1;
                         for (int c = 0; c < 6; ++c) {
+                            if (check_history) sfem_check_history("bsr_read", i, qp_idx, p, c, H_i[c], H_scale);
                             S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
+                            if (check_history) sfem_check_history("bsr_S_hist", i, qp_idx, p, c, S_hist[c]);
                         }
                     }
 
@@ -608,6 +640,7 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
     real_t *const SFEM_RESTRICT       outz) {
     auto run = [&](const auto *const history) -> int {
     SFEM_UNUSED(nnodes);
+    const bool check_history = sfem_history_checks_enabled();
     
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
@@ -675,7 +708,9 @@ int hex8_mooney_rivlin_visco_hessian_diag_unique_hi(
                         const auto *H_i = history + hist_offset + p * 6;
                         const scalar_t H_scale = history_scale_data ? history_scale_data[scale_offset + p] : 1;
                         for (int c = 0; c < 6; ++c) {
+                            if (check_history) sfem_check_history("diag_read", i, qp_idx, p, c, H_i[c], H_scale);
                             S_hist[c] += alpha[p] * H_scale * H_i[c] - beta[p] * S_dev_prev[c];
+                            if (check_history) sfem_check_history("diag_S_hist", i, qp_idx, p, c, S_hist[c]);
                         }
                     }
 
