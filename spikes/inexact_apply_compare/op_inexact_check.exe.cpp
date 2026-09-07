@@ -23,19 +23,9 @@
 #include "sfem_GeneratedLinearElasticity.hpp"
 
 // This drives the Op that libsfem actually carries, now that linear_elasticity
-// is generated in-tree with the split enabled.
-//
-// This worktree registers a generated Op whose sources it does not carry:
-// sfem_generated_ops_registration.cpp calls
-// register_GeneratedMooneyRivlinKelvinVoigtNewmark_generated_op, but
-// frontend/ops/generated/ has no mooney_rivlin_kelvin_voigt_newmark tree, so
-// libsfem.a cannot link a binary on its own.  That is a pre-existing gap in the
-// checkout rather than anything to do with the split, and a spike has no
-// business fixing it, so it is stubbed here to get the check linked.  The stub
-// registers nothing; this driver instantiates the Op it tests directly.
-namespace sfem {
-    void register_GeneratedMooneyRivlinKelvinVoigtNewmark_generated_op() {}
-}
+// is generated in-tree with the split enabled.  It links against libsfem alone:
+// no privately generated copy, and no stub for a registration the library used
+// to reference without carrying.
 
 int main(int argc, char *argv[]) {
     sfem::Context context(argc, argv);
