@@ -52,9 +52,6 @@ from codegen.framework.targets import current_target
 from codegen.framework.plans.matrix_formats import (
     BSRAssemblyPlan,
     BlockDiagSymAssemblyPlan,
-    COOAssemblyPlan,
-    DIAAssemblyPlan,
-    PatchAssemblyPlan,
 )
 from codegen.framework.symbolic.core import (
     ExpressionRole,
@@ -7482,30 +7479,6 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
             % function_base,
         ),
         (
-            "dia",
-            2,
-            "%s_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values);"
-            % function_base,
-        ),
-        (
-            "coo",
-            3,
-            "%s_scatter_coo(ev, element_matrix, coo_nnz, coo_rows, coo_cols, values);"
-            % function_base,
-        ),
-        (
-            "coo",
-            5,
-            "%s_scatter_coo_triplets(ev, element_matrix, element, coo_triplet_rows, coo_triplet_cols, values);"
-            % function_base,
-        ),
-        (
-            "patch",
-            4,
-            "%s_scatter_patch(ev, element_matrix, rowptr, colidx, values);"
-            % function_base,
-        ),
-        (
             "block_diag_sym",
             6,
             "%s_scatter_block_diag_sym(ev, element_matrix, values);" % function_base,
@@ -7641,13 +7614,6 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_fiel
         lines.extend(_sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     if "crs" in formats:
         lines.extend(_sfem_soa_hessian_scatter_crs_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
-    if "dia" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
-    if "coo" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
-        lines.extend(_sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
-    if "patch" in formats:
-        lines.extend(_sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     if "block_diag_sym" in formats:
         lines.extend(_sfem_soa_hessian_scatter_block_diag_sym_lines(function_base, dim, n_nodes, n_field_components=n_field_components))
     return lines
@@ -7964,325 +7930,6 @@ def _sfem_soa_hessian_packed_crs_helper_lines(function_base, dim, n_nodes, n_fie
     ]
 
 
-def _sfem_soa_hessian_scatter_dia_lines(function_base, dim, n_nodes, assembly=None, n_field_components=None):
-    """Scatter one element block onto the stored diagonals.
-
-    The offset and value stream names and the reduction come from
-    ``DIAAssemblyPlan``.  Note which field the parameter is spelled from:
-    ``diagonal_offsets`` is the diagnostics indexing policy and says
-    "diagonal_offsets", while the kernel's parameter is ``diag_offsets``.  The
-    two drifted apart because nothing read the plan; the parameter comes from
-    ``diagonal_offset_stream`` and the divergence is recorded, not reconciled,
-    because reconciling it changes published diagnostics text.
-    """
-    n_field_components = dim if n_field_components is None else n_field_components
-    assembly = DIAAssemblyPlan() if assembly is None else assembly
-    offsets = assembly.diagonal_offset_stream
-    value_stream = assembly.value_stream
-    _assembly_reduction_is_atomic(assembly.reduction_policy, "DIA")
-    return [
-        "template <typename scalar_t>",
-        "static SFEM_INLINE void %s_scatter_dia(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
-        "        const ptrdiff_t nnodes,",
-        "        const int *const SFEM_RESTRICT %s," % offsets,
-        "        const ptrdiff_t ndiag,",
-        "        scalar_t *const SFEM_RESTRICT %s) {" % value_stream,
-        "    static constexpr int N_FIELD_COMPONENTS = %d;" % n_field_components,
-                "    static constexpr int SPATIAL_DIM = %d;" % dim,
-        "    static constexpr int N_SHAPE = %d;" % n_nodes,
-        "    ptrdiff_t diagonals[N_SHAPE * N_SHAPE];",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            const int offset = (int)(ev[j] - ev[i]);",
-        "            ptrdiff_t diagonal = 0;",
-        "            while (diagonal < ndiag && %s[diagonal] != offset) ++diagonal;" % offsets,
-        "            diagonals[i * N_SHAPE + j] = diagonal;",
-        "        }",
-        "    }",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            const ptrdiff_t diagonal = diagonals[i * N_SHAPE + j];",
-        "            scalar_t *const block = &%s[(diagonal * nnodes + ev[i]) * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];" % value_stream,
-        "            for (int bi = 0; bi < N_FIELD_COMPONENTS; ++bi) {",
-        "                const int row = bi * N_SHAPE + i;",
-        "                for (int bj = 0; bj < N_FIELD_COMPONENTS; ++bj) {",
-        "                    const int col = bj * N_SHAPE + j;",
-        "#pragma omp atomic update",
-        "                    block[bi * N_FIELD_COMPONENTS + bj] += element_matrix[row * (N_FIELD_COMPONENTS * N_SHAPE) + col];",
-        "                }",
-        "            }",
-        "        }",
-        "    }",
-        "}",
-        "",
-    ]
-
-
-def _sfem_soa_hessian_scatter_coo_lines(function_base, dim, n_nodes, assembly=None, n_field_components=None):
-    """Locate each element entry in a sorted COO graph and accumulate into it.
-
-    Stream names and reduction from ``COOAssemblyPlan``, and the same split as
-    DIA applies: ``row_index_stream``/``column_index_stream`` are the
-    diagnostics policy and say "rowidx"/"colidx", while the kernel writes
-    ``rows`` and ``cols``, which is what ``row_stream``/``column_stream`` hold.
-    """
-    n_field_components = dim if n_field_components is None else n_field_components
-    assembly = COOAssemblyPlan() if assembly is None else assembly
-    rows = assembly.row_stream
-    cols = assembly.column_stream
-    value_stream = assembly.value_stream
-    # COOAssemblyPlan carries no reduction_policy.  It has reduction_phase =
-    # "non_hot_setup_phase" and accumulation_policy = "emit_triplets", which
-    # describe the *triplet* scatter -- the one that writes (row, col, value)
-    # and leaves the reduction to a later pass.  This scatter is the other COO
-    # form: it locates the entry in a sorted graph and accumulates atomically
-    # in the hot loop.  One plan, two kernels, and the plan describes only one
-    # of them.  Recorded in ARCHITECTURE.html OP 13 rather than papered over by
-    # asserting a policy that would be the wrong one for this kernel.
-    return [
-        "template <typename scalar_t>",
-        "static SFEM_INLINE void %s_scatter_coo(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const scalar_t *const SFEM_RESTRICT element_matrix,",
-        "        const ptrdiff_t nnz,",
-        "        const idx_t *const SFEM_RESTRICT %s," % rows,
-        "        const idx_t *const SFEM_RESTRICT %s," % cols,
-        "        scalar_t *const SFEM_RESTRICT %s) {" % value_stream,
-        "    static constexpr int N_FIELD_COMPONENTS = %d;" % n_field_components,
-                "    static constexpr int SPATIAL_DIM = %d;" % dim,
-        "    static constexpr int N_SHAPE = %d;" % n_nodes,
-        "    ptrdiff_t entries[N_SHAPE * N_SHAPE];",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            ptrdiff_t lo = 0;",
-        "            ptrdiff_t hi = nnz;",
-        "            while (lo < hi) {",
-        "                const ptrdiff_t mid = lo + (hi - lo) / 2;",
-        "                if (%s[mid] < ev[i] || (%s[mid] == ev[i] && %s[mid] < ev[j])) lo = mid + 1;"
-        % (rows, rows, cols),
-        "                else hi = mid;",
-        "            }",
-        "            entries[i * N_SHAPE + j] = lo;",
-        "        }",
-        "    }",
-        "    for (int i = 0; i < N_SHAPE; ++i) {",
-        "        for (int j = 0; j < N_SHAPE; ++j) {",
-        "            scalar_t *const block = &%s[entries[i * N_SHAPE + j] * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS];" % value_stream,
-        "            for (int bi = 0; bi < N_FIELD_COMPONENTS; ++bi) {",
-        "                const int row = bi * N_SHAPE + i;",
-        "                for (int bj = 0; bj < N_FIELD_COMPONENTS; ++bj) {",
-        "                    const int col = bj * N_SHAPE + j;",
-        "#pragma omp atomic update",
-        "                    block[bi * N_FIELD_COMPONENTS + bj] += element_matrix[row * (N_FIELD_COMPONENTS * N_SHAPE) + col];",
-        "                }",
-        "            }",
-        "        }",
-        "    }",
-        "}",
-        "",
-    ]
-
-
-def _sfem_soa_hessian_scatter_coo_triplet_lines(function_base, dim, n_nodes, n_field_components=None):
-    """Write one element's matrix out as (row, col, value) triplets."""
-    # The block is the field's components, not the spatial dimension.
-    n_field_components = dim if n_field_components is None else n_field_components
-    inner = [
-        BufferDeclNode("const int", "col", (), expr_ref("bj * N_SHAPE + j")),
-        BufferDeclNode(
-            "const ptrdiff_t",
-            "entry",
-            (),
-            expr_ref("element_offset + row * NDOFS + col"),
-        ),
-        AssignmentNode(expr_ref("rows[entry]"), expr_ref("global_row")),
-        AssignmentNode(expr_ref("cols[entry]"), expr_ref("ev[j] * N_FIELD_COMPONENTS + bj")),
-        AssignmentNode(
-            expr_ref("values[entry]"), expr_ref("element_matrix[row * NDOFS + col]")
-        ),
-    ]
-    body = [
-        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(n_field_components))),
-        BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
-        BufferDeclNode("static constexpr int", "NDOFS", (), expr_ref("N_FIELD_COMPONENTS * N_SHAPE")),
-        BufferDeclNode(
-            "const ptrdiff_t", "element_offset", (), expr_ref("element * NDOFS * NDOFS")
-        ),
-        _counting_loop(
-            "bi",
-            0,
-            expr_ref("N_FIELD_COMPONENTS"),
-            [
-                _counting_loop(
-                    "i",
-                    0,
-                    expr_ref("N_SHAPE"),
-                    [
-                        BufferDeclNode(
-                            "const int", "row", (), expr_ref("bi * N_SHAPE + i")
-                        ),
-                        BufferDeclNode(
-                            "const idx_t", "global_row", (), expr_ref("ev[i] * N_FIELD_COMPONENTS + bi")
-                        ),
-                        _counting_loop(
-                            "bj",
-                            0,
-                            expr_ref("N_FIELD_COMPONENTS"),
-                            [_counting_loop("j", 0, expr_ref("N_SHAPE"), inner)],
-                        ),
-                    ],
-                )
-            ],
-        ),
-    ]
-    return _print_scatter_function(
-        FunctionDefNode(
-            "%s_scatter_coo_triplets" % function_base,
-            params=(
-                "const idx_t *const SFEM_RESTRICT ev",
-                "const scalar_t *const SFEM_RESTRICT element_matrix",
-                "const ptrdiff_t element",
-                "idx_t *const SFEM_RESTRICT rows",
-                "idx_t *const SFEM_RESTRICT cols",
-                "scalar_t *const SFEM_RESTRICT values",
-            ),
-            body=tuple(body),
-            qualifier="static SFEM_INLINE",
-            template_params=("typename scalar_t",),
-        )
-    )
-
-
-def _sfem_soa_hessian_scatter_patch_lines(function_base, dim, n_nodes, assembly=None, n_field_components=None):
-    """Scatter into a patch-local CRS block.
-
-    Graph and value stream names and the reduction come from
-    ``PatchAssemblyPlan``.  Unlike DIA and COO its diagnostics policy and its
-    parameters agree -- ``patch_graph`` is "rowptr_colidx" and the kernel does
-    read ``rowptr`` and ``colidx`` -- so the two new fields simply name the
-    halves the scatter spells.
-
-    Migrated because it carries no graph validation: it locates its entries
-    and uses them.  The BSR, CRS, DIA and COO helpers do validate, and that
-    machinery is what OP 10 is about removing -- see the note in
-    ``RawLinesRatchetTest``.
-    """
-    # The block is the field's components, not the spatial dimension.
-    n_field_components = dim if n_field_components is None else n_field_components
-    assembly = PatchAssemblyPlan() if assembly is None else assembly
-    row_pointer = assembly.row_pointer
-    column_index = assembly.column_index
-    value_stream = assembly.value_stream
-    _assembly_reduction_is_atomic(assembly.reduction_policy, "patch")
-    accumulate = [
-        BufferDeclNode("const int", "col", (), expr_ref("bj * N_SHAPE + j")),
-        ScatterNode(
-            expr_ref("block[bi * N_FIELD_COMPONENTS + bj]"),
-            expr_ref("element_matrix[row * (N_FIELD_COMPONENTS * N_SHAPE) + col]"),
-            "+=",
-            atomic=True,
-        ),
-    ]
-    body = [
-        BufferDeclNode("static constexpr int", "N_FIELD_COMPONENTS", (), expr_ref(str(n_field_components))),
-        BufferDeclNode("static constexpr int", "N_SHAPE", (), expr_ref(str(n_nodes))),
-        BufferDeclNode("count_t", "entries", ("N_SHAPE * N_SHAPE",)),
-        BufferDeclNode("idx_t", "ks", ("N_SHAPE",)),
-        _counting_loop(
-            "i",
-            0,
-            expr_ref("N_SHAPE"),
-            [
-                BufferDeclNode(
-                    "const count_t",
-                    "row_begin",
-                    (),
-                    expr_ref("%s[ev[i]]" % row_pointer),
-                ),
-                BufferDeclNode(
-                    "const int",
-                    "lenrow",
-                    (),
-                    expr_ref("(int)(%s[ev[i] + 1] - row_begin)" % row_pointer),
-                ),
-                BufferDeclNode(
-                    "const idx_t *const SFEM_RESTRICT",
-                    "cols",
-                    (),
-                    expr_ref("&%s[row_begin]" % column_index),
-                ),
-                CallNode(
-                    "%s_find_cols" % function_base,
-                    ("ev", "cols", "lenrow", "ks"),
-                ),
-                _counting_loop(
-                    "j",
-                    0,
-                    expr_ref("N_SHAPE"),
-                    [
-                        AssignmentNode(
-                            expr_ref("entries[i * N_SHAPE + j]"),
-                            expr_ref("row_begin + ks[j]"),
-                        )
-                    ],
-                ),
-            ],
-        ),
-        _counting_loop(
-            "i",
-            0,
-            expr_ref("N_SHAPE"),
-            [
-                _counting_loop(
-                    "j",
-                    0,
-                    expr_ref("N_SHAPE"),
-                    [
-                        BufferDeclNode(
-                            "scalar_t *const",
-                            "block",
-                            (),
-                            expr_ref(
-                "&%s[entries[i * N_SHAPE + j] * N_FIELD_COMPONENTS * N_FIELD_COMPONENTS]" % value_stream
-            ),
-                        ),
-                        _counting_loop(
-                            "bi",
-                            0,
-                            expr_ref("N_FIELD_COMPONENTS"),
-                            [
-                                BufferDeclNode(
-                                    "const int", "row", (), expr_ref("bi * N_SHAPE + i")
-                                ),
-                                _counting_loop(
-                                    "bj", 0, expr_ref("N_FIELD_COMPONENTS"), accumulate
-                                ),
-                            ],
-                        ),
-                    ],
-                )
-            ],
-        ),
-    ]
-    return _print_scatter_function(
-        FunctionDefNode(
-            "%s_scatter_patch" % function_base,
-            params=(
-                "const idx_t *const SFEM_RESTRICT ev",
-                "const scalar_t *const SFEM_RESTRICT element_matrix",
-                "const count_t *const SFEM_RESTRICT %s" % row_pointer,
-                "const idx_t *const SFEM_RESTRICT %s" % column_index,
-                "scalar_t *const SFEM_RESTRICT %s" % value_stream,
-            ),
-            body=tuple(body),
-            qualifier="static SFEM_INLINE",
-            template_params=("typename scalar_t",),
-        )
-    )
-
-
 def _sfem_soa_hessian_scatter_block_diag_sym_lines(
     function_base, dim, n_nodes, assembly=None, n_field_components=None
 ):
@@ -8369,10 +8016,13 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     uses_current,
     packed_crs_passes=(),
 ):
-    format_tags = {"crs": 0, "bsr": 1, "dia": 2, "coo": 3, "patch": 4, "coo_triplet": 5, "block_diag_sym": 6}
+    # The ids the `FORMAT` template parameter is instantiated with.  They are
+    # sparse because DIA, COO and patch were removed; the remaining three keep
+    # the numbers they had, so nothing already compiled changes meaning.
+    format_tags = {"crs": 0, "bsr": 1, "block_diag_sym": 6}
     lines = []
     for matrix_format in formats:
-        emitted_formats = ("coo", "coo_triplet") if matrix_format == "coo" else (matrix_format,)
+        emitted_formats = (matrix_format,)
         for emitted_format in emitted_formats:
             public_name = function_base.replace(
                 "_hessian_",

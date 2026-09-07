@@ -483,27 +483,11 @@ def _header(material, residual, publishes_value_steps=None):
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override;
-        int hessian_dia(const real_t *const x,
-                        const int *const diag_offsets,
-                        const ptrdiff_t ndiag,
-                        real_t *const values) override;""" if residual else """
+""" if residual else """
         int hessian_bsr(const real_t *const x,
                         const count_t *const rowptr,
                         const idx_t *const colidx,
                         real_t *const values) override;
-        int hessian_dia(const real_t *const x,
-                        const int *const diag_offsets,
-                        const ptrdiff_t ndiag,
-                        real_t *const values) override;
-        int hessian_coo(const real_t *const x,
-                        const ptrdiff_t nnz,
-                        const idx_t *const rows,
-                        const idx_t *const cols,
-                        real_t *const values);
-        int hessian_patch(const real_t *const x,
-                          const count_t *const rowptr,
-                          const idx_t *const colidx,
-                          real_t *const values);
         int hessian_block_diag_sym(const real_t *const x,
                                    real_t *const values) override;"""
     return """#pragma once
@@ -807,9 +791,6 @@ def _hyperelastic_op(
     objective_steps_cases = []
     hessian_crs_cases = []
     hessian_bsr_cases = []
-    hessian_dia_cases = []
-    hessian_coo_cases = []
-    hessian_patch_cases = []
     generated_packed_apply = any("_packed_" in source for source in kernel_sources.values())
     packed_scratch_include = '#include "packed_thread_scratch.hpp"\n#include "smesh_env.hpp"' if generated_packed_apply else ""
     packed_scratch_prealloc = (
@@ -843,9 +824,14 @@ def _hyperelastic_op(
     affine_metric_flags = []
     for element in elements:
         dim = _element_dim(element)
+        # Per element, not per new dimension.  This used to live inside the
+        # `if` below, so on the second element of a dimension it kept whatever
+        # collection the previous iteration left behind -- and the auto-added
+        # PROTEUS_QUAD4 is appended after the 3D elements, so the 2D field's
+        # component count was read from the 3D collection.
+        collection = form_collections[dim]
         dependencies = dependencies_by_dim.get(dim)
         if dependencies is None:
-            collection = form_collections[dim]
             dependencies = (
                 collection.form_metadata(_form_order_zero()).dependencies,
                 collection.form_metadata(_form_order_one()).dependencies,
@@ -1140,55 +1126,6 @@ def _hyperelastic_op(
                 _case(
                     element,
                     hessian_bsr_function,
-                    ", ".join(
-                        _nonempty(
-                            hessian_state_args,
-                            "rowptr",
-                            "colidx",
-                            "values",
-                        )
-                    ),
-                )
-            )
-        hessian_dia_function = "%s_hessian_dia_isoparametric_mesh_soa" % stem
-        if _c_abi_function_exists(kernel_sources, hessian_dia_function):
-            hessian_dia_cases.append(
-                _case(
-                    element,
-                    hessian_dia_function,
-                    ", ".join(
-                        _nonempty(
-                            hessian_state_args,
-                            "diag_offsets",
-                            "ndiag",
-                            "values",
-                        )
-                    ),
-                )
-            )
-        hessian_coo_function = "%s_hessian_coo_isoparametric_mesh_soa" % stem
-        if _c_abi_function_exists(kernel_sources, hessian_coo_function):
-            hessian_coo_cases.append(
-                _case(
-                    element,
-                    hessian_coo_function,
-                    ", ".join(
-                        _nonempty(
-                            hessian_state_args,
-                            "nnz",
-                            "rows",
-                            "cols",
-                            "values",
-                        )
-                    ),
-                )
-            )
-        hessian_patch_function = "%s_hessian_patch_isoparametric_mesh_soa" % stem
-        if _c_abi_function_exists(kernel_sources, hessian_patch_function):
-            hessian_patch_cases.append(
-                _case(
-                    element,
-                    hessian_patch_function,
                     ", ".join(
                         _nonempty(
                             hessian_state_args,
@@ -1574,45 +1511,8 @@ namespace sfem {
         });
     }
 
-    int %(op)s::hessian_dia(const real_t *const x,
-                            const int *const diag_offsets,
-                            const ptrdiff_t ndiag,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_dia");
-%(hessian_dia_current_prologue)s
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-%(hessian_dia_dispatch_body)s
-        });
-    }
 
-    int %(op)s::hessian_coo(const real_t *const x,
-                            const ptrdiff_t nnz,
-                            const idx_t *const rows,
-                            const idx_t *const cols,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_coo");
-%(hessian_coo_current_prologue)s
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-%(hessian_coo_dispatch_body)s
-        });
-    }
 
-    int %(op)s::hessian_patch(const real_t *const x,
-                              const count_t *const rowptr,
-                              const idx_t *const colidx,
-                              real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_patch");
-%(hessian_patch_current_prologue)s
-        auto mesh = impl_->space->mesh_ptr();
-        auto points = const_cast<const geom_t *const *>(mesh->points()->data());
-        return impl_->domains->iterate([&](const OpDomain &domain) {
-%(hessian_patch_dispatch_body)s
-        });
-    }
 
     int %(op)s::hessian_block_diag_sym(const real_t *const x,
                                        real_t *const values) {
@@ -1744,9 +1644,6 @@ namespace sfem {
         "objective_steps_cases": "\n".join(objective_steps_cases),
         "hessian_crs_cases": "\n".join(hessian_crs_cases),
         "hessian_bsr_cases": "\n".join(hessian_bsr_cases),
-        "hessian_dia_cases": "\n".join(hessian_dia_cases),
-        "hessian_coo_cases": "\n".join(hessian_coo_cases),
-        "hessian_patch_cases": "\n".join(hessian_patch_cases),
         "apply_dispatch_body": _hyperelastic_apply_dispatch_body(
             material.name,
             kernel_sources,
@@ -1815,48 +1712,6 @@ namespace sfem {
         "hessian_bsr_current_prologue": _hyperelastic_hessian_current_prologue(
             material.op_name,
             "hessian_bsr",
-            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
-        ),
-        "hessian_dia_dispatch_body": _hyperelastic_hessian_dispatch_body(
-            material.name,
-            "hessian_dia",
-            kernel_sources,
-            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
-            ("diag_offsets", "ndiag", "values"),
-            indent="            ",
-            n_field_components_by_dim=n_field_components_by_dim,
-        ),
-        "hessian_dia_current_prologue": _hyperelastic_hessian_current_prologue(
-            material.op_name,
-            "hessian_dia",
-            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
-        ),
-        "hessian_coo_dispatch_body": _hyperelastic_hessian_dispatch_body(
-            material.name,
-            "hessian_coo",
-            kernel_sources,
-            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
-            ("nnz", "rows", "cols", "values"),
-            indent="            ",
-            n_field_components_by_dim=n_field_components_by_dim,
-        ),
-        "hessian_coo_current_prologue": _hyperelastic_hessian_current_prologue(
-            material.op_name,
-            "hessian_coo",
-            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
-        ),
-        "hessian_patch_dispatch_body": _hyperelastic_hessian_dispatch_body(
-            material.name,
-            "hessian_patch",
-            kernel_sources,
-            {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
-            ("rowptr", "colidx", "values"),
-            indent="            ",
-            n_field_components_by_dim=n_field_components_by_dim,
-        ),
-        "hessian_patch_current_prologue": _hyperelastic_hessian_current_prologue(
-            material.op_name,
-            "hessian_patch",
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "hessian_block_diag_sym_dispatch_body": _hyperelastic_hessian_dispatch_body(
@@ -1933,7 +1788,6 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     action_cases = []
     hessian_crs_cases = []
     hessian_bsr_cases = []
-    hessian_dia_cases = []
     performance_cases = {"value": [], "gradient": [], "apply": []}
     dependencies_by_dim = {}
     parameter_names_by_dim = {}
@@ -1951,9 +1805,14 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     action_affine_metric_aos_unit_elements_by_dim = {}
     for element in elements:
         dim = _element_dim(element)
+        # Per element, not per new dimension.  This used to live inside the
+        # `if` below, so on the second element of a dimension it kept whatever
+        # collection the previous iteration left behind -- and the auto-added
+        # PROTEUS_QUAD4 is appended after the 3D elements, so the 2D field's
+        # component count was read from the 3D collection.
+        collection = form_collections[dim]
         dependencies = dependencies_by_dim.get(dim)
         if dependencies is None:
-            collection = form_collections[dim]
             dependencies = (
                 collection.form_metadata(_form_order_one()).dependencies,
                 collection.form_metadata(_form_order_two()).dependencies,
@@ -2322,26 +2181,6 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                     ),
                     block_size_by_dim[dim],
                     hessian_setup,
-                )
-            )
-        hessian_dia_function = "%s_hessian_dia_isoparametric_mesh_soa" % stem
-        if _c_abi_function_exists(kernel_sources, hessian_dia_function):
-            hessian_dia_cases.append(
-                _case(
-                    element,
-                    hessian_dia_function,
-                    ", ".join(
-                        (
-                            common_isoparametric,
-                            *_dependency_storage_args(
-                                action_dependencies.parameters,
-                                parameter_index,
-                            ),
-                            "diag_offsets",
-                            "ndiag",
-                            "values",
-                        )
-                    ),
                 )
             )
 
@@ -3061,14 +2900,6 @@ namespace sfem {
 %(hessian_bsr_body)s
     }
 
-    int %(op)s::hessian_dia(const real_t *const state,
-                            const int *const diag_offsets,
-                            const ptrdiff_t ndiag,
-                            real_t *const values) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_dia");
-%(hessian_dia_body)s
-    }
-
 %(merit_methods)s}  // namespace sfem
 """ % {
         "op": material.op_name,
@@ -3198,39 +3029,6 @@ namespace sfem {
                 ),
             )
             if hessian_bsr_cases
-            else "        return SFEM_FAILURE;"
-        ),
-        "hessian_dia_body": (
-            "%s\n"
-            "%s\n"
-            "        auto mesh = impl_->space->mesh_ptr();\n"
-            "        auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
-            "        return impl_->domains->iterate([&](const OpDomain &domain) {\n"
-            "            real_t storage[MAX_PARAMETERS];\n"
-            "            parameter_array(*domain.parameters,\n"
-            "                            mesh->spatial_dimension(),\n"
-            "                            storage);\n"
-            "%s\n"
-            "%s\n"
-            "        });"
-            % (
-                hessian_state_alias,
-                hessian_state_check,
-                hessian_previous_alias,
-                _residual_hessian_dispatch_body(
-                    material.name,
-                    "hessian_dia",
-                    kernel_sources,
-                    {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
-                    parameter_names_by_dim,
-                    fields_by_dim,
-                    block_size_by_dim,
-                    ("diag_offsets", "ndiag", "values"),
-                    "            ",
-                    mixed_order=mixed_order,
-                ),
-            )
-            if hessian_dia_cases
             else "        return SFEM_FAILURE;"
         ),
         "affine_options": _affine_option_entries(
@@ -4224,14 +4022,6 @@ namespace sfem {
                             const idx_t *const,
                             real_t *const) {
         SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
-        return SFEM_FAILURE;
-    }
-
-    int %(op)s::hessian_dia(const real_t *const,
-                            const int *const,
-                            const ptrdiff_t,
-                            real_t *const) {
-        SFEM_TRACE_SCOPE("%(op)s::hessian_dia");
         return SFEM_FAILURE;
     }
 }  // namespace sfem
@@ -6454,14 +6244,8 @@ _RUNTIME_OPERATION_MARKERS = (
     ("jacobian_action", "_jacobian_action_"),
     ("hessian_block_diag_sym", "_hessian_block_diag_sym_"),
     ("hessian_bsr", "_hessian_bsr_"),
-    ("hessian_coo_triplet", "_hessian_coo_triplet_"),
-    ("hessian_coo", "_hessian_coo_"),
     ("hessian_crs", "_hessian_crs_"),
-    ("hessian_dia", "_hessian_dia_"),
-    ("hessian_patch", "_hessian_patch_"),
     ("bsr_apply", "_bsr_apply_"),
-    ("dia_apply", "_dia_apply_"),
-    ("patch_apply", "_patch_apply_"),
     ("boundary_residual", "_boundary_residual_"),
     ("objective_steps", "_objective_steps_"),
     ("objective", "_objective_"),

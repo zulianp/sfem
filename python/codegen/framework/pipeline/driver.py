@@ -206,6 +206,7 @@ from codegen.framework.fem import (
     sfem_simplex_field_reference_data,
     sfem_soa_element_specialization,
     sfem_soa_element_specializations,
+    sfem_default_element_types,
     sfem_supported_element_types,
     sfem_taylor_hood_element_types,
     sfem_tensor_product_field_reference_data,

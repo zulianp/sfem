@@ -81,12 +81,7 @@ MATERIALS = (
     "laplace",
     "linear_elasticity",
     "neohookean_ogden",
-    "saint_venant_kirchhoff",
-    "modified_mooney_rivlin",
-    "poro_hyperelasticity",
-    "stokes",
     "two_phase_flow",
-    "scalar_potential",
 )
 
 #: Element the grid is built from, and the elements that must be generated with

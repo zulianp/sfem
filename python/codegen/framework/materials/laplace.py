@@ -32,13 +32,13 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "laplace",
     systems,
-    elements=gen.sfem_supported_element_types() + ("PROTEUS_HEX125", "PROTEUS_HEX729"),
+    elements=gen.sfem_default_element_types(),
     op_name="GeneratedLaplace",
     parameter_defaults=(("kappa", 1.0),),
     # The formats the shipped tree carries.  They used to be requested from the
     # command line, which no generator script passes, so a regeneration deleted
     # them.
-    matrix_formats=("crs", "bsr", "dia"),
+    matrix_formats=("crs", "bsr"),
 )
 
 
