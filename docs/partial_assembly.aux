@@ -8,9 +8,6 @@
 \citation{Kolev2021}
 \citation{libCEED2021}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{2}{section.1}\protected@file@percent }
-\citation{DemboEisenstatSteihaug1982}
-\citation{EisenstatWalker1996}
-\citation{KnollKeyes2004}
 \citation{Orszag1980}
 \citation{DevilleFischerMund2002}
 \citation{KronbichlerKormann2012}
@@ -23,109 +20,107 @@
 \citation{KnollKeyes2004}
 \citation{DemboEisenstatSteihaug1982}
 \citation{EisenstatWalker1996}
-\@writefile{toc}{\contentsline {section}{\numberline {2}Related work}{3}{section.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Matrix-free operator application.}{3}{section*.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Nonlinear matrix-free solvers.}{3}{section*.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Inexact Newton.}{3}{section*.5}\protected@file@percent }
 \citation{KirbyLogg2006}
 \citation{UFL2014}
 \citation{Firedrake2016}
-\citation{KoldaBader2009}
 \citation{HighamMary2022}
 \citation{Abdelfattah2021}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background and related work}{3}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Matrix-free operator application.}{3}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Nonlinear matrix-free solvers.}{3}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Code generation.}{3}{section*.5}\protected@file@percent }
 \citation{Ogden1972}
 \citation{BonetWood2008}
-\citation{libCEED2021}
-\@writefile{toc}{\contentsline {paragraph}{Code generation for finite elements.}{4}{section*.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Low-rank structure and reduced precision.}{4}{section*.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}Problem setting}{4}{section.3}\protected@file@percent }
-\newlabel{eq:exact}{{1}{4}{Problem setting}{equation.1}{}}
-\newlabel{eq:pullback}{{2}{4}{Problem setting}{equation.2}{}}
-\newlabel{eq:reference}{{3}{4}{Problem setting}{equation.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Cost structure}{4}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Reduced precision.}{4}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Method}{4}{section.3}\protected@file@percent }
+\newlabel{sec:method}{{3}{4}{Method}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Formulation}{4}{subsection.3.1}\protected@file@percent }
+\newlabel{eq:exact}{{1}{4}{Formulation}{equation.1}{}}
+\newlabel{eq:reference}{{2}{4}{Formulation}{equation.2}{}}
+\newlabel{eq:projected}{{3}{4}{Formulation}{equation.3}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Partial assembly by projection, within one Newton step}}{4}{algorithm.1}\protected@file@percent }
+\newlabel{alg:split}{{1}{4}{Formulation}{algorithm.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Accuracy}{4}{subsection.3.2}\protected@file@percent }
 \citation{BrambleHilbert1970}
 \citation{Ciarlet1978}
-\citation{DemboEisenstatSteihaug1982}
-\@writefile{toc}{\contentsline {section}{\numberline {4}Partial assembly by $L^2$ projection}{5}{section.4}\protected@file@percent }
-\newlabel{sec:projection}{{4}{5}{Partial assembly by $L^2$ projection}{section.4}{}}
-\newlabel{eq:projected}{{5}{5}{Partial assembly by $L^2$ projection}{equation.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Exactness on affine simplices}{5}{subsection.4.1}\protected@file@percent }
-\newlabel{prop:exact}{{1}{5}{Exactness}{proposition.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Consistency on curved and higher-order elements}{5}{subsection.4.2}\protected@file@percent }
-\newlabel{prop:consistency}{{2}{5}{First-order consistency}{proposition.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Symmetry of the stored tensor}{6}{subsection.4.3}\protected@file@percent }
-\newlabel{prop:sym}{{3}{6}{Symmetry}{proposition.3}{}}
-\newlabel{eq:tangentsym}{{7}{6}{Symmetry}{equation.7}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5}Structure of the reference tensor}{6}{section.5}\protected@file@percent }
-\newlabel{sec:compression}{{5}{6}{Structure of the reference tensor}{section.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Sparsity}{6}{subsection.5.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces The symbolically integrated reference tensor $\overline  {W}$. At most ten distinct rational values occur for any element considered.}}{6}{table.1}\protected@file@percent }
-\newlabel{tab:reference}{{1}{6}{The symbolically integrated reference tensor $\Wbar $. At most ten distinct rational values occur for any element considered}{table.1}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Rank}{7}{subsection.5.2}\protected@file@percent }
-\newlabel{prop:rank}{{4}{7}{Rank}{proposition.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Rank of the reference tensor. In each case the rank equals the dimension of the span of the element's gradient functions exactly, as Proposition~\ref {prop:rank} requires.}}{7}{table.2}\protected@file@percent }
-\newlabel{tab:rank}{{2}{7}{Rank of the reference tensor. In each case the rank equals the dimension of the span of the element's gradient functions exactly, as Proposition~\ref {prop:rank} requires}{table.2}{}}
-\newlabel{eq:factorisation}{{10}{7}{Rank}{equation.10}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6}Kernel synthesis}{7}{section.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Staged contraction}{7}{subsection.6.1}\protected@file@percent }
-\newlabel{eq:stage1}{{11}{7}{Staged contraction}{equation.11}{}}
-\newlabel{eq:stage4}{{14}{7}{Staged contraction}{equation.14}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}Direct contraction, and the choice between the two}{8}{subsection.6.2}\protected@file@percent }
-\newlabel{sec:contraction}{{6.2}{8}{Direct contraction, and the choice between the two}{subsection.6.2}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Floating-point operations for the two contraction orderings, counted after common-subexpression elimination. The factorisation ceases to pay once the rank reaches a sufficient fraction of the order.}}{8}{table.3}\protected@file@percent }
-\newlabel{tab:ordering}{{3}{8}{Floating-point operations for the two contraction orderings, counted after common-subexpression elimination. The factorisation ceases to pay once the rank reaches a sufficient fraction of the order}{table.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}Constant folding versus runtime tabulation}{8}{subsection.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}Vectorisation and register pressure}{8}{subsection.6.4}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Floating-point operations in the element application, counted after common-subexpression elimination. These are symbolic operation counts, not measured run times.}}{9}{table.4}\protected@file@percent }
-\newlabel{tab:cost}{{4}{9}{Floating-point operations in the element application, counted after common-subexpression elimination. These are symbolic operation counts, not measured run times}{table.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Live intermediates per element in each stage. In a blocked kernel each is one vector register, so these are the register-pressure figures.}}{9}{table.5}\protected@file@percent }
-\newlabel{tab:stages}{{5}{9}{Live intermediates per element in each stage. In a blocked kernel each is one vector register, so these are the register-pressure figures}{table.5}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}Storage format and precision}{9}{subsection.6.5}\protected@file@percent }
-\newlabel{sec:precision}{{6.5}{9}{Storage format and precision}{subsection.6.5}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Bytes of stored tangent per element. The \texttt  {fp16} row includes a per-element \texttt  {fp32} scaling factor, applied to the outputs rather than to the components, which is why it exceeds half the \texttt  {fp32} figure.}}{10}{table.6}\protected@file@percent }
-\newlabel{tab:storage}{{6}{10}{Bytes of stored tangent per element. The \texttt {fp16} row includes a per-element \texttt {fp32} scaling factor, applied to the outputs rather than to the components, which is why it exceeds half the \texttt {fp32} figure}{table.6}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7}Implementation}{10}{section.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8}Numerical experiments}{10}{section.8}\protected@file@percent }
-\newlabel{sec:experiments}{{8}{10}{Numerical experiments}{section.8}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}Experimental protocol}{10}{subsection.8.1}\protected@file@percent }
-\newlabel{sec:protocol}{{8.1}{10}{Experimental protocol}{subsection.8.1}{}}
-\@writefile{toc}{\contentsline {paragraph}{Hardware and software.}{10}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}What is stored, and when symmetry may be assumed}{5}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:symmetry}{{3.3}{5}{What is stored, and when symmetry may be assumed}{subsection.3.3}{}}
+\newlabel{eq:tangentsym}{{4}{5}{What is stored, and when symmetry may be assumed}{equation.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Structure of the reference tensor}{5}{section.4}\protected@file@percent }
+\newlabel{sec:refstructure}{{4}{5}{Structure of the reference tensor}{section.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces The symbolically integrated reference tensor $\overline  {W}$.}}{5}{table.1}\protected@file@percent }
+\newlabel{tab:reference}{{1}{5}{The symbolically integrated reference tensor $\Wbar $}{table.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Rank of the reference tensor, which equals the dimension of the span of the element's gradient functions.}}{6}{table.2}\protected@file@percent }
+\newlabel{tab:rank}{{2}{6}{Rank of the reference tensor, which equals the dimension of the span of the element's gradient functions}{table.2}{}}
+\newlabel{eq:factorisation}{{5}{6}{Structure of the reference tensor}{equation.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Kernel synthesis}{6}{section.5}\protected@file@percent }
+\newlabel{sec:schedule}{{5}{6}{Kernel synthesis}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Two contraction schedules}{6}{subsection.5.1}\protected@file@percent }
+\newlabel{eq:stage1}{{6}{6}{Two contraction schedules}{equation.6}{}}
+\newlabel{eq:stage4}{{9}{6}{Two contraction schedules}{equation.9}{}}
+\newlabel{eq:direct}{{10}{6}{Two contraction schedules}{equation.10}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Floating-point operations per element for the two schedules, counted after common-subexpression elimination. The factorisation ceases to pay once the rank reaches a sufficient fraction of the order.}}{7}{table.3}\protected@file@percent }
+\newlabel{tab:ordering}{{3}{7}{Floating-point operations per element for the two schedules, counted after common-subexpression elimination. The factorisation ceases to pay once the rank reaches a sufficient fraction of the order}{table.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Constant folding versus runtime tabulation}{7}{subsection.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Floating-point operations per element application after common-subexpression elimination. Symbolic counts, not measured run times.}}{7}{table.4}\protected@file@percent }
+\newlabel{tab:cost}{{4}{7}{Floating-point operations per element application after common-subexpression elimination. Symbolic counts, not measured run times}{table.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Vectorisation and register pressure}{7}{subsection.5.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Live intermediates per element in each stage; in a blocked kernel each is one vector register.}}{8}{table.5}\protected@file@percent }
+\newlabel{tab:stages}{{5}{8}{Live intermediates per element in each stage; in a blocked kernel each is one vector register}{table.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Cost model}{8}{section.6}\protected@file@percent }
+\newlabel{sec:model}{{6}{8}{Cost model}{section.6}{}}
+\newlabel{eq:bytes}{{11}{8}{Cost model}{equation.11}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Per-element cost of the stored application from \eqref  {eq:bytes}. The store is $88\%$ of TET4's compulsory traffic and $63\%$ of TET10's.}}{8}{table.6}\protected@file@percent }
+\newlabel{tab:intensity}{{6}{8}{Per-element cost of the stored application from \eqref {eq:bytes}. The store is $88\%$ of TET4's compulsory traffic and $63\%$ of TET10's}{table.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Per-degree-of-freedom cost of the stored application. TET4 moves nearly six times the bytes per degree of freedom of the other two, because a structured tetrahedral mesh has six elements per lattice cell and each carries its own store.}}{9}{table.7}\protected@file@percent }
+\newlabel{tab:perdof}{{7}{9}{Per-degree-of-freedom cost of the stored application. TET4 moves nearly six times the bytes per degree of freedom of the other two, because a structured tetrahedral mesh has six elements per lattice cell and each carries its own store}{table.7}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Implementation}{9}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Experimental setup}{9}{section.8}\protected@file@percent }
+\newlabel{sec:setup}{{8}{9}{Experimental setup}{section.8}{}}
+\@writefile{toc}{\contentsline {paragraph}{Machines.}{9}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Build.}{9}{section*.8}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Timed region.}{10}{section*.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Problem size.}{11}{section*.10}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Mesh resolution.}{11}{section*.11}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Increment.}{11}{section*.12}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Comparison frame.}{11}{section*.13}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}Verification}{11}{subsection.8.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {8.3}Accuracy of the approximation}{11}{subsection.8.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {8.4}Convergence under refinement}{11}{subsection.8.4}\protected@file@percent }
-\newlabel{sec:convergence}{{8.4}{11}{Convergence under refinement}{subsection.8.4}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Relative error of the approximate application against the exact one, neo-Hookean Ogden material, resolution $n=16$ ($\approx 2.0\times 10^{5}$ dof), M1, one thread. The $w=0$ column is the control: it recovers Proposition~\ref {prop:exact} and confirms that the sweep measures the geometry rather than the harness. TET4 is flat across the sweep, as it must be.}}{12}{table.7}\protected@file@percent }
-\newlabel{tab:warp}{{7}{12}{Relative error of the approximate application against the exact one, neo-Hookean Ogden material, resolution $n=16$ ($\approx 2.0\times 10^{5}$ dof), M1, one thread. The $w=0$ column is the control: it recovers Proposition~\ref {prop:exact} and confirms that the sweep measures the geometry rather than the harness. TET4 is flat across the sweep, as it must be}{table.7}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {8.5}Effect of store precision}{12}{subsection.8.5}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Relative difference between the approximate application with an \texttt  {fp32} store and the exact application, at three mesh resolutions. The power-of-two columns are artefacts of exact representability, not measurements of the method; the $n=12$ column is the honest figure.}}{12}{table.8}\protected@file@percent }
-\newlabel{tab:precision}{{8}{12}{Relative difference between the approximate application with an \texttt {fp32} store and the exact application, at three mesh resolutions. The power-of-two columns are artefacts of exact representability, not measurements of the method; the $n=12$ column is the honest figure}{table.8}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {8.6}Throughput against library operators}{12}{subsection.8.6}\protected@file@percent }
-\newlabel{sec:throughput}{{8.6}{12}{Throughput against library operators}{subsection.8.6}{}}
-\@writefile{toc}{\contentsline {paragraph}{Break-even.}{12}{section*.14}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Application throughput in MDOF/s. Neo-Hookean Ogden material, $1.04\times 10^{7}$ degrees of freedom, M1, eight threads, identical build for all three columns. The HEX8 entries are five-run means; the run-to-run spread of the hand-optimised operator on that element is $\pm 7\%$, so the comparison there is a statistical tie. Before the contraction-ordering selection of Section~\ref {sec:contraction} the HEX8 figure for this work was $100.2$.}}{13}{table.9}\protected@file@percent }
-\newlabel{tab:throughput}{{9}{13}{Application throughput in MDOF/s. Neo-Hookean Ogden material, $1.04\times 10^{7}$ degrees of freedom, M1, eight threads, identical build for all three columns. The HEX8 entries are five-run means; the run-to-run spread of the hand-optimised operator on that element is $\pm 7\%$, so the comparison there is a statistical tie. Before the contraction-ordering selection of Section~\ref {sec:contraction} the HEX8 figure for this work was $100.2$}{table.9}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {8.7}Parallel scalability}{13}{subsection.8.7}\protected@file@percent }
-\newlabel{sec:scaling}{{8.7}{13}{Parallel scalability}{subsection.8.7}{}}
-\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Throughput in MDOF/s against thread count, Mooney--Rivlin material with Kelvin--Voigt viscosity, $206\,763$ degrees of freedom. Grace attains $69.4\times $ on $72$ cores for the exact application and $73.5\times $ for the stored one.}}{13}{table.10}\protected@file@percent }
-\newlabel{tab:scaling}{{10}{13}{Throughput in MDOF/s against thread count, Mooney--Rivlin material with Kelvin--Voigt viscosity, $206\,763$ degrees of freedom. Grace attains $69.4\times $ on $72$ cores for the exact application and $73.5\times $ for the stored one}{table.10}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {9}Discussion and limitations}{13}{section.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Where the method is expected to pay.}{13}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Problem sizes.}{10}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Comparison frame.}{10}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Accuracy measurements.}{10}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Results}{10}{section.9}\protected@file@percent }
+\newlabel{sec:results}{{9}{10}{Results}{section.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.1}Validation}{10}{subsection.9.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.2}Accuracy of the approximation}{10}{subsection.9.2}\protected@file@percent }
+\newlabel{sec:accuracy}{{9.2}{10}{Accuracy of the approximation}{subsection.9.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Relative error of the approximate application against the exact one. Neo-Hookean Ogden, $\approx 2.0\times 10^{5}$~dof, M1, one thread. The $w=0$ column is the control: it recovers the exactness of the affine case and confirms the sweep measures geometry rather than the harness.}}{11}{table.8}\protected@file@percent }
+\newlabel{tab:warp}{{8}{11}{Relative error of the approximate application against the exact one. Neo-Hookean Ogden, $\approx 2.0\times 10^{5}$~dof, M1, one thread. The $w=0$ column is the control: it recovers the exactness of the affine case and confirms the sweep measures geometry rather than the harness}{table.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.3}Node-level throughput}{11}{subsection.9.3}\protected@file@percent }
+\newlabel{sec:throughput}{{9.3}{11}{Node-level throughput}{subsection.9.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Application throughput in MDOF/s. Neo-Hookean Ogden, $1.04\times 10^{7}$~dof, M1, eight threads, identical build for all columns. ``PA'' is a hand-optimised partial-assembly implementation of the same material, available for TET10 and HEX8 but not TET4; ``MF'' is the exact matrix-free application. HEX8 entries are five-run means; the run-to-run spread of the hand-optimised operator on that element is $\pm 7\%$, so the comparison there is a statistical tie. Before the schedule selection of Section~\ref {sec:schedule} the HEX8 figure for this work was $100.2$.}}{11}{table.9}\protected@file@percent }
+\newlabel{tab:throughput}{{9}{11}{Application throughput in MDOF/s. Neo-Hookean Ogden, $1.04\times 10^{7}$~dof, M1, eight threads, identical build for all columns. ``PA'' is a hand-optimised partial-assembly implementation of the same material, available for TET10 and HEX8 but not TET4; ``MF'' is the exact matrix-free application. HEX8 entries are five-run means; the run-to-run spread of the hand-optimised operator on that element is $\pm 7\%$, so the comparison there is a statistical tie. Before the schedule selection of Section~\ref {sec:schedule} the HEX8 figure for this work was $100.2$}{table.9}{}}
+\@writefile{toc}{\contentsline {paragraph}{Break-even.}{11}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.4}Achieved rates against the model}{11}{subsection.9.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Achieved rates derived from Tables~\ref {tab:perdof} and \ref {tab:throughput}. M1, eight threads, $1.04\times 10^{7}$~dof. ``\% of peak'' is against the nominal $410$~GFLOP/s double-precision vector peak of the eight performance cores.}}{12}{table.10}\protected@file@percent }
+\newlabel{tab:achieved}{{10}{12}{Achieved rates derived from Tables~\ref {tab:perdof} and \ref {tab:throughput}. M1, eight threads, $1.04\times 10^{7}$~dof. ``\% of peak'' is against the nominal $410$~GFLOP/s double-precision vector peak of the eight performance cores}{table.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.5}Strong scaling}{12}{subsection.9.5}\protected@file@percent }
+\newlabel{sec:scaling}{{9.5}{12}{Strong scaling}{subsection.9.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Throughput in MDOF/s against thread count. Mooney--Rivlin with Kelvin--Voigt viscosity, $2.07\times 10^{5}$~dof. Parenthesised thread counts give the point at which the M1 speed-up is measured.}}{12}{table.11}\protected@file@percent }
+\newlabel{tab:scaling}{{11}{12}{Throughput in MDOF/s against thread count. Mooney--Rivlin with Kelvin--Voigt viscosity, $2.07\times 10^{5}$~dof. Parenthesised thread counts give the point at which the M1 speed-up is measured}{table.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.6}Store precision}{12}{subsection.9.6}\protected@file@percent }
+\newlabel{sec:precision}{{9.6}{12}{Store precision}{subsection.9.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Bytes of stored tangent per element. The \texttt  {fp16} row for $126$ components includes a per-element \texttt  {fp32} scaling factor, which is why it exceeds half the \texttt  {fp32} figure.}}{13}{table.12}\protected@file@percent }
+\newlabel{tab:storage}{{12}{13}{Bytes of stored tangent per element. The \texttt {fp16} row for $126$ components includes a per-element \texttt {fp32} scaling factor, which is why it exceeds half the \texttt {fp32} figure}{table.12}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Relative difference between the \texttt  {fp32}-store application and the exact one at three mesh resolutions. The power-of-two columns are artefacts of exact representability; $n=12$ is the honest figure.}}{13}{table.13}\protected@file@percent }
+\newlabel{tab:precision}{{13}{13}{Relative difference between the \texttt {fp32}-store application and the exact one at three mesh resolutions. The power-of-two columns are artefacts of exact representability; $n=12$ is the honest figure}{table.13}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10}Discussion}{13}{section.10}\protected@file@percent }
+\newlabel{sec:discussion}{{10}{13}{Discussion}{section.10}{}}
+\@writefile{toc}{\contentsline {paragraph}{Where the method pays.}{13}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Where it is inadmissible.}{13}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{The remaining performance gap.}{13}{section*.16}\protected@file@percent }
 \bibcite{Abdelfattah2021}{1}
 \bibcite{MFEM2021}{2}
 \bibcite{UFL2014}{3}
-\@writefile{toc}{\contentsline {paragraph}{Where the approximation is inadmissible.}{14}{section*.16}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Element coverage.}{14}{section*.17}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Higher order.}{14}{section*.18}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {10}Conclusions}{14}{section.10}\protected@file@percent }
-\newlabel{sec:conclusions}{{10}{14}{Conclusions}{section.10}{}}
 \bibcite{BonetWood2008}{4}
 \bibcite{BrambleHilbert1970}{5}
 \bibcite{Brown2010}{6}
+\@writefile{toc}{\contentsline {paragraph}{Element coverage and higher order.}{14}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11}Conclusions}{14}{section.11}\protected@file@percent }
 \bibcite{libCEED2021}{7}
 \bibcite{Ciarlet1978}{8}
 \bibcite{DemboEisenstatSteihaug1982}{9}
@@ -134,12 +129,11 @@
 \bibcite{HighamMary2022}{12}
 \bibcite{KirbyLogg2006}{13}
 \bibcite{KnollKeyes2004}{14}
-\bibcite{KoldaBader2009}{15}
-\bibcite{Kolev2021}{16}
-\bibcite{KronbichlerKormann2012}{17}
-\bibcite{KronbichlerKormann2019}{18}
-\bibcite{MelenkGerdesSchwab2001}{19}
-\bibcite{Ogden1972}{20}
-\bibcite{Orszag1980}{21}
-\bibcite{Firedrake2016}{22}
+\bibcite{Kolev2021}{15}
+\bibcite{KronbichlerKormann2012}{16}
+\bibcite{KronbichlerKormann2019}{17}
+\bibcite{MelenkGerdesSchwab2001}{18}
+\bibcite{Ogden1972}{19}
+\bibcite{Orszag1980}{20}
+\bibcite{Firedrake2016}{21}
 \gdef \@abspage@last{15}
