@@ -2558,7 +2558,25 @@ private:
                                 timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)), nullptr);
             }
         }
-        g.mg->set_max_it(1);  // one V-cycle per preconditioner application
+        // Cycle index, following Brandt's TME report (NASA/CR-1998-207647).
+        //
+        // For non-aligned grids with open characteristics -- entering flow, which is what an
+        // inlet/outlet channel is -- he identifies the difficulty as "the shorter distance
+        // (along the characteristics) for which a coarser grid still approximates some smooth
+        // solution components", and lists three cures: downstream-ordered relaxation marching,
+        // semi-coarsening, and a cycle index of 2^(p/m), the last "not requiring ordered
+        // relaxation". For closed characteristics -- a recirculation bubble, which the
+        // backward-facing step also has -- the recommended cycles are likewise W-based
+        // (defect correction within W cycles, or downstream ordering with doubled transferred
+        // residuals).
+        //
+        // That matches what was measured here: the weakly damped modes are smooth streamwise
+        // velocity, not pressure, and neither the repaired smoother nor the coarse space
+        // removes them. A higher cycle index visits the coarse levels more often per fine
+        // sweep, which is the cheapest of the three cures to try and the only one needing no
+        // new machinery.
+        g.mg->set_cycle_type(smesh::Env::read<int>("SFEM_GMG_CYCLE", 1));
+        g.mg->set_max_it(1);  // one cycle per preconditioner application
     }
 
 }  // namespace
