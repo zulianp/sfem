@@ -1,13 +1,12 @@
 \documentclass[11pt]{article}
 
 \usepackage[a4paper,margin=1in]{geometry}
-\usepackage{amsmath,amssymb,amsthm}
+\usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usepackage[hidelinks]{hyperref}
-
-\newtheorem{proposition}{Proposition}
-\newtheorem{remark}{Remark}
 
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\Q}{\mathbb{Q}}
@@ -15,10 +14,11 @@
 \newcommand{\Wbar}{\overline{W}}
 \newcommand{\Sbar}{\overline{S}}
 \newcommand{\xhat}{\boldsymbol{\xi}}
-\newcommand{\dof}{\mathrm{dof}}
+\newcommand{\flop}{\mathrm{flop}}
 
-\title{Partial Assembly by $L^2$-Projection\\
-       for Inexact-Newton Solvers in Elasticity}
+\title{Partial Assembly by $L^2$-Projection:\\
+       node-level performance of generated inexact tangent kernels\\
+       for finite-strain elasticity}
 \author{Patrick Zulian\thanks{Affiliation to be completed.}}
 \date{\today}
 
@@ -26,224 +26,178 @@
 \maketitle
 
 \begin{abstract}
-Matrix-free Newton--Krylov solvers for finite-strain elasticity spend most of
-their time applying the tangent operator, and each application carries a
-quadrature loop because the material tangent varies within every element.  We
-replace that tangent by its element-wise $L^2$ projection onto the constants.
-The projection separates the integrand into a small per-element tensor,
-assembled once per Newton step, and a purely geometric tensor that belongs to
-the reference element and can therefore be integrated exactly and symbolically
-at code-generation time.  The quadrature loop leaves the kernel entirely, and
-the resulting operator application reads only the stored tensor and the
-increment: no geometry, no state, no material parameters.
+The tangent operator of a finite-strain elasticity problem is applied tens to
+hundreds of times per Newton step, and every application re-evaluates the same
+constitutive tangent at every quadrature point of every element, because the
+tangent varies within the element and the increment is all that changes between
+Krylov iterations.  We eliminate that redundancy by replacing the pulled-back
+material tangent with its element-wise $L^2$ projection onto the constants.  The
+projection factors the integrand into a per-element tensor, assembled once per
+Newton step, and a purely geometric tensor belonging to the reference element,
+which is integrated exactly and symbolically at code-generation time and folded
+into the emitted kernel as literal constants.  The quadrature loop leaves the
+application entirely: it reads a $45$-number store and the increment, and
+touches neither geometry, state, nor material parameters.
 
-The reference tensor is far smaller than its size suggests.  Read as a matrix on
-the (node, direction) pair index it is the Gram matrix of the element's gradient
-functions, so its rank equals the dimension of the span of those functions:
-one for linear simplices, four for quadratic tetrahedra, seven for trilinear
-hexahedra.  We give an exact rational factorisation of that rank structure and
-show that the projection is an identity, not an approximation, on affine
-simplices --- for nonlinear materials as much as linear ones --- which supplies
-an exact reference against which the construction can be verified.  We also
-show that the symmetry that halves the storage is a property of the
-\emph{formulation} rather than of the method, and that assuming it for a
-residual-based material such as Kelvin--Voigt viscoelasticity yields a
-different operator, with $5.3\times10^{-2}$ relative error on an element where
-the projection is provably exact.
+We give a per-element cost model --- floating-point operations and compulsory
+memory traffic --- that places the resulting kernels between $1.0$ and
+$6.9$~flop/byte of arithmetic intensity depending on element type, and predicts
+that linear tetrahedra are limited by the store bandwidth while quadratic
+tetrahedra and trilinear hexahedra are limited by the contraction.  The
+generator exploits the second regime by selecting between two contraction
+schedules per element on symbolic operation count, which reduces the trilinear
+hexahedral kernel from $2732$ to $1801$ operations.
 
-A code generator implements the construction for five element types, choosing
-between two contraction orderings per element by symbolic operation count.
-On a 10.4-million-degree-of-freedom neo-Hookean problem the generated
-kernels reach $219.6$~MDOF/s on quadratic tetrahedra against $137.4$ for a
-hand-optimised partial-assembly implementation of the same material, with the
-assembly phase also faster ($0.392$\,s against $0.653$\,s), and parity on
-trilinear hexahedra.  Parallel efficiency is $96\%$ on 72 Arm Neoverse-V2
-cores.  The approximation converges to the exact operator at $O(h^{1.07})$
-under refinement.
+On $1.04\times10^{7}$ degrees of freedom the generated kernels reach
+$219.6$~MDOF/s on quadratic tetrahedra against $137.4$ for a hand-optimised
+partial-assembly implementation of the same neo-Hookean material, with the
+assembly phase also $1.67\times$ faster, and reach parity on trilinear
+hexahedra.  Measured against the exact matrix-free application the speed-ups are
+$8.1\times$, $2.8\times$ and $2.4\times$ for the three element types, with
+break-even below $1.2$ applications per assembly.  Strong scaling on $72$ Arm
+Neoverse-V2 cores is $69.4\times$ for the exact application and $73.5\times$ for
+the stored one.  The approximation is exact on affine simplices and converges at
+$O(h^{1.07})$ elsewhere.
 \end{abstract}
 
 \tableofcontents
 
 \section{Introduction}
 
-A Newton--Krylov solve of a finite-strain elasticity problem has a
-characteristic cost profile.  Each Newton step forms a residual once and then
-applies the tangent operator tens to hundreds of times inside a Krylov method.
-In a matrix-free implementation each of those applications re-evaluates the
-material tangent at every quadrature point of every element, because the
-tangent depends on the deformation gradient and the deformation gradient varies
-within the element.  The work is repeated identically across all Krylov
-iterations of a step: the state does not change, only the increment does.
+Newton--Krylov solvers for finite-strain elasticity have a lopsided cost
+profile.  A Newton step forms one residual and then applies the tangent operator
+$n_{\mathrm{it}}$ times inside a Krylov method, where $n_{\mathrm{it}}$ is
+typically in the tens to the hundreds.  In a matrix-free implementation each of
+those applications evaluates the constitutive tangent at every quadrature point
+of every element.  All $n_{\mathrm{it}}$ evaluations produce identical results:
+the state is frozen within the step and only the increment changes.
 
-Sparse assembly is the classical way to pay that cost once, but for high-order
-or vector-valued problems the assembled matrix is expensive in memory and its
-application is bandwidth-bound.  \emph{Partial assembly} --- storing a compact
-per-element quantity that captures the geometry and the state, and applying it
-with a small tensor contraction --- occupies the middle ground, and is standard
-practice in high-order matrix-free codes for linear operators
-\cite{Orszag1980,DevilleFischerMund2002,KronbichlerKormann2012,Kolev2021,libCEED2021}.
-Extending it to a nonlinear material is not immediate, because the object that
-would be stored is not constant over the element.
+The redundancy is well known and the standard responses are sparse assembly,
+which pays once but produces an object that is expensive in memory and
+bandwidth-bound to apply, and \emph{partial assembly}, which stores a compact
+per-element quantity capturing geometry and state and applies it by a small
+tensor contraction.  Partial assembly is routine in high-order matrix-free codes
+for linear operators \cite{Orszag1980,DevilleFischerMund2002,KronbichlerKormann2012,Kolev2021,libCEED2021}.
+It does not transfer directly to a nonlinear material, because the object one
+would store --- the pulled-back tangent $\Sbar$ --- is not constant over the
+element.
 
-This paper makes that extension by projection.  We replace the pulled-back
-material tangent $\Sbar(\xhat)$ by its element average $\Sbar^0$, which is its
-$L^2$ projection onto the constants on the element.  Because $\Sbar^0$ leaves
-the integral, the remaining integrand involves only reference basis-function
-gradients: a tensor $\Wbar$ that depends on the element type and on nothing
-else, and can therefore be integrated exactly in rational arithmetic before the
-program is compiled.  What is stored per element is $\Sbar^0$ alone --- 45
-numbers in three dimensions for a symmetric material --- and what the operator
-application reads is that store and the increment.
-
-The resulting method is inexact by construction, which is why the target is an
-inexact-Newton solver \cite{DemboEisenstatSteihaug1982,EisenstatWalker1996,KnollKeyes2004}:
-a framework that already tolerates an approximate Jacobian action provided the
-approximation is controlled.  We show the approximation is first-order in the
-mesh size, and we measure it.
+This paper takes the obvious step and measures the consequences.  We replace
+$\Sbar$ by its element average, which factors the integrand into a per-element
+store and a reference-element tensor.  The interesting content is not the
+approximation, which is elementary, but what becomes possible once it is made:
+the reference tensor can be integrated exactly in rational arithmetic before
+compilation, its rank structure can be exposed and exploited symbolically, and
+the resulting element kernel contains no loads other than the store and the
+increment, no branches, and no constants that are not compile-time immediates.
+The questions this raises are node-level performance questions: what is the
+arithmetic intensity of the resulting kernel, which bound is it against, how does
+it vectorise, how does it scale, and does it beat a hand-optimised kernel for
+the same material.
 
 \subsection*{Contributions}
 
 \begin{enumerate}[leftmargin=1.5em,itemsep=2pt]
-\item A partial-assembly scheme for nonlinear elasticity obtained by $L^2$
-  projection of the pulled-back tangent onto element-wise constants
-  (Section~\ref{sec:projection}), with a proof that the projection is exact ---
-  not merely accurate --- on affine simplices for arbitrary hyperelastic
-  materials (Proposition~\ref{prop:exact}).
-\item Identification of the reference tensor as a Gram matrix, giving its rank
-  in closed form as the dimension of the span of the element's gradient
-  functions (Proposition~\ref{prop:rank}), together with an exact rational
-  factorisation that turns the operator application into four staged
-  contractions.
-\item A symmetry analysis (Proposition~\ref{prop:sym}) showing that the
-  storage-halving symmetry of $\Sbar^0$ holds for energy-based materials and
-  fails for residual-based ones, with a measured counterexample.
-\item Two contraction orderings with a per-element selection rule based on
-  symbolic operation count after common-subexpression elimination
-  (Section~\ref{sec:contraction}), and evidence that the count must be taken
-  after elimination rather than before.
-\item An implementation in a finite-element code generator covering TRI3,
-  QUAD4, TET4, TET10 and HEX8, and a measurement campaign
-  (Section~\ref{sec:experiments}) comparing against hand-optimised kernels for
-  the same materials at 10.4~million degrees of freedom, on two architectures,
-  with a stated experimental protocol.
+\item A partial-assembly formulation for nonlinear elasticity by $L^2$ projection
+  of the pulled-back tangent (Section~\ref{sec:method}), whose application reads
+  only a $45$-number per-element store and the increment.
+\item A structural analysis of the reference tensor
+  (Section~\ref{sec:refstructure}): it is a Gram matrix, so its rank is the
+  dimension of the span of the element's gradient functions, which yields an
+  exact rational factorisation and a four-stage contraction schedule.
+\item A second contraction schedule and a per-element selection rule on symbolic
+  operation count after common-subexpression elimination
+  (Section~\ref{sec:schedule}), reducing the trilinear hexahedral kernel by
+  $34\%$ and raising its throughput from $100$ to $132$~MDOF/s.
+\item A per-element cost model in flops and compulsory bytes
+  (Section~\ref{sec:model}), giving arithmetic intensities of $1.0$, $4.9$ and
+  $6.9$~flop/byte for TET4, TET10 and HEX8, and predicting distinct bottlenecks
+  for the three.
+\item A node-level performance study (Section~\ref{sec:results}) at
+  $1.04\times10^{7}$ degrees of freedom against hand-optimised kernels for the
+  same materials, with achieved flop and bandwidth rates derived from the model,
+  strong scaling to $72$ cores, and a store-precision study.
+\item A practical result on storage: the symmetry that halves the store holds for
+  energy-based materials and fails for residual-based ones, and assuming it for
+  Kelvin--Voigt viscoelasticity produces a different operator with
+  $5.3\times10^{-2}$ relative error (Section~\ref{sec:symmetry}).
 \end{enumerate}
 
-\section{Related work}
+\section{Background and related work}
 
-\paragraph{Matrix-free operator application.}  The idea of storing per-quadrature-point
-geometric data and applying an operator by tensor contraction goes back to
-spectral-element methods \cite{Orszag1980,DevilleFischerMund2002} and is the
-basis of modern high-order matrix-free frameworks: \texttt{deal.II}'s cell-based
-interface \cite{KronbichlerKormann2012,KronbichlerKormann2019}, MFEM
-\cite{MFEM2021}, and libCEED \cite{libCEED2021}, whose ``operator data'' or
-``Q-data'' plays the role of our $\Sbar$.  The efficiency of these methods rests
-on sum factorisation, whose asymptotic advantage appears at polynomial degrees
-well above those considered here \cite{MelenkGerdesSchwab2001,Kolev2021}.  Our
-setting is complementary: low to moderate order, where the element tensors are
-small enough to be handled exactly and symbolically, and where the dominant cost
-is the repeated evaluation of a nonlinear constitutive law rather than the
-basis-function contraction.
+\paragraph{Matrix-free operator application.}  Storing per-quadrature-point geometric
+data and applying an operator by tensor contraction originates in
+spectral-element methods \cite{Orszag1980,DevilleFischerMund2002} and underpins
+modern matrix-free frameworks: the cell-based interface of \texttt{deal.II}
+\cite{KronbichlerKormann2012,KronbichlerKormann2019}, MFEM \cite{MFEM2021}, and
+libCEED \cite{libCEED2021}, whose ``Q-data'' plays the role of $\Sbar$ here.
+The performance of these frameworks rests on sum factorisation, whose asymptotic
+advantage appears at polynomial degrees well above those considered in this work
+\cite{MelenkGerdesSchwab2001,Kolev2021}.  Our regime is complementary: low to
+moderate order, where element tensors are small enough to be manipulated exactly
+and symbolically, and where the dominant cost is the repeated evaluation of a
+nonlinear constitutive law rather than basis-function contraction.
 
-\paragraph{Nonlinear matrix-free solvers.}  Brown \cite{Brown2010} analyses matrix-free
-Newton--Krylov methods for nodal high-order elements in three dimensions and
-identifies the tangent evaluation as the bottleneck.  Jacobian-free
-Newton--Krylov methods \cite{KnollKeyes2004} avoid forming the tangent at all,
-at the price of a directional-difference approximation whose accuracy is
-delicate; our scheme instead forms an approximate tangent explicitly, which is
-cheaper to apply repeatedly and whose error is a property of the discretisation
-rather than of a difference parameter.
+\paragraph{Nonlinear matrix-free solvers.}  Brown \cite{Brown2010} analyses
+matrix-free Newton--Krylov methods for nodal high-order elements in three
+dimensions and identifies tangent evaluation as the bottleneck.  Jacobian-free
+Newton--Krylov methods \cite{KnollKeyes2004} avoid forming the tangent at all at
+the price of a directional-difference approximation; we instead form an
+approximate tangent explicitly, which is cheaper to apply repeatedly and whose
+error is a property of the discretisation rather than of a difference parameter.
+The convergence theory for solvers with inexact Jacobian information is
+classical \cite{DemboEisenstatSteihaug1982,EisenstatWalker1996}.
 
-\paragraph{Inexact Newton.}  The convergence theory of Newton methods with
-inexactly solved --- or inexactly formed --- linear systems is classical
-\cite{DemboEisenstatSteihaug1982}, with the choice of forcing terms treated in
-\cite{EisenstatWalker1996}.  Our operator perturbation is $O(h)$
-(Proposition~\ref{prop:consistency}), which places it within the regime these
-results address.
+\paragraph{Code generation.}  Automatic generation of element kernels from a
+symbolic weak form is established \cite{KirbyLogg2006,UFL2014,Firedrake2016}.
+What distinguishes the generator described here is that the projection, the
+exact rational integration, the rank factorisation and the schedule selection
+are all performed symbolically, and the reference tensor appears in the emitted
+code only as folded literal constants --- never as a runtime table.
 
-\paragraph{Code generation for finite elements.}  Automatic generation of element
-kernels from a symbolic weak form is established practice: the FEniCS form
-compiler \cite{KirbyLogg2006}, the Unified Form Language \cite{UFL2014}, and
-Firedrake \cite{Firedrake2016}.  What distinguishes the present work is that the
-generator performs the projection, the exact rational integration, the rank
-factorisation and the contraction-ordering choice symbolically, and emits
-element-specific code in which the reference tensor appears only as folded
-literal constants.
+\paragraph{Reduced precision.}  Storing the assembled tensor at reduced precision
+connects to the mixed-precision literature
+\cite{HighamMary2022,Abdelfattah2021}.  Our finding
+(Section~\ref{sec:precision}) is negative and instructive: \texttt{fp16} does not
+pay on either machine tested, because the kernels are not at the bandwidth bound
+at the problem sizes where the store would dominate.
 
-\paragraph{Low-rank structure and reduced precision.}  The factorisation of
-Section~\ref{sec:compression} is an exact rank-revealing decomposition of a Gram
-matrix rather than a numerical low-rank approximation \cite{KoldaBader2009}; the
-rank is small for structural reasons, not because the tensor happens to be
-compressible.  Storing the assembled tensor at reduced precision connects to the
-broader mixed-precision literature \cite{HighamMary2022,Abdelfattah2021}; our
-finding (Section~\ref{sec:precision}) is that \texttt{fp32} is the useful
-operating point and \texttt{fp16} is not, for reasons of bandwidth saturation
-rather than accuracy.
+\section{Method}
+\label{sec:method}
 
-\section{Problem setting}
+\subsection{Formulation}
 
-Let $\Omega \subset \R^d$, $d \in \{2,3\}$, be discretised by a mesh of elements
-$K$, each the image of a reference cell $\refcell$ under a map
-$\boldsymbol{x}(\xhat)$ with Jacobian $J = \partial\boldsymbol{x}/\partial\xhat$
-and $\mathrm{d}V = \det J \, \mathrm{d}\xhat$.  Let $\{\varphi_p\}_{p=1}^{N}$ be
-the scalar reference basis, with the displacement field discretised
-component-wise on the same space.
-
-For a hyperelastic material with strain energy $\Psi(F)$ and first Piola--Kirchhoff
-stress $P = \partial\Psi/\partial F$ \cite{Ogden1972,BonetWood2008}, the
-matrix-free action of the tangent operator on an increment $h$ is
+Let $K$ be an element with reference cell $\refcell$, map
+$\boldsymbol{x}(\xhat)$, Jacobian $J$ and $\mathrm{d}V = \det J\,\mathrm{d}\xhat$,
+and let $\{\varphi_p\}_{p=1}^{N}$ be the reference basis.  For a hyperelastic
+material with first Piola--Kirchhoff stress $P(F)$ \cite{Ogden1972,BonetWood2008}
+the matrix-free tangent action on an increment $h$ is
 \begin{equation}
   (\mathcal{H} h)_{i,p}
   = \int_K S_{ijkl}\bigl(F(\boldsymbol{x})\bigr)\,
     \frac{\partial h_k}{\partial x_l}\,
     \frac{\partial \varphi_p}{\partial x_j}\;\mathrm{d}V ,
   \qquad
-  S_{ijkl} = \frac{\partial P_{ij}}{\partial F_{kl}} ,
+  S_{ijkl} = \frac{\partial P_{ij}}{\partial F_{kl}} .
   \label{eq:exact}
 \end{equation}
-where $i$ indexes the output component and $p$ the test function.
-
-Pulling the derivatives back to the reference cell with
-$\partial/\partial x_j = \sum_n J^{-1}_{nj}\, \partial/\partial \xi_n$ and
-collecting all geometric factors into the tangent gives
+Pulling the derivatives back with $\partial/\partial x_j = \sum_n J^{-1}_{nj}\,
+\partial/\partial \xi_n$ and absorbing the geometry into the tangent,
 \begin{equation}
-  \Sbar_{ikmn}
-  = \sum_{j,l} S_{ijkl}\, J^{-1}_{nj}\, J^{-1}_{ml}\, \det J ,
-  \label{eq:pullback}
-\end{equation}
-so that \eqref{eq:exact} becomes
-\begin{equation}
+  \Sbar_{ikmn} = \sum_{j,l} S_{ijkl}\, J^{-1}_{nj}\, J^{-1}_{ml}\, \det J ,
+  \qquad
   (\mathcal{H} h)_{i,p}
   = \int_{\refcell} \Sbar_{ikmn}(\xhat)\,
     \frac{\partial h_k}{\partial \xi_m}\,
     \frac{\partial \varphi_p}{\partial \xi_n}\;\mathrm{d}\xhat .
   \label{eq:reference}
 \end{equation}
-The tensor $\Sbar$ is the material tangent with the geometry already folded in;
-it is the analogue of the ``operator data'' of \cite{libCEED2021} for the second
-variation.  Every factor under the integral in \eqref{eq:reference} except
-$\Sbar$ is a property of the reference element alone.  What forces a quadrature
-loop is the dependence of $\Sbar$ on $\xhat$, which enters through $F$.
+Everything under this integral except $\Sbar$ belongs to the reference element.
+The quadrature loop exists solely because $\Sbar$ depends on $\xhat$, through $F$.
 
-\subsection{Cost structure}
-
-Within one Newton step the state, and hence $\Sbar$, is fixed while
-\eqref{eq:reference} is applied once per Krylov iteration.  Writing $n_{\mathrm{it}}$
-for the number of applications per step, a matrix-free implementation performs
-$n_{\mathrm{it}}$ evaluations of the constitutive tangent per quadrature point,
-all of them identical.  This is the redundancy the present method removes: it
-performs one, stores its projection, and makes the remaining $n_{\mathrm{it}}-1$
-applications independent of the state entirely.
-
-\section{Partial assembly by $L^2$ projection}
-\label{sec:projection}
-
-Let $\Pi^0_K$ denote the $L^2(\refcell)$ projection onto the constants, that is
-the element average, and set
-\begin{equation}
-  \Sbar^0 \;=\; \Pi^0_K \Sbar \;=\; |\refcell|^{-1}\int_{\refcell}\Sbar \,\mathrm{d}\xhat .
-\end{equation}
-Replacing $\Sbar$ by $\Sbar^0$ in \eqref{eq:reference} takes it out of the
-integral and separates the sum:
+Replacing $\Sbar$ by its element average
+$\Sbar^0 = |\refcell|^{-1}\int_{\refcell}\Sbar$ --- its $L^2$ projection onto the
+constants --- removes it from the integral:
 \begin{equation}
   (\mathcal{H} h)_{i,p}
   \;\approx\;
@@ -255,130 +209,88 @@ integral and separates the sum:
     \frac{\partial \varphi_p}{\partial \xi_n}\;\mathrm{d}\xhat .
   \label{eq:projected}
 \end{equation}
-Two objects appear, with entirely different lifetimes.  $\Sbar^0$ is one small
-tensor per element, computed once per Newton step from the current state.
-$\Wbar$ depends only on the element type; it is integrated exactly, in rational
-arithmetic, at code-generation time.  The quadrature loop is therefore absent
-from the operator application, and so are the geometry, the state and the
-material parameters: the application reads $\Sbar^0$ and $h$ and nothing else.
+The two factors have entirely different lifetimes.  $\Sbar^0$ is a small
+per-element tensor computed once per Newton step; $\Wbar$ depends only on the
+element type and is integrated exactly, in rational arithmetic, before
+compilation.  Algorithm~\ref{alg:split} states the resulting split.
 
-\subsection{Exactness on affine simplices}
+\begin{algorithm}[ht]
+\caption{Partial assembly by projection, within one Newton step}
+\label{alg:split}
+\begin{algorithmic}[1]
+\State \textbf{once per Newton step:}
+\ForAll{elements $K$ \textbf{in parallel}}
+  \State evaluate $F$, $S(F)$ and $J$ on $K$; form $\Sbar$ by \eqref{eq:reference}
+  \State $\Sbar^0_K \gets$ element average of $\Sbar$ \Comment{$45$ or $81$ numbers}
+\EndFor
+\Statex
+\State \textbf{once per Krylov iteration:}
+\ForAll{elements $K$ \textbf{in parallel}}
+  \State gather $h|_K$; contract with $\Sbar^0_K$ and the folded constants of $\Wbar$
+  \State scatter the result \Comment{no geometry, state or material read}
+\EndFor
+\end{algorithmic}
+\end{algorithm}
 
-\begin{proposition}[Exactness]
-\label{prop:exact}
-Let $K$ be an affinely mapped simplex discretised with the lowest-order
-(P1) basis, and let the material be any function of the deformation gradient.
-Then \eqref{eq:projected} holds with equality.
-\end{proposition}
+\subsection{Accuracy}
 
-\begin{proof}
-For an affine map $J$ is constant on $K$, and for a P1 displacement field the
-gradients $\partial h_k/\partial \xi_m$ are constant, so $F$ is constant on $K$.
-Hence $S(F)$ is constant, and by \eqref{eq:pullback} so is $\Sbar$.  The $L^2$
-projection of a constant onto the constants is that constant, so
-$\Sbar^0 = \Sbar$ pointwise and \eqref{eq:projected} reproduces
-\eqref{eq:reference}.
-\end{proof}
+On an affinely mapped simplex with a P1 basis, $J$ and $\nabla h$ are constant,
+hence $F$ and $\Sbar$ are constant, hence $\Sbar^0 = \Sbar$ and
+\eqref{eq:projected} is an identity: the projection is exact for any
+constitutive law, nonlinear or not.  This is elementary but operationally
+central, because it gives a configuration in which the approximate kernel must
+reproduce the exact one to round-off, independently of every other component of
+the implementation.  It is the control for every measurement in
+Section~\ref{sec:results}.
 
-The proposition is a statement about the geometry, not about the constitutive
-law: it holds for a nonlinear material exactly as for a linear one.  Its
-practical importance is methodological.  It supplies a family of configurations
-in which the approximate operator must agree with the exact one to round-off,
-independently of any other component of the implementation, and it is the
-control against which every measurement in Section~\ref{sec:experiments} is
-taken.
+Elsewhere the projection reproduces constants and is therefore first-order
+accurate in the element size by the standard Bramble--Hilbert argument
+\cite{BrambleHilbert1970,Ciarlet1978}.  The measured rate is $O(h^{1.07})$
+(Section~\ref{sec:accuracy}).
 
-\subsection{Consistency on curved and higher-order elements}
+\subsection{What is stored, and when symmetry may be assumed}
+\label{sec:symmetry}
 
-\begin{proposition}[First-order consistency]
-\label{prop:consistency}
-Let $\mathcal{T}_h$ be a shape-regular family of meshes and suppose $\Sbar \in
-W^{1,\infty}(K)$ uniformly.  Then the operator perturbation induced by the
-projection satisfies
+The element matrix implied by \eqref{eq:projected} is
+$\Sbar^0_{ikmn}\Wbar_{jmpn}$, and since $\Wbar_{jmpn} = \Wbar_{pnjm}$, requiring
+it to be symmetric under exchange of the two (component, node) pairs is
+equivalent to
 \begin{equation}
-  \bigl\| (\mathcal{H} - \mathcal{H}^0) h \bigr\|_{K}
-  \;\le\; C\, h_K \, |\Sbar|_{W^{1,\infty}(K)}\, \|\nabla h\|_{K}\,\|\nabla\varphi\|_{K} ,
-\end{equation}
-with $C$ independent of $h_K$ and of the material.
-\end{proposition}
-
-\begin{proof}[Proof sketch]
-$\Pi^0_K$ reproduces constants, so by the Bramble--Hilbert lemma
-\cite{BrambleHilbert1970,Ciarlet1978} $\|\Sbar - \Pi^0_K \Sbar\|_{L^\infty(K)}
-\le C h_K |\Sbar|_{W^{1,\infty}(K)}$.  Substituting into the difference of
-\eqref{eq:reference} and \eqref{eq:projected} and bounding the remaining
-integral by Cauchy--Schwarz gives the claim.
-\end{proof}
-
-The rate is confirmed experimentally in Section~\ref{sec:convergence}, where the
-measured order is $1.07$.  Within an inexact-Newton framework
-\cite{DemboEisenstatSteihaug1982} an $O(h)$ perturbation of the Jacobian action
-is compatible with retaining a linear rate of convergence, with the constant
-improving under refinement; establishing the resulting forcing-term theory for
-this specific perturbation is outside the scope of this paper and is discussed
-in Section~\ref{sec:conclusions}.
-
-\subsection{Symmetry of the stored tensor}
-
-\begin{proposition}[Symmetry]
-\label{prop:sym}
-The element matrix implied by \eqref{eq:projected} is symmetric under exchange
-of the two (component, node) pairs if and only if
-\begin{equation}
-  \Sbar^0_{ikmn} = \Sbar^0_{kinm} .
+  \Sbar^0_{ikmn} = \Sbar^0_{kinm} ,
   \label{eq:tangentsym}
 \end{equation}
-\end{proposition}
+which reduces the store from $81$ to $45$ numbers in three dimensions and from
+$16$ to $10$ in two.  The pair that exchanges is $(i,n)$ against $(k,m)$: the
+output component with the \emph{test} direction, and the increment component
+with the \emph{increment} direction.  Packing on $(i,k)$ against $(m,n)$ instead
+is a consistent error, invisible to any test that compares one form of the
+construction against another, and detectable only by comparison against
+\eqref{eq:exact} integrated independently.
 
-\begin{proof}
-The entry is $\Sbar^0_{ikmn}\Wbar_{jmpn}$, and $\Wbar_{jmpn} = \Wbar_{pnjm}$ by
-\eqref{eq:projected}.  Exchanging $(i,j) \leftrightarrow (k,p)$ and relabelling
-gives the stated condition.
-\end{proof}
-
-The index pairing deserves emphasis because the plausible alternative is wrong.
-The pair that exchanges is $(i,n)$ against $(k,m)$: the output component with the
-\emph{test} direction, and the increment component with the \emph{increment}
-direction.  Packing on $(i,k)$ against $(m,n)$ instead is a consistent error ---
-it is invisible to any test that compares one form of the construction against
-another, since both share it --- and is detected only by comparison against
-\eqref{eq:exact} integrated independently.  Under \eqref{eq:tangentsym},
-$\Sbar^0$ has $45$ independent components in three dimensions and $10$ in two,
-against $81$ and $16$ unsymmetric.
-
-Whether \eqref{eq:tangentsym} holds is a property of the \emph{formulation}, not
-of the method.  A material specified by a strain energy has a flux that is a
-gradient, so its tangent is a Hessian and \eqref{eq:tangentsym} follows from
-equality of mixed partials.  A material specified directly by a residual has no
-such guarantee: its flux is not a gradient, its tangent is a Jacobian, and it
-need not be symmetric.  Kelvin--Voigt viscoelasticity is a case in point.  For
-the parameters used in Section~\ref{sec:experiments} we measure
-\begin{equation}
-  \max_{ijkl}\bigl|A_{ijkl}-A_{klij}\bigr| = 0.25 ,
-\end{equation}
-so folding the tangent into $45$ components averages its antisymmetric part away
-and yields a \emph{different operator}, with $5.3\times 10^{-2}$ relative error
-on TET4 --- an element on which Proposition~\ref{prop:exact} guarantees the
-projection itself is exact.
-
-The generator therefore determines symmetry per material, symbolically, and
-stores $45$ or $81$ components accordingly, defaulting to unsymmetric.  The two
-possible mistakes are not comparable in consequence: storing a full square for a
-symmetric tangent wastes memory, whereas storing half of an unsymmetric one is
-silently wrong.
+Whether \eqref{eq:tangentsym} holds at all is a property of the formulation.  A
+material given by a strain energy has a flux that is a gradient, so its tangent
+is a Hessian and the symmetry follows.  A material given directly by a residual
+has no such guarantee: its tangent is a Jacobian and need not be symmetric.
+Kelvin--Voigt viscoelasticity is a case in point; for the parameters used in
+Section~\ref{sec:results} we measure
+$\max_{ijkl}|A_{ijkl}-A_{klij}| = 0.25$, so folding it into $45$ components
+averages the antisymmetric part away and produces a \emph{different operator},
+with $5.3\times10^{-2}$ relative error on TET4 --- an element on which the
+projection itself is exact.  The generator therefore decides symmetry per
+material, symbolically, and defaults to unsymmetric: storing a full square for a
+symmetric tangent wastes bandwidth, whereas storing half of an unsymmetric one
+is silently wrong.
 
 \section{Structure of the reference tensor}
-\label{sec:compression}
-
-\subsection{Sparsity}
+\label{sec:refstructure}
 
 Because $\Wbar$ is integrated exactly its entries are rationals, and there are
-remarkably few distinct ones (Table~\ref{tab:reference}).  On simplices the
-majority vanish.
+very few distinct ones: at most ten for any element considered
+(Table~\ref{tab:reference}).  On simplices most entries vanish.
 
 \begin{table}[ht]
 \centering
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrrl}
 \toprule
 element & entries & distinct values & zeros & projection \\
 \midrule
@@ -389,32 +301,18 @@ HEX8  & 576 & 10 &   0 & inexact \\
 TET10 & 900 &  9 & 519 & inexact \\
 \bottomrule
 \end{tabular}
-\caption{The symbolically integrated reference tensor $\Wbar$.  At most ten
-distinct rational values occur for any element considered.}
+\caption{The symbolically integrated reference tensor $\Wbar$.}
 \label{tab:reference}
 \end{table}
 
-\subsection{Rank}
-
-The sparsity is a symptom of a stronger property.
-
-\begin{proposition}[Rank]
-\label{prop:rank}
-Read as a matrix on the pair index $(j,m)$, $\Wbar$ is the Gram matrix in
-$L^2(\refcell)$ of the family of gradient functions
-$\{\partial\varphi_j/\partial\xi_m\}$.  Consequently
-\begin{equation}
-  \operatorname{rank}\Wbar
-  \;=\; \dim \operatorname{span}\Bigl\{\tfrac{\partial\varphi_j}{\partial\xi_m}\Bigr\} .
-\end{equation}
-\end{proposition}
-
-\begin{proof}
-Immediate from the definition in \eqref{eq:projected}, which is precisely the
-$L^2$ inner product of the $(j,m)$th and $(p,n)$th members of the family, and
-from the standard fact that a Gram matrix has the rank of the dimension of the
-span of the vectors it is built from.
-\end{proof}
+The sparsity is a symptom of a stronger property.  Read as a matrix on the pair
+index $(j,m)$, $\Wbar$ is by definition the Gram matrix in $L^2(\refcell)$ of the
+family $\{\partial\varphi_j/\partial\xi_m\}$, so its rank is the dimension of the
+span of that family (Table~\ref{tab:rank}).  A linear simplex is rank one because
+its gradients are constants, which is precisely the classical geometric-factor
+formulation: one object per element, contracted once.  The rank structure is
+therefore not a separate mechanism but the same one carried to elements whose
+gradients vary.
 
 \begin{table}[ht]
 \centering
@@ -429,34 +327,28 @@ HEX8  & 24 & 7 & $1$ and the six bilinear monomials \\
 TET10 & 30 & 4 & $1,\ \xi_0,\ \xi_1,\ \xi_2$ \\
 \bottomrule
 \end{tabular}
-\caption{Rank of the reference tensor.  In each case the rank equals the
-dimension of the span of the element's gradient functions exactly, as
-Proposition~\ref{prop:rank} requires.}
+\caption{Rank of the reference tensor, which equals the dimension of the span of
+the element's gradient functions.}
 \label{tab:rank}
 \end{table}
 
-A linear simplex has rank one because its gradients are constants, and rank one
-is exactly the classical geometric-factor formulation: one object per element,
-contracted once.  The rank structure is thus not a second mechanism alongside
-the geometric factor; it is the same structure carried to elements whose
-gradients are not constant.
-
-Because the rank is known and the entries are rational, the factorisation
+Since the rank is known and the entries rational, the factorisation
 \begin{equation}
   \Wbar = C^{\mathsf T} X C ,
   \qquad C \in \Q^{r \times Nd},
   \qquad X \in \Q^{r \times r},
   \label{eq:factorisation}
 \end{equation}
-is computed exactly, with no numerical tolerance and no loss, and verified
-against the tensor it factors over the rationals.
+is computed exactly, with no tolerance and no loss, and verified against the
+tensor it factors over the rationals.
 
 \section{Kernel synthesis}
+\label{sec:schedule}
 
-\subsection{Staged contraction}
+\subsection{Two contraction schedules}
 
 Substituting \eqref{eq:factorisation} into \eqref{eq:projected} and naming each
-intermediate gives four stages:
+intermediate gives a four-stage schedule:
 \begin{align}
   P_{kam} &= \sum_j C_{a,(j,m)}\, h_{k,j}
             && \text{compress the increment} \label{eq:stage1}\\
@@ -467,31 +359,24 @@ intermediate gives four stages:
   \text{out}_{ip} &= \sum_{b,n} C_{b,(p,n)}\, Q_{ibn}
             && \text{expand back to nodes} \label{eq:stage4}
 \end{align}
-Every sum skips its zero coefficients, so a vanishing entry of $C$ or $X$ never
-enters an expression rather than being cancelled out of one afterwards.
+Every sum skips its zero coefficients, so a vanishing entry never enters an
+expression rather than being cancelled out of one afterwards.  The staging is
+load-bearing: expanding \eqref{eq:stage1}--\eqref{eq:stage4} into one expression
+per output and letting common-subexpression elimination rediscover the structure
+recovers the dense operation count exactly.
 
-The staging is essential rather than incidental.  Expanding
-\eqref{eq:stage1}--\eqref{eq:stage4} into one expression per output and allowing
-common-subexpression elimination to rediscover the structure returns the dense
-operation count exactly; the saving resides in keeping the intermediates named.
-
-\subsection{Direct contraction, and the choice between the two}
-\label{sec:contraction}
-
-Staging is not always the cheaper arrangement.  The factorisation must compress
-the increment and expand the result, and where the rank is a large fraction of
-the order those two stages cost more than the factorisation saves.  The
-alternative contracts $\Wbar$ against the increment directly,
+Staging is nonetheless not always cheaper.  It must compress the increment and
+expand the result, and where the rank is a large fraction of the order those two
+stages cost more than the factorisation saves.  The alternative contracts
+$\Wbar$ against the increment directly,
 \begin{align}
-  G_{kmpn} &= \sum_j \Wbar_{jmpn}\, h_{k,j} \\
+  G_{kmpn} &= \sum_j \Wbar_{jmpn}\, h_{k,j} ,
+  &
   \text{out}_{ip} &= \sum_{k,m,n} \Sbar^0_{ikmn}\, G_{kmpn} ,
+  \label{eq:direct}
 \end{align}
-so that $\Sbar^0$ appears once, in a single $27$-term contraction per output in
-three dimensions, with nothing to compress or expand.
-
-Which of the two is cheaper is a property of the element, so the generator
-constructs both symbolically and emits the one with the lower operation count
-(Table~\ref{tab:ordering}).
+so that $\Sbar^0$ appears once, in a single $27$-term contraction per output,
+with nothing to compress or expand.
 
 \begin{table}[ht]
 \centering
@@ -504,36 +389,34 @@ TET10 & 1380 & 1605 &  4 of 30 & staged \\
 HEX8  & 2610 & 1731 &  7 of 24 & direct \\
 \bottomrule
 \end{tabular}
-\caption{Floating-point operations for the two contraction orderings, counted
+\caption{Floating-point operations per element for the two schedules, counted
 after common-subexpression elimination.  The factorisation ceases to pay once
 the rank reaches a sufficient fraction of the order.}
 \label{tab:ordering}
 \end{table}
 
-On HEX8 the choice reduces the emitted application from $2732$ to $1801$
-operations, against $1558$ for a hand-written kernel for the same contraction,
-and raises its measured throughput from $100$ to $132$~MDOF/s under the
-conditions of Section~\ref{sec:throughput}.
+Which schedule wins is a property of the element, so the generator constructs
+both symbolically and emits the cheaper (Table~\ref{tab:ordering}).  On HEX8 the
+selection reduces the emitted application from $2732$ to $1801$ operations,
+against $1558$ for a hand-written kernel for the same contraction, and raises
+measured throughput from $100$ to $132$~MDOF/s (Section~\ref{sec:throughput}).
 
-The comparison must be made \emph{after} elimination.  Measured on the
-unsimplified expressions the direct ordering appears inferior on every element,
-because the elimination is precisely what removes its redundancy; a selection
-rule based on the pre-elimination count would reject it universally.
+The comparison must be made \emph{after} elimination.  On the unsimplified
+expressions the direct schedule appears inferior on every element, because
+elimination is exactly what removes its redundancy; a selection rule using the
+pre-elimination count rejects it universally.
 
 \subsection{Constant folding versus runtime tabulation}
 
-The entries of $\Wbar$, $C$ and $X$ are known at generation time and are
-therefore emitted as literals.  The apparently attractive alternative --- storing
-the distinct values in a runtime table and indexing it --- compresses the memory
+The entries of $\Wbar$, $C$ and $X$ are known at generation time and are emitted
+as literals.  Tabulating the distinct values at runtime and indexing them --- the
+apparently attractive alternative --- compresses a negligible amount of memory
 and destroys the arithmetic: the constants cease to be constants, the compiler
 can no longer fold them, and every multiplication by a zero entry survives into
-the emitted code.
-
-The effect is large.  A tabulated implementation of the TET4 kernel stores a
-table containing exactly the values $1$, $-1$ and $0$, and its kernels then
-multiply by the zero entry twelve times each; the nominal ``$97.9\%$ memory
-saving'' buys $141$ stored numbers that were $0$ and $\pm1$ at a cost of several
-hundred floating-point operations.
+the emitted code.  A tabulated TET4 kernel stores a table containing exactly $1$,
+$-1$ and $0$, and then multiplies by the zero entry twelve times per kernel; the
+nominal ``$97.9\%$ memory saving'' buys $141$ stored numbers that were $0$ and
+$\pm1$ at a cost of several hundred operations (Table~\ref{tab:cost}).
 
 \begin{table}[ht]
 \centering
@@ -548,45 +431,31 @@ HEX8  & 7/24 & 4059 & \textbf{2610} & 6330 \\
 TET10 & 4/30 & 4018 & \textbf{1380} & 8349 \\
 \bottomrule
 \end{tabular}
-\caption{Floating-point operations in the element application, counted after
-common-subexpression elimination.  These are symbolic operation counts, not
-measured run times.}
+\caption{Floating-point operations per element application after
+common-subexpression elimination.  Symbolic counts, not measured run times.}
 \label{tab:cost}
 \end{table}
 
-Table~\ref{tab:cost} locates the benefit of staging.  The saving tracks the rank
-against the order: TET10 at $4/30$ gains $2.9\times$ and TET4 at $1/12$ gains
-$2.4\times$, whereas QUAD4 at $3/8$ breaks even, having insufficient structure to
-improve on common-subexpression elimination of the dense form.  Against the
-tabulated form the improvement is $7.1\times$ on TET4 and $6.1\times$ on TET10.
-
 \subsection{Vectorisation and register pressure}
 
-The generated kernels process a block of elements at a time with the lane loop
-innermost.  The staged form suits that layout, for three reasons that are worth
-separating.
+Kernels process a block of elements at a time with the lane loop innermost.
+Three properties of the staged form matter for that layout.
 
 \begin{description}[leftmargin=1.5em]
 \item[The reference tensor is lane-invariant.]  $C$ and $X$ are compile-time
-  rationals, identical for every element and hence for every lane.  Folded, they
-  appear as immediates: no load, no broadcast, and a multiplication by $\pm1$ or
-  by a power of two is eliminated entirely.  Behind a runtime table the same
-  values become a memory reference whose address is lane-independent --- a
-  broadcast load rather than an immediate --- and, more damagingly, an opaque
-  value that no longer permits folding.  This is the arithmetic component of the
-  cost in Table~\ref{tab:cost}.
-
-\item[The tangent is a per-element stream.]  $\Sbar^0$ is $45$ numbers per
-  element in three dimensions, held one component-array per index in a
-  structure-of-arrays layout.  Each component is then a unit-stride read across
-  the lane loop and vectorises without gather.
-
+  rationals, identical for every lane.  Folded, they appear as immediates: no
+  load, no broadcast, and multiplication by $\pm1$ or a power of two is
+  eliminated.  Behind a runtime table the same values become a lane-independent
+  memory reference --- a broadcast load rather than an immediate --- and, more
+  damagingly, an opaque value that no longer permits folding.
+\item[The store is a unit-stride stream.]  $\Sbar^0$ is held one component-array
+  per index in a structure-of-arrays layout, so each of the $45$ components is a
+  unit-stride read across the lane loop and vectorises without gather.
 \item[The intermediates are lane-width vectors.]  $P$, $Y$ and $Q$ are
-  per-element scalars, so in a blocked kernel each occupies one vector register.
-  Their counts (Table~\ref{tab:stages}) are the binding constraint: on HEX8,
-  $63+63+63$ live intermediates at a lane width of eight will not remain in
-  registers and the kernel spills.  All three stage sizes are $d^2 r$, so rank
-  controls this as well.
+  per-element scalars, so each occupies one vector register; all three stage
+  sizes are $d^2 r$, so rank governs register pressure
+  (Table~\ref{tab:stages}).  On HEX8, $63+63+63$ live intermediates at a lane
+  width of eight will not stay in registers and the kernel spills.
 \end{description}
 
 \begin{table}[ht]
@@ -602,152 +471,196 @@ HEX8  & 7 & 63 & 63 & 63 & 24 \\
 TET10 & 4 & 36 & 36 & 36 & 30 \\
 \bottomrule
 \end{tabular}
-\caption{Live intermediates per element in each stage.  In a blocked kernel each
-is one vector register, so these are the register-pressure figures.}
+\caption{Live intermediates per element in each stage; in a blocked kernel each
+is one vector register.}
 \label{tab:stages}
 \end{table}
 
-The two difficulties therefore arrive together and are the same difficulty.  On
-the elements where the projection is exact the register pressure is lowest; on
-HEX8, where the projection is an approximation, it is highest; and HEX8 is also
-the element on which the staged form loses to the direct contraction, which
-requires no intermediates at all.  A rank-truncated factorisation, keeping
-$r' < r$ modes, remains available for elements where staging still wins, at the
-price of a second and larger approximation.
+The two difficulties therefore coincide: on the elements where the projection is
+exact the register pressure is lowest, and on HEX8, where it is an
+approximation, register pressure is highest --- and HEX8 is also the element on
+which the staged schedule loses to the direct one, which needs no intermediates.
+Rank truncation, keeping $r' < r$ modes, remains available for elements where
+staging still wins, at the cost of a second and larger approximation.
 
-The final stage writes one value per node per component, exactly as a
-conventional element kernel does, and reuses the same scatter: atomic
-accumulation on an unordered traversal, plain accumulation into thread-private
-scratch on a colour- or block-ordered one.
+The final stage writes one value per node per component and reuses the
+conventional scatter: atomic accumulation on an unordered traversal, plain
+accumulation into thread-private scratch on a block-ordered one.
 
-\subsection{Storage format and precision}
-\label{sec:precision}
+\section{Cost model}
+\label{sec:model}
 
-The stored tensor is the only per-element data the application reads.  For a
-symmetric material in three dimensions it is $45$ numbers per element; for the
-mixed Mooney--Rivlin/Kelvin--Voigt material of Section~\ref{sec:experiments},
-which contributes one symmetric and one unsymmetric part, it is $45+81 = 126$.
-Table~\ref{tab:storage} gives the resulting footprints.
+We model the stored application per element.  Let $n_c$ be the number of stored
+components, $s_t$ the store precision in bytes, $N$ the node count, $d = 3$, and
+$s_i$, $s_r$ the index and vector precisions.  Compulsory traffic per element is
+\begin{equation}
+  B_e \;=\; \underbrace{n_c s_t}_{\text{store}}
+        \;+\; \underbrace{N s_i}_{\text{connectivity}}
+        \;+\; \underbrace{\frac{2 N d\, s_r}{\kappa}}_{\text{increment and output}} ,
+  \qquad
+  \kappa = \frac{N\, n_{\mathrm{elem}}}{n_{\mathrm{nodes}}} ,
+  \label{eq:bytes}
+\end{equation}
+where $\kappa$ is the mean number of elements sharing a node, which amortises the
+gathered increment and the scattered output over the elements that reuse them.
+The store is streamed once and never reused, so it is charged in full.
+
+For the configuration measured here, $s_t = 4$ (\texttt{fp32} store), $s_i = 4$
+(32-bit indices), $s_r = 8$ (\texttt{fp64} vectors), $n_c = 45$; and for the
+structured meshes used, $\kappa = 24$, $7.5$ and $8$ for TET4, TET10 and HEX8
+respectively.  Taking $W_e$ from the \emph{selected} schedule
+(Table~\ref{tab:ordering}) gives the intensities in Table~\ref{tab:intensity}.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrrrrr}
+\toprule
+        & $N$ & $\kappa$ & $W_e$ & store & other & $B_e$ & $I_e = W_e/B_e$ \\
+element &     &          & (flop) & (B) & (B) & (B) & (flop/B) \\
+\midrule
+TET4  &  4 & $24$  &  $207$ & $180$ & $24$  & $204$ & $1.01$ \\
+TET10 & 10 & $7.5$ & $1380$ & $180$ & $104$ & $284$ & $4.86$ \\
+HEX8  &  8 & $8$   & $1801$ & $180$ & $80$  & $260$ & $6.93$ \\
+\bottomrule
+\end{tabular}
+\caption{Per-element cost of the stored application from \eqref{eq:bytes}.  The
+store is $88\%$ of TET4's compulsory traffic and $63\%$ of TET10's.}
+\label{tab:intensity}
+\end{table}
+
+The model separates the three elements sharply.  TET4 sits at
+$1.0$~flop/byte: it does so little arithmetic that its cost is essentially the
+cost of streaming its own store, and it is the element for which reduced store
+precision should matter most.  TET10 and HEX8, at $4.9$ and $6.9$~flop/byte,
+are on the compute side of any plausible machine balance, and their performance
+should be governed by the contraction --- which is what makes the schedule
+selection of Section~\ref{sec:schedule} worth performing.
+
+Converting to per-degree-of-freedom quantities requires the element-to-dof ratio
+$\rho = n_{\mathrm{elem}}/n_{\mathrm{dof}}$, which for the structured meshes used
+is $2$, $1/4$ and $1/3$ for TET4, TET10 and HEX8.  Table~\ref{tab:perdof} gives
+the resulting figures, which are what the measured throughputs of
+Section~\ref{sec:throughput} must be multiplied by to obtain achieved rates.
 
 \begin{table}[ht]
 \centering
 \begin{tabular}{lrrr}
 \toprule
-components per element & \texttt{fp64} & \texttt{fp32} & \texttt{fp16} \\
+element & $\rho$ & flop/dof & byte/dof \\
 \midrule
-$45$ (symmetric)                  &  360 & 180 &  90 \\
-$126$ (symmetric $+$ unsymmetric) & 1008 & 504 & 260 \\
+TET4  & $2$   & $414$ & $408$ \\
+TET10 & $1/4$ & $345$ & $ 71$ \\
+HEX8  & $1/3$ & $600$ & $ 87$ \\
 \bottomrule
 \end{tabular}
-\caption{Bytes of stored tangent per element.  The \texttt{fp16} row includes a
-per-element \texttt{fp32} scaling factor, applied to the outputs rather than to
-the components, which is why it exceeds half the \texttt{fp32} figure.}
-\label{tab:storage}
+\caption{Per-degree-of-freedom cost of the stored application.  TET4 moves
+nearly six times the bytes per degree of freedom of the other two, because a
+structured tetrahedral mesh has six elements per lattice cell and each carries
+its own store.}
+\label{tab:perdof}
 \end{table}
+
+A consequence worth stating in advance of the measurements: partial assembly is
+not uniformly attractive.  Its benefit is the arithmetic it removes, and TET4
+has little to remove; its store, by contrast, is the largest per degree of
+freedom of the three.  The method should therefore help TET4 least and TET10
+most, and Section~\ref{sec:throughput} confirms this ($2.4\times$ against
+$8.1\times$ over the exact application).
 
 \section{Implementation}
 
 The scheme is implemented in the code generator of SFEM, an open-source
-finite-element library.  From a symbolic statement of the material the generator
-derives the flux, differentiates it to obtain $S$, performs the pullback
-\eqref{eq:pullback}, decides symmetry, integrates $\Wbar$ exactly, computes the
-factorisation \eqref{eq:factorisation}, selects the contraction ordering by
-operation count, and emits two kernels per element type: an \emph{assembly}
-kernel that consumes geometry and state and produces the store, and an
-\emph{application} kernel that consumes the store and the increment.  A third,
-reduced-precision application kernel reads a compressed store with a per-element
-scaling factor.
+finite-element library.  From a symbolic material description the generator
+derives the flux, differentiates it, performs the pullback, decides symmetry,
+integrates $\Wbar$ exactly, computes the factorisation \eqref{eq:factorisation},
+selects the schedule by operation count, and emits per element type an
+\emph{assembly} kernel consuming geometry and state and producing the store, and
+an \emph{application} kernel consuming the store and the increment.  A third
+kernel reads a reduced-precision store with a per-element scaling factor applied
+to the outputs rather than to the components.
 
-The kernels are reachable from the library's operator interface through three
-methods with defaults that decline, so that existing operators and callers are
-unaffected: a query reporting whether the approximate path is available for the
-current mesh and element type, an explicit update that assembles the store from
-the current state, and an application that takes the increment alone.  Making
-the update explicit is a deliberate choice: the stored tangent remains valid
-until the next update, which is exactly the reuse the method exists to exploit,
-and the application takes no state argument at all, so it cannot silently
-consume a stale one.
+The kernels reach the library's solver stack through three operator methods
+whose defaults decline, so existing operators and callers are unaffected: a
+query reporting whether the approximate path is available for the current mesh
+and element type, an explicit update assembling the store from the current state,
+and an application taking the increment alone.  Making the update explicit is
+deliberate --- the store remains valid until the next update, which is the reuse
+the method exists to exploit, and the application takes no state argument, so it
+cannot silently consume a stale one.
 
-\section{Numerical experiments}
-\label{sec:experiments}
+\section{Experimental setup}
+\label{sec:setup}
 
-\subsection{Experimental protocol}
-\label{sec:protocol}
+\paragraph{Machines.}  \textbf{M1}: Apple M1~Max, $8$ performance and $2$
+efficiency cores, Homebrew Clang 20.1.8, OpenMP enabled.  Nominal
+double-precision vector peak across the eight performance cores is
+approximately $410$~GFLOP/s (four $128$-bit NEON FMA pipes per core at
+$\sim$$3.2$~GHz); this figure is derived from the microarchitecture, not
+measured.  Nominal package memory bandwidth is $400$~GB/s, of which the CPU
+complex can sustain roughly half.  \textbf{Grace}: one node of a GH200 system
+(CSCS Alps) with $72$ Arm Neoverse-V2 cores.
 
-Throughput measurements in the literature are easy to render incomparable, so we
-state the protocol in full.
+\paragraph{Build.}  \texttt{real\_t} is \texttt{double}, \texttt{geom\_t} and
+\texttt{metric\_tensor\_t} are \texttt{float}, \texttt{idx\_t} is
+\texttt{int32\_t}.  All operators within a comparison are built identically and
+run in the same process; figures from different machines or configurations are
+never combined in one table.
 
-\paragraph{Hardware and software.}  Two machines are used.  \textbf{M1}: an Apple
-M1~Max laptop with $8$ performance and $2$ efficiency cores, Homebrew Clang
-20.1.8, OpenMP enabled.  \textbf{Grace}: one node of a GH200 system (CSCS Alps)
-with $72$ Arm Neoverse-V2 cores.  All operators within a comparison are built in
-the same configuration and run in the same process; figures from different
-machines or different build configurations are never combined in one table.
+\paragraph{Timed region.}  The timed region contains the operator application and
+nothing else; output initialisation, allocation and correctness checking are
+outside it, and each sample averages many repetitions so that no measurement is
+charged OpenMP team creation or a cold cache.  This is not pedantry: a serial
+output initialisation inside the timed region perturbs the single-thread figure
+by $6\%$ ($2.52$ against $2.68$~MDOF/s) and the eight-thread figure by $44\%$
+($13.04$ against $18.75$), reporting a speed-up of $5.4\times$ where the true
+figure is $7.0\times$.  The distortion grows with thread count, which is the
+worst possible shape for a scaling study.
 
-\paragraph{Timed region.}  The timed region contains the operator application
-and nothing else.  Initialisation of the output arrays, allocation, and any
-correctness checking are performed outside it, and each sample averages many
-repetitions so that no measurement is charged the cost of OpenMP team creation
-or a cold cache.  This matters more than it might appear: a serial output
-initialisation placed inside the timed region distorts the single-thread figure
-negligibly ($2.52$ against $2.68$~MDOF/s) and the eight-thread figure by half
-($13.04$ against $18.75$), reporting a parallel speed-up of $5.4\times$ where
-the true figure is $7.0\times$.  The distortion grows with the thread count,
-which is the worst possible shape for a scaling study.
+\paragraph{Problem sizes.}  Throughput is reported only at sizes that saturate the
+machine.  The comparison against library operators uses
+$1.04\times10^{7}$~dof; the scaling study uses $2.07\times10^{5}$~dof.  Every
+table states its size, thread count and machine.
 
-\paragraph{Problem size.}  Throughput is reported only at problem sizes that
-saturate the machine.  The comparison against library operators
-(Section~\ref{sec:throughput}) uses $10.4\times10^6$ degrees of freedom; the
-scaling study (Section~\ref{sec:scaling}) uses $206\,763$.  Every table states
-its size, thread count and machine.
+\paragraph{Comparison frame.}  Calling a kernel directly with precomputed geometry
+and calling it through the library's operator interface are not interchangeable
+frames: at $1.70\times10^{5}$~dof the same kernel measures approximately
+$5$~MDOF/s in the first and $1.46$ in the second.  Only the second is comparable
+with library operators, and all figures below are taken in it.
 
-\paragraph{Mesh resolution.}  Accuracy measurements are taken at non-power-of-two
-resolutions.  On a uniform mesh whose spacing is a power of two the entries of
-an \texttt{fp32} store are exactly representable and the difference between the
-approximate and exact applications collapses to $10^{-14}$, which suggests a
-conclusion far stronger than the truth (Table~\ref{tab:precision}).
+\paragraph{Accuracy measurements.}  Taken at non-power-of-two resolutions.  On a
+mesh whose spacing is a power of two the entries of an \texttt{fp32} store are
+exactly representable and the difference from the exact application collapses to
+$10^{-14}$, suggesting a far stronger conclusion than the truth
+(Table~\ref{tab:precision}).  Convergence rates are measured against a
+white-noise increment, for the reason given in Section~\ref{sec:accuracy}.
 
-\paragraph{Increment.}  Convergence rates of the projection error are measured
-against a white-noise increment, for reasons given in
-Section~\ref{sec:convergence}.
+\section{Results}
+\label{sec:results}
 
-\paragraph{Comparison frame.}  Two frames appear in the literature and they are
-not interchangeable: calling a kernel directly with the geometry precomputed,
-and calling it through the library's operator interface as a solve does.  At
-$170\,373$ degrees of freedom the same kernel measures approximately $5$~MDOF/s
-in the first and $1.46$ in the second.  Only the second is comparable with
-library operators, and all figures below are taken in it.
+\subsection{Validation}
 
-\subsection{Verification}
-
-Each stage of the construction can be wrong in a way the next cannot detect, so
-it is verified at four independent points.
-
-\begin{enumerate}[leftmargin=1.5em]
-\item \textbf{The symbolic integration}, against four-point Gauss--Legendre
-  quadrature on QUAD4 and HEX8, entry by entry: agreement to $10^{-16}$.
-\item \textbf{The factorisation}, against the tensor it factors:
-  $C^{\mathsf T} X C = \Wbar$ exactly, over the rationals.
-\item \textbf{The action}, against \eqref{eq:exact} integrated independently on
-  a concrete tetrahedron, for linear elasticity and for neo-Hookean Ogden
-  material.
-\item \textbf{The generated operator}, inside the library, driven as a solver
-  drives it.
-\end{enumerate}
+The construction is verified at four independent points: the symbolic
+integration against four-point Gauss--Legendre quadrature on QUAD4 and HEX8,
+entry by entry, to $10^{-16}$; the factorisation against the tensor it factors,
+exactly over the rationals; the action against \eqref{eq:exact} integrated
+independently on a concrete tetrahedron, for linear elasticity and neo-Hookean
+Ogden material; and the generated operator inside the library, driven as a
+solver drives it.
 
 Only the third detects an incorrect index convention, and it did: the symmetry
 \eqref{eq:tangentsym} was initially implemented as $(i,k)$ against $(m,n)$,
-which the first two checks and any comparison of the staged form against the
+which the first two checks and any comparison of the staged schedule against the
 dense form all pass, because they share the error.  This is the practical reason
-for stating Proposition~\ref{prop:sym} with its index pairing made explicit.
+for stating the index pairing explicitly in Section~\ref{sec:symmetry}.
 
 \subsection{Accuracy of the approximation}
+\label{sec:accuracy}
 
-Proposition~\ref{prop:exact} settles the affine simplex case; on quadratic
-tetrahedra and trilinear hexahedra the error must be measured.  We do so by
-warping the reference configuration by an increasing amount $w$, verifying
-$\det F > 0$ at each step, and comparing the approximate neo-Hookean
-application against the exact one (Table~\ref{tab:warp}).
+On affine simplices the approximation is exact and the measured error is at
+round-off, uniformly across a sweep of increasing geometric distortion.
+Elsewhere it is measured by warping the reference configuration by an amount
+$w$, verifying $\det F > 0$ at each step, and comparing against the exact
+application (Table~\ref{tab:warp}).
 
 \begin{table}[ht]
 \centering
@@ -760,44 +673,180 @@ TET10 & $2.4\mathrm{e}{-}14$ & $1.0\mathrm{e}{-}02$ & $4.3\mathrm{e}{-}02$ \\
 HEX8  & $2.7\mathrm{e}{-}15$ & ---                  & $3.7\mathrm{e}{-}04$ \\
 \bottomrule
 \end{tabular}
-\caption{Relative error of the approximate application against the exact one,
-neo-Hookean Ogden material, resolution $n=16$ ($\approx 2.0\times10^{5}$ dof),
-M1, one thread.  The $w=0$ column is the control: it recovers
-Proposition~\ref{prop:exact} and confirms that the sweep measures the geometry
-rather than the harness.  TET4 is flat across the sweep, as it must be.}
+\caption{Relative error of the approximate application against the exact one.
+Neo-Hookean Ogden, $\approx 2.0\times10^{5}$~dof, M1, one thread.  The $w=0$
+column is the control: it recovers the exactness of the affine case and confirms
+the sweep measures geometry rather than the harness.}
 \label{tab:warp}
 \end{table}
 
-TET10 is two orders of magnitude worse than HEX8 at comparable warp.  Both are
-quadratic in the geometry, but TET10 carries a quadratic \emph{displacement}
-whose gradient varies linearly over the cell, and it is exactly that variation
-which projection onto the constants discards.
+TET10 is two orders of magnitude worse than HEX8 at comparable distortion.  Both
+are quadratic in the geometry, but TET10 carries a quadratic \emph{displacement}
+whose gradient varies linearly over the cell, and that variation is exactly what
+projection onto the constants discards.
 
-\subsection{Convergence under refinement}
-\label{sec:convergence}
+Measuring the convergence rate requires care in the choice of increment.
+Against a smooth increment the TET10 error remains at $1.0\times10^{-2}$ across
+an eightfold refinement and appears not to converge.  The cause is in the metric,
+not the operator: for a smooth field the assembled result is a discrete second
+derivative, so contributions from neighbouring elements cancel and the
+denominator of the relative error collapses by an additional order, while the
+per-element projection errors carry independent signs and do not cancel.  Against
+a white-noise increment the same kernel converges at $O(h^{1.07})$.  At $w=0.4$
+the measured sequences are TET10 smooth $1.07\mathrm{e}{-}2 \rightarrow
+9.93\mathrm{e}{-}3$ (flat) against random $2.73\mathrm{e}{-}3 \rightarrow
+2.95\mathrm{e}{-}4$, and HEX8 smooth $1.16\mathrm{e}{-}3 \rightarrow
+2.08\mathrm{e}{-}5$.
 
-Proposition~\ref{prop:consistency} predicts first-order convergence of the
-perturbation.  Measuring it requires care in the choice of increment.  Against a
-\emph{smooth} increment the TET10 relative error remains at $1.0\times10^{-2}$
-across an eightfold refinement and appears not to converge at all.  The
-explanation is in the metric rather than the operator: for a smooth field the
-assembled $(\mathcal{H}h)_p$ is a discrete second derivative, so contributions
-from neighbouring elements cancel and the denominator of the relative error
-collapses by an additional order, while the per-element projection errors carry
-independent signs and do not cancel.  Against a white-noise increment the same
-kernel converges at $O(h^{1.07})$, in agreement with
-Proposition~\ref{prop:consistency}.
+\subsection{Node-level throughput}
+\label{sec:throughput}
 
-At $w=0.4$ the measured sequences are: TET10 smooth $1.07\times10^{-2}
-\rightarrow 9.93\times10^{-3}$ (flat) against random $2.73\times10^{-3}
-\rightarrow 2.95\times10^{-4}$; HEX8 smooth $1.16\times10^{-3} \rightarrow
-2.08\times10^{-5}$.
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrll}
+\toprule
+element & hand-optimised PA & exact MF & this work & vs.\ PA & vs.\ MF \\
+\midrule
+TET10 & $137.4$         & $27.2$ & $\mathbf{219.6}$ & $1.60\times$ & $8.07\times$ \\
+HEX8  & $122.5 \pm 7\%$ & $47.5$ & $\mathbf{132}$   & parity       & $2.78\times$ \\
+TET4  & ---             & $47.9$ & $\mathbf{116.9}$ & ---          & $2.44\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Application throughput in MDOF/s.  Neo-Hookean Ogden,
+$1.04\times10^{7}$~dof, M1, eight threads, identical build for all columns.
+``PA'' is a hand-optimised partial-assembly implementation of the same material,
+available for TET10 and HEX8 but not TET4; ``MF'' is the exact matrix-free
+application.  HEX8 entries are five-run means; the run-to-run spread of the
+hand-optimised operator on that element is $\pm7\%$, so the comparison there is
+a statistical tie.  Before the schedule selection of Section~\ref{sec:schedule}
+the HEX8 figure for this work was $100.2$.}
+\label{tab:throughput}
+\end{table}
 
-\subsection{Effect of store precision}
+Assembly, timed separately at the same problem size, is $0.392$\,s for the
+generated store against $0.653$\,s for the hand-optimised implementation on
+TET10, and $0.414$\,s against $0.427$\,s on HEX8.  On TET10 the method is
+therefore ahead on both phases; on HEX8 the assemblies are level, so the entire
+remaining difference is in the contraction --- consistent with
+Table~\ref{tab:ordering}, where the emitted HEX8 kernel is $1801$ operations
+against a hand-written $1558$.
 
-Table~\ref{tab:precision} isolates the store precision from the projection error
-by taking the measurement on configurations where Proposition~\ref{prop:exact}
-applies or the warp is zero, so that the entire discrepancy is representation.
+The ordering of the speed-ups over the exact application --- $8.07\times$ on
+TET10, $2.78\times$ on HEX8, $2.44\times$ on TET4 --- is the ordering the cost
+model predicts in Section~\ref{sec:model}, and for the reason given there: the
+method removes arithmetic, and TET4 has the least to remove and the largest
+store per degree of freedom.
+
+\paragraph{Break-even.}  The number of applications per assembly at which the
+method pays requires a reference performing no setup of its own, which excludes
+the hand-optimised operator; the exact matrix-free application is the
+appropriate denominator.  Against it, TET10 breaks even at $1.03$ applications
+per assembled tangent and TET4 at $1.16$.  A Krylov method performs tens to
+hundreds of applications per Newton step, so the assembly is amortised after the
+first iteration.
+
+\subsection{Achieved rates against the model}
+
+Multiplying the measured throughputs of Table~\ref{tab:throughput} by the
+per-degree-of-freedom costs of Table~\ref{tab:perdof} gives the achieved rates
+in Table~\ref{tab:achieved}.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+element & MDOF/s & GFLOP/s & \% of peak & GB/s & $I_e$ \\
+\midrule
+TET4  & $116.9$ & $48.4$ & $12\%$ & $47.7$ & $1.01$ \\
+TET10 & $219.6$ & $75.8$ & $18\%$ & $15.6$ & $4.86$ \\
+HEX8  & $132.0$ & $79.2$ & $19\%$ & $11.4$ & $6.93$ \\
+\bottomrule
+\end{tabular}
+\caption{Achieved rates derived from Tables~\ref{tab:perdof} and
+\ref{tab:throughput}.  M1, eight threads, $1.04\times10^{7}$~dof.  ``\% of
+peak'' is against the nominal $410$~GFLOP/s double-precision vector peak of the
+eight performance cores.}
+\label{tab:achieved}
+\end{table}
+
+The picture is consistent with the model.  TET10 and HEX8 reach $18$--$19\%$ of
+nominal vector peak while moving under $16$~GB/s, an order of magnitude below
+what the memory system sustains: they are compute-bound, and the schedule
+selection is the right lever.  TET4 reaches only $12\%$ of peak while moving
+$47.7$~GB/s, roughly a quarter of the sustainable CPU-side bandwidth, at an
+intensity of $1.01$~flop/byte --- close enough to the machine balance that
+neither bound dominates cleanly, which is the least favourable position to be
+in and matches its being the element that benefits least.
+
+That $18$--$19\%$ of vector peak is the ceiling for the compute-bound elements
+deserves comment.  The kernels contain no branches and no gathers in the
+contraction itself, but they retain a gather of the increment and a scatter of
+the output at element boundaries, and the intermediates of
+Table~\ref{tab:stages} exceed the register file on HEX8.  Closing that gap is the
+principal remaining optimisation and is discussed in Section~\ref{sec:discussion}.
+
+\subsection{Strong scaling}
+\label{sec:scaling}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{llrrrrrr}
+\toprule
+machine & variant & $1$ & $8$ & $32$ & $64$ & $72$ & speed-up \\
+\midrule
+M1    & exact MF              & $2.68$ & $18.75$ & ---     & ---      & ---      & $7.0\times$ (8) \\
+M1    & stored, \texttt{fp16} & $7.61$ & $55.15$ & ---     & ---      & ---      & $7.2\times$ (8) \\
+Grace & exact MF              & $1.33$ & $10.68$ & $41.65$ & $ 82.13$ & $ 92.28$ & $69.4\times$ \\
+Grace & stored, \texttt{fp16} & $2.85$ & $25.30$ & $97.67$ & $191.62$ & $209.60$ & $73.5\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Throughput in MDOF/s against thread count.  Mooney--Rivlin with
+Kelvin--Voigt viscosity, $2.07\times10^{5}$~dof.  Parenthesised thread counts
+give the point at which the M1 speed-up is measured.}
+\label{tab:scaling}
+\end{table}
+
+Grace scales essentially linearly to the full node: $96\%$ parallel efficiency
+for the exact application, and above unity for the stored one, the latter
+reflecting improved cache residency as the per-thread working set shrinks.  The
+atomic scatter, which is the obvious candidate for a scalability limit, is not
+one at this core count.
+
+On M1 every variant peaks at eight threads and falls by approximately a fifth at
+ten.  This is heterogeneity, not contention: the M1~Max has eight performance
+and two efficiency cores, a static loop schedule assigns them equal chunks, and
+the loop waits for the slower ones.  An earlier reading of the same data
+attributed the plateau to the scatter; the Grace measurements refute it, and we
+record the episode as a caution against inferring an algorithmic limit from a
+single heterogeneous machine.
+
+\subsection{Store precision}
+\label{sec:precision}
+
+Table~\ref{tab:storage} gives the footprints.  For a symmetric material in three
+dimensions the store is $45$ numbers per element; for the mixed
+Mooney--Rivlin/Kelvin--Voigt material, which contributes one symmetric and one
+unsymmetric part, it is $45+81 = 126$.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrr}
+\toprule
+components per element & \texttt{fp64} & \texttt{fp32} & \texttt{fp16} \\
+\midrule
+$45$ (symmetric)                  &  $360$ & $180$ &  $90$ \\
+$126$ (symmetric $+$ unsymmetric) & $1008$ & $504$ & $260$ \\
+\bottomrule
+\end{tabular}
+\caption{Bytes of stored tangent per element.  The \texttt{fp16} row for $126$
+components includes a per-element \texttt{fp32} scaling factor, which is why it
+exceeds half the \texttt{fp32} figure.}
+\label{tab:storage}
+\end{table}
+
+Table~\ref{tab:precision} isolates representation error from projection error by
+measuring on configurations where the projection is exact, so the whole
+discrepancy is the store.
 
 \begin{table}[ht]
 \centering
@@ -810,164 +859,90 @@ TET10 & $1.4\mathrm{e}{-}14$ & $1.0\mathrm{e}{-}05$ & $4.8\mathrm{e}{-}14$ \\
 HEX8  & ---                  & $6.8\mathrm{e}{-}07$ & ---                  \\
 \bottomrule
 \end{tabular}
-\caption{Relative difference between the approximate application with an
-\texttt{fp32} store and the exact application, at three mesh resolutions.  The
-power-of-two columns are artefacts of exact representability, not measurements
-of the method; the $n=12$ column is the honest figure.}
+\caption{Relative difference between the \texttt{fp32}-store application and the
+exact one at three mesh resolutions.  The power-of-two columns are artefacts of
+exact representability; $n=12$ is the honest figure.}
 \label{tab:precision}
 \end{table}
 
-The approximate application therefore reproduces the exact one to the precision
-of its store, and that precision is element-dependent: the quadratic basis of
-TET10 gives its tangent a wider dynamic range and costs roughly two decimal
-digits more than TET4 for the same \texttt{fp32} store.  This is an input to the
-choice of store precision, not a tolerance to be widened.
+The application therefore reproduces the exact one to the precision of its
+store, and that precision is element-dependent: the quadratic basis of TET10
+gives its tangent a wider dynamic range and costs roughly two decimal digits
+more than TET4 for the same \texttt{fp32} store.
 
-\subsection{Throughput against library operators}
-\label{sec:throughput}
+Halving the store again does not pay.  At one thread the \texttt{fp16} store is
+slower than \texttt{fp32} on both machines, and at $72$ threads it is within two
+per cent while costing four decimal digits.  The cost model explains why: at
+$2.07\times10^{5}$~dof the working set is small enough to remain resident, so
+the kernel is not at the bandwidth bound where a smaller store would help, and
+the conversion cost is not recovered.  The model does predict that
+\texttt{fp16} should help TET4 at large problem sizes, where its
+$408$~byte/dof store dominates; that measurement has not been taken and is the
+most direct test of the model this work leaves open.  We recommend
+\texttt{fp32} as the operating point.
 
-Table~\ref{tab:throughput} compares the generated kernels against the
-corresponding operators of the library, including a hand-optimised
-partial-assembly implementation of the same neo-Hookean material which is
-available for TET10 and HEX8 but not for TET4.
+\section{Discussion}
+\label{sec:discussion}
 
-\begin{table}[ht]
-\centering
-\begin{tabular}{lrrrl}
-\toprule
-element & hand-optimised PA & exact matrix-free & this work & ratio \\
-\midrule
-TET10 & $137.4$ & $27.2$ & $\mathbf{219.6}$ & $1.60\times$ faster \\
-HEX8  & $122.5 \pm 7\%$ & $47.5$ & $\mathbf{132}$ & parity \\
-TET4  & --- & $47.9$ & $\mathbf{116.9}$ & --- \\
-\bottomrule
-\end{tabular}
-\caption{Application throughput in MDOF/s.  Neo-Hookean Ogden material,
-$1.04\times10^{7}$ degrees of freedom, M1, eight threads, identical build for
-all three columns.  The HEX8 entries are five-run means; the run-to-run spread
-of the hand-optimised operator on that element is $\pm7\%$, so the comparison
-there is a statistical tie.  Before the contraction-ordering selection of
-Section~\ref{sec:contraction} the HEX8 figure for this work was $100.2$.}
-\label{tab:throughput}
-\end{table}
+\paragraph{Where the method pays.}  It converts state-dependent work into a one-off
+assembly plus a state-independent application, so it is favourable exactly when
+the ratio of applications to assemblies is high --- Krylov iterations within a
+Newton step, repeated smoothing at a fixed state within a multigrid cycle --- and
+unfavourable when the state changes every application.  With break-even below
+$1.2$, the threshold is essentially always met in a Newton--Krylov context.
 
-The assembly phases, timed separately at the same problem size, are $0.392$\,s
-for the generated store against $0.653$\,s for the hand-optimised implementation
-on TET10, and $0.414$\,s against $0.427$\,s on HEX8.  On TET10 the method is
-therefore ahead on both phases.  On HEX8 the assemblies are level, so the entire
-remaining difference lies in the contraction.
+\paragraph{Where it is inadmissible.}  The scheme perturbs the operator by $O(h)$.
+Used as the operator of record it changes the discrete problem.  Its proper roles
+are as the Krylov operator inside an inexact-Newton iteration, where the residual
+is still evaluated exactly, and as a preconditioner.  Quantifying the effect on
+Newton convergence for a specific forcing-term strategy is the most immediate
+open question and is not addressed here.
 
-\paragraph{Break-even.}  The number of applications per assembly at which the
-method pays for itself requires a reference that performs no setup of its own,
-which excludes the hand-optimised operator; the exact matrix-free application is
-the appropriate denominator.  Against it, TET10 breaks even at $1.03$
-applications per assembled tangent and TET4 at $1.16$.  Since a Krylov method
-performs tens to hundreds of applications per Newton step, the assembly cost is
-amortised after the first iteration.
+\paragraph{The remaining performance gap.}  At $18$--$19\%$ of nominal vector peak
+the compute-bound elements are not close to the machine.  Three causes are
+identifiable and separable: the gather and scatter at element boundaries, which
+the cost model charges as bandwidth but which also costs instructions and
+inhibits vectorisation at block edges; register spilling on HEX8, where
+Table~\ref{tab:stages} exceeds the register file; and the $1801$ against $1558$
+operation gap to the hand-written HEX8 contraction, which is a scheduling
+question rather than a methodological one.
 
-\subsection{Parallel scalability}
-\label{sec:scaling}
-
-\begin{table}[ht]
-\centering
-\begin{tabular}{llrrrrr}
-\toprule
-machine & variant & $1$ & $8$ & $32$ & $64$ & $72$ \\
-\midrule
-M1    & exact matrix-free & $2.68$ & $18.75$ & --- & --- & --- \\
-M1    & stored, \texttt{fp16} & $7.61$ & $55.15$ & --- & --- & --- \\
-Grace & exact matrix-free & $1.33$ & $10.68$ & $41.65$ & $ 82.13$ & $ 92.28$ \\
-Grace & stored, \texttt{fp16} & $2.85$ & $25.30$ & $97.67$ & $191.62$ & $209.60$ \\
-\bottomrule
-\end{tabular}
-\caption{Throughput in MDOF/s against thread count, Mooney--Rivlin material with
-Kelvin--Voigt viscosity, $206\,763$ degrees of freedom.  Grace attains
-$69.4\times$ on $72$ cores for the exact application and $73.5\times$ for the
-stored one.}
-\label{tab:scaling}
-\end{table}
-
-On Grace the scaling is essentially linear to the full node, with parallel
-efficiency of $96\%$ for the exact application and above unity for the stored
-one, the latter reflecting improved cache residency as the per-thread working
-set shrinks.  On M1 every variant peaks at eight threads and falls by
-approximately a fifth at ten.  This is a property of the machine, not of the
-scatter: the M1~Max has eight performance and two efficiency cores, a static
-loop schedule assigns them equal chunks, and the loop waits for the slower ones.
-An earlier reading of the same data attributed the plateau to contention in the
-atomic scatter; the Grace measurements refute that reading, and we record it as
-a caution against inferring an algorithmic limit from a single heterogeneous
-machine.
-
-Reduced precision does not pay on either machine.  At one thread the
-\texttt{fp16} store is slower than \texttt{fp32}, and at $72$ threads it is
-within two per cent of it while costing four decimal digits of accuracy.  The
-kernel is not bandwidth-bound at the point where halving the store would help,
-and the conversion cost is not recovered.  \texttt{fp32} is the operating point
-we recommend.
-
-\section{Discussion and limitations}
-
-\paragraph{Where the method is expected to pay.}  The method converts state-dependent
-work into a one-off assembly plus a state-independent application.  It is
-therefore favourable exactly when the ratio of applications to assemblies is
-high --- Krylov iterations within a Newton step, repeated smoothing at a fixed
-state within a multigrid cycle --- and unfavourable when the state changes every
-application.  The measured break-even below $1.2$ applications means the
-threshold is essentially always met in a Newton--Krylov context.
-
-\paragraph{Where the approximation is inadmissible.}  The scheme perturbs the
-operator by $O(h)$.  Used as the operator of record it changes the discrete
-problem being solved.  Its proper roles are as the Krylov operator inside an
-inexact-Newton iteration, where the residual is still evaluated exactly, and as
-a preconditioner.  Quantifying the effect on Newton convergence for a specific
-forcing-term strategy is the most immediate open question and is not addressed
-here.
-
-\paragraph{Element coverage.}  The trilinear hexahedron remains behind the
-hand-optimised kernel in the contraction, though not in the assembly; the gap is
-$1801$ against $1558$ operations and closing it is a matter of the contraction
-schedule rather than of the method.  The two-dimensional kernels are generated
-and verified symbolically but have not been executed, pending support for the
-required affine geometry cache on triangular and quadrilateral meshes in the
-underlying mesh library.
-
-\paragraph{Higher order.}  Proposition~\ref{prop:rank} gives the rank for any
-element, and it grows with the polynomial degree; at sufficiently high order the
-rank approaches the order, the factorisation ceases to pay
-(Table~\ref{tab:ordering} already shows this trend at HEX8), and sum
-factorisation becomes the appropriate technique instead.  Determining the
-crossover degree is future work.
+\paragraph{Element coverage and higher order.}  The two-dimensional kernels are
+generated and verified symbolically but have not been executed, pending support
+for the required affine geometry cache on triangular and quadrilateral meshes in
+the underlying mesh library.  The rank grows with polynomial degree, so at
+sufficiently high order the factorisation ceases to pay --- the trend is already
+visible at HEX8 in Table~\ref{tab:ordering} --- and sum factorisation becomes the
+appropriate technique instead.  Determining the crossover degree is future work.
 
 \section{Conclusions}
-\label{sec:conclusions}
 
 Projecting the pulled-back material tangent onto element-wise constants removes
 the quadrature loop from the matrix-free application of a nonlinear elasticity
-operator, leaving an application that reads only a small stored tensor and the
-increment.  The reference tensor that remains is a Gram matrix whose rank is the
-dimension of the span of the element's gradient functions, and can be factored
-exactly in rational arithmetic and folded into the emitted code as literal
-constants.  The projection is exact on affine simplices for arbitrary
-hyperelastic materials and first-order accurate otherwise, at a measured rate of
-$O(h^{1.07})$.
+operator, leaving an application that reads a $45$-number store and the
+increment and nothing else.  The reference tensor that remains is a Gram matrix
+whose rank is the dimension of the span of the element's gradient functions; it
+is factored exactly in rational arithmetic and folded into the emitted kernel as
+literal constants.
 
-At $1.04\times10^{7}$ degrees of freedom the generated kernels are $1.60\times$
-faster than a hand-optimised partial-assembly implementation of the same
-material on quadratic tetrahedra, with a $1.67\times$ faster assembly, and at
-parity on trilinear hexahedra; parallel efficiency on $72$ Arm cores is $96\%$.
-The symmetry that halves the storage must be decided per material rather than
-assumed, since it holds for energy-based formulations and fails for
-residual-based ones.
+A per-element cost model places the resulting kernels at $1.0$, $4.9$ and
+$6.9$~flop/byte for TET4, TET10 and HEX8, predicts that the first is limited by
+its own store and the other two by the contraction, and correctly orders the
+measured speed-ups over the exact matrix-free application ($2.4\times$,
+$8.1\times$, $2.8\times$).  At $1.04\times10^{7}$~dof on eight cores the
+generated TET10 kernel is $1.60\times$ faster than a hand-optimised
+partial-assembly implementation of the same material, with a $1.67\times$ faster
+assembly, and HEX8 is at parity; strong scaling on $72$ Arm cores is $69.4\times$
+and $73.5\times$.  Reduced-precision storage does not pay at the problem sizes
+measured, for reasons the cost model accounts for.
 
 Three directions follow.  The first is the inexact-Newton analysis: with an
-$O(h)$ Jacobian perturbation, what forcing-term strategy retains superlinear
+$O(h)$ Jacobian perturbation, what forcing-term strategy retains fast
 convergence, and how does the resulting iteration count trade against the
-per-application saving?  The second is the use of the stored tensor as a
-multigrid smoother operator, where the ratio of applications to assemblies is
-higher still.  The third is rank truncation: Proposition~\ref{prop:rank} makes
-the modes explicit, and discarding the smallest is a controlled second
-approximation whose error can be estimated a priori.
+per-application saving?  The second is closing the gap to vector peak, where the
+gather--scatter and HEX8's register pressure are the identified causes.  The
+third is rank truncation: the modes are explicit, and discarding the smallest is
+a controlled second approximation.
 
 \section*{Acknowledgements}
 
@@ -1044,11 +1019,6 @@ R.~C. Kirby, A.~Logg.
 D.~A. Knoll, D.~E. Keyes.
 \newblock Jacobian-free Newton--Krylov methods: a survey of approaches and applications.
 \newblock \emph{J. Comput. Phys.}, 193(2):357--397, 2004.
-
-\bibitem{KoldaBader2009}
-T.~G. Kolda, B.~W. Bader.
-\newblock Tensor decompositions and applications.
-\newblock \emph{SIAM Rev.}, 51(3):455--500, 2009.
 
 \bibitem{Kolev2021}
 T.~Kolev et al.
