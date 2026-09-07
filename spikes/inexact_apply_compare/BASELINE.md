@@ -78,3 +78,86 @@ at f16, against the 3.4 GB the whole benchmark currently resides in.  For the
 two-unit Mooney-Rivlin Kelvin-Voigt material it is 126 numbers, so 10.4 GB at
 f32.  At this size the store is a first-order cost, which the 206763-dof
 measurements could not show.
+
+# The generated split against the baseline
+
+`bench_op_split.exe.cpp` / `run_bench_op_split.sh`.  A spike copy of `bench_op`,
+deliberately outside the driver tree so the baseline above cannot drift: it
+builds the same mesh from the same environment variables, times the library's
+operators through `Op::apply` exactly as `bench_op` does, and then times the
+generated split kernels on that same mesh in the same process -- which removes
+the harness mismatch that made the earlier `spikes/` figures incomparable to
+these.
+
+It separates the two costs `bench_op` folds together.  The tangent is assembled
+once per Newton step and applied once per Krylov iteration, so an apply rate
+without its assembly is half the story.
+
+Both at ~10.4M dof, 8 threads, `build64` libraries, MDOF/s.
+
+**TET10, 2592000 elements, 10498683 dof**
+
+| | setup [s] | apply [s] | rate |
+|---|---|---|---|
+| library `NeoHookeanOgden`, hand-written partial assembly | 0.6525 | 7.643e-02 | 137.37 |
+| library `GeneratedNeoHookeanOgden`, fused                | --     | 3.854e-01 |  27.24 |
+| generated split, assembly                                 | 0.3922 | --        |  --    |
+| generated split, stored apply f64                         | 0.3922 | 4.927e-02 | 213.09 |
+| generated split, stored apply f32                         | 0.3922 | 4.781e-02 | 219.61 |
+| generated split, stored apply f16                         | 0.3922 | 4.865e-02 | 215.80 |
+
+**HEX8, 3375000 elements, 10328853 dof**
+
+| | setup [s] | apply [s] | rate |
+|---|---|---|---|
+| library `NeoHookeanOgden`, hand-written partial assembly | 0.4273 | 6.341e-02 | 162.90 |
+| library `GeneratedNeoHookeanOgden`, fused                | --     | 2.174e-01 |  47.52 |
+| generated split, assembly                                 | 0.4143 | --        |  --    |
+| generated split, stored apply f32                         | 0.4143 | 1.031e-01 | 100.21 |
+
+**TET4, 768000 elements, 398763 dof** (small: see the memory note below)
+
+| | setup [s] | apply [s] | rate |
+|---|---|---|---|
+| library `NeoHookeanOgden`, no partial assembly           | --     | 1.187e-02 |  33.59 |
+| library `GeneratedNeoHookeanOgden`, fused                | --     | 8.319e-03 |  47.93 |
+| generated split, assembly                                 | 0.0129 | --        |  --    |
+| generated split, stored apply f16                         | 0.0129 | 3.410e-03 | 116.95 |
+
+## What it says
+
+**TET10: the generated split beats hand-written partial assembly on both halves.**
+The apply is 1.60x faster (219.61 against 137.37) and the assembly is 1.66x
+cheaper (0.392 s against 0.653 s).  The baseline had the generated kernel 5.86x
+behind on this element; the split turns that deficit into a lead.
+
+**HEX8: the split doubles the generated kernel but stays 1.63x behind the
+hand-written one** (100.21 against 162.90, from 47.52).  The assembly times are
+level -- 0.414 s against 0.427 s -- so the whole remaining gap is the
+contraction: `hex8_SdotHdotG` beats the staged rank-factored contraction, which
+is expensive precisely on HEX8, where `Wbar` has high rank.  That is the next
+thing to fix, and it is a contraction problem rather than a partial-assembly one.
+
+**TET4: 2.44x over the fused kernel**, on the element where the library does not
+use partial assembly at all.  There is nothing hand-written to catch here; this
+is new throughput.
+
+## Two things to read carefully
+
+**Break-even needs the right reference.**  It only means something against an
+operator that performs no setup of its own.  The hand-written `NeoHookeanOgden`
+enables partial assembly for HEX8 and TET10 and pays for it in its own setup
+column, so charging the split for an assembly the reference also performs would
+be wrong -- the first version of this spike did exactly that and reported 15.1
+applies for TET10 where the honest figure against the fused kernel is 1.16.  The
+tool now prints both framings and names which reference each applies to.  Against
+an operator that also assembles, compare apply to apply and setup to setup.
+
+**The store is a first-order cost at this scale.**  The bench holds f64, f32 and
+f16 stores at once, 630 bytes per element.  That is 1.6 GB on TET10 and 2.1 GB on
+HEX8 at the sizes above, but 13 GB for TET4 at the baseline resolution of 120,
+which is why the TET4 row is measured at 768000 elements rather than 20.7M.
+Reaching the full baseline size on TET4 needs the precisions allocated and freed
+one at a time.  In a solver only one precision is ever resident, so this is a
+property of the benchmark; the underlying per-element cost -- 45 numbers, 180
+bytes at f32 -- is what a real use pays.
