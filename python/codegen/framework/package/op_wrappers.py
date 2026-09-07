@@ -442,7 +442,7 @@ def _inexact_declarations(material):
     if not getattr(material, "inexact_apply", False):
         return ""
     return """
-        bool inexact_supported() const override { return true; }
+        bool inexact_supported() const override;
         int inexact_update(const real_t *const x) override;
         int inexact_apply(const real_t *const h, real_t *const out) override;"""
 
@@ -584,7 +584,14 @@ def _inexact_needs_affine(material):
     """
     if not getattr(material, "inexact_apply", False):
         return ""
-    return " ||\n                true /* the inexact path assembles from the affine geometry */"
+    # Only where the cache can actually be built.  smesh's adjugate fill has no
+    # TRI3 or QUAD4 case and aborts rather than returning, so asking for the
+    # cache on a 2D mesh kills the process inside `initialize` -- which is how
+    # enabling the split first broke 2D linear elasticity outright.  The split
+    # needs affine geometry; affine geometry exists in three dimensions.
+    return (" ||\n                (mesh->spatial_dimension() == 3"
+            " /* the inexact path assembles from the affine geometry,"
+            " which smesh fills for 3D elements only */)")
 
 
 def _inexact_cache_field(material):
@@ -710,6 +717,23 @@ def _inexact_definitions(
         "(dim == %d) ? %d" % (dim, count) for dim, count in sorted(components.items())
     ) + " : 0"
     return """
+
+    bool %%(op)s::inexact_supported() const {
+        // The split assembles its tangent from the cached affine geometry, and
+        // that cache does not exist for every element: smesh's adjugate fill
+        // refuses TRI3 and QUAD4, so a 2D mesh reaches `inexact_update` with
+        // nothing to read.  Reporting support the operator cannot deliver is
+        // worse than reporting none, so this asks the cache rather than
+        // answering from what was generated.
+        for (const auto &entry : impl_->domains->domains()) {
+            auto cache = std::static_pointer_cast<AffineGeometryCache>(
+                    entry.second.user_data);
+            if (!cache || !cache->jacobian_soa) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     int %%(op)s::inexact_update(const real_t *const x) {
         SFEM_TRACE_SCOPE("%%(op)s::inexact_update");
