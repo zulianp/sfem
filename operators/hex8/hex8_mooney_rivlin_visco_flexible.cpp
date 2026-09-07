@@ -58,7 +58,8 @@ static int dispatch_history_update(const smesh::PrimitiveType storage,
     return SFEM_FAILURE;
 }
 
-static inline float fp16_history_scale(const scalar_t *const H, const int n) {
+static inline float fp16_history_scale(const scalar_t *const H, const int n, const bool check_history,
+                                       const ptrdiff_t element, const ptrdiff_t qp, const int prony) {
     scalar_t max_abs = 0;
     for (int i = 0; i < n; ++i) {
         max_abs = fmax(max_abs, fabs(H[i]));
@@ -67,8 +68,12 @@ static inline float fp16_history_scale(const scalar_t *const H, const int n) {
     if (max_abs == 0) return 1;
 
     int exponent;
-    frexp(max_abs, &exponent);
-    return (float)ldexp(1.0, exponent - 15);
+    const double mantissa = frexp(max_abs, &exponent);
+    const double scale64 = ldexp(1.0, exponent - 15);
+    const float scale32 = (float)scale64;
+    if (check_history) sfem_check_history_scale(max_abs, mantissa, exponent, scale64, scale32,
+                                              element, qp, prony);
+    return scale32;
 }
 
 // ============================================================================
@@ -145,7 +150,7 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
         }
 
         if (new_history_scale_data) {
-            const float new_scale = fp16_history_scale(updated, 6);
+            const float new_scale = fp16_history_scale(updated, 6, check_history, element, qp, p);
             if (check_history) sfem_check_history("scale", element, qp, p, -1, 0, new_scale);
             const scalar_t inv_scale = 1.0 / new_scale;
             new_history_scale_data[scale_offset + p] = new_scale;
@@ -281,7 +286,8 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
                         }
                     }
 
-                    const float new_scale = fp16_history_scale(&updated[0][0], history_n_qp * 6);
+                    const float new_scale = fp16_history_scale(&updated[0][0], history_n_qp * 6,
+                                                               check_history, i, -1, p);
                     if (check_history) sfem_check_history("scale", i, -1, p, -1, 0, new_scale);
                     const scalar_t inv_scale = 1.0 / new_scale;
                     new_history_scale_data[scale_offset] = new_scale;

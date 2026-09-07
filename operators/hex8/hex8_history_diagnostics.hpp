@@ -23,6 +23,29 @@ inline bool sfem_history_finite(const double value) {
     return (observed & UINT64_C(0x7ff0000000000000)) != UINT64_C(0x7ff0000000000000);
 }
 
+inline void sfem_check_history_scale(const double max_abs, const double mantissa, const int exponent,
+                                     const double scale64, const float scale32,
+                                     const ptrdiff_t element, const ptrdiff_t qp, const int prony) {
+    if (sfem_history_finite(scale64) && scale64 > 0 &&
+        sfem_history_finite(scale32) && scale32 > 0) return;
+
+#pragma omp critical(sfem_history_diagnostic)
+    {
+        static_assert(sizeof(float) == sizeof(uint32_t) && std::numeric_limits<float>::is_iec559,
+                      "Scale diagnostics require IEEE binary32");
+        uint32_t bits;
+        std::memcpy(&bits, &scale32, sizeof(bits));
+        std::fprintf(stderr,
+                     "[history-check] stage=scale_build element=%td qp=%td prony=%d "
+                     "max_abs=%.17g mantissa=%.17g exponent=%d scale_exponent=%d "
+                     "scale64=%.17g scale32=%.17g scale32_bits=0x%08x\n",
+                     element, qp, prony, max_abs, mantissa, exponent, exponent - 15,
+                     scale64, double(scale32), static_cast<unsigned int>(bits));
+        std::fflush(stderr);
+        std::_Exit(EXIT_FAILURE);
+    }
+}
+
 inline void sfem_check_history(const char *stage, const ptrdiff_t element, const ptrdiff_t qp,
                                const int prony, const int component, const double value,
                                const double scale = 1, const bool require_fp16_range = false) {
