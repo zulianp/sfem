@@ -33,7 +33,7 @@ namespace sfem {
                         const int nsteps,
                         const real_t *const steps,
                         real_t *const out) override;
-        bool inexact_supported() const override { return true; }
+        bool inexact_supported() const override;
         int inexact_update(const real_t *const x) override;
         int inexact_apply(const real_t *const h, real_t *const out) override;
         int hessian_crs(const real_t *const x,

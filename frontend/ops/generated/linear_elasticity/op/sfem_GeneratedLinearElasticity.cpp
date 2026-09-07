@@ -503,7 +503,7 @@ namespace sfem {
                 impl_->objective_uses_affine ||
                 impl_->gradient_uses_affine ||
                 impl_->apply_uses_affine ||
-                true /* the inexact path assembles from the affine geometry */;
+                (mesh->spatial_dimension() == 3 /* the inexact path assembles from the affine geometry, which smesh fills for 3D elements only */);
         for (auto &entry : impl_->domains->domains()) {
             seed_parameters(*entry.second.parameters);
             impl_->element_capacity =
@@ -1123,6 +1123,23 @@ namespace sfem {
         return ret;
     }
 #endif  // SFEM_ENABLE_RYAML
+
+    bool GeneratedLinearElasticity::inexact_supported() const {
+        // The split assembles its tangent from the cached affine geometry, and
+        // that cache does not exist for every element: smesh's adjugate fill
+        // refuses TRI3 and QUAD4, so a 2D mesh reaches `inexact_update` with
+        // nothing to read.  Reporting support the operator cannot deliver is
+        // worse than reporting none, so this asks the cache rather than
+        // answering from what was generated.
+        for (const auto &entry : impl_->domains->domains()) {
+            auto cache = std::static_pointer_cast<AffineGeometryCache>(
+                    entry.second.user_data);
+            if (!cache || !cache->jacobian_soa) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     int GeneratedLinearElasticity::inexact_update(const real_t *const x) {
         SFEM_TRACE_SCOPE("GeneratedLinearElasticity::inexact_update");
