@@ -134,16 +134,47 @@ struct CsvRow {
     ptrdiff_t   packs_per_color_min;
     ptrdiff_t   packs_per_color_max;
     double      checksum;
+    int         rhie_chow;   // 0, or the scale the Rhie-Chow term ran at
+    double      rhie_chow_scale;
+    int         boundary;    // 1 if the boundary control volumes were closed
     const double *phase;  // PH_N entries, thread-summed ms per call, or nullptr
 };
 
 static void csv_write(const std::string &path, const CsvRow &r) {
     if (path.empty()) return;
 
+    // The column set changes when options are added, and this file is opened for APPEND.
+    // Writing a new row shape under an old header produces a csv whose columns silently
+    // shift partway down -- and report_cvfem_bench.py / plot_cvfem_bench.py read these by
+    // name. So the existing header is compared against the one we would write, and a
+    // mismatch is refused rather than appended to.
+    std::string header =
+            "tag,host,element,operation,layout,kernel,geom,warp,threads,pack_size,cube_n,"
+            "nodes,elements,dofs,bsr_nnz,bsr_values_MiB,repeat,seconds_per_call,"
+            "MDOF_s,MDOF_s_element_visits,MELEM_s,GFLOP_s_model,"
+            "n_colors,packs_per_color_min,packs_per_color_max,checksum,"
+            "rhie_chow,rhie_chow_scale,boundary";
+    for (int i = 0; i < PH_N; ++i) header += std::string(",ms_") + g_phase_name[i];
+
     bool need_header = true;
     if (FILE *probe = std::fopen(path.c_str(), "r")) {
         std::fseek(probe, 0, SEEK_END);
-        need_header = std::ftell(probe) == 0;
+        const long size = std::ftell(probe);
+        need_header     = size == 0;
+        if (size > 0) {
+            std::rewind(probe);
+            std::string first;
+            for (int c = std::fgetc(probe); c != EOF && c != '\n'; c = std::fgetc(probe))
+                first.push_back((char)c);
+            if (first != header) {
+                std::fclose(probe);
+                std::fprintf(stderr,
+                             "error: '%s' has a different column set than this build writes.\n"
+                             "       Appending would misalign it. Write to a new file instead.\n",
+                             path.c_str());
+                return;
+            }
+        }
         std::fclose(probe);
     }
 
@@ -157,15 +188,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
     if (gethostname(host, sizeof(host) - 1) != 0) std::snprintf(host, sizeof(host), "unknown");
     host[sizeof(host) - 1] = '\0';
 
-    if (need_header) {
-        std::fprintf(f,
-                     "tag,host,element,operation,layout,kernel,geom,warp,threads,pack_size,cube_n,"
-                     "nodes,elements,dofs,bsr_nnz,bsr_values_MiB,repeat,seconds_per_call,"
-                     "MDOF_s,MDOF_s_element_visits,MELEM_s,GFLOP_s_model,"
-                     "n_colors,packs_per_color_min,packs_per_color_max,checksum");
-        for (int i = 0; i < PH_N; ++i) std::fprintf(f, ",ms_%s", g_phase_name[i]);
-        std::fprintf(f, "\n");
-    }
+    if (need_header) std::fprintf(f, "%s\n", header.c_str());
 
     std::fprintf(f,
                  "%s,%s,hex8,%s,%s,%s,%s,%.6e,%d,%d,%d,%td,%td,%td,%td,%.4f,%d,%.9e,%.4f,%.4f,%.4f,%.4f,%d,%td,%td,%.12e",
@@ -173,6 +196,7 @@ static void csv_write(const std::string &path, const CsvRow &r) {
                  r.nodes, r.elements, r.dofs, r.bsr_nnz, r.bsr_values_mib, r.repeat, r.seconds_per_call,
                  r.mdofs, r.mdofs_element_visits, r.melems, r.gflops_model,
                  r.n_colors, r.packs_per_color_min, r.packs_per_color_max, r.checksum);
+    std::fprintf(f, ",%d,%.6f,%d", r.rhie_chow, r.rhie_chow_scale, r.boundary);
     for (int i = 0; i < PH_N; ++i) {
         if (r.phase)
             std::fprintf(f, ",%.6f", 1000.0 * r.phase[i] / double(r.repeat));
@@ -208,6 +232,12 @@ int main(int argc, char **argv) {
     scalar_t    warp       = 0;
     int         pack_size  = 2048;
     int         assemble_diag = 0;
+    // Both off by default. The benchmark's job is to isolate the element kernel, and the
+    // recorded throughput baselines were measured without either term; turning one on
+    // changes what is being measured, so it has to be asked for.
+    int         rhie_chow  = 0;
+    scalar_t    rc_scale   = 1;
+    int         boundary   = 0;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -251,6 +281,12 @@ int main(int argc, char **argv) {
             g_kernel_only = 1;
         else if (arg == "--dense-flush")
             g_dense_flush = 1;
+        else if (arg == "--rhie-chow") {
+            rhie_chow = 1;
+            // Optional scale, so --rhie-chow 0.5 works and a bare --rhie-chow means 1.
+            if (i + 1 < argc && argv[i + 1][0] != '-') rc_scale = (scalar_t)std::atof(argv[++i]);
+        } else if (arg == "--boundary")
+            boundary = 1;
         else if (arg == "--csv" && i + 1 < argc)
             csv_path = argv[++i];
         else if (arg == "--tag" && i + 1 < argc)
@@ -290,11 +326,58 @@ int main(int argc, char **argv) {
                     "  --kernel NAME  residual/Jacobian micro-kernel variant (default sumfact)\n"
                     "  --geom NAME    affine (constant J) or isoparam (12 SCS trilinear J)\n"
                     "  --warp EPS     x += EPS * sin(pi y) nodal perturbation\n"
-                    "  --bsr-apply    assemble once, then time BSR SpMV y = J(u) v\n",
+                    "  --bsr-apply    assemble once, then time BSR SpMV y = J(u) v\n"
+                    "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
+                    "                 S (default 1), and the nodal pressure gradient it needs.\n"
+                    "                 sumfact only -- the hand-written and generated kernels carry\n"
+                    "                 no Rhie-Chow term. Off by default: without it there is no\n"
+                    "                 pressure-pressure coupling at all, which is a smaller and\n"
+                    "                 faster operator than the one the solver runs.\n"
+                    "  --boundary     close the boundary control volumes with the boundary\n"
+                    "                 sub-control-surface terms. Off by default; the benchmark\n"
+                    "                 otherwise has no boundary handling. Reaches ~43%% of the\n"
+                    "                 nodes on this channel at N=8.\n",
                     argv[0]);
             if (own_mpi) MPI_Finalize();
             return 0;
+        } else {
+            // An unrecognised token used to be ignored in silence, so a typo such as
+            // --rhie_chow produced a plain-kernel number that looked like a measurement of
+            // something else. A wrong number is worse than an error.
+            std::fprintf(stderr, "unknown option '%s' (try --help)\n", arg.c_str());
+            if (own_mpi) MPI_Finalize();
+            return 1;
         }
+    }
+
+    // Rhie-Chow exists only in the sum-factorised kernels. cvfem_hex8_ns_upwind_residual
+    // (the hand-written `current` kernel) and every generated sympy kernel take no
+    // Hex8RhieChow argument at all, so asking for it there would silently measure a kernel
+    // without it -- exactly the confusion this option exists to remove.
+    if (rhie_chow && kernel != "sumfact") {
+        std::fprintf(stderr,
+                     "--rhie-chow requires --kernel sumfact (got '%s'): the hand-written and\n"
+                     "generated kernels carry no Rhie-Chow term.\n",
+                     kernel.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // Only the atomic layout threads the two terms through so far. The packed, colored and
+    // store layouts stage their element data through Hex8ResidualPack/Hex8RhieChowPack and
+    // need that staging extended before they can carry either term; until then, asking for
+    // one there has to fail rather than quietly return a number measured without it.
+    if ((rhie_chow || boundary) && layout != "atomic") {
+        std::fprintf(stderr,
+                     "--rhie-chow / --boundary are implemented for --layout atomic only "
+                     "(got '%s')\n",
+                     layout.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    if (rhie_chow && rc_scale == scalar_t(0)) {
+        std::fprintf(stderr, "--rhie-chow 0 is the same as omitting it; say so explicitly\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
     }
 
     if (!kernel_is_valid(kernel)) {
@@ -418,6 +501,54 @@ int main(int argc, char **argv) {
 
     fill_fields(d);
     precompute_affine_geometry(d);
+
+    // --- optional terms -------------------------------------------------------------
+    //
+    // The boundary mask is built from the bounding box rather than from a sideset. That
+    // is enough here and it is what the solver's own fallback does when no sideset is
+    // named (build_face_mask in cvfem_hex8_ns_op.cpp): the benchmark mesh is a box, so a
+    // coordinate test and a topological skin agree on it by construction. On a mesh with
+    // a re-entrant face they would not, which is why the solver prefers the sideset --
+    // but a benchmark that measured a non-box mesh would be measuring something else.
+    if (boundary) {
+        d.Lx = d.Ly = d.Lz = 0;
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            d.Lx = std::max(d.Lx, (scalar_t)d.points[0][i]);
+            d.Ly = std::max(d.Ly, (scalar_t)d.points[1][i]);
+            d.Lz = std::max(d.Lz, (scalar_t)d.points[2][i]);
+        }
+        d.face_mask.assign((size_t)d.nelements, 0);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+            scalar_t x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
+            gather_element_coords(d, e, x, y, z);
+            uint8_t m = 0;
+            for (int f = 0; f < 6; ++f)
+                if (hex8_face_on_domain(f, x, y, z, d.Lx, d.Ly, d.Lz)) m |= (uint8_t)(1u << f);
+            d.face_mask[(size_t)e] = m;
+        }
+        ptrdiff_t nfaces = 0, nel_touched = 0;
+        for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+            const int m = d.face_mask[(size_t)e];
+            if (m) ++nel_touched;
+            for (int f = 0; f < 6; ++f) nfaces += (m >> f) & 1;
+        }
+        std::printf("boundary: %td faces on %td of %td elements\n", nfaces, nel_touched, d.nelements);
+    }
+
+    if (rhie_chow) {
+        d.rhie_chow_scale = rc_scale;
+        // Built once here, so the timed loop measures the apply with the gradient already
+        // available -- the hoisted case, which is what SFEM_PGRAD_CACHE=1 gives the solver.
+        // The other case, rebuilding it inside every apply, is the more expensive one and
+        // is NOT measured yet: the gradient is a full element sweep costing about 39% of
+        // an apply, and caching it is worth 1.26x off the whole linear solve
+        // (docs/README_alps.md). Exposing both is the point of a cascade and is the next
+        // step here; until it exists, a --rhie-chow number is the hoisted figure.
+        cvfem_hex8_assemble_nodal_grad(d, geom_kind == GeomKind::Isoparam ? 1 : 0, d.p.data(), 1,
+                                       d.pgx, d.pgy, d.pgz);
+        std::printf("rhie_chow: scale %g\n", (double)rc_scale);
+    }
 
     BSR4                  bsr;
     std::vector<scalar_t> jac_linear;
@@ -977,6 +1108,9 @@ int main(int argc, char **argv) {
         row.packs_per_color_min  = colors.min_packs_per_color;
         row.packs_per_color_max  = colors.max_packs_per_color;
         row.checksum             = checksum;
+        row.rhie_chow            = rhie_chow;
+        row.rhie_chow_scale      = rhie_chow ? (double)rc_scale : 0.0;
+        row.boundary             = boundary;
         row.phase                = g_breakdown ? g_phase : nullptr;
         csv_write(csv_path, row);
     }

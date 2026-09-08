@@ -70,7 +70,12 @@ def inum(row, key, default=0):
 class Bench:
     """Best-of runs, indexed by configuration."""
 
-    KEY = ("sweep", "operation", "layout", "kernel", "geom", "threads", "pack_size", "cube_n")
+    # rhie_chow and boundary are part of the key, not incidental metadata: a run with
+    # either term on is measuring a different operator, and collapsing it together with a
+    # run without would average two unrelated things into one "best of". Older csv files
+    # have no such columns and default to 0, so they group exactly as they did before.
+    KEY = ("sweep", "operation", "layout", "kernel", "geom", "threads", "pack_size", "cube_n",
+           "rhie_chow", "boundary")
 
     def __init__(self, rows):
         self.rows = rows
@@ -97,6 +102,8 @@ class Bench:
                 row["pack_size"] = inum(raw, "pack_size")
                 row["cube_n"] = inum(raw, "cube_n")
                 row["dofs"] = inum(raw, "dofs")
+                row["rhie_chow"] = inum(raw, "rhie_chow", 0)
+                row["boundary"] = inum(raw, "boundary", 0)
                 row["elements"] = inum(raw, "elements")
                 row["nodes"] = inum(raw, "nodes")
                 row["bsr_nnz"] = inum(raw, "bsr_nnz")
