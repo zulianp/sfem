@@ -158,8 +158,8 @@ def geometry_variant_plan(weak_form, rule, *, specialized=True, assembles_matrix
         # each guarded on its own entry point existing, the way the packed
         # dispatch already is.  That is why packed could be switched on and
         # these two cannot yet.
-        emits_affine=True,
-        emits_isoparametric=True,
+        emits_affine=constant_p1 or dim == 3,
+        emits_isoparametric=(not constant_p1) or assembles_matrix,
         emits_packed=dim == 3,
         cached_metric=metric,
     )

@@ -900,10 +900,9 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         self.assertNotIn("const scalar_t *const SFEM_RESTRICT q_weight_1d", operator_source)
         self.assertIn("const int qx = q % N_QP_1D;", operator_source)
         self.assertIn("const int qy = q / N_QP_1D;", operator_source)
-        self.assertIn(
-            "const scalar_t tensor_q_weight = affine_q_weight_1d[qx] * affine_q_weight_1d[qy];",
-            operator_source,
-        )
+        # No affine assertion for QUAD4: two dimensions publishes only the
+        # isoparametric variant now, and the tensor-product reference data
+        # this test is about is what that kernel reads.
         self.assertIn(
             "const scalar_t tensor_q_weight = isoparametric_q_weight_1d[qx] * isoparametric_q_weight_1d[qy];",
             operator_source,

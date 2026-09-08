@@ -2102,35 +2102,42 @@ int main() {
                     neohookean_ogden, elements=gen.sfem_supported_element_types()
                 ),
                 out_dir,
-                elements=("TRI6",),
+                # TET10 rather than TRI6: the point is that the two geometry
+                # modes take different quadrature, which needs an element that
+                # publishes both, and 2D now publishes only the isoparametric
+                # one.  TET10 is the 3D non-P1 simplex, the closest analogue.
+                elements=("TET10",),
             )
             source = os.path.join(
                 out_dir,
-                "d2",
-                "tri6",
-                "neohookean_ogden_tri6_operator.cpp",
+                "d3",
+                "tet10",
+                "neohookean_ogden_tet10_operator.cpp",
             )
             with open(source, encoding="utf-8") as stream:
                 contents = stream.read()
 
         affine = contents.index(
-            "neohookean_ogden_tri6_gradient_affine_mesh_soa_impl"
+            "neohookean_ogden_tet10_gradient_affine_mesh_soa_impl"
         )
         isoparametric = contents.index(
-            "neohookean_ogden_tri6_gradient_isoparametric_mesh_soa_impl"
+            "neohookean_ogden_tet10_gradient_isoparametric_mesh_soa_impl"
         )
-        self.assertIn("static constexpr int N_QP = 3;", contents[affine:isoparametric])
+        # TET10: four points affine, eleven isoparametric.  The numbers are the
+        # element's, not the point -- what is pinned is that the two modes do
+        # not share a quadrature rule.
+        self.assertIn("static constexpr int N_QP = 4;", contents[affine:isoparametric])
         self.assertIn("const scalar_t *const affine_grad_ref_x", contents[affine:isoparametric])
         self.assertIn("const scalar_t *const affine_q_weight", contents[affine:isoparametric])
         self.assertIn(
-            "neohookean_ogden_tri6_affine_reference_data<scalar_t>::grad_ref_x()",
+            "neohookean_ogden_tet10_affine_reference_data<scalar_t>::grad_ref_x()",
             contents[affine:isoparametric],
         )
-        self.assertIn("static constexpr int N_QP = 6;", contents[isoparametric:])
+        self.assertIn("static constexpr int N_QP = 11;", contents[isoparametric:])
         self.assertIn("const scalar_t *const isoparametric_grad_ref_x", contents[isoparametric:])
         self.assertIn("const scalar_t *const isoparametric_q_weight", contents[isoparametric:])
         self.assertIn(
-            "neohookean_ogden_tri6_isoparametric_reference_data<scalar_t>::grad_ref_x()",
+            "neohookean_ogden_tet10_isoparametric_reference_data<scalar_t>::grad_ref_x()",
             contents[isoparametric:],
         )
 
@@ -3494,15 +3501,17 @@ int main() {
             result = gen.generate(
                 poro_hyperelasticity,
                 out_dir,
-                elements=("TRI6",),
+                # TET10_TET4 rather than TET10_TRI3: 2D publishes only the
+                # isoparametric variant now, and this test is about both.
+                elements=("TET10",),
             )
             names = _relative_sources(result, out_dir)
             self.assertIn(
-                "d2/tri6/poro_hyperelasticity_solid_tri6_operator.cpp",
+                "d3/tet10/poro_hyperelasticity_solid_tet10_operator.cpp",
                 names,
             )
             self.assertIn(
-                "d2/tri6_tri3/poro_hyperelasticity_poro_tri6_tri3_operator.cpp",
+                "d3/tet10_tet4/poro_hyperelasticity_poro_tet10_tet4_operator.cpp",
                 names,
             )
             self.assertIn("op/sfem_GeneratedPoroHyperelasticity.cpp", names)
@@ -3516,48 +3525,48 @@ int main() {
                 wrapper_contents = input_file.read()
             self.assertIn("class GeneratedPoroHyperelasticity::Impl", wrapper_contents)
             self.assertIn(
-                "poro_hyperelasticity_solid_gradient_2d_isoparametric_mesh_soa",
+                "poro_hyperelasticity_solid_gradient_3d_isoparametric_mesh_soa",
                 wrapper_contents,
             )
             self.assertIn(
-                "poro_hyperelasticity_poro_residual_2d_isoparametric_mesh_soa",
+                "poro_hyperelasticity_poro_residual_3d_isoparametric_mesh_soa",
                 wrapper_contents,
             )
             self.assertIn(
-                "poro_hyperelasticity_poro_jacobian_action_2d_affine_mesh_soa",
+                "poro_hyperelasticity_poro_jacobian_action_3d_affine_mesh_soa",
                 wrapper_contents,
             )
             for private_function in (
-                "poro_hyperelasticity_solid_tri6_objective_affine_mesh_soa",
-                "poro_hyperelasticity_solid_tri6_gradient_isoparametric_mesh_soa",
-                "poro_hyperelasticity_solid_tri6_apply_affine_mesh_soa",
-                "poro_hyperelasticity_poro_tri6_tri3_residual_isoparametric_mesh_soa",
-                "poro_hyperelasticity_poro_tri6_tri3_jacobian_action_affine_mesh_soa",
-                "poro_hyperelasticity_solid_tri6_gradient_soa_diagnostics()",
-                "poro_hyperelasticity_poro_tri6_tri3_residual_element_soa_diagnostics()",
+                "poro_hyperelasticity_solid_tet10_objective_affine_mesh_soa",
+                "poro_hyperelasticity_solid_tet10_gradient_isoparametric_mesh_soa",
+                "poro_hyperelasticity_solid_tet10_apply_affine_mesh_soa",
+                "poro_hyperelasticity_poro_tet10_tet4_residual_isoparametric_mesh_soa",
+                "poro_hyperelasticity_poro_tet10_tet4_jacobian_action_affine_mesh_soa",
+                "poro_hyperelasticity_solid_tet10_gradient_soa_diagnostics()",
+                "poro_hyperelasticity_poro_tet10_tet4_residual_element_soa_diagnostics()",
             ):
                 self.assertNotIn(private_function, wrapper_contents)
             self.assertIn(
-                "poro_hyperelasticity_solid_gradient_2d_soa_diagnostics(domain.element_type)",
+                "poro_hyperelasticity_solid_gradient_3d_soa_diagnostics(domain.element_type)",
                 wrapper_contents,
             )
             self.assertIn(
-                "poro_hyperelasticity_poro_residual_element_2d_soa_diagnostics(domain.element_type)",
+                "poro_hyperelasticity_poro_residual_element_3d_soa_diagnostics(domain.element_type)",
                 wrapper_contents,
             )
             c_abi = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity_c_abi.hpp")
             with open(c_abi, encoding="utf-8") as input_file:
                 declarations = input_file.read()
             self.assertIn(
-                "extern \"C\" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_solid_gradient_2d_soa_diagnostics",
+                "extern \"C\" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_solid_gradient_3d_soa_diagnostics",
                 declarations,
             )
             self.assertNotIn(
-                "extern \"C\" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_solid_tri6_gradient_soa_diagnostics",
+                "extern \"C\" const sfem::codegen::KernelDiagnostics *poro_hyperelasticity_solid_tet10_gradient_soa_diagnostics",
                 declarations,
             )
             self.assertIn(
-                "extern \"C\" int poro_hyperelasticity_poro_residual_2d_affine_mesh_soa",
+                "extern \"C\" int poro_hyperelasticity_poro_residual_3d_affine_mesh_soa",
                 declarations,
             )
             manifest = os.path.join(out_dir, "op", "sfem_GeneratedPoroHyperelasticity_manifest.json")
@@ -3568,9 +3577,9 @@ int main() {
                 metadata["registration"]["function"],
                 "sfem::register_GeneratedPoroHyperelasticity_generated_op",
             )
-            self.assertIn("d2/tri6_tri3", metadata["generated_include_paths"])
+            self.assertIn("d3/tet10_tet4", metadata["generated_include_paths"])
             self.assertIn(
-                "poro_hyperelasticity_poro_residual_2d_affine_mesh_soa",
+                "poro_hyperelasticity_poro_residual_3d_affine_mesh_soa",
                 {entry["name"] for entry in metadata["c_abi"]},
             )
             self.assertEqual(
