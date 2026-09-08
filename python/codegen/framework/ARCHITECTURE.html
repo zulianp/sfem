@@ -190,12 +190,12 @@
 <header class="masthead">
   <div class="eyebrow"><b>Prescriptive</b> — what the layers must own &nbsp;·&nbsp; <i>Descriptive</i> — what is built today &nbsp;·&nbsp; Open points</div>
   <h1>SFEM Codegen Architecture</h1>
-  <p class="standfirst">The layer graph is clean and enforced, and the matrix-free apply path is now measured as well as described. The emission layer still holds 23,409 lines that should be a printer — up from 22,727, because node construction is longer than string appends, which is why it is now measured by the decisions it makes rather than by its size.</p>
+  <p class="standfirst">Every plan the planning layer produces now has a reader, and the decisions left in emission are down from 428 to 200 under a shrink-only ratchet. Two things changed character since the last pass. Byte-identity stopped being the universal gate, because the first changes that are <em>meant</em> to alter the output landed — closed-form simplex kernels, a collapsed public ABI, a narrowed scope. And the shipped tree turned out to have gone six weeks without being regenerated, which is now gated, and which had shipped a Laplacian whose block scatter indexed a 4&times;4 element matrix as 12&times;12.</p>
   <div class="meta">
     <span><b>Package</b> python/codegen/framework</span>
-    <span><b>Branch</b> codegen-layering, 42 commits from 060684ff</span>
+    <span><b>Branch</b> codegen-layering, 178 commits from 060684ff, at 700cef824</span>
     <span><b>Out of scope</b> the mlir/ subtree</span>
-    <span><b>Date</b> 2026-09-03 (second pass)</span>
+    <span><b>Date</b> 2026-09-08 (third pass)</span>
   </div>
 </header>
 
@@ -203,11 +203,12 @@
 
 <div class="callout">
   <div class="label">Where things stand</div>
-  <p>Structure is done: every import in the framework points up the lowering order, zero violations, enforced by a test that fails on any new one. The specification layer has no outgoing edges at all. The planning layer exists. Nothing architectural lives outside the framework.</p>
-  <p>Behaviour is not. The emission layer still makes the decisions the planning layer is supposed to make — which loops exist, what hoists to which scope, which buffers are gathered, how a matrix scatters. Thirteen plan types and six assembly plans describe those decisions and <b>no emitter reads any of them</b>.</p>
+  <p>Structure is done: every import in the framework points up the lowering order, zero violations, enforced by a test that fails on any new one. The specification layer has no outgoing edges at all. Nothing architectural lives outside the framework.</p>
+  <p>Data flow is no longer the headline gap. Every structural plan has a reader — the count of unread plans went 13 → 0, and three of the thirteen stopped existing when the matrix formats were cut. <b>Direction</b> is the gap that remains: L3 describes the kernel, L6 prints it, and L6 still <em>originates</em> 200 of the decisions, 192 of them in two modules.</p>
+  <p>What the last stretch established is that the ratchet is worth more than the convenient move. Twice now a change that worked, compiled and passed every functional test was rejected because it pushed the decision count up by one: reading <code>plan.emits_packed</code> inside an emitter is still emission choosing what to emit. Both times the accepted form was a sequence the emitter <em>iterates</em> — empty, and it emits nothing — which is the shape the rest of this work should take.</p>
 </div>
 
-<p>Put plainly: the boxes are in the right places and the arrows point the right way, but the work is still being done in the wrong box. Every open point in Part 3 is either that problem or a consequence of it.</p>
+<p>Put plainly: the boxes are in the right places, the arrows point the right way, and the plans are read — but the emitter still decides most of what the plans describe. Every open point in Part 3 is either that problem, a consequence of it, or a piece of scope deliberately set down while it is fixed.</p>
 
 <!-- ============================ PART 1 ============================ -->
 <section>
@@ -217,7 +218,7 @@
 
   <figure>
     <div class="fig-wrap">
-      <svg viewBox="0 0 940 806" role="img" aria-label="Eight layers from specification to packaging. For each layer the left column states what it must own; the right column names the code that occupies it today with a conformance status. Specification, discretization and packaging conform; form lowering, kernel planning and target lowering are partial; the kernel IR is bypassed; the emission layer does not conform, holding 22,970 lines that still make planning decisions.">
+      <svg viewBox="0 0 940 806" role="img" aria-label="Eight layers from specification to packaging. For each layer the left column states what it must own; the right column names the code that occupies it today with a conformance status. Specification, discretization and packaging conform; form lowering, kernel planning and target lowering are partial; the kernel IR is bypassed; the emission layer does not conform, holding 24,027 lines that still make 200 planning decisions.">
         <text x="24" y="26" class="d-hdr">THE EIGHT LAYERS — REQUIREMENT vs. OCCUPANT</text>
         <text x="104" y="56" class="d-key">PRESCRIBED · what the layer must own</text>
         <text x="514" y="56" class="d-keyd">AS BUILT · what is there today</text>
@@ -231,7 +232,7 @@
         <text x="106" y="132" class="d-sub">pure SymPy · names no other layer</text>
         <rect x="500" y="70" width="416" height="78" class="d-okb" rx="2"/>
         <text x="516" y="94" class="d-name">symbolic/</text>
-        <text x="516" y="114" class="d-sub">4,524 LOC · 11 modules</text>
+        <text x="516" y="114" class="d-sub">5,322 LOC · 11 modules</text>
         <text x="516" y="132" class="d-okt">zero outgoing edges</text>
         <text x="902" y="94" class="d-okt" text-anchor="end">CONFORMS</text>
 
@@ -243,7 +244,7 @@
         <text x="106" y="218" class="d-sub">block structure · provenance ends here</text>
         <rect x="500" y="156" width="416" height="78" class="d-partb" rx="2"/>
         <text x="516" y="180" class="d-name">symbolic/forms · equations · residual · weak_forms</text>
-        <text x="516" y="200" class="d-sub">FormCollection is closed; no back-pointer</text>
+        <text x="516" y="200" class="d-sub">component_blocks_for reaches the residual side</text>
         <text x="516" y="218" class="d-dim">not yet its own package — shares L0's</text>
         <text x="902" y="180" class="d-keyd" text-anchor="end">PARTIAL</text>
 
@@ -255,8 +256,8 @@
         <text x="106" y="304" class="d-sub">geometry mode · mixed order · emits nothing</text>
         <rect x="500" y="242" width="416" height="78" class="d-okb" rx="2"/>
         <text x="516" y="266" class="d-name">fem/</text>
-        <text x="516" y="286" class="d-sub">1,914 LOC · 5 modules</text>
-        <text x="516" y="304" class="d-okt">two emitter modules moved out</text>
+        <text x="516" y="286" class="d-sub">2,159 LOC · 7 modules</text>
+        <text x="516" y="304" class="d-okt">element_family answers the strategy</text>
         <text x="902" y="266" class="d-okt" text-anchor="end">CONFORMS</text>
 
         <!-- L3 -->
@@ -267,7 +268,7 @@
         <text x="106" y="390" class="d-sub">streams · phases · layouts · cost · SymPy ends</text>
         <rect x="500" y="328" width="416" height="78" class="d-partb" rx="2"/>
         <text x="516" y="352" class="d-name">plans/</text>
-        <text x="516" y="372" class="d-sub">5,996 LOC · 19 modules · scheduler landed</text>
+        <text x="516" y="372" class="d-sub">7,904 LOC · 25 modules</text>
         <text x="516" y="390" class="d-okt">every structural plan has a reader</text>
         <text x="902" y="352" class="d-keyd" text-anchor="end">PARTIAL</text>
 
@@ -279,8 +280,8 @@
         <text x="106" y="476" class="d-sub">AST passes · loop structure fixed here</text>
         <rect x="500" y="414" width="416" height="78" class="d-gapb" rx="2"/>
         <text x="516" y="438" class="d-name">ir/</text>
-        <text x="516" y="458" class="d-sub">1,211 LOC · one pass wired, an analysis</text>
-        <text x="516" y="476" class="d-gapt">every residual kernel is a tree</text>
+        <text x="516" y="458" class="d-sub">1,211 LOC · 34 node kinds · one pass</text>
+        <text x="516" y="476" class="d-gapt">holds no optimization; unchanged this pass</text>
         <text x="902" y="438" class="d-gapt" text-anchor="end">PARTIAL</text>
 
         <!-- L5 -->
@@ -292,7 +293,7 @@
         <rect x="500" y="500" width="416" height="78" class="d-partb" rx="2"/>
         <text x="516" y="524" class="d-name">targets/</text>
         <text x="516" y="544" class="d-sub">513 LOC · own layer since the split</text>
-        <text x="516" y="562" class="d-gapt">bound, not threaded; 28 literal pragmas</text>
+        <text x="516" y="562" class="d-gapt">bound, not threaded; 24 literal pragmas</text>
         <text x="902" y="524" class="d-keyd" text-anchor="end">PARTIAL</text>
 
         <!-- L6 -->
@@ -303,8 +304,8 @@
         <text x="106" y="648" class="d-sub">mechanical · no policy · no decisions</text>
         <rect x="500" y="586" width="416" height="78" class="d-gapb" rx="2"/>
         <text x="516" y="610" class="d-name">emitters/</text>
-        <text x="516" y="630" class="d-sub">23,409 LOC · 13 modules</text>
-        <text x="516" y="648" class="d-gapt">239 decisions left, from 428 measured</text>
+        <text x="516" y="630" class="d-sub">24,027 LOC · 14 modules</text>
+        <text x="516" y="648" class="d-gapt">200 decisions left, from 428 measured</text>
         <text x="902" y="610" class="d-gapt" text-anchor="end">DOES NOT CONFORM</text>
 
         <!-- L7 -->
@@ -315,14 +316,14 @@
         <text x="106" y="734" class="d-sub">FLOP/AI reports · never changes a kernel body</text>
         <rect x="500" y="672" width="416" height="78" class="d-okb" rx="2"/>
         <text x="516" y="696" class="d-name">package/</text>
-        <text x="516" y="716" class="d-sub">7,388 LOC · moved in from python/sfem/</text>
-        <text x="516" y="734" class="d-okt">inside the framework; shim kept for callers</text>
+        <text x="516" y="716" class="d-sub">8,761 LOC · op_wrappers.py is all of it</text>
+        <text x="516" y="734" class="d-okt">runtime-typed ABI: no _float entry points</text>
         <text x="902" y="696" class="d-okt" text-anchor="end">CONFORMS</text>
 
-        <text x="24" y="782" class="d-dim">Driver (pipeline/, 2,342 LOC) calls each layer in sequence and is imported by none. Frontend (materials/, generators/) sits above the stack.</text>
+        <text x="24" y="782" class="d-dim">Driver (pipeline/, 2,428 LOC) calls each layer in sequence and is imported by none. Frontend (materials/, generators/) sits above the stack.</text>
       </svg>
     </div>
-    <figcaption><b>Figure 1.</b> The same eight rows read twice. Three layers conform, three are partial, one is bypassed, and one — emission — is doing four layers' work at once. The line between the columns is the whole remaining project: <b>22,970 lines on the right of row L6 that belong distributed up rows L3 to L5.</b></figcaption>
+    <figcaption><b>Figure 1.</b> The same eight rows read twice. Three layers conform, four are partial, and one — emission — is still doing several layers' work at once. The line between the columns is the whole remaining project: <b>24,027 lines on the right of row L6, holding 200 decisions that belong distributed up rows L3 to L5.</b> L4 is the row that did not move this pass: the IR is reachable and every residual kernel is built from it, but no optimization has been written as a pass over it yet.</figcaption>
   </figure>
 
   <h3>The rules that make a boundary real</h3>
@@ -344,7 +345,7 @@
       <tr>
         <td><b>One dispatch axis</b></td>
         <td>A layer may branch on the concept it owns and on nothing a layer above owns. No <code>if kind == "energy_soa"</code> in a backend, no <code>if "crs" in formats</code> in a printer.</td>
-        <td class="m">partly: tests/test_plans_are_consumed.py pins the structural plans no emitter reads — 10 of 13, shrink-only in both directions — see open point 5</td>
+        <td class="m">partly: tests/test_plans_are_consumed.py is now at 0 of 10 unread and guards against regression; tests/test_emission_is_a_printer.py holds the live measure at 200 — see open point 5</td>
       </tr>
     </tbody>
   </table>
@@ -358,7 +359,7 @@
   <p>Two facts about the current tree. The first is good and finished; the second is the reason this document exists.</p>
 
   <h3>The import graph is clean</h3>
-  <p>Twelve layer-to-layer edges, every one pointing up the lowering order. It started at seventeen edges with six pointing the wrong way, including all four leaving the specification layer.</p>
+  <p>Twelve layer-to-layer edges, every one pointing up the lowering order. It started at seventeen edges with six pointing the wrong way, including all four leaving the specification layer. The edge <em>weights</em> have grown — <code>plans</code> reads <code>symbolic</code> from ten files now rather than six, <code>emitters</code> reads <code>plans</code> from seven rather than five — which is the shape of plans being consumed rather than ignored.</p>
 
   <figure>
     <div class="fig-wrap">
@@ -399,14 +400,14 @@
         <text x="206" y="339" class="d-sub" text-anchor="end">backends</text>
 
         <!-- cells: plans row -->
-        <rect x="217" y="132" width="66" height="43" class="d-okb"/><text x="250" y="159" class="d-okt" text-anchor="middle">6</text>
-        <rect x="285" y="132" width="66" height="43" class="d-okb"/><text x="318" y="159" class="d-okt" text-anchor="middle">4</text>
+        <rect x="217" y="132" width="66" height="43" class="d-okb"/><text x="250" y="159" class="d-okt" text-anchor="middle">10</text>
+        <rect x="285" y="132" width="66" height="43" class="d-okb"/><text x="318" y="159" class="d-okt" text-anchor="middle">7</text>
         <!-- emitters row -->
         <rect x="217" y="267" width="66" height="43" class="d-okb"/><text x="250" y="294" class="d-okt" text-anchor="middle">3</text>
         <rect x="285" y="267" width="66" height="43" class="d-okb"/><text x="318" y="294" class="d-okt" text-anchor="middle">4</text>
-        <rect x="353" y="267" width="66" height="43" class="d-okb"/><text x="386" y="294" class="d-okt" text-anchor="middle">5</text>
-        <rect x="421" y="267" width="66" height="43" class="d-okb"/><text x="454" y="294" class="d-okt" text-anchor="middle">3</text>
-        <rect x="489" y="267" width="66" height="43" class="d-okb"/><text x="522" y="294" class="d-okt" text-anchor="middle">6</text>
+        <rect x="353" y="267" width="66" height="43" class="d-okb"/><text x="386" y="294" class="d-okt" text-anchor="middle">7</text>
+        <rect x="421" y="267" width="66" height="43" class="d-okb"/><text x="454" y="294" class="d-okt" text-anchor="middle">4</text>
+        <rect x="489" y="267" width="66" height="43" class="d-okb"/><text x="522" y="294" class="d-okt" text-anchor="middle">8</text>
         <!-- backends row -->
         <rect x="217" y="312" width="66" height="45" class="d-okb"/><text x="250" y="339" class="d-okt" text-anchor="middle">2</text>
         <rect x="353" y="312" width="66" height="45" class="d-okb"/><text x="386" y="339" class="d-okt" text-anchor="middle">2</text>
@@ -421,16 +422,16 @@
   </figure>
 
   <h3>The decisions are still in the wrong layer</h3>
-  <p>What the clean graph does not show: the emission layer receives plan objects and ignores them, re-deriving the same decisions internally from SymPy and element metadata. The plan layer describes the kernel; the emitter builds a different description of the same kernel in control flow and strings.</p>
+  <p>What the clean graph does not show: the emission layer reads the plan objects now, but still decides most of what they describe. The previous pass could state this as a count of plans nobody read; that count is zero, so the statement has to be made directly. It is 200 branches whose test reads planning-layer input, ratcheted shrink-only, and 192 of them are in two modules.</p>
 
   <figure>
     <div class="fig-wrap">
-      <svg viewBox="0 0 940 470" role="img" aria-label="The residual generation path. Plan objects flow from kernel planning toward emission, but thirteen plan types and six assembly plans are never read; the emitter re-derives loop structure, scopes, streams, gather and scatter, geometry policy and matrix format internally, and hardcodes its target.">
+      <svg viewBox="0 0 940 470" role="img" aria-label="The generation path. Plan objects flow from kernel planning into emission and every structural plan now has a reader. What remains is that emission still originates two hundred decisions, ninety-nine in the energy emitter and ninety-three in the residual one, over which loops exist, what hoists where, and how gather and scatter are shaped.">
         <defs>
           <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-head"/></marker>
           <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-ghead"/></marker>
         </defs>
-        <text x="24" y="26" class="d-hdr">THE RESIDUAL PATH TODAY — WHAT IS PASSED, AND WHAT IS IGNORED</text>
+        <text x="24" y="26" class="d-hdr">THE GENERATION PATH — WHAT IS READ, AND WHAT IS STILL ORIGINATED BELOW</text>
 
         <!-- chain -->
         <rect x="24" y="52" width="180" height="52" class="d-plain" rx="2"/>
@@ -440,90 +441,159 @@
 
         <rect x="250" y="52" width="200" height="52" class="d-pre" rx="2"/>
         <text x="264" y="74" class="d-name">plans/ (L3)</text>
-        <text x="264" y="92" class="d-sub">scheduler · 4,699 LOC</text>
+        <text x="264" y="92" class="d-sub">7,904 LOC · 25 modules</text>
         <path d="M450,78 L492,78" class="d-line" marker-end="url(#a1)"/>
 
         <rect x="496" y="52" width="220" height="52" class="d-plain" rx="2"/>
-        <text x="510" y="74" class="d-name">ResidualEmissionModel</text>
-        <text x="510" y="92" class="d-sub">8 members · the only input used</text>
+        <text x="510" y="74" class="d-name">emission model + plans</text>
+        <text x="510" y="92" class="d-sub">every structural plan is read</text>
         <path d="M716,78 L758,78" class="d-line" marker-end="url(#a1)"/>
 
         <rect x="762" y="52" width="154" height="52" class="d-gapb" rx="2"/>
         <text x="776" y="74" class="d-name">emitters/ (L6)</text>
-        <text x="776" y="92" class="d-sub">22,970 LOC</text>
+        <text x="776" y="92" class="d-sub">24,027 LOC</text>
 
-        <!-- what L3 produces but nobody reads -->
-        <rect x="250" y="140" width="200" height="196" class="d-plain" rx="2"/>
-        <text x="264" y="162" class="d-sub">L3 also produces:</text>
-        <text x="264" y="184" class="d-dim">LocalPhasePlan</text>
-        <text x="264" y="200" class="d-dim">MeshPhasePlan</text>
-        <text x="264" y="216" class="d-dim">DataStreamPlan</text>
-        <text x="264" y="232" class="d-dim">BlockPlan</text>
-        <text x="264" y="248" class="d-dim">GeometryPlan</text>
-        <text x="264" y="264" class="d-okt">LocalKernelPlan · MeshKernelPlan  ✓ read</text>
-        <text x="264" y="288" class="d-dim">BSR / DIA / COO / Patch</text>
-        <text x="264" y="304" class="d-dim">Patch / BlockDiagSym AssemblyPlan</text>
-        <text x="264" y="326" class="d-gapt">10 of 13 read by no emitter</text>
+        <!-- what L3 produces, now all read -->
+        <rect x="250" y="140" width="200" height="196" class="d-okb" rx="2"/>
+        <text x="264" y="162" class="d-sub">L3 produces, all read:</text>
+        <text x="264" y="184" class="d-okt">LocalPhasePlan · MeshPhasePlan</text>
+        <text x="264" y="202" class="d-okt">DataStreamPlan · BlockPlan</text>
+        <text x="264" y="220" class="d-okt">GeometryPlan · GeometryVariantPlan</text>
+        <text x="264" y="238" class="d-okt">LocalKernelPlan · MeshKernelPlan</text>
+        <text x="264" y="256" class="d-okt">CRS · BSR · BlockDiagSym assembly</text>
+        <text x="264" y="278" class="d-okt">EvaluationStrategy · ApplyVariantPlan</text>
+        <text x="264" y="300" class="d-dim">DIA · COO · Patch plans deleted</text>
+        <text x="264" y="326" class="d-okt">0 of 10 read by no emitter</text>
         <path d="M350,140 L350,110" class="d-gline" stroke-dasharray="4 4"/>
 
-        <!-- what the emitter re-derives -->
+        <!-- what the emitter still originates -->
         <rect x="600" y="140" width="316" height="196" class="d-gapb" rx="2"/>
-        <text x="616" y="162" class="d-name">decided inside the emitter</text>
+        <text x="616" y="162" class="d-name">still originated in the emitter</text>
         <text x="616" y="186" class="d-sub">loop nest and bounds</text>
         <text x="616" y="204" class="d-sub">scope hoisting and temporaries</text>
-        <text x="616" y="222" class="d-okt">data streams and layout  ✓ moved to L3</text>
-        <text x="616" y="240" class="d-sub">gather / scatter shape</text>
-        <text x="616" y="258" class="d-sub">affine vs. isoparametric geometry</text>
-        <text x="616" y="276" class="d-sub">matrix-format scatter (CRS ✓ from plan)</text>
-        <text x="616" y="294" class="d-sub">target syntax — <tspan class="d-gapt">_target() → OpenMPTarget()</tspan></text>
-        <text x="616" y="322" class="d-gapt">each one belongs in L3, L4 or L5</text>
+        <text x="616" y="222" class="d-sub">gather / scatter shape</text>
+        <text x="616" y="240" class="d-sub">which form is being emitted (energy side)</text>
+        <text x="616" y="262" class="d-okt">streams · layout · geometry · variants  ✓ from plans</text>
+        <text x="616" y="288" class="d-gapt">200 decision branches</text>
+        <text x="616" y="308" class="d-gapt">energy_codegen 99 · residual_codegen 93 · rest 8</text>
         <path d="M840,140 L840,110" class="d-gline" marker-end="url(#a2)"/>
 
-        <!-- IR bypassed -->
-        <rect x="24" y="140" width="180" height="90" class="d-gapb" rx="2"/>
+        <!-- IR -->
+        <rect x="24" y="140" width="180" height="90" class="d-partb" rx="2"/>
         <text x="38" y="162" class="d-name">ir/ (L4)</text>
-        <text x="38" y="182" class="d-sub">KernelAST · 930 LOC</text>
-        <text x="38" y="202" class="d-gapt">every residual kernel; energy started</text>
-        <text x="38" y="220" class="d-dim">energy path uses 4 fragments</text>
+        <text x="38" y="182" class="d-sub">KernelAST · 34 node kinds</text>
+        <text x="38" y="202" class="d-okt">every residual kernel is a tree</text>
+        <text x="38" y="220" class="d-gapt">1 pass, an analysis; no transform</text>
 
-        <text x="24" y="376" class="d-dim">The chain along the top is correct and enforced. Everything below it is the gap: one layer describing the kernel, another re-deriving it.</text>
+        <text x="24" y="376" class="d-dim">The duplication the previous pass described is closed: nothing is described twice by a plan nobody reads. What is left is direction.</text>
         <line x1="24" y1="396" x2="916" y2="396" class="d-rule"/>
-        <text x="24" y="420" class="d-sub">Consequence: a CUDA residual kernel is a fork, not an argument; a new matrix format is a new string template;</text>
-        <text x="24" y="440" class="d-sub">a vectorization or blocking change has nowhere to live but inside 10,074 lines of print statements.</text>
+        <text x="24" y="420" class="d-sub">Consequence: a CUDA residual kernel is still a fork rather than an argument, and a vectorization or blocking</text>
+        <text x="24" y="440" class="d-sub">change still has nowhere to live but inside two modules of 9,963 and 8,783 lines.</text>
       </svg>
     </div>
-    <figcaption><b>Figure 3.</b> The top row is the architecture working: a closed collection, a planning layer, a narrow model, an emitter. Below it, the same kernel is described twice — once by plan objects nobody reads, once by control flow inside the emitter. <b>Closing that duplication is the whole of the remaining work.</b></figcaption>
+    <figcaption><b>Figure 3.</b> The same figure as the last pass, with its middle panel inverted. Ten structural plans, ten readers; the decisions the emitters make are now measured directly rather than inferred from what they ignore. <b>The remaining work is that the emitter still originates what the plans describe</b> — and the energy emitter, which has never had a decision taken out of it in bulk, is now the larger half.</figcaption>
   </figure>
 
-  <h3>Where it stands after the IR work</h3>
-  <p>The kernel IR went from a well-formed subsystem nobody called to the thing every residual kernel is made of. Three measures moved, and three did not, and the ones that did not are the more informative half.</p>
+  <h3>Where it stands now</h3>
+  <p>The same measures as the last pass, carried forward. Three of them moved a long way, two moved backwards for reasons worth reading, and one did not move at all.</p>
   <div class="tbl-wrap">
   <table>
-    <tr><th>Measure</th><th>Before</th><th>Now</th><th>Reading</th></tr>
-    <tr><td>IR node kinds</td><td class="n">8</td><td class="n">34</td><td>function, block, loop header, return, conditional — each added for a shape real generated code already had</td></tr>
-    <tr><td>Residual kernels as trees</td><td class="n">0</td><td class="n">all</td><td>signature included; zero un-migrated bodies</td></tr>
-    <tr><td>Pragmas bypassing the target</td><td class="n">66</td><td class="n">28</td><td>the rest are structure or deprioritised formats</td></tr>
-    <tr><td><b>emitters/ lines</b></td><td class="n">22,727</td><td class="n">23,409</td><td><b>grew.</b> Node construction is longer than string appends; the layer that should be a printer got bigger</td></tr>
-    <tr><td><b>Structural plans unread</b></td><td class="n">10 of 13</td><td class="n">0 of 13</td><td><b>closed.</b> Every structural and assembly plan has a reader; connecting the last four found two of them describing streams their kernels do not have — OP 13</td></tr>
-    <tr><td><b>Decisions in emission</b></td><td class="n">428</td><td class="n">239</td><td><b>the headline measure.</b> Branches whose test reads planning-layer input, ratcheted shrink-only. Not headed for zero by design: a branch on how C spells a declaration is emission's own business</td></tr>
-      <tr><td><b>Answer-level coverage</b></td><td class="n">0</td><td class="n">148</td><td><b>new.</b> Kernels driven and digested across all 8 materials at two mesh sizes — the gate that replaces byte-identity once output changes on purpose</td></tr>
-      <tr><td><b>Passes over the IR</b></td><td class="n">0</td><td class="n">1</td><td><b>opened.</b> VectorizationContractPass runs in the printer's default pipeline — an analysis, not a transform, so the layer is reachable but still holds no optimization</td></tr>
+    <tr><th>Measure</th><th>Sept 3</th><th>Now</th><th>Reading</th></tr>
+    <tr><td>IR node kinds</td><td class="n">34</td><td class="n">34</td><td>unchanged; the IR was not the work this pass</td></tr>
+    <tr><td>Residual kernels as trees</td><td class="n">all</td><td class="n">all</td><td>signature included; zero un-migrated bodies</td></tr>
+    <tr><td>Pragmas bypassing the target</td><td class="n">28</td><td class="n">24</td><td>ratcheted down as the scope reduction removed scatter helpers — 15 residual, 9 energy</td></tr>
+    <tr><td><b>emitters/ lines</b></td><td class="n">23,409</td><td class="n">24,027</td><td><b>grew again</b>, and the split moved: <code>energy_codegen.py</code> is now 9,963 and <code>residual_codegen.py</code> 8,783. Line count remains the wrong measure, which is why the row below exists</td></tr>
+    <tr><td><b>Structural plans unread</b></td><td class="n">0 of 13</td><td class="n">0 of 10</td><td><b>held.</b> Three of the thirteen — the DIA, COO and patch assembly plans — stopped existing with their formats rather than gaining readers</td></tr>
+    <tr><td><b>Decisions in emission</b></td><td class="n">239</td><td class="n">200</td><td><b>the headline measure.</b> Ratcheted shrink-only, and it twice rejected a change that worked. Not headed for zero by design: a branch on how C spells a declaration is emission's own business</td></tr>
+    <tr><td><b>Answer-level coverage</b></td><td class="n">148</td><td class="n">724</td><td><b>the gate that replaced byte-identity.</b> 724 kernel measurements over 366 distinct kernels in six element/refinement buckets, including 2D (TRI3, QUAD4) and TET4 buckets that did not exist before</td></tr>
+    <tr><td><b>Passes over the IR</b></td><td class="n">1</td><td class="n">1</td><td><b>did not move.</b> <code>VectorizationContractPass</code> is still the only one, and still an analysis. Every optimization the PRD asks for has nowhere else to live</td></tr>
+    <tr><td><b>Generated files that ship</b></td><td class="n">520</td><td class="n">313</td><td><b>new, and deliberate.</b> A scope cut: five materials, three matrix formats and the non-default elements left the generated tree without leaving the framework</td></tr>
+    <tr><td><b>Public C ABI entry points</b></td><td class="n">690</td><td class="n">372</td><td>the runtime-typed ABI is complete on the public surface — <b>zero <code>_float</code> entry points remain</b>. The 832 <code>_float</code> kernel bodies behind it are stage two, still open</td></tr>
   </table>
   </div>
-  <p><b>The shape is right; the direction of data flow is not.</b> L3 computes the structure, L4 can now represent it, L6 prints it — and L6 still originates it. That is the same defect found and fixed twice in narrow places this session: the scheduler computed <code>hoist_scope</code> and the emitters re-derived the loop nest by hand; the driver selected a target and the emitters constructed their own. Both are closed. The general case is not.</p>
-  <p>Converting strings to nodes was a prerequisite for plan-driven emission, not a substitute for it, which is why the unread-plans measure correctly refused to move all the way through this work.</p>
+  <p><b>The shape is right; the direction of data flow is not.</b> L3 computes the structure, L4 can represent it, L6 prints it — and L6 still originates it. That has not changed, and it is the same defect that keeps being fixed one narrow place at a time: the scheduler computed <code>hoist_scope</code> and the emitters re-derived the loop nest; the driver selected a target and the emitters built their own; the geometry policy was a plan and four sites in the energy emitter each spelled it again. Each instance closes. The general case is open.</p>
+  <p><b>What did change is the gate.</b> For most of this branch every step was proved by byte-identity across the generated tree, which settles correctness and performance at once and is why so much could be moved so fast. That gate has now been spent: closed-form simplex kernels, a collapsed ABI and a narrowed scope all change the output on purpose. What replaces it is answer-level — kernels driven on real meshes and digested, with parity between variants and a throughput comparison — and it is weaker, slower and the thing to keep investing in. The <code>check-tree</code> gate is the other half of the same lesson: the framework was six weeks ahead of the tree the build compiles, and nothing was comparing them.</p>
 </section>
 
 <!-- ============================ PART 3 ============================ -->
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Twenty, ordered by what unblocks what. Two are closed and one is under way since this document was written. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Twenty-five, ordered by what unblocks what. Four are new since the last pass, and two of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 24</div>
+    <div class="body">
+      <div class="op-title">The shipped tree had stopped being regenerated, and nothing was checking <span class="chip c-ok">closed — <code>check-tree</code> gates it now</span></div>
+
+      <p><b>The finding.</b> <code>frontend/ops/generated/</code> is globbed into <code>libsfem</code> by <code>CMakeLists.txt</code> and is never regenerated by the build, so it is what actually ships. Six weeks of generator work had not reached the binary: of the 374 paths the tree shared with the snapshot manifest, <b>195 were byte-identical and 179 were not</b>. Both existing gates — <code>verify</code> and <code>check</code> — ask whether the generator still agrees with a record of itself, which cannot detect a tree that simply stopped being regenerated.</p>
+
+      <p><b>What it had been hiding.</b> A scalar Laplacian written as an energy whose BSR scatter declared <code>N_FIELD_COMPONENTS = dim</code> — right for a displacement, which was every energy material the framework had, and wrong for a scalar field. The scatter indexed a 4&times;4 element matrix as if it were 12&times;12: out of bounds by nine times its own size, producing values around 1e+210 and garbage that moved between CRS and BSR when the thread count changed. Four separate sites in the energy wrapper and scatter emitters spelled the component count as <code>dim</code>. <code>scalar_potential</code>, the only other scalar material, had the same defect.</p>
+
+      <p><b>The gate.</b> <code>codegen_snapshot check-tree</code> regenerates into a temporary directory and compares against the shipped tree, exiting non-zero with a unified diff and the command that fixes it. Six paths are exempt and listed: the four <code>.cuh</code> headers, which only <code>generators.cuda</code> writes and only under <code>SFEM_GENERATE_CUDA=1</code>, and the registration unit, which is manifest-driven and hand-edited. It was verified in both directions — it passes on the tree as committed and fails, naming the file, when one comment is appended to a generated source. A test pins the exemption list at six root-level files, because an entry quietly added there would hide exactly the class of drift the gate exists to catch.</p>
+
+      <p><b>The general lesson, which is the reason this stays on the list.</b> Every other gate on this branch compares the generator against a record of the generator. This is the only one that compares it against the artifact a user receives, and it is the one that found a wrong answer. Any future gate should be asked which of the two it is.</p>
+
+      <div class="op-facts"><span><i>tree paths byte-identical before</i> 195 of 374</span><span><i>exempt paths</i> 6, pinned</span><span><i>manifest</i> 307 paths</span><span><i>runs behind</i> SFEM_CODEGEN_TREE=1</span><span><i>found</i> a wrong answer, not a drift</span></div>
+    </div>
+  </div>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 23</div>
+    <div class="body">
+      <div class="op-title">The generated surface was cut on purpose <span class="chip c-ok">closed — 623 files &rarr; 313</span></div>
+
+      <p>A scope reduction taken while the framework is being reworked, on the principle that a capability the framework has and the tree does not carry is cheaper to maintain than one that ships. <b>Nothing here removes a capability from the framework, only from what the shipped tree carries by default.</b></p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>axis</th><th>default</th><th>still reachable</th></tr>
+        <tr><td>elements</td><td>TRI3 · QUAD4 · TET4 · TET10 · HEX8, with PROTEUS_QUAD4 and PROTEUS_HEX8 beside their bases</td><td><code>sfem_supported_element_types()</code> is untouched: TRI6, HEX27 and the higher PROTEUS elements generate on <code>--element</code></td></tr>
+        <tr><td>materials</td><td>8 generated by <code>regenerate_all.sh</code></td><td>5 generator scripts kept and not run by default: stokes, poro_hyperelasticity, scalar_potential, saint_venant_kirchhoff, modified_mooney_rivlin</td></tr>
+        <tr><td>matrix formats</td><td>CRS · BSR · BlockDiagSym</td><td><b>none</b> — DIA, COO and patch are deleted outright, with their three assembly plans, their scatter emitters and the <code>hessian_dia</code>/<code>hessian_coo</code>/<code>hessian_patch</code> methods the Op wrappers declared whether or not a material asked for them</td></tr>
+      </table>
+
+      <p><b>The cut exposed a latent bug, which is the argument for doing it.</b> In <code>_hyperelastic_op</code> and its residual twin, <code>collection = form_collections[dim]</code> sat inside <code>if dependencies is None</code>, so on the second element of a dimension it kept whatever collection the previous iteration had left behind. With the full element list this never fired, because that list happened to be ordered 2D-first. With the narrowed list, <code>PROTEUS_QUAD4</code> is appended after the 3D elements, so every 2D dispatch read its component count from the 3D collection and generation aborted on its own wrapper check. A latent ordering dependency in the generator was invisible for as long as the input happened to be sorted the right way.</p>
+
+      <p><b>What follows from it, and is not done.</b> The reproducibility baseline still carries recorded digests for five materials that are no longer generated by default — <code>saint_venant_kirchhoff</code>, <code>modified_mooney_rivlin</code>, <code>scalar_potential</code>, <code>poro_elasticity</code> and <code>stokes</code>, 239 of the 724 records. They are history rather than coverage, and the gate does not currently distinguish the two.</p>
+
+      <div class="op-facts"><span><i>generated files</i> 623 &rarr; 313</span><span><i>materials by default</i> 8</span><span><i>matrix formats</i> 6 &rarr; 3</span><span><i>capability removed</i> only the three formats</span><span><i>latent bug found</i> 1, ordering-dependent</span><span><i>stale baseline records</i> 239 of 724</span></div>
+    </div>
+  </div>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 22</div>
+    <div class="body">
+      <div class="op-title">Partial assembly is a generated kernel variant, on the C ABI <span class="chip c-part">built and measured; one material declares it</span></div>
+
+      <p>The framework now generates a second form of the Jacobian action alongside the exact matrix-free one: <b>precompute the compressed element tangent, store it, and have the apply read it</b> instead of the Jacobian and the state. It is reached through <code>inexact_apply</code> on the material and <code>--inexact-apply/--no-inexact-apply</code> on the generator, it appears on the public C ABI as its own entry points, and <code>Op</code> declares <code>inexact_supported</code> and <code>inexact_update</code> so a solver can ask for it.</p>
+
+      <p><b>It is measured rather than argued.</b> On Neo-Hookean Ogden at 1.04&times;10<sup>7</sup> dof, eight threads of an M1, the stored variant reaches <b>219.6 MDOF/s on quadratic tetrahedra against 137.4</b> for a hand-optimised reference, and HEX8 is at parity. Break-even is below 1.2 applications per assembly. On one node of a GH200 (72 Arm Neoverse-V2 cores, CSCS Alps) at 2.07&times;10<sup>5</sup> dof it scales <b>73.5&times;</b> against the exact matrix-free path's 69.4&times; — essentially linear, which refuted an earlier reading that attributed a plateau to the scatter.</p>
+
+      <p><b>Two corrections the work produced, both worth keeping.</b> A projected variant was measured first and is slower on every element it can reach, so it was dropped rather than kept as an option. And a TET10 "non-convergence" attributed to the approximation turned out to be the metric — the approximation was fine and the measurement was not.</p>
+
+      <p><b>What is open.</b> One material declares it. Whether the split is a per-element choice the plan layer should make for every material, rather than a flag set on one, is the question this entry holds; it is the same shape as every other axis in Part 2 that emission still decides.</p>
+
+      <div class="op-facts"><span><i>ABI entry points</i> 36</span><span><i>materials declaring it</i> 1</span><span><i>TET10, 1.04e7 dof, M1 &times;8</i> 219.6 vs 137.4 MDOF/s</span><span><i>Grace 72 cores, 2.07e5 dof</i> 73.5&times;</span><span><i>break-even</i> &lt; 1.2 applies per assembly</span><span><i>written up</i> docs/partial_assembly.tex</span></div>
+    </div>
+  </div>
+
+  <div class="op decide">
+    <div class="rail"></div><div class="num">OP 21</div>
+    <div class="body">
+      <div class="op-title">Laplace is written as an energy now, and the energy path still decides its own geometry <span class="chip c-part">migrated; two metric tests still fail</span></div>
+
+      <p>Laplace was the framework's canonical residual material and is now written as an energy, which is what made OP 20's claim testable: if the two front ends lower to one form algebra, the simplest operator in the framework can be written either way and produce the same kernels. Getting there took the field's arity through <code>N_FIELD_COMPONENTS</code>, the ABI, the wrapper and the Op's <code>create</code>, which had required <code>block_size == spatial_dimension</code> — right for a displacement, wrong for a scalar.</p>
+
+      <p><b>It is not finished, and the failure is diagnostic rather than incidental.</b> The energy path decides whether a kernel takes the cached metric by calling <code>cached_metric_geometry</code> from four sites inside <code>energy_codegen.py</code> rather than through a plan node. <code>GeometryVariantPlan</code> now states that rule once and the emitters read it, but the metric <em>transform phase</em> is still not planned while the wrapper binds the metric, so the two <code>*_laplace_uses_metric_specialized_simplex_kernel</code> tests fail. They are asserting the plan-side shape the residual path already has. The answer is correct; the decision is in the wrong layer, and the test is reporting the layering rather than the arithmetic.</p>
+
+      <div class="op-facts"><span><i>failing tests</i> 2, both plan-shape</span><span><i>sites deciding the metric</i> 4, in emission</span><span><i>plan that should answer it</i> GeometryVariantPlan</span><span><i>defect this exposed</i> OP 24's component count</span></div>
+    </div>
+  </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 20</div>
     <div class="body">
-      <div class="op-title">Energy and residual must lower to one form algebra <span class="chip c-part">1a done; 1b stopped &mdash; the split is contraction mode</span></div>
+      <div class="op-title">Energy and residual must lower to one form algebra <span class="chip c-part">the vocabulary is shared; the contraction still is not</span></div>
 
       <p><b>The requirement.</b> Both formulations lower to the same three objects &mdash; 0-form (energy, or a residual-based merit), 1-form (gradient, or the negated residual), 2-form (Hessian, or the Jacobian) &mdash; and nothing below the form layer distinguishes them.</p>
 
@@ -597,14 +667,17 @@
 
       <p>That is what OP 18 found from the other end. The compact expanded form exists only as hand-written C transcribed into the emitter for the Laplacian, behind a six-condition gate, with the material special-cased by name on three element families. <code>tests/test_contraction_mode.py</code> pins the present coupling between contraction shape and formulation, so the day it stops being true is a test failure rather than a rediscovery.</p>
 
-      <div class="op-facts"><span><i>FormOrder in emitters</i> 0</span><span><i>parallel-state consumers</i> 49 / 8 files</span><span><i>form-accessor consumers</i> 19 / 5 files</span><span><i>emitters</i> 18,854 lines</span><span><i>decisions they hold</i> 231 of 233</span><span><i>strategy departures</i> 20, all rule two</span><span><i>rule one</i> met, twice over</span></div>
+      <p><b>Since the last pass, the vocabulary moved and the mathematics did not.</b> <code>plans/form_emission.py</code> states the correspondence the two front ends already had &mdash; <code>objective</code> is the 0-form, <code>gradient</code> the 1-form, <code>apply</code> the 2-form &mdash; and eighteen of the string comparisons that had been asking <code>form.name == "objective"</code> now ask <code>writes_per_shape</code>, which follows from the order rather than from the name. An undeclared kernel name raises instead of being guessed. Three <code>form.name ==</code> tests survive, from thirty-seven.</p>
+      <p>The 0-form itself became real on the residual side across five commits: a residual with no potential still has one, a mixed material computes <em>one</em> residual merit rather than two kinds of scalar, and <code>value</code> is <code>value_steps</code> at &alpha;&nbsp;=&nbsp;0, so there is one 0-form kernel rather than two. Stokes and two-phase flow have theirs. And laplace &mdash; the canonical residual material &mdash; is now written as an energy, which is OP 21.</p>
+      <p><b>What has not moved is the finding that stopped phase 1b.</b> A residual 1-form is a weak form whose contraction is finished before emission sees it; an energy 1-form is <code>dE/dF</code>, contracted against the test functions afterwards, and <em>that</em> contraction is sum-factorised. Nothing since has changed that, and the correct response to it is OP 18 rather than a unification: make the evaluation strategy follow the element, and the two paths converge because they stop needing to differ.</p>
+      <div class="op-facts"><span><i>FormOrder named in emitters</i> 0</span><span><i>form_order / writes_per_shape sites</i> 20</span><span><i>form.name string tests</i> 37 &rarr; 3</span><span><i>emitters</i> 18,746 lines in two modules</span><span><i>decisions they hold</i> 192 of 200</span><span><i>strategy departures</i> closing &mdash; see OP 18</span></div>
     </div>
   </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 19</div>
     <div class="body">
-      <div class="op-title">The mesh geometry a kernel takes is now the plan's decision <span class="chip c-ok">done &mdash; 239 &rarr; 233</span></div>
+      <div class="op-title">The mesh geometry a kernel takes is now the plan's decision <span class="chip c-ok">done &mdash; and extended to the variant cross-product</span></div>
 
       <p>Choosing the next step by measurement rather than by feel: of the 239 decisions left in emission, <b>231 are in the two big emitters</b>, and they split cleanly by what they read. The residual emitter's 126 are dominated by <code>dependencies</code> (74), testing exactly the flags the plan layer already answers &mdash; <code>current</code>, <code>direction</code>, <code>previous</code>, <code>uses_adjugate</code>. The energy emitter's 110 are dominated by <code>form</code> (65), testing <code>name</code> and <code>weak_form</code>, for which <b>no plan exists</b>. So the residual side was ready and the energy side needs design first; this took the ready one.</p>
 
@@ -614,14 +687,16 @@
 
       <p>All 505 files byte-identical at every step, so nothing about the generated code moved &mdash; only where the decision lives. The wrapper also stops recomputing <code>dim * (dim + 1) / 2</code> for itself and reads the plan's count, which is the arithmetic both sides previously agreed on only by coincidence.</p>
 
-      <div class="op-facts"><span><i>decisions</i> 239 &rarr; 233</span><span><i>sites unified</i> 25 + 4 + 1</span><span><i>byte-identical</i> 505 of 505</span><span><i>next, and it needs design</i> energy's 65 form branches</span></div>
+      <p><b>Extended since.</b> <code>plans/geometry_variants.py</code> now owns the whole cross-product an operator publishes &mdash; form &times; geometry &times; mesh layout &times; precision &mdash; which four guards inside <code>energy_codegen.py</code> had each been spelling separately. Its policy is written down with the reasoning rather than the rule: a constant-P1 simplex has a Jacobian constant over the cell, so its isoparametric kernel computes what its affine kernel computes more slowly and emitting both doubles the bodies for nothing; the cached metric replaces the adjugate where the contraction factors through it; and two dimensions carries the standard-layout kernels only, which is flagged as a scope decision rather than a mathematical one.</p>
+      <p><b>The consumption of it is the interesting part, because the first attempt was rejected.</b> Gating packed emission on <code>if plan.emits_packed</code> worked &mdash; 2D lost 35,652 lines, 3D was untouched, the build and all 43 ctest tests passed &mdash; and <code>test_emission_is_a_printer</code> went from 200 branches to 201. The ratchet was right: a branch reading a plan is still emission choosing what to emit. The accepted form exposes <code>packed_mesh_layouts</code> as a <em>sequence</em>, empty in 2D and one long in 3D, which the emitter iterates. An element that publishes no packed kernels does not enter the loop, and nothing at the point of emission decides anything. That is the shape the rest of OP 1 should take.</p>
+      <div class="op-facts"><span><i>decisions</i> 239 &rarr; 200</span><span><i>sites unified</i> 25 + 4 + 1, then 4 more</span><span><i>2D packed entry points</i> removed, 42,133 lines</span><span><i>rejected form</i> a flag; <i>accepted form</i> a sequence</span><span><i>3D</i> untouched</span></div>
     </div>
   </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 18</div>
     <div class="body">
-      <div class="op-title">Low-order Laplacian and elasticity want CSE expanded, and one of them already has it &mdash; as frozen text <span class="chip c-part">analysed; the plan is the work</span></div>
+      <div class="op-title">Low-order Laplacian and elasticity want CSE expanded, and one of them already has it &mdash; as frozen text <span class="chip c-part">built for the Laplacian shape; elasticity is the remaining half</span></div>
 
       <p>The requirement is that the simplest and most important kernels &mdash; Laplacian and linear elasticity on low-order elements &mdash; expand their common subexpressions rather than sharing them, so the emitted code is small and the register footprint minimal. A shared subexpression is a value live in a register from its definition to its last use; for a low-order element the expression it names is tiny and cheap to recompute, so naming it buys almost no arithmetic and lengthens live ranges across a loop the compiler is trying to vectorise. This is the register-pressure mechanism OP 15 measured, pointing the other way.</p>
 
@@ -653,14 +728,49 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
 
       <p><b>This is measurable now, which it was not an hour ago.</b> The reproducibility harness reaches TET4 and drives ten laplace kernels including the metric family, with a recorded baseline and throughput saturating by refine=24. Whether expansion pays, and where it stops paying as the element order rises, is a measurement rather than an argument &mdash; and OP 15 is the standing warning that the intuition can be wrong in either direction.</p>
 
-      <div class="op-facts"><span><i>laplace TET4</i> 389 temps</span><span><i>vs neohookean TET4</i> 186</span><span><i>hand-written kernel lines</i> 28</span><span><i>gate conditions in emission</i> 6</span><span><i>elasticity low-order</i> no fast path</span><span><i>gate</i> TET4, 10 kernels</span></div>
+      <p><b>This is the open point that moved furthest, and it moved in the order the entry asked for: plan first, then derive, then measure.</b></p>
+
+      <p><b>The strategy became a plan.</b> <code>plans/evaluation_strategy.py</code> takes the element and returns <code>SUM_FACTORIZED</code>, <code>EXPANDED</code> or <code>QUADRATURE</code>. It takes no dependencies, no form and no <code>FormKind</code> &mdash; which is the entire point, because a strategy cannot track the formulation if the formulation is not an argument. Five sites in the energy emitter print the scope the element&rsquo;s strategy calls for, and quadrature loops on TET4 and TRI3 fell from <b>156 to 16</b>. The four sites deliberately left alone are recorded with their reasons: two serve tensor-product elements only, one is never reached for TRI3 or TET4, and two write a header that TRI3 and TRI6 share.</p>
+
+      <p><b>The applicability test stopped being the answer written as a question.</b> Whether an element can read a cached metric had been decided by asking whether its flux is a uniform scalar multiple of the field gradient &mdash; true of the Laplacian and of nothing else, so the metric path reached exactly one operator by construction. <code>plans/loperand.py</code> asks the structural question instead: written as a contracted <code>loperand</code>, an affine element&rsquo;s operator is a linear map from the reference-gradient coefficients to the outputs, and the question is whether that map&rsquo;s matrix is free of the gradient and symmetric. What it finds is now in tests:</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>material</th><th>isolated map</th><th class="n">components</th><th>carries</th></tr>
+        <tr><td>laplace · scalar_potential</td><td>3&times;3 symmetric</td><td class="n">6</td><td><code>kappa</code></td></tr>
+        <tr><td>linear_elasticity</td><td>9&times;9 symmetric</td><td class="n">45</td><td><code>mu</code>, <code>lambda</code></td></tr>
+        <tr><td>stokes</td><td>12&times;12 symmetric</td><td class="n">78</td><td><code>mu</code></td></tr>
+        <tr><td>two_phase_flow</td><td>isolatable, not symmetric</td><td class="n">&mdash;</td><td>the state</td></tr>
+        <tr><td>saint_venant_kirchhoff · neohookean_ogden</td><td colspan="3">not isolatable &mdash; the map depends on the gradient</td></tr>
+      </table>
+
+      <p>Two consequences the old condition could not express: the material parameters ride <em>inside</em> the isolated matrix rather than beside it (laplace&rsquo;s is <code>kappa * FFF</code> exactly, asserted entry by entry), which makes an element-varying coefficient representable rather than disqualifying; and a vector-valued operator isolates perfectly well and is simply expensive &mdash; 45 numbers per element against the adjugate&rsquo;s nine and a determinant, which is a cost comparison rather than a capability question. <b>That is the door to elasticity that the transcribed kernel could never open.</b></p>
+
+      <p><b>The kernel is derived now, not transcribed, and it is faster than the text it replaces.</b> The arithmetic is printed from <code>p1_simplex_metric_apply_plan</code>, which the energy and residual emitters both print, so the two formulations emit one kernel rather than two maintained copies. Six temporaries and four outputs on TET4 &mdash; the size of the hand-written kernel at a third of its operation count. The closed-form treatment then reached the mesh loop as well as the element body, and the packed traversal after it:</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>TET4, 15,625 dof (--refine 24), scalar field, M1</th><th class="n">MDOF/s</th><th class="n">repeat</th></tr>
+        <tr><td>scalar_potential gradient, affine SoA &mdash; blocked mesh loop</td><td class="n">21.7</td><td class="n">20.7</td></tr>
+        <tr><td>scalar_potential gradient, affine SoA &mdash; closed-form mesh loop</td><td class="n"><b>43.7</b></td><td class="n"><b>44.4</b></td></tr>
+        <tr><td>laplace as a residual, hand-written <code>_aos_unit</code></td><td class="n">40.7</td><td class="n">44.1</td></tr>
+        <tr><td>packed affine &mdash; adjugate + block staging</td><td class="n">17.6</td><td class="n">18.1</td></tr>
+        <tr><td>packed affine &mdash; metric + closed form</td><td class="n"><b>45.4</b></td><td class="n"><b>45.4</b></td></tr>
+        <tr><td>packed affine &mdash; hand-written reference</td><td class="n">25.7</td><td class="n">26.1</td></tr>
+      </table>
+
+      <p>So the derived kernel is about twice the blocked one, at or above the hand-written <code>tet4_laplacian_apply_fff</code> it was meant to replace, and about 1.7&times; the hand-written packed reference &mdash; and packed is now the fastest layout on this element, 45.4 against 41.4 unpacked, which is the ordering the layout exists to produce. <b>Read the size before the ratio:</b> 15,625 dof is cache-resident on this machine, so these are kernel-quality numbers rather than a memory-bound comparison, and the same measurement at a saturating size has not been taken. Answers did not move &mdash; same arithmetic per element, same accumulation order, digests bit-identical on TET4 and TRI3 with packed/unpacked parity holding.</p>
+
+      <p><b>One trap recorded next to the enum, because it is the thing most likely to be got wrong.</b> &ldquo;Expanded&rdquo; refers to the loop and quadrature structure, not to the algebra. On the TET4 Laplacian element vector, contracting the metric and running CSE on the <em>factored</em> expression gives 3 temporaries and 45 operations; calling <code>sp.expand</code> first gives 15 and 50 &mdash; worse than the hand-written kernel it would replace. Expanding the algebra defeats the rule.</p>
+
+      <p><b>What is left.</b> Linear elasticity. <code>plans/loperand.py</code> says its map isolates &mdash; 45 symmetric components carrying <code>mu</code> and <code>lambda</code> &mdash; so the structural obstacle the entry named is gone, and what remains is the cost comparison: 45 stored numbers per element against nine adjugate components and a determinant, which is a measurement rather than an argument. The hand-written Laplacian kernel stays where it is; it is what said the first rows of the table above were not good enough.</p>
+
+      <div class="op-facts"><span><i>quadrature loops on TET4/TRI3</i> 156 &rarr; 16</span><span><i>plan</i> evaluation_strategy · loperand · affine_element_kernel</span><span><i>TET4 closed form</i> 6 temps, 4 outputs</span><span><i>speedup over blocked loop</i> ~2&times; at 15,625 dof</span><span><i>vs hand-written packed</i> ~1.7&times;</span><span><i>elasticity</i> isolates at 45 components &mdash; not yet built</span><span><i>unmeasured</i> the same kernels at a saturating size</span></div>
     </div>
   </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 17</div>
     <div class="body">
-      <div class="op-title">The precision axis multiplies the ABI, and should be a parameter <span class="chip c-part">stage 1 built; stage 2 open</span></div>
+      <div class="op-title">The precision axis multiplies the ABI, and should be a parameter <span class="chip c-part">stage 1 complete across the tree; stage 2 open</span></div>
 
       <p><b>Every kernel that touches scalar data is emitted twice.</b> <code>precision_axis()</code> returns <code>(double, "")</code> and <code>(float, "_float")</code>, and each emitter loops over it, so the generated tree carries a full second copy of every kernel that differs from the first in one line &mdash; <code>using scalar_t = float;</code> &mdash; and in the types of its field parameters. They are not two instantiations of a template; they are two written-out bodies.</p>
 
@@ -683,7 +793,7 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
 
       <p><b>Where the decision lives.</b> <code>precision_axis()</code> stops being an axis that multiplies symbols and becomes the list of runtime cases the switch spells &mdash; the same plan, read by emission for a different purpose, which is the shape OP 0 established for this axis when it was made plan-driven. The wrapper loses an axis outright: <code>package/op_wrappers.py</code> currently selects a symbol by precision and would instead pass a value.</p>
 
-      <p><b>Two things this must not break, and one gate that does not yet exist.</b> Byte-identity breaks by design here &mdash; this is precisely the case OP 14 built <code>tools/reproducibility.py</code> for, and the 148 kernel digests are the correctness statement that has to survive unchanged. The second is performance, and it is the real risk: the standing rule in this codebase is that nothing trades measured CPU throughput for cleanliness. Moving a kernel body behind a template and a runtime switch should be free &mdash; the switch runs once per call, outside the element loop, exactly where SFEM's CUDA operators put it &mdash; but "should be" is not a measurement, and inlining and vectorisation of these bodies are sensitive. <b>A throughput gate before and after, on the same machine, is a precondition for this change rather than a follow-up to it.</b></p>
+      <p><b>Two things this must not break, and one gate that does not yet exist.</b> Byte-identity breaks by design here &mdash; this is precisely the case OP 14 built <code>tools/reproducibility.py</code> for, and the reproducibility digests are the correctness statement that has to survive unchanged. The second is performance, and it is the real risk: the standing rule in this codebase is that nothing trades measured CPU throughput for cleanliness. Moving a kernel body behind a template and a runtime switch should be free &mdash; the switch runs once per call, outside the element loop, exactly where SFEM's CUDA operators put it &mdash; but "should be" is not a measurement, and inlining and vectorisation of these bodies are sensitive. <b>A throughput gate before and after, on the same machine, is a precondition for this change rather than a follow-up to it.</b></p>
 
       <p><b>The Op class mirrors <code>GPULaplacian</code>.</b> It declares <code>enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};</code> as a public member, carries it through <code>clone()</code>, and hands it to every kernel call alongside the buffers &mdash; whose interface types do not change, because the base <code>Op</code> methods take <code>real_t *</code> and a <code>real_t *</code> converts to <code>void *</code> at the call. That is exactly what <code>gpu_laplacian_block_vector</code> does. The generated Op has no <code>clone()</code> and keeps its state behind a pimpl, so the member is the one visible addition.</p>
 
@@ -719,14 +829,16 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
 
       <p><b>Open, and worth deciding before building stage two.</b> <code>SMESH_DEFAULT</code> maps to <code>real_t</code>, which in most builds is <code>double</code>, so mirroring SFEM gives three instantiations where there are two today &mdash; object size grows even as the ABI halves, unless <code>DEFAULT</code> is folded into the matching concrete case. And the material scalar moving to <code>real_t</code> is a small semantic change: a caller running in single precision currently hands these kernels a <code>float</code> parameter and would hand them a <code>real_t</code>.</p>
 
-      <div class="op-facts"><span><i>ABI</i> 1,124 &rarr; 690</span><span><i>on scalar-carrying symbols</i> exactly 2&times;</span><span><i>source</i> &minus;8.7 MB of 31.8</span><span><i>bodies collapsed</i> 2,332</span><span><i>form</i> cu_tet4_laplacian.cu</span><span><i>stage 1</i> built, 1,124 &rarr; 690</span><span><i>stage 2</i> 1 of 4 sites, gated</span><span><i>body sites</i> 4</span></div>
+      <p><b>Stage one is now complete on every material that ships.</b> <code>linear_elasticity</code> was the last to migrate, and the shipped tree carries <b>zero <code>_float</code> public entry points</b>: 372 declarations across seven <code>_c_abi.hpp</code> headers, every scalar-carrying one taking <code>const enum smesh::PrimitiveType</code> ahead of its <code>void *</code> buffers. The field&rsquo;s arity reaches the ABI and the wrapper with it, which is what let laplace cross as a one-component field rather than as a displacement.</p>
+      <p><b>Stage two is untouched and is where the source is.</b> 832 <code>_float</code> symbols remain inside the generated <code>.cpp</code> files as written-out bodies opening with <code>using scalar_t = float;</code>. Collapsing them means turning each into a <code>template &lt;typename scalar_t&gt;</code>, which is the inlining and vectorisation risk this entry was always about, and the throughput gate is still the precondition rather than the follow-up.</p>
+      <div class="op-facts"><span><i>public ABI</i> 1,124 &rarr; 372</span><span><i>_float entry points</i> 0</span><span><i>_float bodies left</i> 832</span><span><i>materials on the runtime ABI</i> all shipped</span><span><i>form</i> cu_tet4_laplacian.cu</span><span><i>stage 2</i> open, gate first</span></div>
     </div>
   </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 16</div>
     <div class="body">
-      <div class="op-title">L7 reconstructs the kernel ABI instead of being handed it <span class="chip c-part">contained and gated; the layering cause is open</span></div>
+      <div class="op-title">L7 reconstructs the kernel ABI instead of being handed it <span class="chip c-part">the two broken operators left the default scope; the cause is open</span></div>
 
       <p><b>Two operators had never compiled.</b> Stokes and poro-hyperelasticity emit wrappers that call their own kernels with the wrong number of arguments &mdash; two too many for Stokes on every residual and Jacobian action, six for poro. Not a subtle disagreement: <code>candidate function not viable: requires 16 arguments, but 18 were provided</code>, on eleven of the eleven materials&rsquo; worth of gates being green. The generated code for two materials could not be built at all, and the framework did not know.</p>
 
@@ -785,27 +897,30 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
 
       <p>Note why it hid. Add any tensor-product element to the same generation and the shared dimension-level entry point becomes the adjugate form, so the unconditional spelling is correct again. Every configuration the snapshot exercises has one, so the defect was invisible to a 505-file byte-identity gate that has been green throughout. Fixing it leaves all 505 files byte-identical and turns the TRI3-only build from five compile errors into zero &mdash; it changes output only where the output was already broken.</p>
 
-      <div class="op-facts"><span><i>operators that never compiled</i> 2 of 11</span><span><i>op_wrappers.py</i> 7,610 lines, 3 imports</span><span><i>call shape</i> from the element</span><span><i>dispatch ABI</i> declared</span><span><i>still parsed</i> kernel ABI</span><span><i>publication cost</i> 58 sites, 20 uniform</span><span><i>package</i> ranked L7</span><span><i>compile gate</i> 291 units, 0 errors</span><span><i>snapshot moved</i> 2 of 505</span><span><i>latent</i> boundary path</span><span><i>now refused at generation</i> arity mismatch</span><span><i>found by it</i> laplace TRI3/TET4</span></div>
+      <p><b>The two operators that had never compiled are Stokes and poro-hyperelasticity, and both left the default generation set with OP 23.</b> That removes the symptom and not the cause: <code>package/op_wrappers.py</code> is 8,760 lines and still reconstructs the kernel ABI by parsing rather than being handed it, so the next mixed-order material will meet the same wall. The arity mismatch is at least refused at generation now instead of at compile time, which is what caught the laplace TRI3/TET4 geometry-argument defect.</p>
+      <div class="op-facts"><span><i>operators that never compiled</i> 2 &mdash; both out of default scope</span><span><i>op_wrappers.py</i> 8,760 lines</span><span><i>still parsed</i> kernel ABI</span><span><i>cause</i> open</span><span><i>now refused at generation</i> arity mismatch</span><span><i>next material to hit it</i> any mixed-order one</span></div>
     </div>
   </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 0</div>
     <div class="body">
-      <div class="op-title">The matrix-free apply matrix <span class="chip c-part">verified end to end; 1 of 4 axes drives</span></div>
-      <p>The matrix-free action is the framework's primary product — <b>219 of the 520 generated files</b> — and every kernel is emitted several times over across four axes: mesh traversal, geometry mode, element data layout, and precision. Which combinations exist was written down nowhere; it was readable only by generating the output and looking at what came out.</p>
+      <div class="op-title">The matrix-free apply matrix <span class="chip c-part">2 of 4 axes drive; the rule survived a 40% cut to the tree</span></div>
+      <p>The matrix-free action is the framework's primary product — <b>219 of the then 520 generated files</b> — and every kernel is emitted several times over across four axes: mesh traversal, geometry mode, element data layout, and precision. Which combinations exist was written down nowhere; it was readable only by generating the output and looking at what came out.</p>
       <p><code>plans/apply_variants.py</code> now states the rule, verified against the real tree: <b>181 of 181 apply kernels predicted exactly</b> across all eleven materials. The rule has genuine content — AoS only ever appears with isoparametric geometry, and never for Taylor–Hood formulations, which is why poro-hyperelasticity and Stokes have no AoS variants at all; packed traversal applies to the Jacobian action only, never the residual; and packed isoparametric variants are skipped for TRI3 and TET4, whose isoparametric geometry <em>is</em> affine.</p>
       <p><b>The precision axis drives.</b> It was a literal tuple repeated seventeen times in one emitter; all seventeen now read the plan, and a test proves the difference between consulted and ignored by changing the plan and requiring the kernels to follow — drop a precision and its kernels vanish, add a third and a third full set appears. That is the precondition for the per-thread, per-warp and CUDA/HIP apply variants goal 8 asks for: adding a row is now a plan change.</p>
       <p><b>The other three axes are still decided by the emitters.</b> Precision was the one already expressed as a clean iteration; traversal, geometry and layout are branches woven through emission, and moving them is the harder half.</p>
-      <div class="op-facts"><span><i>apply kernels</i> 219 files · 181 kernels</span><span><i>axes driving</i> 1 of 4</span><span><i>gate</i> 9 variants, parity + digest + throughput</span></div>
+      <p><b>The layout axis now drives too</b>, through <code>GeometryVariantPlan.packed_mesh_layouts</code> &mdash; as a sequence the emitter iterates rather than a flag it tests, for the reason recorded in OP 19. Removing 2D&rsquo;s packed kernels was a plan edit, and the Op wrappers needed no change because their packed dispatch already skips a branch whose entry point does not exist. Traversal and geometry mode remain woven through emission.</p>
+      <p>The variant rule also survived the scope cut without amendment, which is the strongest evidence so far that it has real content: three matrix formats, five materials and most of the non-default elements left the tree, and the prediction still matches what comes out.</p>
+      <div class="op-facts"><span><i>axes driving</i> 2 of 4 &mdash; precision, layout</span><span><i>remaining</i> traversal, geometry mode</span><span><i>gate</i> 9 variants, parity + digest + throughput</span><span><i>rule</i> unchanged through the scope cut</span></div>
     </div>
   </div>
 
   <div class="op decide">
     <div class="rail"></div><div class="num">OP 1</div>
     <div class="body">
-      <div class="op-title">Move the emitters' decisions into L3 <span class="chip c-part">under way — dependency analysis done</span></div>
-      <p>The root open point. <code>residual_codegen.py</code> (10,074 lines) and <code>energy_codegen.py</code> (8,483) decide loop structure, scope placement, stream layout, gather and scatter shape and geometry policy while building strings. The plan types for all of it already exist and are unread.</p>
+      <div class="op-title">Move the emitters' decisions into L3 <span class="chip c-part">428 → 200; the energy emitter is now the larger half</span></div>
+      <p>The root open point. <code>residual_codegen.py</code> and <code>energy_codegen.py</code> &mdash; 8,783 and 9,963 lines today, from 10,074 and 8,483 &mdash; decide loop structure, scope placement, stream layout, gather and scatter shape and geometry policy while building strings. When this entry was opened the plan types for all of it already existed and none was read.</p>
       <p><b>Done: the analysis family.</b> <code>plans/streams.py</code> owns which field stream groups a kernel needs — the emitter keeps only how each is spelled in C. <code>plans/dependencies.py</code> owns dependency pruning: which roles are touched, which parameters survive, which coefficient entries are structurally zero. <code>plans/boundary_usage.py</code> owns whether a boundary form's coefficients reach for coordinates or current values, a question the emitter had been asking four times in two different shapes.</p>
       <p><b>Done: the layout family.</b> <code>plans/layout.py</code> takes 17 more functions — which shape function maps to which stream, where a field's components sit in a packed lane buffer, how tensor-product elements reorder into Cartesian order, and the mixed-order variants for Taylor–Hood. These decide the memory access pattern of every generated loop, and so whether the loads are unit stride.</p>
       <p>Measured effect: <b>the largest emitter contains zero free-symbol analysis</b>, down from six references, and its text-free helper count has fallen from 32 to 18. <code>residual_codegen.py</code> is 9,875 lines, from 10,074. The boundary emitter is down from eight symbol scans to two, both argument validation rather than planning.</p>
@@ -814,14 +929,16 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
       <p>The one site left out is <code>_simplex_metric_scalar_affine_aos_wrapper_lines</code>, deliberately. Its stream set is genuinely narrower — one field, current exclusive-or direction, no previous — because the specialization is only selected for forms shaped that way, and it spells its scalar type from the precision axis. Teaching the plan that shape would serve exactly one consumer, and the duplication argument that justified the other seventeen does not apply to a single site.</p>
       <p><b>Done: the field roles.</b> The largest single population of decisions in emission was one loop, unrolled. <code>if dependencies.current: …</code> followed by <code>if dependencies.previous: …</code>, the same pair rewritten wherever a block buffer is declared, a per-thread scratch slot is taken, a stream argument is named or a gather is emitted — 104 branches on the three roles. <code>live_field_roles</code> returns the roles the form reads in ABI order, each carrying the names that order implies: the suffix on its per-field arrays, the element stride before them, and its index, which is what the scratch slots key on. Seventeen sites iterate it, the three gather bodies included — those were not a clean pair, because the shared field-node index was declared inside whichever role came first, which as a loop is simply the first iteration.</p>
       <p>That conversion reaches further than the boundary work: the boundary sites built argument lists, these build the kernel body — gathers, buffers, scratch declarations — and byte identity across 520 files is what makes it safe to say they are unchanged. It also <b>surfaced a live defect</b>, recorded as OP 12: writing two roles as one statement exposed that <code>pack_current</code> and <code>pack_previous</code> are both allocated from thread-scratch slot 1, which two symmetric branches had made invisible.</p>
-      <p><b>Done: the assembly formats and the geometry values.</b> All six assembly plans drive their scatters, which took the unread count to zero — and found that two of them had been describing kernels that do not exist, recorded as OP 13. <code>plans/geometry_quantities.py</code> owns which per-point geometry a kernel reads: the offset, the determinant, the adjugate's components. Fourteen sites iterate it, and writing the derivation once showed that <code>uses_geometry_offset = uses_determinant or uses_adjugate</code> was <code>uses_determinant</code> restated, since the first already contains the second — a distinction that was never one.</p>
+      <p><b>Done: the assembly formats and the geometry values.</b> All six assembly plans of the time drove their scatters, which took the unread count to zero &mdash; three of the six have since been deleted with their formats — and found that two of them had been describing kernels that do not exist, recorded as OP 13. <code>plans/geometry_quantities.py</code> owns which per-point geometry a kernel reads: the offset, the determinant, the adjugate's components. Fourteen sites iterate it, and writing the derivation once showed that <code>uses_geometry_offset = uses_determinant or uses_adjugate</code> was <code>uses_determinant</code> restated, since the first already contains the second — a distinction that was never one.</p>
       <p>The three moves together take decision branches from 428 to 296, all byte-identical. <b>The two big emitters have swapped places:</b> <code>residual_codegen.py</code> is at 146 and <code>energy_codegen.py</code> at 142, so the module that has had no decision moved out of it is now the larger share of the problem — and it is a different problem. 74 distinct tests rather than one shape repeated, clustered on <i>which form is being emitted</i>: <code>form.name == "objective"</code>, <code>form.weak_form is None</code>, <code>quadrature_rule is None</code>. That is dispatch on a concept a layer above owns, which is the rule OP 5 would enforce, and unpicking it is OP 8's work rather than more of this.</p>
       <p><b>Done: the energy path starts moving.</b> Phase 2 of the convergence plan opened the emitter nothing had been taken out of. <code>_sfem_soa_block_function</code> turned out to be <i>two kernels wearing one name</i> — a quadrature kernel and a per-point kernel, chosen by asking <code>form.weak_form is not None</code> thirteen times through a 351-line body, returning different types from different early returns. Split into one dispatch and two named emitters, after which the conditions that followed collapse rather than move: the per-point kernel cannot have stream arrays or omit its reference basis, so it stops saying so.</p>
       <p>Then the guard that was not a decision at all. <b>Twenty-one places asked whether there was a quadrature rule</b> — three raising an error to say there had to be one, the rest quietly emitting a <code>GENERIC</code> element type, a zero quadrature order, function names without their element. Nothing produces any of it: the element entry point always passes the specialization's rule, and the nine helpers carrying the guard are private with no other caller. The rule is now established once at the boundary and refused when absent, and byte-identity is what proves the removed arms were unreachable. A precondition asserted from inside emission is the same defect as one tested there, only louder.</p>
       <div class="op-facts" style="margin:10px 0 14px"><span><i>phase 1</i> 428 → 296</span><span><i>phase 2 so far</i> 296 → 239</span><span><i>energy emitter</i> 142 → 105</span><span><i>residual emitter</i> 146 → 126</span><span><i>gate</i> byte-identical at all 19 steps</span></div>
       <p><b>Remaining: the rest of the structural family</b> — loop nest and bounds, scope hoisting, gather and scatter shape, and geometry mode. These are the genuinely hard ones: unlike everything moved so far, they are not code that lifts out whole but structure that exists only as the shape of the emitter's control flow. The mesh phases, for instance, are spread across six large emission functions, each interleaving gather and scatter with buffer declarations that depend on the dependency set. They are what OP 2 and OP 4 wait on.</p>
       <p><b>The measure had to be fixed before it could report any of this.</b> <code>test_emission_is_a_printer</code> counts branches in the emitters whose test reads planning-layer input, and it matched <code>'dependencies'</code> <i>quoted</i> inside the AST dump — so <code>state_dependencies</code>, <code>quadrature_rule</code>, <code>matrix_format_plan</code>, <code>stream_layout</code> and every other qualified name read as not-a-decision. 130 branches, 30% of the real population, were invisible; converting eight of them moved the number by exactly zero, which is how it was found. The measure now walks identifiers, the budget was re-baselined 298 → 412 once for that reason alone, and the boundary work then took it to 404. This is the second time on this branch that the metric rather than the code was the thing to fix — the first was counting emitter lines, which rose through the IR migration and scored progress as regression. A measure that cannot move is worse than none, because it certifies.</p>
-      <div class="op-facts"><span><i>emitters</i> 18,983 LOC in two modules</span><span><i>plans unread</i> 13 → 0</span><span><i>mesh boundary sites</i> 17 of 18 plan-driven</span><span><i>decision branches</i> 428 → 239, ratcheted</span><span><i>the two big emitters</i> 126 · 105</span><span><i>gate</i> byte-identity holds throughout</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed · test_emission_is_a_printer</span><span><i>still blocks</i> OP3 — OP2 done, OP4 under way</span></div>
+      <p><b>Since the last pass: 239 → 200, and the balance inverted.</b> <code>energy_codegen.py</code> holds 99 and <code>residual_codegen.py</code> 93, with 8 spread over the boundary emitter, the matrix-format emitter, the AST printer and <code>energy.py</code>. The energy emitter is now the larger share of the problem and it is a different problem — dispatch on <em>which form is being emitted</em>, for which OP 20's <code>form_emission</code> vocabulary is the precondition rather than the fix.</p>
+      <p><b>The ratchet earned its keep twice, and both times by rejecting working code.</b> A packed-emission gate and a geometry-variant flag each compiled, passed every functional test, and pushed the count from 200 to 201. In both cases the accepted form turned a flag the emitter tests into a sequence the emitter iterates. That distinction — <em>iterate what the plan says, do not ask it a question</em> — is the concrete technique this open point has been missing, and it should be the default shape for the structural family that remains.</p>
+      <div class="op-facts"><span><i>emitters</i> 18,746 LOC in two modules</span><span><i>plans unread</i> 0 of 10</span><span><i>decision branches</i> 428 → 200, ratcheted</span><span><i>the two big emitters</i> 99 energy · 93 residual</span><span><i>gate</i> byte-identity, where output must not move</span><span><i>ratchets</i> test_emitters_do_not_analyse · test_plans_are_consumed · test_emission_is_a_printer</span><span><i>technique</i> a sequence to iterate, not a flag to test</span></div>
     </div>
   </div>
 
@@ -832,28 +949,30 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
       <p>The defect was sharper than recorded here. The driver <i>already</i> mapped <code>KernelTarget.CUDA</code> onto a backend built with <code>CUDATarget</code>, and <code>KernelTarget.AVX512</code> onto one built with <code>AVX512Target</code>. That target reached a language check and the energy emitter, and nothing else: the residual emitters constructed their own <code>OpenMPTarget</code> and ignored it. A decision made in the right layer, discarded by the layer that needed it — the same shape as the scheduler's <code>hoist_scope</code>.</p>
       <p><code>targets/context.py</code> binds the target for the duration of an emission; backends bind theirs in <code>emit()</code>, and the four emitter modules that built their own now read it. Bound rather than threaded, on purpose: 112 call sites in 49 functions ask for a qualifier or a pragma, and none of them <i>chooses</i> a target, so 49 extra parameters would record plumbing rather than a decision.</p>
       <p>Proven by driving a probe target through the real backend: <b>39 of 90</b> lane-loop pragmas take the probe's spelling. The other 51 do not, because 66 pragmas were written as string literals that bypass the target — 35 converted, 31 under a shrink-only ratchet — 24 in the residual emitter, 11 more once <code>energy_codegen</code>'s leaf pragmas moved onto the <code>source_builder</code> it already receives. No generated output changes, because the AVX512 and ARM targets spell everything exactly as OpenMP does: the wiring was <i>dead rather than wrong</i>. The 31 that remain are held back by three distinct reasons, recorded in the ratchet: 7 are parallel regions with a work-sharing <code>for</code> inside, which are structure rather than spelling and would compile into a serial loop in a bare block if an accessor returned nothing; 7 sit in scatter helpers that take no builder; 1 is OpenMP-specific thread-scratch infrastructure; the other 16 are in the residual emitter, which has no accessor for them yet.</p>
-      <div class="op-facts"><span><i>cost as feared</i> 43 signatures</span><span><i>actual</i> one binding, four modules</span><span><i>literal pragmas</i> 66 → 28, ratcheted</span><span><i>gate</i> byte-identity holds</span></div>
-    </div>
-  </div>
-
-  <div class="op decide">
-    <div class="rail"></div><div class="num">OP 3</div>
-    <div class="body">
-      <div class="op-title">Make the six assembly plans drive assembly <span class="chip c-part">1 of 6 done</span></div>
-      <p><code>CRSAssemblyPlan</code>, <code>BSRAssemblyPlan</code>, <code>DIAAssemblyPlan</code>, <code>COOAssemblyPlan</code>, <code>PatchAssemblyPlan</code> and <code>BlockDiagSymAssemblyPlan</code> describe row pointers, column indices, block layout and accumulation policy. They were referenced in exactly three places: their definition, the facade re-export, and their own test.</p>
-      <p><b>CRS is converted.</b> <code>_scalar_crs_matrix_scatter_lines</code> takes the plan and spells what it defines; the plan's defaults are the names the kernels have always used, so the text is unchanged, but changing the plan now changes the kernel. The reduction policy goes through a helper that raises on a policy it cannot spell rather than silently emitting a plain add. The other five have the same shape.</p>
-      <p>The two-stage approach holds: consume the plans at byte-identical output first, which proves they describe what is actually emitted, and only then change what they say — which is where OP 6 becomes the blocker.</p>
-      <div class="op-facts"><span><i>done</i> CRS</span><span><i>remaining</i> BSR · DIA · COO · Patch · BlockDiagSym</span><span><i>stage 2 gate</i> OP 6</span></div>
+      <div class="op-facts"><span><i>cost as feared</i> 43 signatures</span><span><i>actual</i> one binding, four modules</span><span><i>literal pragmas</i> 66 → 24, ratcheted</span><span><i>gate</i> byte-identity holds</span></div>
     </div>
   </div>
 
   <div class="op ready">
+    <div class="rail"></div><div class="num">OP 3</div>
+    <div class="body">
+      <div class="op-title">Make the assembly plans drive assembly <span class="chip c-ok">done &mdash; 3 of 3, after three formats were deleted</span></div>
+      <p><code>CRSAssemblyPlan</code>, <code>BSRAssemblyPlan</code>, <code>DIAAssemblyPlan</code>, <code>COOAssemblyPlan</code>, <code>PatchAssemblyPlan</code> and <code>BlockDiagSymAssemblyPlan</code> describe row pointers, column indices, block layout and accumulation policy. They were referenced in exactly three places: their definition, the facade re-export, and their own test.</p>
+      <p><b>CRS is converted.</b> <code>_scalar_crs_matrix_scatter_lines</code> takes the plan and spells what it defines; the plan's defaults are the names the kernels have always used, so the text is unchanged, but changing the plan now changes the kernel. The reduction policy goes through a helper that raises on a policy it cannot spell rather than silently emitting a plain add. The other five have the same shape.</p>
+      <p>The two-stage approach holds: consume the plans at byte-identical output first, which proves they describe what is actually emitted, and only then change what they say — which is where OP 6 becomes the blocker.</p>
+      <p><b>Closed, and half of it by subtraction.</b> CRS, BSR and BlockDiagSym all drive their scatters. DIA, COO and patch were deleted with their formats in OP 23 — they had no caller, and the Op wrappers had been declaring <code>hessian_dia</code>, <code>hessian_coo</code> and <code>hessian_patch</code> unconditionally whether or not a material asked for them. Connecting the last of the survivors is what found OP 13.</p>
+      <div class="op-facts"><span><i>driving</i> CRS · BSR · BlockDiagSym</span><span><i>deleted</i> DIA · COO · Patch</span><span><i>stage 2 gate</i> OP 6</span></div>
+    </div>
+  </div>
+
+  <div class="op decide">
     <div class="rail"></div><div class="num">OP 4</div>
     <div class="body">
-      <div class="op-title">Route the residual path through <code>KernelAST</code> <span class="chip c-ok">under way — two kernels in</span></div>
-      <p><code>ir/kernel_ast.py</code> is a complete, well-formed kernel IR: typed loops with vectorization and tabulation strategies, buffers, gather and scatter nodes, geometry nodes, plus <code>KernelASTPass</code> and <code>KernelASTPassPipeline</code>. The residual path now builds nodes for <b>two kernel bodies</b> and for every statement helper feeding them, so the sympy-to-C bridge and the chain rule produce IR rather than text; the energy path still uses four fragments, and the pass pipeline is still referenced only from tests.</p>
+      <div class="op-title">Route the residual path through <code>KernelAST</code> <span class="chip c-part">the routing is done; the passes are not</span></div>
+      <p><code>ir/kernel_ast.py</code> is a complete, well-formed kernel IR: typed loops with vectorization and tabulation strategies, buffers, gather and scatter nodes, geometry nodes, plus <code>KernelASTPass</code> and <code>KernelASTPassPipeline</code>. The residual path builds nodes for every kernel body and for every statement helper feeding them, so the sympy-to-C bridge and the chain rule produce IR rather than text.</p>
       <p>Every optimization the PRD asks for — vectorization, unrolling, blocking, scratchpad packing, per-warp variants — is a pass over this IR. There is nowhere else for them to live, and today nothing to attach them to.</p>
-      <div class="op-facts"><span><i>IR</i> 930 LOC, ready</span><span><i>residual nodes built</i> 0</span></div>
+      <p><b>The routing half is finished and the useful half has not started.</b> Every residual kernel is a tree, signature included, across 34 node kinds; the energy path still uses four fragments. One pass runs in the printer&rsquo;s default pipeline, <code>VectorizationContractPass</code>, and it is an analysis rather than a transform. So the layer is reachable and holds no optimization &mdash; unchanged from the last pass, and the single row in Part 2 that did not move.</p>
+      <div class="op-facts"><span><i>IR</i> 1,211 LOC &middot; 34 node kinds</span><span><i>residual kernels as trees</i> all</span><span><i>energy path</i> 4 fragments</span><span><i>passes</i> 1, an analysis</span><span><i>transforms</i> 0</span></div>
     </div>
   </div>
 
@@ -878,13 +997,15 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
     </div>
   </div>
 
-  <div class="op ready">
+  <div class="op decide">
     <div class="rail"></div><div class="num">OP 7</div>
     <div class="body">
-      <div class="op-title">Triage the 23 pre-existing test failures <span class="chip c-ok">ready</span></div>
+      <div class="op-title">Triage the pre-existing test failures <span class="chip c-part">now 28, and the baseline argument no longer holds</span></div>
       <p>The suite has run at 10 failures and 13 errors throughout, an identical set at every step, and identical to the same suite on <code>nonlinearspmg</code>. They predate this work entirely. That made them a usable baseline, but "unchanged" is a weaker guarantee than "passing", and a genuine regression hiding inside a known-failing test would not be visible.</p>
       <p>Independent of the architecture, and can start immediately.</p>
-      <div class="op-facts"><span><i>10 failures · 13 errors · 8 skips</i></span><span><i>same on both branches</i></span></div>
+      <p><b>This has degraded, and the reason it matters is that the argument for tolerating it has gone.</b> The suite is 424 tests at 16 failures, 12 errors and 9 skips. The set is no longer identical at every step: some of the new failures are diagnostic and known — the two <code>*_laplace_uses_metric_specialized_simplex_kernel</code> tests are reporting OP 21's layering, and <code>test_the_op_declares_the_inexact_methods</code> follows OP 22 — but "unchanged from a baseline" stopped being checkable once the baseline started moving. A genuine regression hiding inside a known-failing test is now more likely, not less.</p>
+      <p>One flake is recorded rather than diagnosed: <code>test_generated_block_diag_sym_hessian_for_neohookean_and_linear_elasticity</code> failed once in a full-suite run and passed in the next, in isolation, and in every pairing tried against the modules most likely to share state with it.</p>
+      <div class="op-facts"><span><i>suite</i> 424 tests</span><span><i>now</i> 16 failures · 12 errors · 9 skips</span><span><i>was</i> 10 · 13 · 8</span><span><i>known-diagnostic</i> 3</span><span><i>flake</i> 1, undiagnosed</span><span><i>ctest</i> 43/43 as of 700cef824</span></div>
     </div>
   </div>
 
@@ -892,8 +1013,8 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
     <div class="rail"></div><div class="num">OP 8</div>
     <div class="body">
       <div class="op-title">Finish the package boundaries <span class="chip c-ok">ready</span></div>
-      <p>Two tidy-ups the layering test cannot see. L1 has no package of its own — <code>forms.py</code>, <code>equations.py</code>, <code>residual.py</code> and <code>weak_forms.py</code> sit inside <code>symbolic/</code>, so the boundary where provenance dies is a convention rather than a structure. And the energy path carries two generations at once: <code>emitters/energy.py</code> is a plan-driven façade whose <code>emit_plan</code> immediately unpacks the plan and calls the 8,483-line direct emitter beneath it.</p>
-      <div class="op-facts"><span><i>cost</i> mechanical</span><span><i>gate</i> byte-identity</span></div>
+      <p>Two tidy-ups the layering test cannot see. L1 has no package of its own — <code>forms.py</code>, <code>equations.py</code>, <code>residual.py</code> and <code>weak_forms.py</code> sit inside <code>symbolic/</code>, so the boundary where provenance dies is a convention rather than a structure. And the energy path carries two generations at once: <code>emitters/energy.py</code> is a plan-driven façade whose <code>emit_plan</code> immediately unpacks the plan and calls the direct emitter beneath it &mdash; now 9,963 lines.</p>
+      <div class="op-facts"><span><i>cost</i> mechanical</span><span><i>gate</i> byte-identity</span><span><i>energy emitter beneath the façade</i> now 9,963 lines</span></div>
     </div>
   </div>
 
@@ -920,18 +1041,22 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
       <p><b>Four formats still validate</b> — CRS, DIA, COO and patch — and the <code>invalid_matrix_graph</code> flag with its <code>reduction(|:…)</code> clause stays until they follow. That clause is the one OP 2 plumbed through <code>parallel_for_pragma</code> to reproduce this check byte-for-byte; it goes when the last of them does, and the target API that carries it goes with it.</p>
             <p><b>All five formats now.</b> BSR, CRS, DIA, COO and patch have lost the flag, the per-candidate branch and the <code>std::fprintf</code>; all five return <code>void</code>, no caller folds a status, and <code>invalid_matrix_graph</code> together with its <code>reduction(|:…)</code> clause is gone from the generated code. What survives under that name's old clothes is <code>unsupported_matrix_format</code>, which is a different thing: <code>FORMAT</code> is a compile-time constant, so for any supported format the branch is discarded by <code>if constexpr</code> and costs nothing.</p>
       <p><b>The other half is not done, and that is the open part.</b> Patrick's instruction was that the check belongs "way before, for instance during <code>Op::initialize</code>, then assumed". Written, then reverted: there are <i>four</i> <code>initialize</code> templates and the first attempt patched one the laplace path does not use, and more decisively <code>ryml.hpp</code> is absent from this tree, so the generated wrapper cannot be compiled here at all — the repo's own wrapper syntax gate reports itself skipped. Putting uncompiled C++ into four templates, and thereby into every generated operator, is not a thing to do unverified. So the precondition is currently assumed by the kernels and established nowhere.</p>
-      <div class="op-facts"><span><i>files changed</i> 36</span><span><i>formats done</i> 5 of 5</span><span><i>proof</i> 148 digests unchanged</span><span><i>gate gained</i> BSR assembly coverage</span><span><i>still open</i> establish it at setup</span><span><i>blocked by</i> no wrapper compile here</span></div>
+      <p><b>Since then, three of the five formats stopped existing</b> — DIA, COO and patch went with OP 23 — so what the removal now covers is CRS, BSR and BlockDiagSym, and the phrase "five of five" describes work that was done rather than a surface that still exists. <code>invalid_matrix_graph</code> appears nowhere in the shipped tree.</p>
+      <p><b>The open half is unchanged and is the one that was asked for.</b> The precondition is assumed by the kernels and established nowhere: hoisting it into <code>Op::initialize</code> was written and reverted, because there are four <code>initialize</code> templates, the first attempt patched one the laplace path does not use, and <code>ryml.hpp</code> is absent from this tree so the generated wrapper cannot be compiled here at all. Putting unverified C++ into four templates, and thereby into every generated operator, is not a thing to do blind. That constraint has not moved.</p>
+      <div class="op-facts"><span><i>formats stripped</i> 5, of which 3 survive</span><span><i>invalid_matrix_graph in the tree</i> 0</span><span><i>proof</i> digests unchanged</span><span><i>still open</i> establish it at Op::initialize</span><span><i>blocked by</i> no wrapper compile here (ryml.hpp absent)</span></div>
     </div>
   </div>
 
-  <div class="op decide">
+  <div class="op ready">
     <div class="rail"></div><div class="num">OP 11</div>
     <div class="body">
-      <div class="op-title">Generated kernels carry dead temporaries and aliases <span class="chip c-part">deferred — residuals must be reproduced first</span></div>
+      <div class="op-title">Generated kernels carry dead temporaries and aliases <span class="chip c-part">unblocked — the reason for deferring it has gone</span></div>
       <p>Raised by Patrick, and still true of current generation rather than only the older generator. A scan of the 508 generated sources finds <b>358 declarations that are a pure alias</b> of another name — <code>const scalar_t material1 = weak_mat_tmp4;</code>, with <code>material1</code> and <code>material3</code> aliasing the same temporary — and <b>343 declarations never referenced again</b>.</p>
       <p>Both have identifiable causes. <code>_physical_gradient_nodes</code> emits all <code>dim</code> physical components unconditionally, so a form using a subset gets dead ones: <code>u0_grad_1</code> and <code>u0_grad_2</code> are unread while <code>u0_grad_0</code> is live. The dependency set already records which components are needed as <code>dependencies.gradient_coefficients[row][d]</code>, so the emitter has the information and ignores it. The aliases are a material-slot to CSE-temporary mapping that could be substituted at the use sites instead of named.</p>
-      <p>This work is <b>deferred until the residuals have been reproduced</b>, and the reason is the verification posture rather than the difficulty. Every change on this branch has been proven by 520 generated files coming back byte-identical. Removing dead declarations changes that text by design, so byte-identity stops being the proof and becomes the thing that must break. The gate becomes the apply bench — parity across all nine variants and the answer digest, both of which must be <i>unchanged</i>, since deleting code nothing reads cannot move a number — and the snapshot is then re-recorded as a deliberate act. Doing that while results are being reproduced would make an output change and a reproduction run indistinguishable.</p>
-      <div class="op-facts"><span><i>pure aliases</i> 358</span><span><i>unread declarations</i> 343</span><span><i>files scanned</i> 508</span><span><i>gate changes to</i> parity + digest</span></div>
+      <p>This work is <b>deferred until the residuals have been reproduced</b>, and the reason is the verification posture rather than the difficulty. Every change on this branch had, until recently, been proven by the generated files coming back byte-identical. Removing dead declarations changes that text by design, so byte-identity stops being the proof and becomes the thing that must break. The gate becomes the apply bench — parity across all nine variants and the answer digest, both of which must be <i>unchanged</i>, since deleting code nothing reads cannot move a number — and the snapshot is then re-recorded as a deliberate act. Doing that while results are being reproduced would make an output change and a reproduction run indistinguishable.</p>
+      <p><b>The deferral no longer stands.</b> It was deferred because byte-identity was the proof of every step, and an output change would have been indistinguishable from a reproduction run. Byte-identity has since been broken on purpose several times &mdash; the matrix-graph removal, the ABI collapse, the closed-form simplex kernels &mdash; and the reproducibility gate carried each of them. The posture this entry was waiting for is the one in force.</p>
+      <p><b>The counts, however, are stale and should be re-taken before the work starts.</b> They were measured on a 508-file tree that has since been cut to 313 and regenerated by emitters that have changed substantially, including the closed-form simplex path which exists precisely to emit fewer temporaries. Whether the two causes named below &mdash; <code>_physical_gradient_nodes</code> emitting all <code>dim</code> physical components unconditionally, and the material-slot to CSE-temporary aliasing &mdash; still account for what is there is the first thing to check.</p>
+      <div class="op-facts"><span><i>pure aliases</i> 358 <i>(stale, 508-file tree)</i></span><span><i>unread declarations</i> 343 <i>(stale)</i></span><span><i>gate</i> parity + digest, now in force</span><span><i>first step</i> re-measure on the 313-file tree</span></div>
     </div>
   </div>
 
@@ -940,7 +1065,7 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
     <div class="body">
       <div class="op-title">Two packed state buffers share one scratch slot <span class="chip c-part">latent — unreachable today</span></div>
       <p>Found while turning the field-role conditionals into a loop, because writing the two roles as one statement is what made the asymmetry visible. In <code>_scalar_packed_jacobian_action_source</code> and its affine twin, <code>pack_current</code> and <code>pack_previous</code> are both allocated from <code>thread_scratch&lt;scalar_t&gt;(<b>1</b>, …)</code> — the same slot. The direction and output buffers take slots 2 and 3, so the numbering was clearly meant to be one slot per buffer and the second state role was missed.</p>
-      <p>If a form ever read both roles here the two gathers would write the same memory, and the kernel would linearize about the wrong state. <b>No shipped material reaches it.</b> Both emitters are guarded by <code>len(system.fields) != 1 or not dependencies.direction</code>, so they only produce single-field action kernels, and no single-field material has a previous state: <code>pack_previous</code> appears in none of the 520 generated sources. That is why it has survived, and why the byte-identity gate cannot see it.</p>
+      <p>If a form ever read both roles here the two gathers would write the same memory, and the kernel would linearize about the wrong state. <b>No shipped material reaches it.</b> Both emitters are guarded by <code>len(system.fields) != 1 or not dependencies.direction</code>, so they only produce single-field action kernels, and no single-field material has a previous state: <code>pack_previous</code> appears in none of the generated sources, then 520 and now 313. That is why it has survived, and why the byte-identity gate cannot see it.</p>
       <p>Preserved verbatim in the loop rather than corrected, with the reasoning at the site. Correcting it is a one-character change — the slot should be <code>role.index + 1</code>, which is what the equivalent multi-field gather already uses — but it changes emitted text for a case nothing generates, so it cannot be proven by this branch's gate and would be an unreviewable no-op in the snapshot. It wants a material that exercises it, which is the same argument OP 11 makes for a different reason.</p>
       <div class="op-facts"><span><i>sites</i> 2</span><span><i>reachable today</i> no</span><span><i>fix</i> one character</span><span><i>needs</i> a single-field form with a previous state</span></div>
     </div>
@@ -967,32 +1092,37 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
       <p><b>Measured twice, on the material with the most of it, and it does not pay.</b> Hoisting every genuinely invariant declaration above its lane loop and timing both builds at <code>-O3</code>: two-phase flow's tensor-product kernels, 84 declarations moved, <b>no reproducible change</b> — two apparent wins of +5% and +4% vanished on a repeat run, which is what a ±2% noise floor does to a single sample. Its simplex kernels, 224 declarations moved, <b>median −1.25%, with 29 of 84 kernels worse than −2% against 4 better than +2%</b>. Answers were bit-identical across all 36 kernels in both runs, so the analysis and the transformation are sound; they simply cost more than they save.</p>
       <p>That is the register-pressure effect this entry predicted, now observed: moving scalar work out of a <code>#pragma omp simd</code> loop lengthens live ranges across it. <code>LivenessState</code> already models exactly this, which is the argument for a pass that consults it rather than one that hoists whatever it can.</p>
       <p><b>Open, not closed, and deprioritised.</b> Two of the three largest shares are still unmeasured — poro-elasticity and Stokes are Taylor–Hood on tetrahedra and want a TET10 grid the harness does not build. Given two negative results and an understood mechanism, the expected value is low; but the shares are the largest, so the item stays with its evidence attached. Anything that revisits it should hoist selectively under the liveness model rather than uniformly, and clear the ±2% floor on a machine that is not also full.</p>
-      <div class="op-facts"><span><i>invariant</i> 1,508 of 23,101</span><span><i>concentrated in</i> poro · stokes · two-phase</span><span><i>tensor-product measured</i> no change</span><span><i>simplex measured</i> median −1.25%</span><span><i>unmeasured</i> TET10 Taylor–Hood</span><span><i>noise floor</i> ±2%</span></div>
+      <p><b>One thing the scope cut changed about this entry.</b> Four of the six rows in the table above &mdash; <code>poro_elasticity</code>, <code>stokes</code>, <code>modified_mooney_rivlin</code> and two of the five hyperelastic materials &mdash; are no longer generated by default. The invariant work was concentrated almost entirely in the coupled and mixed-order simplex kernels, and most of those left the tree with OP 23. What ships today is closer to the zero-opportunity end of that table than to the 15% end, so the measurement that would decide this should be re-taken against the materials that actually ship before any more effort goes into it.</p>
+      <div class="op-facts"><span><i>invariant</i> 1,508 of 23,101 <i>(pre-scope-cut)</i></span><span><i>concentrated in</i> poro · stokes · two-phase</span><span><i>tensor-product measured</i> no change</span><span><i>simplex measured</i> median −1.25%</span><span><i>unmeasured</i> TET10 Taylor–Hood</span><span><i>noise floor</i> ±2%</span></div>
     </div>
   </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 14</div>
     <div class="body">
-      <div class="op-title">The gate for changes that are meant to alter the output <span class="chip c-part">built — 54 kernels, 5 materials</span></div>
+      <div class="op-title">The gate for changes that are meant to alter the output <span class="chip c-part">724 measurements; it is now the primary gate</span></div>
       <p>Byte-identity has carried every step of this branch, and it is the strongest statement available while it holds. It is also unavailable for everything left: OP 10 hoists a check out of the kernels, OP 11 deletes dead declarations, OP 12 changes a scratch slot, OP 13 reconciles a name, and every loop-structure pass the IR is supposed to hold rewrites the text by design. For all of those, byte-identity is not the proof — it is the thing that must break.</p>
       <p><code>tools/reproducibility.py</code> is the gate that replaces it, asking the only question that survives an intended output change: <b>given the same inputs, does the kernel still produce the same numbers?</b> It generates each material, compiles the real entry points, drives every one it can bind over a Cartesian grid, and compares an l1/l2 digest per kernel against a committed baseline. <code>--record</code> rewrites that baseline, and the diff it produces is the reviewable statement of exactly which kernels moved.</p>
       <p><b>Nothing in it knows any physics.</b> The generated manifest lists every C ABI entry point with its full declaration, and the parameter names in those declarations are the ABI <code>plans/streams.py</code> defines — <code>nelements</code>, <code>elements</code>, <code>g_jacobian_adjugate&lt;i&gt;</code>, <code>&lt;role&gt;_stride</code>, <code>&lt;field&gt;_direction</code>, <code>&lt;field&gt;_out</code>. Binding a call is reading names, so a material added tomorrow is driven without touching the tool. That the boundary work of this session made those names a single definition is what makes this possible at all.</p>
       <p>It carries a second check for free. The grid is affine, so a kernel pair differing only in geometry mode <i>must</i> agree — 24 such pairs, asserted rather than assumed. A digest alone would record a broken adjugate routing as the new correct answer; the parity check will not.</p>
       <p><b>What it does not cover, stated rather than hidden.</b> Packed variants want a mesh partition, matrix assembly wants a sparsity pattern, and the diagnostics entry points have no numerical output at all — each is skipped with its reason printed. Three materials are out of reach: poro-elasticity and Stokes are Taylor–Hood and want an element topology this grid does not build, and two-phase flow's per-form operators each define the same element-generic entry points, so they cannot be linked into one driver. That last one is a fact about the generated code worth its own look.</p>
-      <div class="op-facts"><span><i>kernels</i> 148</span><span><i>materials</i> 8 of 8</span><span><i>buckets</i> refine 3 · 6</span><span><i>covers</i> apply · residual · BSR assembly</span><span><i>geometry parity</i> 64 pairs</span><span><i>throughput</i> --repeats N</span><span><i>grids</i> HEX8 · HEX27 · TET4</span><span><i>used by</i> OP 10</span></div>
+      <p><b>It has taken over.</b> The baseline is 724 kernel measurements over 366 distinct kernels in six buckets, and three of those buckets — TET4, TRI3 and QUAD4 — did not exist at the last pass. It is what carried the closed-form simplex kernels, the ABI collapse and the matrix-graph removal, none of which byte-identity could have carried.</p>
+      <p><b>One thing to fix, small and worth naming.</b> The recorded baseline still holds 239 records for five materials that OP 23 removed from default generation. They are history, not coverage, and the file does not currently say which is which — so the gate's headline number overstates what it actually re-checks.</p>
+      <div class="op-facts"><span><i>measurements</i> 724 over 366 kernels</span><span><i>buckets</i> 6, incl. TET4 · TRI3 · QUAD4</span><span><i>maintained materials</i> 4</span><span><i>stale records</i> 239</span><span><i>covers</i> apply · residual · BSR assembly</span><span><i>geometry parity</i> asserted, not assumed</span><span><i>used by</i> OP 10 · OP 17 · OP 18</span></div>
     </div>
   </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 13</div>
     <div class="body">
-      <div class="op-title">Assembly plans named streams their kernels do not have <span class="chip c-part">described, not yet driven</span></div>
+      <div class="op-title">Assembly plans named streams their kernels do not have <span class="chip c-ok">resolved — the two wrong plans were deleted with their formats</span></div>
       <p>Connecting the last four assembly plans found that two of them were describing a kernel that is not the one being generated. <code>DIAAssemblyPlan.diagonal_offsets</code> said <code>"diagonal_offsets"</code>; every DIA scatter reads a parameter called <code>diag_offsets</code>. <code>COOAssemblyPlan</code> said <code>"rowidx"</code> and <code>"colidx"</code>; the kernels write <code>rows</code> and <code>cols</code>. Nothing was wrong with the generated code — the plans had simply drifted, which they were free to do because no emitter read them. <b>A plan nobody consults is free to be wrong about the thing it exists to define</b>, and that is the strongest argument yet for connecting the rest.</p>
       <p>The names could not simply be corrected: they are also the diagnostics <code>index_policy</code>, which is emitted into generated metadata and read by <code>scripts/matrix_format_benchmark_report.py</code>. So each plan keeps its descriptor and carries the C name alongside it — <code>diagonal_offset_stream</code>, <code>row_stream</code>, <code>column_stream</code> — and reconciling the two is a deliberate output change, batched with OP 11 and OP 12 rather than smuggled into a byte-identical step.</p>
       <p>A third mismatch surfaced with them: <code>COOAssemblyPlan</code> has no <code>reduction_policy</code> at all. Its <code>accumulation_policy</code> is <code>emit_triplets</code> and its <code>reduction_phase</code> is <code>non_hot_setup_phase</code>, which describe the triplet scatter — but there are <i>two</i> COO kernels, and the other one locates its entry in a sorted graph and accumulates atomically in the hot loop. One plan, two kernels, and it describes one of them.</p>
       <p><b>What is connected, and what is not.</b> Each scatter now takes its stream names and reduction policy from its plan, and <code>test_assembly_plans_name_the_kernels</code> proves the plan is read rather than coincidentally matched, by renaming a stream and requiring the kernel to follow. What that does <i>not</i> yet give is a plan that drives the ABI: the same names appear as literals at roughly a hundred further sites — the mesh-operator signatures and the calls that pass the buffers in, fourteen for <code>rowptr</code> alone — so a rename reaches the scatter's parameters and not its callers, and the result would not compile. The docstrings on the CRS and BSR connections claimed otherwise and have been corrected.</p>
-      <div class="op-facts"><span><i>plans unread</i> 4 → 0</span><span><i>plans found wrong</i> 2 of 4</span><span><i>literal ABI sites left</i> ~100</span><span><i>gate</i> byte-identity holds</span><span><i>reconciliation</i> batched with OP 11</span></div>
+      <p><b>Resolved by deletion rather than by reconciliation.</b> The two plans found to be describing kernels that do not exist were <code>DIAAssemblyPlan</code> and <code>COOAssemblyPlan</code>, and both went with their formats in OP 23 — along with the third mismatch, COO's one plan for two kernels. Nothing was renamed and nothing was reconciled; the drifted descriptions simply stopped being shipped.</p>
+      <p><b>What survives is the finding, and it is the important part.</b> A plan nobody consults is free to be wrong about the thing it exists to define, and two of the four were. That is the argument for connecting the rest, and it is why the three surviving assembly plans are now driven and pinned by <code>test_assembly_plans_name_the_kernels</code>, which renames a stream and requires the kernel to follow. The unfinished half also survives: the same names appear as literals at roughly a hundred further sites — mesh-operator signatures and the calls that pass the buffers in — so a rename reaches the scatter's parameters and not its callers, and the result would not compile.</p>
+      <div class="op-facts"><span><i>plans found wrong</i> 2 of 4 — both since deleted</span><span><i>surviving plans</i> 3, all driven</span><span><i>literal ABI sites left</i> ~100</span><span><i>lesson</i> an unread plan drifts</span></div>
     </div>
   </div>
 </section>
@@ -1000,7 +1130,7 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
 <!-- ============================ PART 4 ============================ -->
 <section>
   <div class="sec-head"><span class="sec-num d">PART 4</span><h2>What changed, in numbers</h2></div>
-  <p>Seventy commits from <code>060684ff</code>. Generated output is byte-identical across all 11 materials at every one of them — nothing on this branch has changed a generated kernel.</p>
+  <p>178 commits from <code>060684ff</code>. Generated output was byte-identical across every one of them until this stretch, and is not any longer: the last few dozen change generated kernels on purpose, and are proved by answers rather than by text.</p>
   <div class="tbl-wrap">
   <table>
     <thead><tr><th style="width:38%"></th><th style="width:18%">At the start</th><th style="width:18%">Now</th><th style="width:26%"></th></tr></thead>
@@ -1008,32 +1138,39 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
       <tr><td>Downward import edges</td><td class="n">6</td><td class="n">0</td><td><span class="chip c-ok">enforced</span></td></tr>
       <tr><td>Outgoing edges from <code>symbolic/</code></td><td class="n">4</td><td class="n">0</td><td><span class="chip c-ok">true bottom layer</span></td></tr>
       <tr><td><code>symbolic/core.py</code></td><td class="n">2,556</td><td class="n">1,245</td><td class="m">split five ways</td></tr>
-      <tr><td>L3 kernel planning</td><td class="m">did not exist</td><td class="m">5,481 LOC · 17 modules</td><td><span class="chip c-part">3 of 13 plans drive</span></td></tr>
+      <tr><td>L3 kernel planning</td><td class="m">did not exist</td><td class="m">7,904 LOC · 25 modules</td><td><span class="chip c-ok">10 of 10 plans drive</span></td></tr>
       <tr><td>Symbol analysis in the residual emitter</td><td class="n">6</td><td class="n">0</td><td><span class="chip c-ok">ratcheted</span></td></tr>
       <tr><td><code>FormCollection.source</code></td><td class="m">read by 3 layers</td><td class="m">deleted</td><td><span class="chip c-ok">boundary closed</span></td></tr>
       <tr><td>Emitter input</td><td class="m">a symbolic system</td><td class="m">an 8-member model</td><td><span class="chip c-ok">severed</span></td></tr>
       <tr><td>Driver and packaging</td><td class="m">outside the framework</td><td class="m">pipeline/ · package/</td><td><span class="chip c-ok">inside</span></td></tr>
-      <tr><td>Residual paths: shared functions</td><td class="n">26</td><td class="n">48</td><td><span class="chip c-part">upper bound</span></td></tr>
-      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">23,409</td><td><span class="chip c-gap">grew — see below</span></td></tr>
+      <tr><td>Decisions in emission</td><td class="n">428</td><td class="n">200</td><td><span class="chip c-part">ratcheted; 192 in two modules</span></td></tr>
+      <tr><td>Emission layer</td><td class="n">19,786</td><td class="n">24,027</td><td><span class="chip c-gap">grew — see below</span></td></tr>
+      <tr><td>Generated files that ship</td><td class="n">—</td><td class="n">313</td><td><span class="chip c-ok">from 623, scope cut</span></td></tr>
+      <tr><td>Public C ABI entry points</td><td class="n">1,124</td><td class="n">372</td><td><span class="chip c-ok">runtime-typed</span></td></tr>
     </tbody>
   </table>
   </div>
-  <p>Two rows need reading carefully rather than celebrating. The emission layer <b>grew</b>, because two emitter modules misfiled under <code>fem/</code> moved into it; almost nothing has been removed from it yet. And “shared functions” is static reachability, so it is an upper bound: <code>_local_header</code> statically reaches <code>_local_function</code> even though the mixed-order branch never calls it. The capability matrix below is the honest statement.</p>
+  <p>Two rows still need reading carefully rather than celebrating. The emission layer <b>grew</b>, and has kept growing through work that moved decisions out of it, which is why line count was replaced as the measure by the decision count above it. And the file count fell by a scope decision rather than by the framework getting smaller — <b>the capability is unchanged except for three matrix formats</b>, and it would be a mistake to read 623 → 313 as progress on the architecture.</p>
 
   <h3>Gates</h3>
-  <p>Every change above was verified, and what counts as verification changed once output was allowed to move.</p>
+  <p>Every change above was verified, and what counts as verification changed once output was allowed to move. That is the single largest difference from the previous pass.</p>
   <div class="tbl-wrap">
   <table>
     <thead><tr><th style="width:26%">Gate</th><th style="width:44%">What it catches</th><th style="width:30%">Status</th></tr></thead>
     <tbody>
-      <tr><td class="m">codegen_snapshot</td><td>Any change to generated text across 11 materials, 520 files. Settles performance by construction while it holds.</td><td><span class="chip c-ok">byte-identical at every commit</span></td></tr>
+      <tr><td class="m">codegen_snapshot <b>check-tree</b></td><td><b>The tree the build actually compiles</b> drifting from the generator. The only gate that compares against the shipped artifact rather than against a record of the generator, and the only one that has caught a wrong answer.</td><td><span class="chip c-ok">new — 307 paths, 6 exempt</span></td></tr>
+      <tr><td class="m">codegen_snapshot verify</td><td>Any change to generated text. Settles performance by construction while it holds — and it no longer holds, by design.</td><td><span class="chip c-part">used per step, not per branch</span></td></tr>
+      <tr><td class="m">reproducibility digests</td><td>An intended output change moving an answer. <b>The primary gate now.</b></td><td class="m">724 measurements · 366 kernels</td></tr>
       <tr><td class="m">apply_bench parity</td><td>Variants disagreeing with each other, across four tolerance classes — exact, round-off, geometry, float.</td><td><span class="chip c-ok">9 of 9 variants</span></td></tr>
       <tr><td class="m">apply_bench digest</td><td>The answer moving <em>uniformly</em>, which cross-variant parity cannot see.</td><td><span class="chip c-ok">rel = 0</span></td></tr>
       <tr><td class="m">apply_bench throughput</td><td>A change that keeps the answer and loses speed.</td><td class="m">iso SoA 10.6 · packed affine 30.4 MDOF/s</td></tr>
       <tr><td class="m">test_layering</td><td>Any import pointing down the stack.</td><td><span class="chip c-ok">0 violations</span></td></tr>
       <tr><td class="m">test_module_imports</td><td>A test module that stops loading — caught three real breakages the other gates missed.</td><td><span class="chip c-ok">all load</span></td></tr>
       <tr><td class="m">test_emitters_do_not_analyse</td><td>An emitter deciding what to emit by analysing symbols.</td><td><span class="chip c-ok">shrink-only</span></td></tr>
-      <tr><td class="m">test_plans_are_consumed</td><td>A plan losing its only consumer.</td><td><span class="chip c-part">10 of 13 unread</span></td></tr>
+      <tr><td class="m">test_plans_are_consumed</td><td>A plan losing its only consumer.</td><td><span class="chip c-ok">0 of 10 unread</span></td></tr>
+      <tr><td class="m">test_emission_is_a_printer</td><td>A decision entering emission, or an improvement not being recorded — it fails in both directions.</td><td><span class="chip c-ok">200, exact</span></td></tr>
+      <tr><td class="m">ctest</td><td>The library building and the operators giving right answers in it.</td><td><span class="chip c-ok">43/43 at 700cef824</span></td></tr>
+      <tr><td class="m">Python suite</td><td>Everything else.</td><td><span class="chip c-part">424 tests · 16 F · 12 E — see OP 7</span></td></tr>
     </tbody>
   </table>
   </div>
@@ -1053,7 +1190,7 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
 </section>
 
 <footer>
-  Measured against the working tree at <code>codegen-layering</code> @ 9917e4fc. Companion to the original analysis, <i>SFEM Codegen Layering</i>, which carries the findings and the migration record.
+  Measured against <code>codegen-layering</code> @ 700cef824, 2026-09-08. Counts of the framework's own source are from the working tree; counts of generated code are read from the commit, because the tree is regenerated in place and a live count catches it mid-write. Companion to the original analysis, <i>SFEM Codegen Layering</i>, which carries the findings and the migration record.
 </footer>
 
 </div>
