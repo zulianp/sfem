@@ -1,3 +1,4 @@
+from codegen.framework.plans.conventions import restrict_prelude
 from dataclasses import dataclass
 
 from codegen.framework.ir.kernel_ast import (
@@ -27,9 +28,7 @@ def _cuda_geometry_header_source():
             "",
             "#include <stddef.h>",
             "",
-            "#ifndef SFEM_RESTRICT",
-            "#define SFEM_RESTRICT __restrict__",
-            "#endif",
+            *restrict_prelude(),
             "",
             "namespace sfem {",
             "namespace codegen {",
@@ -43,8 +42,8 @@ def _cuda_geometry_header_source():
             "        const s_t J01,",
             "        const s_t J10,",
             "        const s_t J11,",
-            "        s_t *const *const SFEM_RESTRICT adjugate,",
-            "        s_t *const SFEM_RESTRICT determinant,",
+            "        s_t *const *const RSTR adjugate,",
+            "        s_t *const RSTR determinant,",
             "        const ptrdiff_t offset) {",
             "    adjugate[0][offset] = J11;",
             "    adjugate[1][offset] = -J01;",
@@ -64,8 +63,8 @@ def _cuda_geometry_header_source():
             "        const s_t J20,",
             "        const s_t J21,",
             "        const s_t J22,",
-            "        s_t *const *const SFEM_RESTRICT adjugate,",
-            "        s_t *const SFEM_RESTRICT determinant,",
+            "        s_t *const *const RSTR adjugate,",
+            "        s_t *const RSTR determinant,",
             "        const ptrdiff_t offset) {",
             "    adjugate[0][offset] = J11 * J22 - J12 * J21;",
             "    adjugate[1][offset] = J02 * J21 - J01 * J22;",
@@ -85,9 +84,9 @@ def _cuda_geometry_header_source():
             "struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ, VS> {",
             "    static __host__ __device__ __forceinline__ void eval(",
             "            const int nelems,",
-            "            const s_t *const SFEM_RESTRICT coordinate_grad_ref,",
-            "            s_t *const *const SFEM_RESTRICT adjugate,",
-            "            s_t *const SFEM_RESTRICT determinant) {",
+            "            const s_t *const RSTR coordinate_grad_ref,",
+            "            s_t *const *const RSTR adjugate,",
+            "            s_t *const RSTR determinant) {",
             "        for (int q = 0; q < NQ; ++q) {",
             "            {",
             "                const ptrdiff_t offset = q * VS;",
@@ -106,9 +105,9 @@ def _cuda_geometry_header_source():
             "struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ, VS> {",
             "    static __host__ __device__ __forceinline__ void eval(",
             "            const int nelems,",
-            "            const s_t *const SFEM_RESTRICT coordinate_grad_ref,",
-            "            s_t *const *const SFEM_RESTRICT adjugate,",
-            "            s_t *const SFEM_RESTRICT determinant) {",
+            "            const s_t *const RSTR coordinate_grad_ref,",
+            "            s_t *const *const RSTR adjugate,",
+            "            s_t *const RSTR determinant) {",
             "        for (int q = 0; q < NQ; ++q) {",
             "            {",
             "                const ptrdiff_t offset = q * VS;",
@@ -132,9 +131,9 @@ def _cuda_geometry_header_source():
             "template <typename s_t, int ND, int NQ, int VS>",
             "static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_determinant(",
             "        const int nelems,",
-            "        const s_t *const SFEM_RESTRICT coordinate_grad_ref,",
-            "        s_t *const *const SFEM_RESTRICT adjugate,",
-            "        s_t *const SFEM_RESTRICT determinant) {",
+            "        const s_t *const RSTR coordinate_grad_ref,",
+            "        s_t *const *const RSTR adjugate,",
+            "        s_t *const RSTR determinant) {",
             "    GeometryJacobianAdjugateDeterminant<s_t, ND, NQ, VS>::eval(",
             "            nelems, coordinate_grad_ref, adjugate, determinant);",
             "}",
@@ -170,9 +169,7 @@ class OpenMPEnergySoASourceBuilder:
             "",
             *self.target.inline_definition_lines(),
             "",
-            "#ifndef SFEM_RESTRICT",
-            "#define SFEM_RESTRICT",
-            "#endif",
+            *restrict_prelude(""),
         )
 
     def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name, extra_headers=()):
@@ -311,9 +308,7 @@ class CUDAEnergySoASourceBuilder:
             '#include "%s"' % math_name,
             *tensor_include,
             "",
-            "#ifndef SFEM_RESTRICT",
-            "#define SFEM_RESTRICT __restrict__",
-            "#endif",
+            *restrict_prelude(),
         )
 
     def operator_preamble_lines(self, local_name, geometry_name, diagnostics_name, extra_headers=()):

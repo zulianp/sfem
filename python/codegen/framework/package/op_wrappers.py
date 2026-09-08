@@ -1,3 +1,4 @@
+from codegen.framework.plans.conventions import restrict_prelude
 import collections
 import json
 import os
@@ -2373,22 +2374,22 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_geom_metric0,
-        const geom_t *const SFEM_RESTRICT g_geom_metric1,
-        const geom_t *const SFEM_RESTRICT g_geom_metric2,
-        const geom_t *const SFEM_RESTRICT g_geom_metric3,
-        const geom_t *const SFEM_RESTRICT g_geom_metric4,
-        const geom_t *const SFEM_RESTRICT g_geom_metric5,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_geom_metric0,
+        const geom_t *const RSTR g_geom_metric1,
+        const geom_t *const RSTR g_geom_metric2,
+        const geom_t *const RSTR g_geom_metric3,
+        const geom_t *const RSTR g_geom_metric4,
+        const geom_t *const RSTR g_geom_metric5,
         const double kappa,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
+        const double *const RSTR u_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        double *const RSTR u_out
 );"""
         )
     for private_name in (
@@ -2403,17 +2404,17 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_geom_metric,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_geom_metric,
         const double kappa,
         const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
+        const double *const RSTR u_direction,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        double *const RSTR u_out
 );"""
                 % private_name
             )
@@ -4766,13 +4767,13 @@ def _residual_soa_view_declarations(fields, base, suffix, scalar_type):
         name = _safe_identifier("%s_%s" % (field.name, suffix))
         if components == 1:
             lines.append(
-                "                    %s *const SFEM_RESTRICT %s = %s + %d;"
+                "                    %s *const RSTR %s = %s + %d;"
                 % (scalar_type, name, base, offset)
             )
         else:
             entries = ", ".join("%s + %d" % (base, offset + component) for component in range(components))
             lines.append(
-                "                    %s *const SFEM_RESTRICT %s[%d] = {%s};"
+                "                    %s *const RSTR %s[%d] = {%s};"
                 % (scalar_type, name, components, entries)
             )
         offset += components
@@ -5638,8 +5639,8 @@ def _dispatch_function_lines(group):
 
 def _c_parameter_name(param):
     cleaned = param.strip()
-    cleaned = cleaned.replace(" SFEM_RESTRICT", "")
-    cleaned = cleaned.replace("SFEM_RESTRICT ", "")
+    cleaned = cleaned.replace(" RSTR", "")
+    cleaned = cleaned.replace("RSTR ", "")
     cleaned = cleaned.rstrip()
     match = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?$", cleaned)
     if not match:
@@ -5815,9 +5816,7 @@ typedef double real_t;
 typedef double geom_t;
 #endif
 
-#ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT __restrict__
-#endif
+%(restrict_prelude)s
 
 #include "../kernel_diagnostics.hpp"
 %(matrix_formats_include)s
@@ -5829,6 +5828,7 @@ typedef double geom_t;
 
 %(body)s""" % {
         "body": body,
+        "restrict_prelude": "\n".join(restrict_prelude()),
         "matrix_formats_include": matrix_formats_include,
         "smesh_include": '#include "smesh_mesh.hpp"' if "smesh::ElemType" in body else "",
     }

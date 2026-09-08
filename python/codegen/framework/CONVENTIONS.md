@@ -65,6 +65,7 @@ Two rules keep this from re-entering emission as a decision, which
 | geometry scalar, internal | `g_t` | template parameter |
 | geometry scalar, at the C ABI | `geom_t` | SFEM-wide typedef, not ours to rename |
 | index, count, pointer difference | `idx_t` · `count_t` · `ptrdiff_t` | SFEM / POSIX, unchanged |
+| restrict qualifier | `RSTR` | the generator's alias for SFEM's `SFEM_RESTRICT` |
 | vector width | `VS` | |
 | quadrature points | `NQ` | per-dimension: `NQ1` |
 | shape functions | `NS` | per-dimension: `NS1`; per-field: `U_NS` |
@@ -86,6 +87,20 @@ generated parameter name is invisible outside. Renaming it shortens the signatur
 body and emits no alias line, which keeps the standing rule that kernels carry no gratuitous
 aliases. An alias appears in exactly one place: the non-template `extern "C"` bodies, where the
 concrete type is `double` or `float`.
+
+**The one macro the generator aliases.** `SFEM_RESTRICT` is not ours — `base/sfem_base.hpp`
+picks `__restrict__` or `__restrict` per compiler — but its thirteen characters appear 48,000
+times, 4.3% of the generated tree. So the generator aliases it, once, in a prelude emitted by
+`conventions.restrict_prelude()`, and every signature below uses `RSTR`. The prelude defers to
+SFEM's macro when the real header is present and falls back only when compiled standalone, so the
+generator never second-guesses which spelling the compiler wants.
+
+This is the one place the *no gratuitous aliases* rule is deliberately spent, and it is spent in a
+prelude rather than in a kernel body. `tests/test_conventions.py` pins that the long form appears
+nowhere in emitted output except a preprocessor line — a signature that still spells it is a site
+that did not go through the prelude, and it is invisible until something parses the declaration:
+`tools/reproducibility.py` matches parameter types by exact text and turns an unrecognised one into
+a silent `skipped` kernel.
 
 **Constants are never a bare single capital.** Single capitals belong to the material author:
 `two_phase_flow` publishes parameters named `T`, `R` and `Z`. `NQ1` and `NS1` exist rather than the

@@ -202,7 +202,7 @@ class OpenMPTarget(TargetPlatform):
         )
 
     def restrict_qualifier(self):
-        return "SFEM_RESTRICT"
+        return "RSTR"
 
     def parallel_for_pragma(self, schedule=None, reduction=None):
         pragma = "#pragma omp parallel for"

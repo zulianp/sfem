@@ -152,7 +152,7 @@ def mesh_geometry_argument_names(dependencies, dim, metric_components=None):
 
 
 def mesh_geometry_parameters(dependencies, dim, metric_components=None,
-                             scalar_type="const g_t *const SFEM_RESTRICT"):
+                             scalar_type="const g_t *const RSTR"):
     """The same buffers, spelled as a signature declares them."""
     return tuple(
         "%s %s" % (scalar_type, stream.name)

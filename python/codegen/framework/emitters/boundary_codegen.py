@@ -2,6 +2,8 @@ import math
 
 import sympy as sp
 
+from codegen.framework.plans.conventions import restrict_prelude
+
 from codegen.framework.emitters.artifacts import (
     GeneratedKernelFile,
 )
@@ -329,19 +331,20 @@ def _boundary_source(function, element_type, surface, components, parameters, co
     ]
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
-        "        s_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "        s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_out_params = "\n".join(
-        "        real_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "        real_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_float_out_params = "\n".join(
-        "        float *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "        float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     return """#include "sfem_base.hpp"
 #include "sfem_macros.hpp"
+{restrict_prelude}
 
 #include <math.h>
 #include "kernel_math.hpp"
@@ -381,8 +384,8 @@ struct {function}_reference_data {{
 template <typename s_t>
 {function_qualifier} s_t {function}_measure(
         const int q,
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points) {{
+        const idx_t *const RSTR ev,
+        const geom_t *const *const RSTR points) {{
     const s_t *const grad = {function}_reference_data<s_t>::grad();
     const int n_shape = {function}_reference_data<s_t>::NS;
 {measure_body}
@@ -398,9 +401,9 @@ template <typename s_t>
 {function_qualifier} void {function}_gather_sideset_element(
         const element_idx_t parent_element,
         const int side,
-        idx_t **const SFEM_RESTRICT elements,
-        idx_t *const SFEM_RESTRICT ev) {{
-    const int *const SFEM_RESTRICT side_nodes = {function}_side_nodes();
+        idx_t **const RSTR elements,
+        idx_t *const RSTR ev) {{
+    const int *const RSTR side_nodes = {function}_side_nodes();
     constexpr int n_shape = {n_shape};
     for (int i = 0; i < n_shape; ++i) {{
         ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
@@ -409,8 +412,8 @@ template <typename s_t>
 
 template <typename s_t>
 {function_qualifier} void {function}_element(
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
+        const idx_t *const RSTR ev,
+        const geom_t *const *const RSTR points{current_decls}{param_decls},
         s_t element_vector[{components}][{n_shape}]) {{
     const s_t *const shape = {function}_reference_data<s_t>::shape();
     const s_t *const weight = {function}_reference_data<s_t>::weight();
@@ -433,7 +436,7 @@ template <typename s_t>
 
 template <typename s_t>
 {function_qualifier} void {function}_scatter_element(
-        const idx_t *const SFEM_RESTRICT ev,
+        const idx_t *const RSTR ev,
         const s_t element_vector[{components}][{n_shape}],
         const int out_stride,
 {out_params}) {{
@@ -448,8 +451,8 @@ template <typename s_t>
 {function_qualifier} int {function}_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
 {parallel_for_pragma}
@@ -475,10 +478,10 @@ template <typename s_t>
 {function_qualifier} int {sideset_function}_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
 {parallel_for_pragma}
@@ -504,8 +507,8 @@ template <typename s_t>
 extern "C" int {function}(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
         const int out_stride,
 {extern_out_params}) {{
     return sfem::codegen::{function}_impl<real_t>(
@@ -515,8 +518,8 @@ extern "C" int {function}(
 extern "C" int {function}_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
         const int out_stride,
 {extern_float_out_params}) {{
     return sfem::codegen::{function}_impl<float>(
@@ -526,10 +529,10 @@ extern "C" int {function}_float(
 extern "C" int {sideset_function}(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
         const int out_stride,
 {extern_out_params}) {{
     return sfem::codegen::{sideset_function}_impl<real_t>(
@@ -539,16 +542,17 @@ extern "C" int {sideset_function}(
 extern "C" int {sideset_function}_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
         const int out_stride,
 {extern_float_out_params}) {{
     return sfem::codegen::{sideset_function}_impl<float>(
             nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 """.format(
+        restrict_prelude="\n".join(restrict_prelude()),
         function=function,
         function_qualifier=_function_qualifier(),
         parallel_for_pragma=_parallel_for_pragma(),
@@ -628,7 +632,7 @@ def _replace_current_symbols(coefficients, current_symbols):
 
 def _current_declarations(current_symbols, scalar_type):
     return "".join(
-        ", const %s *const SFEM_RESTRICT %s" % (scalar_type, symbol)
+        ", const %s *const RSTR %s" % (scalar_type, symbol)
         for symbol in current_symbols
     )
 
@@ -749,19 +753,20 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
     ]
     scatter_streams = ", ".join("out%d" % i for i in range(components))
     out_params = "\n".join(
-        "        s_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "        s_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_out_params = "\n".join(
-        "        real_t *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "        real_t *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     extern_float_out_params = "\n".join(
-        "        float *const SFEM_RESTRICT out%d%s" % (i, "," if i + 1 < components else "")
+        "        float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
     return """#include "sfem_base.hpp"
 #include "sfem_macros.hpp"
+{restrict_prelude}
 
 #include <math.h>
 #include "kernel_math.hpp"
@@ -811,11 +816,11 @@ template <typename s_t>
 {function_qualifier} s_t {function}_measure(
         const int qx,
         const int qy,
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points) {{
-    const s_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<s_t>::shape_1d();
-    const s_t *const SFEM_RESTRICT grad_1d = {function}_reference_data<s_t>::grad_1d();
-    const int *const SFEM_RESTRICT shape_index = {function}_reference_data<s_t>::shape_index();
+        const idx_t *const RSTR ev,
+        const geom_t *const *const RSTR points) {{
+    const s_t *const RSTR shape_1d = {function}_reference_data<s_t>::shape_1d();
+    const s_t *const RSTR grad_1d = {function}_reference_data<s_t>::grad_1d();
+    const int *const RSTR shape_index = {function}_reference_data<s_t>::shape_index();
     constexpr int NS1 = {n_shape_1d};
     s_t dxdr0 = s_t(0);
     s_t dxdr1 = s_t(0);
@@ -860,9 +865,9 @@ template <typename s_t>
 {function_qualifier} void {function}_gather_sideset_element(
         const element_idx_t parent_element,
         const int side,
-        idx_t **const SFEM_RESTRICT elements,
-        idx_t *const SFEM_RESTRICT ev) {{
-    const int *const SFEM_RESTRICT side_nodes = {function}_side_nodes();
+        idx_t **const RSTR elements,
+        idx_t *const RSTR ev) {{
+    const int *const RSTR side_nodes = {function}_side_nodes();
     constexpr int n_shape = {n_shape};
     for (int i = 0; i < n_shape; ++i) {{
         ev[i] = elements[side_nodes[side * n_shape + i]][parent_element];
@@ -871,12 +876,12 @@ template <typename s_t>
 
 template <typename s_t>
 {function_qualifier} void {function}_element(
-        const idx_t *const SFEM_RESTRICT ev,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
+        const idx_t *const RSTR ev,
+        const geom_t *const *const RSTR points{current_decls}{param_decls},
         s_t element_vector[{components}][{n_shape}]) {{
-    const s_t *const SFEM_RESTRICT shape_1d = {function}_reference_data<s_t>::shape_1d();
-    const s_t *const SFEM_RESTRICT weight_1d = {function}_reference_data<s_t>::weight_1d();
-    const int *const SFEM_RESTRICT shape_index = {function}_reference_data<s_t>::shape_index();
+    const s_t *const RSTR shape_1d = {function}_reference_data<s_t>::shape_1d();
+    const s_t *const RSTR weight_1d = {function}_reference_data<s_t>::weight_1d();
+    const int *const RSTR shape_index = {function}_reference_data<s_t>::shape_index();
     constexpr int NS1 = {n_shape_1d};
     constexpr int NQ1 = {n_qp_1d};
 
@@ -902,7 +907,7 @@ template <typename s_t>
 
 template <typename s_t>
 {function_qualifier} void {function}_scatter_element(
-        const idx_t *const SFEM_RESTRICT ev,
+        const idx_t *const RSTR ev,
         const s_t element_vector[{components}][{n_shape}],
         const int out_stride,
 {out_params}) {{
@@ -917,8 +922,8 @@ template <typename s_t>
 {function_qualifier} int {function}_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
 {parallel_for_pragma}
@@ -944,10 +949,10 @@ template <typename s_t>
 {function_qualifier} int {sideset_function}_impl(
         const ptrdiff_t nsides,
         const ptrdiff_t,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{current_decls}{param_decls},
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points{current_decls}{param_decls},
         const int out_stride,
 {out_params}) {{
 {parallel_for_pragma}
@@ -973,8 +978,8 @@ template <typename s_t>
 extern "C" int {function}(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
         const int out_stride,
 {extern_out_params}) {{
     return sfem::codegen::{function}_impl<real_t>(
@@ -984,8 +989,8 @@ extern "C" int {function}(
 extern "C" int {function}_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
         const int out_stride,
 {extern_float_out_params}) {{
     return sfem::codegen::{function}_impl<float>(
@@ -995,10 +1000,10 @@ extern "C" int {function}_float(
 extern "C" int {sideset_function}(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_current_decls}{extern_param_decls},
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
         const int out_stride,
 {extern_out_params}) {{
     return sfem::codegen::{sideset_function}_impl<real_t>(
@@ -1008,16 +1013,17 @@ extern "C" int {sideset_function}(
 extern "C" int {sideset_function}_float(
         const ptrdiff_t nsides,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const element_idx_t *const SFEM_RESTRICT parent,
-        const int16_t *const SFEM_RESTRICT side_idx,
-        const geom_t *const *const SFEM_RESTRICT points{extern_float_current_decls}{extern_float_param_decls},
+        idx_t **const RSTR elements,
+        const element_idx_t *const RSTR parent,
+        const int16_t *const RSTR side_idx,
+        const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
         const int out_stride,
 {extern_float_out_params}) {{
     return sfem::codegen::{sideset_function}_impl<float>(
             nsides, nnodes, elements, parent, side_idx, points{current_args}{param_args}, out_stride, {scatter_streams});
 }}
 """.format(
+        restrict_prelude="\n".join(restrict_prelude()),
         function=function,
         function_qualifier=_function_qualifier(),
         parallel_for_pragma=_parallel_for_pragma(),

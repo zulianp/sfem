@@ -200,23 +200,23 @@ def _mesh_arguments(unit, emission_plan, kind):
     arguments = [
         KernelArgument("nelements", "const ptrdiff_t nelements", "control"),
         KernelArgument("nnodes", "const ptrdiff_t nnodes", "control"),
-        KernelArgument("elements", "idx_t **const SFEM_RESTRICT elements", "connectivity"),
+        KernelArgument("elements", "idx_t **const RSTR elements", "connectivity"),
     ]
     arguments.extend(
         (
             KernelArgument(
                 "adjugate",
-                "const s_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim),
+                "const s_t *const RSTR adjugate[%d]" % (dim * dim),
                 "geometry",
             ),
             KernelArgument(
                 "determinant",
-                "const s_t *const SFEM_RESTRICT determinant",
+                "const s_t *const RSTR determinant",
                 "geometry",
             ),
             KernelArgument(
                 "coordinates",
-                "const s_t *const SFEM_RESTRICT coordinates[%d]" % dim,
+                "const s_t *const RSTR coordinates[%d]" % dim,
                 "geometry",
             ),
         )
@@ -235,7 +235,7 @@ def _mesh_field_arguments(unit, kind):
         arguments.append(
             KernelArgument(
                 "current",
-                "const s_t *const SFEM_RESTRICT current[%d]" % n_field_components,
+                "const s_t *const RSTR current[%d]" % n_field_components,
                 "field",
             )
         )
@@ -243,7 +243,7 @@ def _mesh_field_arguments(unit, kind):
         arguments.append(
             KernelArgument(
                 "previous",
-                "const s_t *const SFEM_RESTRICT previous[%d]" % n_field_components,
+                "const s_t *const RSTR previous[%d]" % n_field_components,
                 "previous",
             )
         )
@@ -251,7 +251,7 @@ def _mesh_field_arguments(unit, kind):
         arguments.append(
             KernelArgument(
                 "direction",
-                "const s_t *const SFEM_RESTRICT direction[%d]" % n_field_components,
+                "const s_t *const RSTR direction[%d]" % n_field_components,
                 "direction",
             )
         )
@@ -260,11 +260,11 @@ def _mesh_field_arguments(unit, kind):
 
 def _mesh_output_arguments(unit, kind):
     if kind == "energy_soa":
-        return (KernelArgument("output", "s_t *const SFEM_RESTRICT output", "output"),)
+        return (KernelArgument("output", "s_t *const RSTR output", "output"),)
     return (
         KernelArgument(
             "output",
-            "s_t *const SFEM_RESTRICT output[%d]" % _field_component_count(unit),
+            "s_t *const RSTR output[%d]" % _field_component_count(unit),
             "output",
         ),
     )
@@ -289,12 +289,12 @@ def _geometry_arguments(dim):
     return (
         KernelArgument(
             "adjugate",
-            "const s_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim),
+            "const s_t *const RSTR adjugate[%d]" % (dim * dim),
             "geometry",
         ),
         KernelArgument(
             "determinant",
-            "const s_t *const SFEM_RESTRICT determinant",
+            "const s_t *const RSTR determinant",
             "geometry",
         ),
     )
@@ -303,32 +303,32 @@ def _geometry_arguments(dim):
 def _reference_arguments(emission_plan, dim, dependencies):
     if emission_plan.basis_family == "tensor_product":
         return (
-            KernelArgument("shape_1d", "const s_t *const SFEM_RESTRICT shape_1d", "reference"),
-            KernelArgument("grad_1d", "const s_t *const SFEM_RESTRICT grad_1d", "reference"),
-            KernelArgument("q_weight_1d", "const s_t *const SFEM_RESTRICT q_weight_1d", "reference"),
+            KernelArgument("shape_1d", "const s_t *const RSTR shape_1d", "reference"),
+            KernelArgument("grad_1d", "const s_t *const RSTR grad_1d", "reference"),
+            KernelArgument("q_weight_1d", "const s_t *const RSTR q_weight_1d", "reference"),
         )
     arguments = [
-        KernelArgument("shape", "const s_t *const SFEM_RESTRICT shape", "reference")
+        KernelArgument("shape", "const s_t *const RSTR shape", "reference")
     ]
     if _uses_reference_gradients(dependencies):
         arguments.extend(
             KernelArgument(
                 "grad_ref_%d" % d,
-                "const s_t *const SFEM_RESTRICT grad_ref_%d" % d,
+                "const s_t *const RSTR grad_ref_%d" % d,
                 "reference",
             )
             for d in range(dim)
         )
     arguments.append(
-        KernelArgument("q_weight", "const s_t *const SFEM_RESTRICT q_weight", "reference")
+        KernelArgument("q_weight", "const s_t *const RSTR q_weight", "reference")
     )
     return tuple(arguments)
 
 
 def _boundary_reference_arguments():
     return (
-        KernelArgument("shape", "const s_t *const SFEM_RESTRICT shape", "reference"),
-        KernelArgument("q_weight", "const s_t *const SFEM_RESTRICT q_weight", "reference"),
+        KernelArgument("shape", "const s_t *const RSTR shape", "reference"),
+        KernelArgument("q_weight", "const s_t *const RSTR q_weight", "reference"),
     )
 
 
@@ -340,7 +340,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
             arguments.append(
                 KernelArgument(
                     "u_streams",
-                    "const s_t *const SFEM_RESTRICT u_streams[NS * %d]" % dim,
+                    "const s_t *const RSTR u_streams[NS * %d]" % dim,
                     "field",
                 )
             )
@@ -348,7 +348,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
             arguments.append(
                 KernelArgument(
                     "h_streams",
-                    "const s_t *const SFEM_RESTRICT h_streams[NS * %d]" % dim,
+                    "const s_t *const RSTR h_streams[NS * %d]" % dim,
                     "direction",
                 )
             )
@@ -361,7 +361,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
         arguments.append(
             KernelArgument(
                 "current",
-                "const s_t *const SFEM_RESTRICT current[%s]" % stream_extent,
+                "const s_t *const RSTR current[%s]" % stream_extent,
                 "field",
             )
         )
@@ -369,7 +369,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
         arguments.append(
             KernelArgument(
                 "previous",
-                "const s_t *const SFEM_RESTRICT previous[%s]" % stream_extent,
+                "const s_t *const RSTR previous[%s]" % stream_extent,
                 "previous",
             )
         )
@@ -377,7 +377,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
         arguments.append(
             KernelArgument(
                 "direction",
-                "const s_t *const SFEM_RESTRICT direction[%s]" % stream_extent,
+                "const s_t *const RSTR direction[%s]" % stream_extent,
                 "direction",
             )
         )
@@ -414,13 +414,13 @@ def _merged_dependencies(expression_plans):
 
 def _output_arguments(unit, kind, expression_plan):
     if kind == "energy_soa" and expression_plan.form_order is FormOrder.ZERO:
-        return (KernelArgument("value", "s_t *const SFEM_RESTRICT value", "output"),)
+        return (KernelArgument("value", "s_t *const RSTR value", "output"),)
     n_streams = _local_field_stream_count(unit, kind)
     if kind == "energy_soa":
         dim = int(unit.dim)
-        declaration = "s_t *const SFEM_RESTRICT out_streams[NS * %d]" % dim
+        declaration = "s_t *const RSTR out_streams[NS * %d]" % dim
     else:
-        declaration = "s_t *const SFEM_RESTRICT output[%s]" % _field_stream_extent(unit, kind)
+        declaration = "s_t *const RSTR output[%s]" % _field_stream_extent(unit, kind)
     return (KernelArgument("output", declaration, "output"),)
 
 

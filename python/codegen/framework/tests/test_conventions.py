@@ -31,6 +31,7 @@ class ConventionTablesTest(unittest.TestCase):
         derived |= set(conventions.CONSTANTS.values())
         derived |= set(conventions.LITERALS.values())
         derived |= set(conventions.INDICES.values())
+        derived |= set(conventions.QUALIFIERS.values())
         self.assertEqual(conventions.reserved(), frozenset(derived))
 
     def test_no_reserved_name_is_a_bare_single_capital(self):
@@ -118,6 +119,62 @@ class ShippedMaterialsTest(unittest.TestCase):
                     # Construction runs the check; reaching here is the assertion.
                     checked += 1
         self.assertGreater(checked, 0, "no CodeGenerator found in the materials")
+
+
+class RestrictQualifierTest(unittest.TestCase):
+    """The short qualifier is 4.3% of the tree, so it needs exactly one owner."""
+
+    def test_the_prelude_defines_the_short_form_from_the_long_one(self):
+        lines = conventions.restrict_prelude()
+        short = conventions.QUALIFIERS["restrict"]
+        source = conventions.QUALIFIERS["restrict_source"]
+        self.assertIn("#define %s %s" % (short, source), lines)
+        # Deferring to SFEM's macro rather than redefining `__restrict__` is the
+        # point: base/sfem_base.hpp picks `__restrict__` or `__restrict` by
+        # compiler, and the generator must not second-guess it.
+        self.assertIn("#ifndef %s" % source, lines)
+
+    def test_a_disabled_qualifier_still_defines_the_short_form(self):
+        lines = conventions.restrict_prelude("")
+        self.assertIn("#define %s" % conventions.QUALIFIERS["restrict_source"], lines)
+        self.assertIn(
+            "#define %s %s"
+            % (conventions.QUALIFIERS["restrict"], conventions.QUALIFIERS["restrict_source"]),
+            lines,
+        )
+
+    def test_the_long_form_appears_only_in_the_prelude(self):
+        """Emitted signatures use the short form; the long one is the alias target.
+
+        A signature that still spells `SFEM_RESTRICT` is a site that did not go
+        through `restrict_prelude`, and it is invisible until something parses
+        the declaration -- `tools/reproducibility.py` matches parameter types by
+        exact text and turns an unrecognised one into a silent `skipped`.
+        """
+        import os
+
+        root = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
+            "frontend", "ops", "generated",
+        )
+        if not os.path.isdir(root):
+            self.skipTest("generated tree not present")
+        source = conventions.QUALIFIERS["restrict_source"]
+        offenders = []
+        for base, _dirs, files in os.walk(root):
+            for name in files:
+                if not name.endswith((".cpp", ".hpp")):
+                    continue
+                path = os.path.join(base, name)
+                with open(path, encoding="utf-8", errors="replace") as handle:
+                    for number, line in enumerate(handle, 1):
+                        if source not in line:
+                            continue
+                        if line.lstrip().startswith("#"):
+                            continue  # the prelude
+                        offenders.append("%s:%d" % (path, number))
+        self.assertEqual(offenders[:10], [], "%d signatures still spell the long form" % len(offenders))
 
 
 class ComposedNamesTest(unittest.TestCase):

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import sympy as sp
 
-from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name
+from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name, restrict_prelude
 
 #: The staged-buffer and per-thread-scratch prefixes, from the one
 #: table that owns them.  Spelling either here again is what made the
@@ -256,7 +256,7 @@ def _single_field_element_alias_lines(n_shape, shape_order, indent, array_name="
     if _identity_order(shape_order):
         return [], "elements"
     return [
-        "%sconst %s *const SFEM_RESTRICT %s[%d] = {%s};"
+        "%sconst %s *const RSTR %s[%d] = {%s};"
         % (
             indent,
             pointer_type,
@@ -341,8 +341,8 @@ def _affine_geometry_stream_helper_lines():
         "template <typename s_t, typename g_t, int VS>",
         "%s const s_t *ageom_stream(" % _inline_qualifier(),
         "        const int,",
-        "        const g_t *const SFEM_RESTRICT source,",
-        "        s_t *const SFEM_RESTRICT,",
+        "        const g_t *const RSTR source,",
+        "        s_t *const RSTR,",
         "        std::true_type) {",
         "    return source;",
         "}",
@@ -350,8 +350,8 @@ def _affine_geometry_stream_helper_lines():
         "template <typename s_t, typename g_t, int VS>",
         "%s const s_t *ageom_stream(" % _inline_qualifier(),
         "        const int nelems,",
-        "        const g_t *const SFEM_RESTRICT source,",
-        "        s_t *const SFEM_RESTRICT converted,",
+        "        const g_t *const RSTR source,",
+        "        s_t *const RSTR converted,",
         "        std::false_type) {",
     ]
     pragma = _vectorize_pragma()
@@ -676,8 +676,8 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
         params = [
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
-            "idx_t **const SFEM_RESTRICT elements",
-            "const geom_t *const SFEM_RESTRICT g_geom_metric",
+            "idx_t **const RSTR elements",
+            "const geom_t *const RSTR g_geom_metric",
         ]
         params.extend(
             "const %s %s" % (scalar_type, parameter)
@@ -690,13 +690,13 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
         for role in live_field_roles(dependencies):
             params.append("const ptrdiff_t %s" % role.stride)
             params.extend(
-                "const %s *const SFEM_RESTRICT %s%s"
+                "const %s *const RSTR %s%s"
                 % (scalar_type, field.name, role.suffix)
                 for field in system.fields
             )
         params.append("const ptrdiff_t out_stride")
         params.extend(
-            "%s *const SFEM_RESTRICT %s_out" % (scalar_type, field.name)
+            "%s *const RSTR %s_out" % (scalar_type, field.name)
             for field in system.fields
         )
         body = [
@@ -773,17 +773,17 @@ def _simplex_metric_scalar_affine_aos_wrapper_lines(
             unit_params = [
                 "const ptrdiff_t nelements",
                 "const ptrdiff_t nnodes",
-                "idx_t **const SFEM_RESTRICT elements",
-                "const geom_t *const SFEM_RESTRICT g_geom_metric",
+                "idx_t **const RSTR elements",
+                "const geom_t *const RSTR g_geom_metric",
             ]
             for role in live_field_roles(dependencies):
                 unit_params.extend(
-                    "const %s *const SFEM_RESTRICT %s%s"
+                    "const %s *const RSTR %s%s"
                     % (scalar_type, field.name, role.suffix)
                     for field in system.fields
                 )
             unit_params.extend(
-                "%s *const SFEM_RESTRICT %s_out" % (scalar_type, field.name)
+                "%s *const RSTR %s_out" % (scalar_type, field.name)
                 for field in system.fields
             )
             unit_body = [
@@ -933,7 +933,7 @@ def _mesh_block_gather_loop_lines(indent, loop, assignment_lines):
     lines = [
         "%sfor (int %s = 0; %s < %s; ++%s) {"
         % (indent, loop.shape_var, loop.shape_var, loop.shape_count, loop.shape_var),
-        "%s    const %s *const SFEM_RESTRICT element_shape = %s[%s];"
+        "%s    const %s *const RSTR element_shape = %s[%s];"
         % (indent, loop.element_pointer_type, loop.element_array, element_index),
     ]
     lines.extend(loop.setup_lines)
@@ -954,7 +954,7 @@ def _mesh_block_scatter_loop_lines(indent, loop, accumulation_line):
     lines = [
         "%sfor (int %s = 0; %s < %s; ++%s) {"
         % (indent, loop.shape_var, loop.shape_var, loop.shape_count, loop.shape_var),
-        "%s    const %s *const SFEM_RESTRICT element_shape = %s[%s];"
+        "%s    const %s *const RSTR element_shape = %s[%s];"
         % (indent, loop.element_pointer_type, loop.element_array, element_index),
     ]
     lines.extend(loop.setup_lines)
@@ -1059,7 +1059,7 @@ def _field_atomic_scatter_lines(system, indent, element_array="elements"):
                     setup_lines=(
                         "%s    for (int field = 0; field < NC; ++field) {" % indent,
                     "%s        const int stream = shape * NC + field;" % indent,
-                    "%s        s_t *const SFEM_RESTRICT out = output_components[field];" % indent,
+                    "%s        s_t *const RSTR out = output_components[field];" % indent,
                 ),
                 close_lines=("%s    }" % indent,),
                 scatter_indent="%s        " % indent,
@@ -1246,7 +1246,7 @@ def _field_stream_initializer(layout, field_index, array_name):
 def _mixed_local_reference_params(cell_rule, n_fields, dim, dependencies, basis_family=None):
     """The reference buffers this kernel declares, spelled from the plan."""
     return [
-        "const s_t *const SFEM_RESTRICT %s%s"
+        "const s_t *const RSTR %s%s"
         % (stream.name, "[%d]" % stream.extent if stream.extent else "")
         for stream in mixed_reference_streams(
             dependencies,
@@ -1377,12 +1377,12 @@ def _mixed_mesh_dependency_params(layout, dependencies):
         for field_group in layout.groups:
             if field_group.components == 1:
                 params.append(
-                    "const s_t *const SFEM_RESTRICT %s%s"
+                    "const s_t *const RSTR %s%s"
                     % (field_group.name, group.pointer_suffix)
                 )
             else:
                 params.append(
-                    "const s_t *const SFEM_RESTRICT %s%s[%d]"
+                    "const s_t *const RSTR %s%s[%d]"
                     % (field_group.name, group.pointer_suffix, field_group.components)
                 )
     return params
@@ -1438,7 +1438,7 @@ def _mixed_field_element_alias_lines(
             continue
         array_name = "field_%d_elements" % field_index
         lines.append(
-            "%sconst idx_t *const SFEM_RESTRICT %s[%d] = {%s};"
+            "%sconst idx_t *const RSTR %s[%d] = {%s};"
             % (
                 indent,
                 array_name,
@@ -1593,7 +1593,7 @@ def _mixed_field_atomic_scatter_lines(system, layout, indent, field_element_arra
         lines.extend(
             [
                 "%s{" % indent,
-                "%s    s_t *const SFEM_RESTRICT out = %s;"
+                "%s    s_t *const RSTR out = %s;"
                 % (indent, _mixed_mesh_output_pointer(field)),
                 *_mesh_block_scatter_loop_lines(
                     "%s    " % indent,
@@ -1941,9 +1941,7 @@ def _local_header(
         '#include "tensor_product_kernels.hpp"',
         "",
         *_inline_definition_lines(),
-        "#ifndef SFEM_RESTRICT",
-        "#define SFEM_RESTRICT",
-        "#endif",
+        *restrict_prelude(""),
         "#ifndef SFEM_GENERATED_SCALAR_T",
         "#define SFEM_GENERATED_SCALAR_T",
         "typedef double real_t;",
@@ -2137,10 +2135,10 @@ def _mixed_local_function(
     params = [
         "const int nelems",
         "const ptrdiff_t geometry_stride",
-        "const s_t *const SFEM_RESTRICT determinant",
+        "const s_t *const RSTR determinant",
     ]
     params.extend(
-        "const s_t *const SFEM_RESTRICT %s[%d]"
+        "const s_t *const RSTR %s[%d]"
         % (quantity.name, quantity.components)
         for quantity in local_geometry_quantities(dependencies, dim)
         if quantity.is_indexed
@@ -2583,8 +2581,8 @@ def _declare_mesh_stream(stream):
     if stream.source == "stride":
         return "const ptrdiff_t %s" % stream.name
     if stream.role is DataStreamRole.OUTPUT:
-        return "s_t *const SFEM_RESTRICT %s" % stream.name
-    return "const s_t *const SFEM_RESTRICT %s" % stream.name
+        return "s_t *const RSTR %s" % stream.name
+    return "const s_t *const RSTR %s" % stream.name
 
 
 def _mesh_stream_parameters(dependencies, fields, output=True):
@@ -2715,7 +2713,7 @@ def _mixed_stream_declaration(name, total_streams, stream_layout, mutable=False)
     qualifier = "s_t" if mutable else "const s_t"
     if stream_layout == "contiguous":
         return "%s %s[%d][VS]" % (qualifier, name, total_streams)
-    return "%s *const SFEM_RESTRICT %s[%d]" % (qualifier, name, total_streams)
+    return "%s *const RSTR %s[%d]" % (qualifier, name, total_streams)
 
 
 def _stream_call_arguments(streams, spell):
@@ -2750,7 +2748,7 @@ def _declare_stream(stream):
             stream.components,
         )
     if stream.role in (DataStreamRole.FIELD, DataStreamRole.DIRECTION, DataStreamRole.OUTPUT):
-        return "%s *const SFEM_RESTRICT %s[%d * NS]" % (
+        return "%s *const RSTR %s[%d * NS]" % (
             qualifier,
             stream.name,
             stream.components,
@@ -2758,11 +2756,11 @@ def _declare_stream(stream):
     if stream.role is DataStreamRole.MATERIAL_PARAMETER:
         return "const s_t %s" % stream.name
     if stream.n_items > 1:
-        return "const s_t *const SFEM_RESTRICT %s[%d]" % (
+        return "const s_t *const RSTR %s[%d]" % (
             stream.name,
             stream.n_items,
         )
-    return "const s_t *const SFEM_RESTRICT %s" % stream.name
+    return "const s_t *const RSTR %s" % stream.name
 
 
 def _local_function(
@@ -4129,16 +4127,16 @@ def _operator_source(
             params = [
                 "const int nelems",
                 "const ptrdiff_t geometry_stride",
-                "const %s *const SFEM_RESTRICT determinant" % scalar_type,
+                "const %s *const RSTR determinant" % scalar_type,
             ]
             params.extend(
-                "const %s *const SFEM_RESTRICT %s[%d]"
+                "const %s *const RSTR %s[%d]"
                 % (scalar_type, quantity.name, quantity.components)
                 for quantity in local_geometry_quantities(dependencies, dim)
                 if quantity.is_indexed
             )
             params.extend(
-                "const %s *const SFEM_RESTRICT %s[%d]"
+                "const %s *const RSTR %s[%d]"
                 % (scalar_type, role.name, n_fields * n_shape)
                 for role in live_field_roles(dependencies)
             )
@@ -4147,7 +4145,7 @@ def _operator_source(
                 for parameter in dependencies.parameters
             )
             params.append(
-                "%s *const SFEM_RESTRICT output[%d]"
+                "%s *const RSTR output[%d]"
                 % (scalar_type, n_fields * n_shape)
             )
             lines.append('extern "C" int %s%s(' % (function, suffix))
@@ -4307,9 +4305,7 @@ def _mixed_operator_source(
         "#ifndef MIN",
         "#define MIN(a, b) ((a) < (b) ? (a) : (b))",
         "#endif",
-        "#ifndef SFEM_RESTRICT",
-        "#define SFEM_RESTRICT",
-        "#endif",
+        *restrict_prelude(""),
         *_inline_definition_lines(),
         "#ifndef SFEM_GENERATED_SCALAR_T",
         "#define SFEM_GENERATED_SCALAR_T",
@@ -4524,7 +4520,7 @@ def _mixed_affine_function(
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
+        "idx_t **const RSTR elements",
     ]
     params.extend(mesh_geometry_parameters(dependencies, dim))
     params.extend("const s_t %s" % parameter for parameter in dependencies.parameters)
@@ -4532,10 +4528,10 @@ def _mixed_affine_function(
     params.append("const ptrdiff_t out_stride")
     for field_group in layout.groups:
         if field_group.components == 1:
-            params.append("s_t *const SFEM_RESTRICT %s_out" % field_group.name)
+            params.append("s_t *const RSTR %s_out" % field_group.name)
         else:
             params.append(
-                "s_t *const SFEM_RESTRICT %s_out[%d]"
+                "s_t *const RSTR %s_out[%d]"
                 % (field_group.name, field_group.components)
             )
 
@@ -4731,18 +4727,18 @@ def _mixed_isoparametric_function(
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
-        "const geom_t *const *const SFEM_RESTRICT points",
+        "idx_t **const RSTR elements",
+        "const geom_t *const *const RSTR points",
     ]
     params.extend("const s_t %s" % parameter for parameter in dependencies.parameters)
     params.extend(_mixed_mesh_dependency_params(layout, dependencies))
     params.append("const ptrdiff_t out_stride")
     for field_group in layout.groups:
         if field_group.components == 1:
-            params.append("s_t *const SFEM_RESTRICT %s_out" % field_group.name)
+            params.append("s_t *const RSTR %s_out" % field_group.name)
         else:
             params.append(
-                "s_t *const SFEM_RESTRICT %s_out[%d]"
+                "s_t *const RSTR %s_out[%d]"
                 % (field_group.name, field_group.components)
             )
     impl = "%s_%s_%s_isoparametric_mesh_mixed_impl" % (prefix, element, form)
@@ -5315,7 +5311,7 @@ def _mesh_operator_source(
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
+        "idx_t **const RSTR elements",
     ]
     params.extend(
         mesh_geometry_parameters(
@@ -5713,15 +5709,15 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
         params = [
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
-            "idx_t **const SFEM_RESTRICT elements",
-            "const geom_t *const *const SFEM_RESTRICT points",
-            "const %s *const SFEM_RESTRICT parameters" % scalar_type,
+            "idx_t **const RSTR elements",
+            "const geom_t *const *const RSTR points",
+            "const %s *const RSTR parameters" % scalar_type,
         ]
         params.extend(
-            "const %s *const SFEM_RESTRICT %s" % (scalar_type, role.name)
+            "const %s *const RSTR %s" % (scalar_type, role.name)
             for role in live_field_roles(dependencies)
         )
-        params.append("%s *const SFEM_RESTRICT output" % scalar_type)
+        params.append("%s *const RSTR output" % scalar_type)
         lines.append('extern "C" int %s%s(' % (function, suffix))
         for index, param in enumerate(params):
             lines.append(
@@ -5819,10 +5815,10 @@ def _compatible_matrix_field_indices_from_prefix(prefix, system, element_type):
 def _crs_find_cols_lines(function_base, n_shape):
     lines = [
         "static SFEM_INLINE void %s_find_cols(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT targets,",
-        "        const idx_t *const SFEM_RESTRICT row,",
+        "        const idx_t *const RSTR targets,",
+        "        const idx_t *const RSTR row,",
         "        const int lenrow,",
-        "        idx_t *const SFEM_RESTRICT ks) {",
+        "        idx_t *const RSTR ks) {",
     ]
     if n_shape <= 10:
         lines.append("#pragma unroll(%d)" % n_shape)
@@ -5882,18 +5878,18 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
     return _crs_find_cols_lines(function_base, n_shape) + [
         "template <typename s_t>",
         "static SFEM_INLINE void %s_scatter_crs(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const s_t *const SFEM_RESTRICT element_matrix,",
-        "        const count_t *const SFEM_RESTRICT %s," % row_pointer,
-        "        const idx_t *const SFEM_RESTRICT %s," % column_index,
-        "        s_t *const SFEM_RESTRICT values) {",
+        "        const idx_t *const RSTR ev,",
+        "        const s_t *const RSTR element_matrix,",
+        "        const count_t *const RSTR %s," % row_pointer,
+        "        const idx_t *const RSTR %s," % column_index,
+        "        s_t *const RSTR values) {",
         "    static constexpr int NS = %d;" % n_shape,
         "    count_t entries[NS * NS];",
         "    idx_t ks[NS];",
         "    for (int i = 0; i < NS; ++i) {",
         "        const count_t row_begin = %s[ev[i]];" % row_pointer,
         "        const int lenrow = (int)(%s[ev[i] + 1] - row_begin);" % row_pointer,
-        "        const idx_t *const SFEM_RESTRICT cols = &%s[row_begin];" % column_index,
+        "        const idx_t *const RSTR cols = &%s[row_begin];" % column_index,
         "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
         "        for (int j = 0; j < NS; ++j) {",
         "            entries[i * NS + j] = row_begin + ks[j];",
@@ -5916,11 +5912,11 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
     return _crs_find_cols_lines(function_base, n_shape) + [
         "template <typename s_t>",
         "static SFEM_INLINE void %s_scatter_crs(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const s_t *const SFEM_RESTRICT element_matrix,",
-        "        const count_t *const SFEM_RESTRICT rowptr,",
-        "        const idx_t *const SFEM_RESTRICT colidx,",
-        "        s_t *const SFEM_RESTRICT values) {",
+        "        const idx_t *const RSTR ev,",
+        "        const s_t *const RSTR element_matrix,",
+        "        const count_t *const RSTR rowptr,",
+        "        const idx_t *const RSTR colidx,",
+        "        s_t *const RSTR values) {",
         "    static constexpr int NS = %d;" % n_shape,
         "    static constexpr int NC = %d;" % n_fields,
         "    static constexpr int N_ROW_STREAMS = %d;" % len(row_streams),
@@ -5950,7 +5946,7 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
         "    for (int i = 0; i < NS; ++i) {",
         "        const count_t row_begin = rowptr[ev[i]];",
         "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
-        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
+        "        const idx_t *const RSTR cols = &colidx[row_begin];",
         "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
         "        for (int j = 0; j < NS; ++j) {",
         "            entries[i * NS + j] = row_begin + ks[j];",
@@ -5977,25 +5973,25 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
         "static SFEM_INLINE idx_t %s_packed_global_node(" % function_base,
         "        const uint16_t packed_node,",
         "        const ptrdiff_t pack,",
-        "        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,",
-        "        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,",
-        "        const idx_t *const SFEM_RESTRICT ghost_idx) {",
+        "        const ptrdiff_t *const RSTR owned_nodes_ptr,",
+        "        const ptrdiff_t *const RSTR ghost_ptr,",
+        "        const idx_t *const RSTR ghost_idx) {",
         "    const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
         "    return packed_node < n_contiguous ? idx_t(owned_nodes_ptr[pack] + packed_node) : ghost_idx[ghost_ptr[pack] + packed_node - n_contiguous];",
         "}",
         "",
         "template <typename s_t>",
         "static SFEM_INLINE void %s_discover_packed_crs_entries(" % function_base,
-        "        const idx_t *const SFEM_RESTRICT ev,",
-        "        const count_t *const SFEM_RESTRICT rowptr,",
-        "        const idx_t *const SFEM_RESTRICT colidx,",
-        "        count_t *const SFEM_RESTRICT entries) {",
+        "        const idx_t *const RSTR ev,",
+        "        const count_t *const RSTR rowptr,",
+        "        const idx_t *const RSTR colidx,",
+        "        count_t *const RSTR entries) {",
         "    static constexpr int NS = %d;" % n_shape,
         "    idx_t ks[NS];",
         "    for (int i = 0; i < NS; ++i) {",
         "        const count_t row_begin = rowptr[ev[i]];",
         "        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);",
-        "        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];",
+        "        const idx_t *const RSTR cols = &colidx[row_begin];",
         "        %s_find_cols(ev, cols, lenrow, ks);" % function_base,
         "        for (int j = 0; j < NS; ++j) {",
         "            entries[i * NS + j] = row_begin + ks[j];",
@@ -6009,9 +6005,9 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
             [
                 "template <typename s_t>",
                 "static SFEM_INLINE void %s_scatter_packed_crs_entries(" % function_base,
-                "        const s_t *const SFEM_RESTRICT element_matrix,",
-                "        const count_t *const SFEM_RESTRICT entries,",
-                "        s_t *const SFEM_RESTRICT values) {",
+                "        const s_t *const RSTR element_matrix,",
+                "        const count_t *const RSTR entries,",
+                "        s_t *const RSTR values) {",
                 "    static constexpr int NS = %d;" % n_shape,
                 "    for (int i = 0; i < NS; ++i) {",
                 "        for (int j = 0; j < NS; ++j) {",
@@ -6031,9 +6027,9 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
         [
             "template <typename s_t>",
             "static SFEM_INLINE void %s_scatter_packed_crs_entries(" % function_base,
-            "        const s_t *const SFEM_RESTRICT element_matrix,",
-            "        const count_t *const SFEM_RESTRICT entries,",
-            "        s_t *const SFEM_RESTRICT values) {",
+            "        const s_t *const RSTR element_matrix,",
+            "        const count_t *const RSTR entries,",
+            "        s_t *const RSTR values) {",
             "    static constexpr int NS = %d;" % n_shape,
             "    static constexpr int NC = %d;" % n_fields,
             "    static constexpr int N_ROW_STREAMS = %d;" % len(row_streams),
@@ -6192,10 +6188,10 @@ def _scalar_crs_precision_entry_points(
                 for param in (
                     packed_params
                     + [
-                        "const count_t *const SFEM_RESTRICT rowptr",
-                        "const idx_t *const SFEM_RESTRICT colidx",
-                        "count_t *const SFEM_RESTRICT packed_element_entries",
-                        "s_t *const SFEM_RESTRICT values",
+                        "const count_t *const RSTR rowptr",
+                        "const idx_t *const RSTR colidx",
+                        "count_t *const RSTR packed_element_entries",
+                        "s_t *const RSTR values",
                     ]
                 )
             ]
@@ -6311,8 +6307,8 @@ def _scalar_crs_matrix_assembly_source(
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
-        "const geom_t *const *const SFEM_RESTRICT points",
+        "idx_t **const RSTR elements",
+        "const geom_t *const *const RSTR points",
     ]
     params.extend(
         "const s_t %s" % parameter for parameter in dependencies.parameters
@@ -6323,9 +6319,9 @@ def _scalar_crs_matrix_assembly_source(
     )
     params.extend(
         [
-            "const count_t *const SFEM_RESTRICT rowptr",
-            "const idx_t *const SFEM_RESTRICT colidx",
-            "s_t *const SFEM_RESTRICT values",
+            "const count_t *const RSTR rowptr",
+            "const idx_t *const RSTR colidx",
+            "s_t *const RSTR values",
         ]
     )
 
@@ -6614,12 +6610,12 @@ def _scalar_crs_matrix_assembly_source(
             "const ptrdiff_t nelements",
             "const ptrdiff_t nnodes",
             "const ptrdiff_t max_nodes_per_pack",
-            "uint16_t **const SFEM_RESTRICT elements",
-            "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
-            "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
-            "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
-            "const idx_t *const SFEM_RESTRICT ghost_idx",
-            "const geom_t *const *const SFEM_RESTRICT points",
+            "uint16_t **const RSTR elements",
+            "const ptrdiff_t *const RSTR owned_nodes_ptr",
+            "const ptrdiff_t *const RSTR n_shared_nodes",
+            "const ptrdiff_t *const RSTR ghost_ptr",
+            "const idx_t *const RSTR ghost_idx",
+            "const geom_t *const *const RSTR points",
         ]
         packed_params.extend(
             "const s_t %s" % parameter for parameter in dependencies.parameters
@@ -6630,8 +6626,8 @@ def _scalar_crs_matrix_assembly_source(
         packed_fill_params = tuple(
             packed_params
             + [
-                "const count_t *const SFEM_RESTRICT packed_element_entries",
-                "s_t *const SFEM_RESTRICT values",
+                "const count_t *const RSTR packed_element_entries",
+                "s_t *const RSTR values",
             ]
         )
         packed_discover_params = tuple(
@@ -6641,14 +6637,14 @@ def _scalar_crs_matrix_assembly_source(
                 "const ptrdiff_t nelements",
                 "const ptrdiff_t nnodes",
                 "const ptrdiff_t max_nodes_per_pack",
-                "uint16_t **const SFEM_RESTRICT elements",
-                "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
-                "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
-                "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
-                "const idx_t *const SFEM_RESTRICT ghost_idx",
-                "const count_t *const SFEM_RESTRICT rowptr",
-                "const idx_t *const SFEM_RESTRICT colidx",
-                "count_t *const SFEM_RESTRICT packed_element_entries",
+                "uint16_t **const RSTR elements",
+                "const ptrdiff_t *const RSTR owned_nodes_ptr",
+                "const ptrdiff_t *const RSTR n_shared_nodes",
+                "const ptrdiff_t *const RSTR ghost_ptr",
+                "const idx_t *const RSTR ghost_idx",
+                "const count_t *const RSTR rowptr",
+                "const idx_t *const RSTR colidx",
+                "count_t *const RSTR packed_element_entries",
             ]
         )
         lines.extend(
@@ -6726,13 +6722,13 @@ def _scalar_crs_matrix_assembly_source(
                 "",
                 "#pragma omp parallel",
                 "    {",
-                "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
+                "        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
             ]
         )
         for role in live_field_roles(state_dependencies):
             # Slot 0 holds the coordinates; the roles follow in ABI order.
             lines.append(
-                "        s_t *const SFEM_RESTRICT pk_%s = sfem::codegen::thread_scratch<s_t>(%d, (size_t)NC * (size_t)max_nodes_per_pack);"
+                "        s_t *const RSTR pk_%s = sfem::codegen::thread_scratch<s_t>(%d, (size_t)NC * (size_t)max_nodes_per_pack);"
                 % (role.name, role.index + 1)
             )
         lines.extend(
@@ -6744,12 +6740,12 @@ def _scalar_crs_matrix_assembly_source(
                 "            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
                 "            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];",
                 "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-                "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+                "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
                 "            const geom_t *const coordinate_components[ND] = {%s};"
                 % ", ".join("points[%d]" % d for d in range(dim)),
                 "            for (int d = 0; d < ND; ++d) {",
-                "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
-                "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
+                "                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
+                "                const geom_t *const RSTR coordinate_component = coordinate_components[d];",
                 "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                    pk_coordinate[k] = s_t(coordinate_component[owned_nodes_ptr[pack] + k]);",
                 "                }",
@@ -6764,7 +6760,7 @@ def _scalar_crs_matrix_assembly_source(
                 lines.extend(
                     [
                         "            {",
-                        "                s_t *const SFEM_RESTRICT pk_field = pk_current + %d * max_nodes_per_pack;" % field_index,
+                        "                s_t *const RSTR pk_field = pk_current + %d * max_nodes_per_pack;" % field_index,
                         "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                         "                    pk_field[k] = %s[(owned_nodes_ptr[pack] + k) * current_stride];" % field.name,
                         "                }",
@@ -6779,7 +6775,7 @@ def _scalar_crs_matrix_assembly_source(
                 lines.extend(
                     [
                         "            {",
-                        "                s_t *const SFEM_RESTRICT pk_field = pk_previous + %d * max_nodes_per_pack;" % field_index,
+                        "                s_t *const RSTR pk_field = pk_previous + %d * max_nodes_per_pack;" % field_index,
                         "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                         "                    pk_field[k] = %s_old[(owned_nodes_ptr[pack] + k) * previous_stride];" % field.name,
                         "                }",
@@ -7050,8 +7046,8 @@ def _isoparametric_mesh_operator_source(
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
-        "idx_t **const SFEM_RESTRICT elements",
-        "const geom_t *const *const SFEM_RESTRICT points",
+        "idx_t **const RSTR elements",
+        "const geom_t *const *const RSTR points",
     ]
     params.extend(
         "const s_t %s" % parameter for parameter in dependencies.parameters
@@ -7338,24 +7334,24 @@ def _scalar_packed_jacobian_action_source(
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
         "const ptrdiff_t max_nodes_per_pack",
-        "uint16_t **const SFEM_RESTRICT elements",
-        "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
-        "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
-        "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
-        "const idx_t *const SFEM_RESTRICT ghost_idx",
+        "uint16_t **const RSTR elements",
+        "const ptrdiff_t *const RSTR owned_nodes_ptr",
+        "const ptrdiff_t *const RSTR n_shared_nodes",
+        "const ptrdiff_t *const RSTR ghost_ptr",
+        "const idx_t *const RSTR ghost_idx",
     ]
     if two_pass:
         params.extend(
             [
                 "const ptrdiff_t n_ghost_entries",
                 "const ptrdiff_t n_ghost_reduce_rows",
-                "const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr",
-                "const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx",
-                "const idx_t *const SFEM_RESTRICT ghost_reduce_dest",
-                "s_t *const SFEM_RESTRICT ghost_buf",
+                "const ptrdiff_t *const RSTR ghost_reduce_ptr",
+                "const ptrdiff_t *const RSTR ghost_reduce_idx",
+                "const idx_t *const RSTR ghost_reduce_dest",
+                "s_t *const RSTR ghost_buf",
             ]
         )
-    params.append("const geom_t *const *const SFEM_RESTRICT points")
+    params.append("const geom_t *const *const RSTR points")
     params.extend("const s_t %s" % parameter for parameter in dependencies.parameters)
     params.extend(
         _mesh_stream_parameters(
@@ -7409,7 +7405,7 @@ def _scalar_packed_jacobian_action_source(
             "",
             "#pragma omp parallel",
             "    {",
-            "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
         ]
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
@@ -7421,13 +7417,13 @@ def _scalar_packed_jacobian_action_source(
         # than corrected: the gate on this branch is byte-identity, and a fix
         # belongs with a case that can exercise it.  ARCHITECTURE.html OP 12.
         lines.append(
-            "        s_t *const SFEM_RESTRICT pk_%s = sfem::codegen::thread_scratch<s_t>(1, (size_t)max_nodes_per_pack);"
+            "        s_t *const RSTR pk_%s = sfem::codegen::thread_scratch<s_t>(1, (size_t)max_nodes_per_pack);"
             % role.name
         )
     lines.extend(
         [
-            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "",
             "#pragma omp for schedule(static)",
             "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
@@ -7437,12 +7433,12 @@ def _scalar_packed_jacobian_action_source(
             "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
             "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
             "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
             "            const geom_t *const coordinate_components[ND] = {%s};"
             % ", ".join("points[%d]" % d for d in range(dim)),
             "            for (int d = 0; d < ND; ++d) {",
-            "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
-            "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
+            "                s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
+            "                const geom_t *const RSTR coordinate_component = coordinate_components[d];",
             "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
             "                    pk_coordinate[k] = s_t(coordinate_component[owned_nodes_ptr[pack] + k]);",
             "                }",
@@ -7494,8 +7490,8 @@ def _scalar_packed_jacobian_action_source(
             "                s_t boutput[N_STREAMS][VS];",
             "",
             "                for (int shape = 0; shape < NS; ++shape) {",
-            "                    const uint16_t *const SFEM_RESTRICT coordinate_shape = %s[shape];" % coordinate_element_array,
-            "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
+            "                    const uint16_t *const RSTR coordinate_shape = %s[shape];" % coordinate_element_array,
+            "                    const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
             "                    for (int d = 0; d < ND; ++d) {",
             _vectorize_pragma(),
             "                        for (int lane = 0; lane < nelems; ++lane) {",
@@ -7606,7 +7602,7 @@ def _scalar_packed_jacobian_action_source(
             % (block_function, ", ".join(call_args)),
             "",
             "                for (int shape = 0; shape < NS; ++shape) {",
-            "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];"
+            "                    const uint16_t *const RSTR field_shape = %s[shape];"
             % field_element_array,
             "                    for (int lane = 0; lane < nelems; ++lane) {",
             "                        pk_out[field_shape[evb + lane]] += boutput[shape][lane];",
@@ -7749,8 +7745,8 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "",
             "#pragma omp parallel",
             "    {",
-            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "        s_t out0[VS];",
             "        s_t out1[VS];",
             "        s_t out2[VS];",
@@ -7774,7 +7770,7 @@ def _laplace_tet4_packed_affine_jacobian_action_source(
             "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
             "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
             "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
             "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
             "                pk_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
             "            }",
@@ -7927,8 +7923,8 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "",
             "#pragma omp parallel",
             "    {",
-            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
         ]
     )
     for shape in range(n_shape):
@@ -7948,7 +7944,7 @@ def _laplace_direct_fff_packed_affine_jacobian_action_source(
             "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
             "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
             "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
             "            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
             "                pk_direction[k] = %s_direction[(owned_nodes_ptr[pack] + k) * direction_stride];" % field_name,
             "            }",
@@ -8113,17 +8109,17 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
         "const ptrdiff_t max_nodes_per_pack",
-        "uint16_t **const SFEM_RESTRICT elements",
-        "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
-        "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
-        "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
-        "const idx_t *const SFEM_RESTRICT ghost_idx",
-        "const g_t *const SFEM_RESTRICT g_geom_metric",
+        "uint16_t **const RSTR elements",
+        "const ptrdiff_t *const RSTR owned_nodes_ptr",
+        "const ptrdiff_t *const RSTR n_shared_nodes",
+        "const ptrdiff_t *const RSTR ghost_ptr",
+        "const idx_t *const RSTR ghost_idx",
+        "const g_t *const RSTR g_geom_metric",
         "const s_t %s" % kappa_name,
         "const ptrdiff_t direction_stride",
-        "const s_t *const SFEM_RESTRICT %s_direction" % field_name,
+        "const s_t *const RSTR %s_direction" % field_name,
         "const ptrdiff_t out_stride",
-        "s_t *const SFEM_RESTRICT %s_out" % field_name,
+        "s_t *const RSTR %s_out" % field_name,
     ]
     call_args = [
         "n_packs",
@@ -8163,8 +8159,8 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "",
             "#pragma omp parallel",
             "    {",
-            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
         ]
     )
     for shape in range(n_shape):
@@ -8184,8 +8180,8 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
             "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
             "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
-            "            s_t *const SFEM_RESTRICT ghost_out = &pk_out[n_contiguous];",
+            "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            s_t *const RSTR ghost_out = &pk_out[n_contiguous];",
             "            memcpy(pk_direction, &%s_direction[owned_nodes_ptr[pack]], (size_t)n_contiguous * sizeof(s_t));" % field_name,
             "            for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
             "                pk_direction[n_contiguous + k] = %s_direction[ghosts[k]];" % field_name,
@@ -8246,7 +8242,7 @@ def _laplace_metric_direct_packed_affine_jacobian_action_source(
             "                }",
             "            }",
             "",
-            "            s_t *const SFEM_RESTRICT acc = &%s_out[owned_nodes_ptr[pack]];" % field_name,
+            "            s_t *const RSTR acc = &%s_out[owned_nodes_ptr[pack]];" % field_name,
             "            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
             "                acc[k] += pk_out[k];",
             "                pk_out[k] = s_t(0);",
@@ -8381,11 +8377,11 @@ def _scalar_packed_affine_jacobian_action_source(
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
         "const ptrdiff_t max_nodes_per_pack",
-        "uint16_t **const SFEM_RESTRICT elements",
-        "const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr",
-        "const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes",
-        "const ptrdiff_t *const SFEM_RESTRICT ghost_ptr",
-        "const idx_t *const SFEM_RESTRICT ghost_idx",
+        "uint16_t **const RSTR elements",
+        "const ptrdiff_t *const RSTR owned_nodes_ptr",
+        "const ptrdiff_t *const RSTR n_shared_nodes",
+        "const ptrdiff_t *const RSTR ghost_ptr",
+        "const idx_t *const RSTR ghost_idx",
     ]
     params.extend(
         mesh_geometry_parameters(
@@ -8546,13 +8542,13 @@ def _scalar_packed_affine_jacobian_action_source(
         # than corrected: the gate on this branch is byte-identity, and a fix
         # belongs with a case that can exercise it.  ARCHITECTURE.html OP 12.
         lines.append(
-            "        s_t *const SFEM_RESTRICT pk_%s = sfem::codegen::thread_scratch<s_t>(1, (size_t)max_nodes_per_pack);"
+            "        s_t *const RSTR pk_%s = sfem::codegen::thread_scratch<s_t>(1, (size_t)max_nodes_per_pack);"
             % role.name
         )
     lines.extend(
         [
-            "        s_t *const SFEM_RESTRICT pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
-            "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
+            "        s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "",
             "#pragma omp for schedule(static)",
             "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
@@ -8562,7 +8558,7 @@ def _scalar_packed_affine_jacobian_action_source(
             "            const ptrdiff_t n_shared = n_shared_nodes[pack];",
             "            const ptrdiff_t n_not_shared = n_contiguous - n_shared;",
             "            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];",
-            "            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];",
+            "            const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];",
         ]
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
@@ -8603,7 +8599,7 @@ def _scalar_packed_affine_jacobian_action_source(
             "                s_t boutput[N_STREAMS][VS];",
             "",
             "                for (int shape = 0; shape < NS; ++shape) {",
-            "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
+            "                    const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
         ]
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
@@ -8707,7 +8703,7 @@ def _scalar_packed_affine_jacobian_action_source(
             % (block_function, ", ".join(call_args)),
             "",
             "                for (int shape = 0; shape < NS; ++shape) {",
-            "                    const uint16_t *const SFEM_RESTRICT field_shape = %s[shape];" % field_element_array,
+            "                    const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
             "                    for (int lane = 0; lane < nelems; ++lane) {",
             "                        pk_out[field_shape[evb + lane]] += boutput[shape][lane];",
             "                    }",

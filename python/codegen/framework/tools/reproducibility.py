@@ -63,6 +63,8 @@ import os
 import re
 import subprocess
 import sys
+
+from codegen.framework.plans import conventions
 import tempfile
 
 
@@ -204,7 +206,7 @@ def _include_flags(root, generated_dir):
 
 #: A parameter is a type, a name, and optionally an array extent.  The extent
 #: matters: a Taylor-Hood kernel takes its velocity components as
-#: ``const double *const SFEM_RESTRICT u_data[3]`` -- an array of pointers, not
+#: ``const double *const RSTR u_data[3]`` -- an array of pointers, not
 #: a pointer -- and calling it needs three buffers and a stack array holding
 #: their addresses.
 _PARAM = re.compile(
@@ -261,23 +263,29 @@ PACK_SIZE = 512
 
 N_STEPS = 3
 
+#: The restrict qualifier the generator emits.  Read from the naming table
+#: rather than spelled here: these tables match parameter declarations by exact
+#: text, so a qualifier that moves without them turns every kernel into a
+#: `skipped` entry -- which is a hole in the gate, not a failure of it.
+_RSTR = conventions.QUALIFIERS["restrict"]
+
 #: Pointer element types that name a field the kernel reads or writes.
 IN_FIELDS = (
-    "const double *const SFEM_RESTRICT",
-    "const float *const SFEM_RESTRICT",
-    "const real_t *const SFEM_RESTRICT",
+    "const double *const %s" % _RSTR,
+    "const float *const %s" % _RSTR,
+    "const real_t *const %s" % _RSTR,
     # A runtime-typed entry point takes its buffers as void and is told their
     # type by a separate parameter.  The harness drives those at
     # SMESH_FLOAT64, so the buffer it allocates is a double one and the digest
     # is directly comparable with the baseline recorded before the ABI carried
     # its type at run time.  See ARCHITECTURE.html OP 17.
-    "const void *const SFEM_RESTRICT",
+    "const void *const %s" % _RSTR,
 )
 OUT_FIELDS = (
-    "double *const SFEM_RESTRICT",
-    "float *const SFEM_RESTRICT",
-    "real_t *const SFEM_RESTRICT",
-    "void *const SFEM_RESTRICT",
+    "double *const %s" % _RSTR,
+    "float *const %s" % _RSTR,
+    "real_t *const %s" % _RSTR,
+    "void *const %s" % _RSTR,
 )
 
 #: What the harness asks a runtime-typed entry point for.
@@ -470,6 +478,12 @@ DRIVER_HEAD = r"""
 
 #include "sfem_base.hpp"
 #include "smesh_elem_type.hpp"
+
+// The generated declarations this driver links against use the generator's
+// short restrict qualifier; the driver is standalone C++ and has to agree.
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #include "smesh_types.hpp"
 #include "tet4_inline_cpu.hpp"
 #include "tri3_inline_cpu.hpp"
