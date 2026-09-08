@@ -172,7 +172,7 @@ def run(out, exe, end_time=None):
     env = os.environ.copy()
     env.setdefault("OMP_NUM_THREADS", "1")
     env["SFEM_HISTORY_MODE"] = "per_qp"
-    env["SFEM_HISTORY_CHECK"] = "1"
+    env.setdefault("SFEM_HISTORY_CHECK", "1")
     mesh_command = [sys.executable, str(ROOT / "python/sfem/mesh/box_mesh.py"), str(out / "mesh"),
                     "--cell_type=HEX8", "-x", env.get("PRONY_NX", "16"),
                     "-y", env.get("PRONY_NY", "5"), "-z", env.get("PRONY_NZ", "5"),
@@ -184,7 +184,7 @@ def run(out, exe, end_time=None):
         "case_sha256": hashlib.sha256((out / "case.yaml").read_bytes()).hexdigest(),
         "source_case": str(CASE), "dynamics": case["dynamics"], "time": case["time"],
         "mesh_command": mesh_command, "omp_num_threads": env["OMP_NUM_THREADS"],
-        "history_mode": "per_qp", "history_check": "1", "runs": {},
+        "history_mode": "per_qp", "history_check": env["SFEM_HISTORY_CHECK"], "runs": {},
     }
     for name, (storage, scaling) in POLICIES.items():
         folder = out / name
