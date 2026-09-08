@@ -37,24 +37,6 @@ extern "C" int laplace_apply_2d_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const real_t kappa,
-        const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx
-);
-
-extern "C" int laplace_apply_2d_affine_metric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
         const geom_t *const SFEM_RESTRICT g_geom_metric0,
         const geom_t *const SFEM_RESTRICT g_geom_metric1,
         const geom_t *const SFEM_RESTRICT g_geom_metric2,
@@ -314,24 +296,6 @@ extern "C" int laplace_apply_packed_two_pass_3d_isoparametric_mesh_soa(
 );
 
 extern "C" int laplace_gradient_2d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx
-);
-
-extern "C" int laplace_gradient_2d_affine_metric_mesh_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -660,27 +624,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *laplace_objective_3d_soa_diag
         const smesh::ElemType element_type);
 
 extern "C" int laplace_objective_steps_2d_affine_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const void *const SFEM_RESTRICT steps,
-        void *const SFEM_RESTRICT value
-);
-
-extern "C" int laplace_objective_steps_2d_affine_metric_mesh_soa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,

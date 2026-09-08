@@ -641,10 +641,7 @@ namespace sfem {
             const int dim = mesh->spatial_dimension();
             if (dim == 2) {
                 if (impl_->gradient_uses_affine) {
-                    if (domain.element_type == smesh::TRI3) {
-                        return laplace_gradient_2d_affine_metric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
-                    }
-                    return laplace_gradient_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
+                    return laplace_gradient_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
                 }
                 return laplace_gradient_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0);
             }
@@ -704,10 +701,7 @@ namespace sfem {
             const int dim = mesh->spatial_dimension();
             if (dim == 2) {
                 if (impl_->apply_uses_affine) {
-                    if (domain.element_type == smesh::TRI3) {
-                        return laplace_apply_2d_affine_metric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
-                    }
-                    return laplace_apply_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
+                    return laplace_apply_2d_affine_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
                 }
                 return laplace_apply_2d_isoparametric_mesh_soa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0);
             }
@@ -862,11 +856,7 @@ namespace sfem {
                 const int dim = mesh->spatial_dimension();
                 if (dim == 2) {
                     if (impl_->objective_uses_affine) {
-                        if (domain.element_type == smesh::TRI3) {
-                            status = laplace_objective_steps_2d_affine_metric_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, steps, impl_->element_values.get());
-                        } else {
-                            status = laplace_objective_steps_2d_affine_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, steps, impl_->element_values.get());
-                        }
+                        status = laplace_objective_steps_2d_affine_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, steps, impl_->element_values.get());
                     } else {
                         status = laplace_objective_steps_2d_isoparametric_mesh_soa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, steps, impl_->element_values.get());
                     }

@@ -4263,61 +4263,17 @@ def _coupled_cases(
         residual_stem = "%s_%s_%s" % (material.name, residual_name, mixed_label)
         energy_dispatch_stem = "%s_%s" % (material.name, energy_name)
         residual_dispatch_stem = "%s_%s" % (material.name, residual_name)
-        has_objective = (
-            _c_abi_function_defined(
-                kernel_sources,
-                "%s_objective_affine_mesh_soa" % energy_stem,
-            )
-            and _c_abi_function_defined(
-                kernel_sources,
-                "%s_objective_isoparametric_mesh_soa" % energy_stem,
-            )
+        has_objective = _publishes_either_geometry(kernel_sources, energy_stem, "objective")
+        has_objective_steps = _publishes_either_geometry(kernel_sources, energy_stem, "objective_steps")
+        has_gradient = _publishes_either_geometry(
+            kernel_sources, energy_stem, "gradient"
+        ) and _publishes_either_geometry(
+            kernel_sources, residual_stem, "residual"
         )
-        has_objective_steps = (
-            _c_abi_function_defined(
-                kernel_sources,
-                "%s_objective_steps_affine_mesh_soa" % energy_stem,
-            )
-            and _c_abi_function_defined(
-                kernel_sources,
-                "%s_objective_steps_isoparametric_mesh_soa" % energy_stem,
-            )
-        )
-        has_gradient = (
-            _c_abi_function_defined(
-                kernel_sources,
-                "%s_gradient_affine_mesh_soa" % energy_stem,
-            )
-            and _c_abi_function_defined(
-                kernel_sources,
-                "%s_gradient_isoparametric_mesh_soa" % energy_stem,
-            )
-            and _c_abi_function_defined(
-                kernel_sources,
-                "%s_residual_affine_mesh_soa" % residual_stem,
-            )
-            and _c_abi_function_defined(
-                kernel_sources,
-                "%s_residual_isoparametric_mesh_soa" % residual_stem,
-            )
-        )
-        has_apply = (
-            _c_abi_function_defined(
-                kernel_sources,
-                "%s_apply_affine_mesh_soa" % energy_stem,
-            )
-            and _c_abi_function_defined(
-                kernel_sources,
-                "%s_apply_isoparametric_mesh_soa" % energy_stem,
-            )
-            and _c_abi_function_defined(
-                kernel_sources,
-                "%s_jacobian_action_affine_mesh_soa" % residual_stem,
-            )
-            and _c_abi_function_defined(
-                kernel_sources,
-                "%s_jacobian_action_isoparametric_mesh_soa" % residual_stem,
-            )
+        has_apply = _publishes_either_geometry(
+            kernel_sources, energy_stem, "apply"
+        ) and _publishes_either_geometry(
+            kernel_sources, residual_stem, "jacobian_action"
         )
         if has_objective:
             cases["performance"]["value"].append(
@@ -4437,10 +4393,19 @@ def _coupled_cases(
                     block_size,
                     residual_gradient_setup,
                     (
-                        "                    int status = impl_->gradient_uses_affine ? %s : %s;\n"
+                        "                    int status = %s;\n"
                         "                    if (status != SFEM_SUCCESS) return status;\n"
-                        "                    return impl_->residual_uses_affine ? %s : %s;"
-                    ) % (energy_grad_affine, energy_grad_iso, residual_grad_affine, residual_grad_iso),
+                        "                    return %s;"
+                    ) % (
+                        _geometry_variant_expression(
+                            kernel_sources, energy_stem, "gradient",
+                            "impl_->gradient_uses_affine", energy_grad_affine, energy_grad_iso,
+                        ),
+                        _geometry_variant_expression(
+                            kernel_sources, residual_stem, "residual",
+                            "impl_->residual_uses_affine", residual_grad_affine, residual_grad_iso,
+                        ),
+                    ),
                 )
             )
 
@@ -4494,10 +4459,20 @@ def _coupled_cases(
                     block_size,
                     residual_apply_setup,
                     (
-                        "                    int status = impl_->apply_uses_affine ? %s : %s;\n"
+                        "                    int status = %s;\n"
                         "                    if (status != SFEM_SUCCESS) return status;\n"
-                        "                    return impl_->jacobian_action_uses_affine ? %s : %s;"
-                    ) % (energy_apply_affine, energy_apply_iso, residual_apply_affine, residual_apply_iso),
+                        "                    return %s;"
+                    ) % (
+                        _geometry_variant_expression(
+                            kernel_sources, energy_stem, "apply",
+                            "impl_->apply_uses_affine", energy_apply_affine, energy_apply_iso,
+                        ),
+                        _geometry_variant_expression(
+                            kernel_sources, residual_stem, "jacobian_action",
+                            "impl_->jacobian_action_uses_affine",
+                            residual_apply_affine, residual_apply_iso,
+                        ),
+                    ),
                 )
             )
 
@@ -4520,11 +4495,13 @@ def _coupled_cases(
         if has_objective:
             cases["objective"].append(
                 """%(cases)s
-                    status = impl_->objective_uses_affine ? %(affine)s : %(isoparametric)s;
+                    status = %(call)s;
                     break;""" % {
                     "cases": _mesh_case_labels(element, "                "),
-                    "affine": energy_objective_affine,
-                    "isoparametric": energy_objective_iso,
+                    "call": _geometry_variant_expression(
+                        kernel_sources, energy_stem, "objective",
+                        "impl_->objective_uses_affine", energy_objective_affine, energy_objective_iso,
+                    ),
                 }
             )
 
@@ -4558,11 +4535,13 @@ def _coupled_cases(
         if has_objective_steps:
             cases["objective_steps"].append(
                 """%(cases)s
-                    status = impl_->objective_uses_affine ? %(affine)s : %(isoparametric)s;
+                    status = %(call)s;
                     break;""" % {
                     "cases": _mesh_case_labels(element, "                "),
-                    "affine": energy_objective_steps_affine,
-                    "isoparametric": energy_objective_steps_iso,
+                    "call": _geometry_variant_expression(
+                        kernel_sources, energy_stem, "objective_steps",
+                        "impl_->objective_uses_affine", energy_objective_steps_affine, energy_objective_steps_iso,
+                    ),
                 }
             )
     return cases
@@ -4613,6 +4592,37 @@ def _field_offsets(fields):
 
 def _component_offsets(base, offset, components):
     return ", ".join("%s + %d" % (base, offset + component) for component in components)
+
+
+def _geometry_variant_expression(kernel_sources, stem, operation, flag, affine_expr, iso_expr):
+    """The call for one form, over whichever geometry variants it publishes.
+
+    The coupled wrapper used to emit `flag ? affine : isoparametric`
+    unconditionally, and gate the whole case on *both* variants existing.  An
+    element that publishes only one -- a constant-P1 simplex, whose affine
+    kernel computes what its isoparametric one would, or a 2D element carrying
+    only the isoparametric standard layout -- lost the case entirely, taking
+    the surviving variant's only caller with it.  The ternary is now emitted
+    only when there really are two things to choose between.
+    """
+    has_affine = _c_abi_function_defined(
+        kernel_sources, "%s_%s_affine_mesh_soa" % (stem, operation)
+    )
+    has_isoparametric = _c_abi_function_defined(
+        kernel_sources, "%s_%s_isoparametric_mesh_soa" % (stem, operation)
+    )
+    if has_affine and has_isoparametric:
+        return "%s ? %s : %s" % (flag, affine_expr, iso_expr)
+    return affine_expr if has_affine else iso_expr
+
+
+def _publishes_either_geometry(kernel_sources, stem, operation):
+    """Whether a form publishes at least one geometry variant."""
+    return _c_abi_function_defined(
+        kernel_sources, "%s_%s_affine_mesh_soa" % (stem, operation)
+    ) or _c_abi_function_defined(
+        kernel_sources, "%s_%s_isoparametric_mesh_soa" % (stem, operation)
+    )
 
 
 def _coupled_energy_field_args(dependencies, block_size, current=None, direction=None):

@@ -11,66 +11,6 @@
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int laplace_proteus_quad4_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_quad4_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_quad4_apply_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_quad4_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
 extern "C" int laplace_tri3_apply_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -246,66 +186,6 @@ extern "C" int laplace_tet4_apply_affine_mesh_soa_float(
         const float kappa,
         const ptrdiff_t h_stride,
         const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_quad4_gradient_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_quad4_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_quad4_gradient_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_quad4_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx
 );
@@ -486,78 +366,6 @@ extern "C" int laplace_tet4_gradient_affine_mesh_soa_float(
         const float *const SFEM_RESTRICT ux,
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_proteus_quad4_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_proteus_quad4_objective_steps_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int laplace_quad4_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_quad4_objective_steps_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
 );
 extern "C" int laplace_tri3_objective_steps_affine_mesh_soa(
         const ptrdiff_t nelements,
@@ -774,60 +582,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const real_t kappa,
-        const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx
-) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_quad4_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_quad4_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_quad4_apply_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_quad4_apply_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-    std::fprintf(stderr,
-            "laplace_apply_2d_affine_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_affine_metric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
         const geom_t *const SFEM_RESTRICT g_geom_metric0,
         const geom_t *const SFEM_RESTRICT g_geom_metric1,
         const geom_t *const SFEM_RESTRICT g_geom_metric2,
@@ -857,7 +611,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_affine_metric_mesh_soa
             break;
     }
     std::fprintf(stderr,
-            "laplace_apply_2d_affine_metric_mesh_soa does not support element type %d with real type %d\n",
+            "laplace_apply_2d_affine_mesh_soa does not support element type %d with real type %d\n",
             (int)element_type,
             (int)real_type);
     return SFEM_FAILURE;
@@ -983,60 +737,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_affine_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        void *const SFEM_RESTRICT outx
-) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_quad4_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_quad4_gradient_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_quad4_gradient_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-    std::fprintf(stderr,
-            "laplace_gradient_2d_affine_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_affine_metric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
         const geom_t *const SFEM_RESTRICT g_geom_metric0,
         const geom_t *const SFEM_RESTRICT g_geom_metric1,
         const geom_t *const SFEM_RESTRICT g_geom_metric2,
@@ -1066,7 +766,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_affine_metric_mesh_
             break;
     }
     std::fprintf(stderr,
-            "laplace_gradient_2d_affine_metric_mesh_soa does not support element type %d with real type %d\n",
+            "laplace_gradient_2d_affine_mesh_soa does not support element type %d with real type %d\n",
             (int)element_type,
             (int)real_type);
     return SFEM_FAILURE;
@@ -1192,63 +892,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_affine_mesh_
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const void *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const void *const SFEM_RESTRICT steps,
-        void *const SFEM_RESTRICT value
-) {
-    const enum smesh::PrimitiveType resolved_real_type =
-            (real_type == smesh::SMESH_DEFAULT)
-                    ? smesh::TypeToEnum<real_t>::value()
-                    : real_type;
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_proteus_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_proteus_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::QUAD4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_quad4_objective_steps_affine_mesh_soa(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_quad4_objective_steps_affine_mesh_soa_float(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        default:
-            break;
-    }
-    std::fprintf(stderr,
-            "laplace_objective_steps_2d_affine_mesh_soa does not support element type %d with real type %d\n",
-            (int)element_type,
-            (int)real_type);
-    return SFEM_FAILURE;
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_affine_metric_mesh_soa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
         const geom_t *const SFEM_RESTRICT g_geom_metric0,
         const geom_t *const SFEM_RESTRICT g_geom_metric1,
         const geom_t *const SFEM_RESTRICT g_geom_metric2,
@@ -1281,7 +924,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_affine_metri
             break;
     }
     std::fprintf(stderr,
-            "laplace_objective_steps_2d_affine_metric_mesh_soa does not support element type %d with real type %d\n",
+            "laplace_objective_steps_2d_affine_mesh_soa does not support element type %d with real type %d\n",
             (int)element_type,
             (int)real_type);
     return SFEM_FAILURE;
