@@ -51,7 +51,7 @@ set -uo pipefail
 
 # ---------------------------------------------------------------- the gated configurations
 #
-# key|operation|layout|kernel|cube_n|ab_band_pct|baseline_band_pct
+# key|operation|layout|kernel|cube_n|ab_band_pct|baseline_band_pct|extra_options
 #
 # ab_band_pct is the band for --against, where node effects cancel and the two sides agree
 # to within 1.8% in practice.
@@ -71,18 +71,25 @@ set -uo pipefail
 # same-binary spread that looks like NUMA or pinning luck across invocations -- and
 # `--layout packed --kernel sympy --assemble` shows the same bimodality less severely.
 CONFIGS=(
-    "residual_packed_sumfact|residual|packed|sumfact|128|5|12"
-    "residual_packed_sumfact_big|residual|packed|sumfact|160|5|12"
-    "residual_packed_sympy|residual|packed|sympy|128|5|12"
-    "residual_packed_current|residual|packed|current|128|5|12"
-    "jac_action_packed_sumfact|jac_action|packed|sumfact|128|5|12"
-    "jac_action_packed_sympy|jac_action|packed|sympy|128|5|12"
-    "jac_action_packed_current|jac_action|packed|current|128|5|12"
-    "residual_colored_sumfact|residual|colored|sumfact|128|5|12"
-    "bsr_apply_packed_sumfact|bsr_apply|packed|sumfact|128|8|-"
-    "assemble_store_sumfact|assemble|store|sumfact|128|10|-"
-    "assemble_colored_sumfact|assemble|colored|sumfact|128|10|-"
-    "assemble_packed_sumfact|assemble|packed|sumfact|128|10|-"
+    "residual_packed_sumfact|residual|packed|sumfact|128|5|12|"
+    "residual_packed_sumfact_big|residual|packed|sumfact|160|5|12|"
+    "residual_packed_sympy|residual|packed|sympy|128|5|12|"
+    "residual_packed_current|residual|packed|current|128|5|12|"
+    "jac_action_packed_sumfact|jac_action|packed|sumfact|128|5|12|"
+    "jac_action_packed_sympy|jac_action|packed|sympy|128|5|12|"
+    "jac_action_packed_current|jac_action|packed|current|128|5|12|"
+    "residual_colored_sumfact|residual|colored|sumfact|128|5|12|"
+    "bsr_apply_packed_sumfact|bsr_apply|packed|sumfact|128|8|-|"
+    "assemble_store_sumfact|assemble|store|sumfact|128|10|-|"
+    "assemble_colored_sumfact|assemble|colored|sumfact|128|10|-|"
+    "assemble_packed_sumfact|assemble|packed|sumfact|128|10|-|"
+    # The operator the SOLVER runs, as opposed to the element kernel in isolation. These
+    # are the ones to watch when a change touches the Rhie-Chow term or the boundary
+    # closure, and the four above them cannot see either. Measured on Grace at 8,586,756
+    # dofs, they run at 63%, 53% and 28% of the bare kernel's 2579 MDOF/s.
+    "residual_packed_rc|residual|packed|sumfact|128|5|12|--rhie-chow"
+    "residual_packed_rc_bnd|residual|packed|sumfact|128|5|12|--rhie-chow --boundary"
+    "residual_packed_rc_perapply|residual|packed|sumfact|128|5|12|--rhie-chow --pgrad-per-apply"
 )
 
 op_flag() {
@@ -141,12 +148,12 @@ echo "### binary   : $BIN"
 echo "### threads  : $THREADS   reps: $REPS   raw csv: $CSV"
 echo "### host     : $(hostname)   $(date '+%Y-%m-%d %H:%M:%S')"
 
-measure() {  # binary tag_prefix key operation layout kernel n
-    local bin=$1 pfx=$2 key=$3 op=$4 layout=$5 kernel=$6 n=$7
+measure() {  # binary tag_prefix key operation layout kernel n [extra options]
+    local bin=$1 pfx=$2 key=$3 op=$4 layout=$5 kernel=$6 n=$7 extra=${8:-}
     # shellcheck disable=SC2046
     OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=close OMP_PLACES=cores \
         stdbuf -oL "$bin" --n "$n" --repeat 20 --warmup 3 \
-            --layout "$layout" --kernel "$kernel" $(op_flag "$op") \
+            --layout "$layout" --kernel "$kernel" $(op_flag "$op") $extra \
             --csv "$CSV" --tag "${pfx}${key}" >/dev/null 2>&1 \
         || echo "### WARNING: ${pfx}${key} returned $? -- it will show as missing below"
 }
@@ -162,20 +169,20 @@ sweep() {
     local only="${1:-}"
     for rep in $(seq 1 "$REPS"); do
     for cfg in "${CONFIGS[@]}"; do
-        IFS='|' read -r key op layout kernel n band bband <<<"$cfg"
+        IFS='|' read -r key op layout kernel n band bband extra <<<"$cfg"
         if [ -n "$only" ] && ! printf '%s\n' "$only" | grep -qx -- "$key"; then continue; fi
         echo "### rep $rep  $key"
         if [ "$MODE" = against ]; then
             # Alternate which side goes first, so position-in-pair is balanced.
             if [ $((rep % 2)) -eq 1 ]; then
-                measure "$BIN"     "new_" "$key" "$op" "$layout" "$kernel" "$n"
-                measure "$REF_BIN" "ref_" "$key" "$op" "$layout" "$kernel" "$n"
+                measure "$BIN"     "new_" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
+                measure "$REF_BIN" "ref_" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
             else
-                measure "$REF_BIN" "ref_" "$key" "$op" "$layout" "$kernel" "$n"
-                measure "$BIN"     "new_" "$key" "$op" "$layout" "$kernel" "$n"
+                measure "$REF_BIN" "ref_" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
+                measure "$BIN"     "new_" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
             fi
         else
-            measure "$BIN" "" "$key" "$op" "$layout" "$kernel" "$n"
+            measure "$BIN" "" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
         fi
     done
     done
@@ -193,7 +200,8 @@ cat > "$OUT/analyse.py" <<'PY'
 import csv, os, statistics as st, sys, subprocess, datetime
 from pathlib import Path
 
-configs = [l.split('|') for l in os.environ["CONFIG_SPEC"].splitlines() if l.strip()]
+configs = [l.split('|') for l in os.environ["CONFIG_SPEC"].splitlines()
+           if l.strip() and not l.strip().startswith('#')]
 raw, baseline_path = Path(os.environ["CSV"]), Path(os.environ["BASELINE"])
 mode = os.environ["MODE"]
 
@@ -217,7 +225,7 @@ if mode == "against":
     fail = 0
     failing = []
     only = {k for k in os.environ.get("CONFIRM_ONLY", "").split() if k}
-    for key, op, layout, kernel, n, band, bband in configs:
+    for key, op, layout, kernel, n, band, bband, *_ in configs:
         if only and key not in only: continue
         r, m, b = med("ref_" + key), med("new_" + key), float(band)
         if r is None or m is None:
@@ -266,13 +274,13 @@ if mode == "record":
         for k, v in p.items():
             f.write(f"# {k}: {v}\n")
         f.write("key,operation,layout,kernel,cube_n,ndof,mdof_s,band_pct,observed_spread_pct\n")
-        for key, op, layout, kernel, n, ab_band, bband in configs:
+        for key, op, layout, kernel, n, ab_band, bband, *_ in configs:
             if med(key) is None:
                 print(f"  {key}: MISSING, not recorded", file=sys.stderr); continue
             f.write(f"{key},{op},{layout},{kernel},{n},{dofs[key]},{med(key):.1f},{bband},{spread(key):.1f}\n")
     print(f"\nwrote {baseline_path}")
     print(f"{'config':<28}{'ndof':>10}{'MDOF/s':>10}{'spread':>9}  baseline band")
-    for key, op, layout, kernel, n, ab_band, bband in configs:
+    for key, op, layout, kernel, n, ab_band, bband, *_ in configs:
         if med(key) is not None:
             b = f"{bband}%" if bband != "-" else "not gated (too noisy)"
             print(f"{key:<28}{dofs[key]:>10}{med(key):>10.1f}{spread(key):>8.1f}%  {b}")
@@ -291,7 +299,7 @@ with baseline_path.open() as f:
 print()
 print(f"{'config':<28}{'ndof':>10}{'ref':>9}{'now':>9}{'delta':>9}{'band':>7}  verdict")
 fail = notes = 0
-for key, op, layout, kernel, n, ab_band, bband in configs:
+for key, op, layout, kernel, n, ab_band, bband, *_ in configs:
     if key not in ref:
         print(f"{key:<28}{'':>10}{'':>9}{'':>9}{'':>9}{'':>7}  no baseline entry"); notes += 1; continue
     if med(key) is None:

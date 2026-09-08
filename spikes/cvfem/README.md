@@ -75,6 +75,11 @@ sbatch --export=ALL,REF_BIN=/path/to/old/cvfem_hex8_ns_upwind_bench jobs/perf_re
 sbatch jobs/perf_regression.sbatch
 ```
 
+The gate carries the bare element kernel *and* three configurations with the Rhie-Chow
+term and the boundary closure on -- the operator the solver actually runs, which is 53%
+of the bare kernel's throughput, or 28% if the nodal pressure gradient is not cached.
+`docs/CVFEM_Operator_Cascade.md` has the measurement.
+
 `scripts/perf_regression.sh --help` explains the two modes, why three configurations are
 recorded but not gated in baseline mode, and which two are too bimodal to measure at all.
 Re-record the baseline (`RECORD=1`) only deliberately, and say in the commit message what
