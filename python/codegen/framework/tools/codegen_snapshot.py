@@ -1,6 +1,7 @@
 """Capture and verify a byte-exact snapshot of every generated kernel source.
 
-This is the refactoring gate for the layering work described in ``LAYERING.md``.
+This is the refactoring gate for the layering work recorded in
+``ARCHITECTURE.html``.
 Steps S0-S6 relocate decisions between layers without changing what is emitted,
 so the acceptance criterion for each of them is that the generated C/C++ is
 unchanged down to the byte.  That is a stronger statement than a passing test
