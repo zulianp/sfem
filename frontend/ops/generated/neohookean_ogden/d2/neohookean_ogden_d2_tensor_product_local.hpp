@@ -30,11 +30,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_tensor_product_objective_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT shape_1d,
         const s_t *const SFEM_RESTRICT grad_1d,
         const s_t *const SFEM_RESTRICT q_weight_1d,
@@ -59,26 +59,26 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_objective_block(
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t det_lane0 = det0[goff];
             s_t gu_ref[4];
             gu_ref[0] = gu_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[1] = gu_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
             gu_ref[2] = gu_ref_q[((1 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[3] = gu_ref_q[((1 * NQ + q) * 2 + 1) * VS + lane];
             s_t gu[4];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            gu[0] = (gu_ref[0] * jacobian_adjugate_lane0 + gu_ref[1] * jacobian_adjugate_lane2) * idet;
-            gu[1] = (gu_ref[0] * jacobian_adjugate_lane1 + gu_ref[1] * jacobian_adjugate_lane3) * idet;
-            gu[2] = (gu_ref[2] * jacobian_adjugate_lane0 + gu_ref[3] * jacobian_adjugate_lane2) * idet;
-            gu[3] = (gu_ref[2] * jacobian_adjugate_lane1 + gu_ref[3] * jacobian_adjugate_lane3) * idet;
+            const s_t idet = s_t(1) / det_lane0;
+            gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
+            gu[1] = (gu_ref[0] * adj_lane1 + gu_ref[1] * adj_lane3) * idet;
+            gu[2] = (gu_ref[2] * adj_lane0 + gu_ref[3] * adj_lane2) * idet;
+            gu[3] = (gu_ref[2] * adj_lane1 + gu_ref[3] * adj_lane3) * idet;
         const s_t weak_obj_tmp0 = gu[0] + s_t(1);
         const s_t weak_obj_tmp1 = gu[3] + s_t(1);
         const s_t weak_obj_tmp2 = log(-gu[1]*gu[2] + weak_obj_tmp0*weak_obj_tmp1);
-        value[lane] += qw * jacobian_determinant_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp2) - mu*weak_obj_tmp2 + ((s_t(1) / s_t(2)))*mu*(pow_2(gu[1]) + pow_2(gu[2]) + pow_2(weak_obj_tmp0) + pow_2(weak_obj_tmp1) + s_t(-2)));
+        value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp2) - mu*weak_obj_tmp2 + ((s_t(1) / s_t(2)))*mu*(pow_2(gu[1]) + pow_2(gu[2]) + pow_2(weak_obj_tmp0) + pow_2(weak_obj_tmp1) + s_t(-2)));
         }
     }
 }
@@ -87,11 +87,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT shape_1d,
         const s_t *const SFEM_RESTRICT grad_1d,
         const s_t *const SFEM_RESTRICT q_weight_1d,
@@ -117,22 +117,22 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t det_lane0 = det0[goff];
             s_t gu_ref[4];
             gu_ref[0] = gu_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[1] = gu_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
             gu_ref[2] = gu_ref_q[((1 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[3] = gu_ref_q[((1 * NQ + q) * 2 + 1) * VS + lane];
             s_t gu[4];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            gu[0] = (gu_ref[0] * jacobian_adjugate_lane0 + gu_ref[1] * jacobian_adjugate_lane2) * idet;
-            gu[1] = (gu_ref[0] * jacobian_adjugate_lane1 + gu_ref[1] * jacobian_adjugate_lane3) * idet;
-            gu[2] = (gu_ref[2] * jacobian_adjugate_lane0 + gu_ref[3] * jacobian_adjugate_lane2) * idet;
-            gu[3] = (gu_ref[2] * jacobian_adjugate_lane1 + gu_ref[3] * jacobian_adjugate_lane3) * idet;
+            const s_t idet = s_t(1) / det_lane0;
+            gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
+            gu[1] = (gu_ref[0] * adj_lane1 + gu_ref[1] * adj_lane3) * idet;
+            gu[2] = (gu_ref[2] * adj_lane0 + gu_ref[3] * adj_lane2) * idet;
+            gu[3] = (gu_ref[2] * adj_lane1 + gu_ref[3] * adj_lane3) * idet;
             s_t loperand[4];
         s_t material[4];
         const s_t weak_mat_tmp0 = gu[0] + s_t(1);
@@ -148,10 +148,10 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
         material[1] = -gu[2]*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp8 + weak_mat_tmp7;
         material[2] = -gu[1]*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp7 + weak_mat_tmp8;
         material[3] = weak_mat_tmp0*weak_mat_tmp6 - weak_mat_tmp1*weak_mat_tmp4 + weak_mat_tmp5;
-        loperand[0] = qw * (material[0] * jacobian_adjugate_lane0 + material[1] * jacobian_adjugate_lane1);
-        loperand[1] = qw * (material[0] * jacobian_adjugate_lane2 + material[1] * jacobian_adjugate_lane3);
-        loperand[2] = qw * (material[2] * jacobian_adjugate_lane0 + material[3] * jacobian_adjugate_lane1);
-        loperand[3] = qw * (material[2] * jacobian_adjugate_lane2 + material[3] * jacobian_adjugate_lane3);
+        loperand[0] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1);
+        loperand[1] = qw * (material[0] * adj_lane2 + material[1] * adj_lane3);
+        loperand[2] = qw * (material[2] * adj_lane0 + material[3] * adj_lane1);
+        loperand[3] = qw * (material[2] * adj_lane2 + material[3] * adj_lane3);
             loperand_q[((0 * NQ + q) * 2 + 0) * VS + lane] = loperand[0];
             loperand_q[((0 * NQ + q) * 2 + 1) * VS + lane] = loperand[1];
             loperand_q[((1 * NQ + q) * 2 + 0) * VS + lane] = loperand[2];
@@ -166,11 +166,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT shape_1d,
         const s_t *const SFEM_RESTRICT grad_1d,
         const s_t *const SFEM_RESTRICT q_weight_1d,
@@ -200,11 +200,11 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t det_lane0 = det0[goff];
             s_t gu_ref[4];
             gu_ref[0] = gu_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[1] = gu_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
@@ -217,15 +217,15 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
             grad_h_ref[3] = grad_h_ref_q[((1 * NQ + q) * 2 + 1) * VS + lane];
             s_t gu[4];
             s_t trial_grad[4];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            gu[0] = (gu_ref[0] * jacobian_adjugate_lane0 + gu_ref[1] * jacobian_adjugate_lane2) * idet;
-            trial_grad[0] = (grad_h_ref[0] * jacobian_adjugate_lane0 + grad_h_ref[1] * jacobian_adjugate_lane2) * idet;
-            gu[1] = (gu_ref[0] * jacobian_adjugate_lane1 + gu_ref[1] * jacobian_adjugate_lane3) * idet;
-            trial_grad[1] = (grad_h_ref[0] * jacobian_adjugate_lane1 + grad_h_ref[1] * jacobian_adjugate_lane3) * idet;
-            gu[2] = (gu_ref[2] * jacobian_adjugate_lane0 + gu_ref[3] * jacobian_adjugate_lane2) * idet;
-            trial_grad[2] = (grad_h_ref[2] * jacobian_adjugate_lane0 + grad_h_ref[3] * jacobian_adjugate_lane2) * idet;
-            gu[3] = (gu_ref[2] * jacobian_adjugate_lane1 + gu_ref[3] * jacobian_adjugate_lane3) * idet;
-            trial_grad[3] = (grad_h_ref[2] * jacobian_adjugate_lane1 + grad_h_ref[3] * jacobian_adjugate_lane3) * idet;
+            const s_t idet = s_t(1) / det_lane0;
+            gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
+            trial_grad[0] = (grad_h_ref[0] * adj_lane0 + grad_h_ref[1] * adj_lane2) * idet;
+            gu[1] = (gu_ref[0] * adj_lane1 + gu_ref[1] * adj_lane3) * idet;
+            trial_grad[1] = (grad_h_ref[0] * adj_lane1 + grad_h_ref[1] * adj_lane3) * idet;
+            gu[2] = (gu_ref[2] * adj_lane0 + gu_ref[3] * adj_lane2) * idet;
+            trial_grad[2] = (grad_h_ref[2] * adj_lane0 + grad_h_ref[3] * adj_lane2) * idet;
+            gu[3] = (gu_ref[2] * adj_lane1 + gu_ref[3] * adj_lane3) * idet;
+            trial_grad[3] = (grad_h_ref[2] * adj_lane1 + grad_h_ref[3] * adj_lane3) * idet;
             s_t loperand[4];
         s_t material[4];
         const s_t weak_mat_tmp0 = gu[3] + s_t(1);
@@ -261,10 +261,10 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
         material[1] = trial_grad[0]*weak_mat_tmp8 + trial_grad[1]*(lmbda*weak_mat_tmp19 + mu*weak_mat_tmp19 + mu - weak_mat_tmp16*weak_mat_tmp19) + trial_grad[2]*weak_mat_tmp24 + trial_grad[3]*weak_mat_tmp22;
         material[2] = trial_grad[0]*weak_mat_tmp10 + trial_grad[1]*weak_mat_tmp24 + trial_grad[2]*(lmbda*weak_mat_tmp25 + mu*weak_mat_tmp25 + mu - weak_mat_tmp16*weak_mat_tmp25) + trial_grad[3]*weak_mat_tmp27;
         material[3] = trial_grad[0]*weak_mat_tmp18 + trial_grad[1]*weak_mat_tmp22 + trial_grad[2]*weak_mat_tmp27 + trial_grad[3]*(lmbda*weak_mat_tmp28 + mu*weak_mat_tmp28 + mu - weak_mat_tmp16*weak_mat_tmp28);
-        loperand[0] = qw * (material[0] * jacobian_adjugate_lane0 + material[1] * jacobian_adjugate_lane1);
-        loperand[1] = qw * (material[0] * jacobian_adjugate_lane2 + material[1] * jacobian_adjugate_lane3);
-        loperand[2] = qw * (material[2] * jacobian_adjugate_lane0 + material[3] * jacobian_adjugate_lane1);
-        loperand[3] = qw * (material[2] * jacobian_adjugate_lane2 + material[3] * jacobian_adjugate_lane3);
+        loperand[0] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1);
+        loperand[1] = qw * (material[0] * adj_lane2 + material[1] * adj_lane3);
+        loperand[2] = qw * (material[2] * adj_lane0 + material[3] * adj_lane1);
+        loperand[3] = qw * (material[2] * adj_lane2 + material[3] * adj_lane3);
             loperand_q[((0 * NQ + q) * 2 + 0) * VS + lane] = loperand[0];
             loperand_q[((0 * NQ + q) * 2 + 1) * VS + lane] = loperand[1];
             loperand_q[((1 * NQ + q) * 2 + 0) * VS + lane] = loperand[2];

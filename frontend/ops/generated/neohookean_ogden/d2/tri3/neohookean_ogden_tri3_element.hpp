@@ -44,8 +44,8 @@ struct neohookean_ogden_tri3_isoparametric_reference_data {
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tri3_energy_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -68,23 +68,23 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_element_geometry_soa(
         for (int lane = 0; lane < nelems; ++lane) {
             bvalue[lane] = s_t(0);
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         {
             const int q = 0;  // TRI3 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
+                badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
+                badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
+                badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
+                bdet0[q * VS + lane] = det[q * nelements + evb + lane];
             }
         }
-        neohookean_ogden_d2_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+        neohookean_ogden_d2_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -122,16 +122,16 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_element_coords_soa(
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
         {
             const int q = 0;  // TRI3 evaluates in closed form
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -179,10 +179,10 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_element_coords_soa(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
             }
         }
-        neohookean_ogden_d2_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+        neohookean_ogden_d2_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -220,16 +220,16 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_element_soa(
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
         {
             const int q = 0;  // TRI3 evaluates in closed form
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -277,10 +277,10 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_element_soa(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
             }
         }
-        neohookean_ogden_d2_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+        neohookean_ogden_d2_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -289,8 +289,8 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_element_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tri3_gradient_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -316,23 +316,23 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_element_geometry_soa(
                 bout_streams[stream][lane] = s_t(0);
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         {
             const int q = 0;  // TRI3 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
+                badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
+                badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
+                badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
+                bdet0[q * VS + lane] = det[q * nelements + evb + lane];
             }
         }
-        neohookean_ogden_d2_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+        neohookean_ogden_d2_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -373,16 +373,16 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_element_coords_soa(
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
         {
             const int q = 0;  // TRI3 evaluates in closed form
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -430,10 +430,10 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_element_coords_soa(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
             }
         }
-        neohookean_ogden_d2_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+        neohookean_ogden_d2_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -474,16 +474,16 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_element_soa(
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
         {
             const int q = 0;  // TRI3 evaluates in closed form
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -531,10 +531,10 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_element_soa(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
             }
         }
-        neohookean_ogden_d2_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+        neohookean_ogden_d2_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -543,8 +543,8 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_element_soa(
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -560,20 +560,20 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_geometry_soa(
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         {
             const int q = 0;  // TRI3 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
+                badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
+                badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
+                badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
+                bdet0[q * VS + lane] = det[q * nelements + evb + lane];
             }
         }
         s_t bh_data[NDOFS][VS];
@@ -592,7 +592,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_geometry_soa(
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            neohookean_ogden_d2_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+            neohookean_ogden_d2_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
@@ -631,16 +631,16 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_coords_soa(
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
         {
             const int q = 0;  // TRI3 evaluates in closed form
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -688,7 +688,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_coords_soa(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
             }
         }
         s_t bh_data[NDOFS][VS];
@@ -707,7 +707,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_coords_soa(
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            neohookean_ogden_d2_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+            neohookean_ogden_d2_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
@@ -746,16 +746,16 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_soa(
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         const s_t *const grad_ref_x = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x();
         const s_t *const grad_ref_y = sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y();
         {
             const int q = 0;  // TRI3 evaluates in closed form
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -803,7 +803,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_soa(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
             }
         }
         s_t bh_data[NDOFS][VS];
@@ -822,7 +822,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_element_soa(
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            neohookean_ogden_d2_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+            neohookean_ogden_d2_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_x(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::grad_ref_y(), sfem::codegen::neohookean_ogden_tri3_isoparametric_reference_data<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd

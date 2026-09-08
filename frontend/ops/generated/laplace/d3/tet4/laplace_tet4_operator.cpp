@@ -2196,17 +2196,17 @@ static int laplace_tet4_hessian_isoparametric_mesh_soa_assemble_impl(
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
         static constexpr int nelems = VS;
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_adjugate4[NQ * VS];
-        s_t bjacobian_adjugate5[NQ * VS];
-        s_t bjacobian_adjugate6[NQ * VS];
-        s_t bjacobian_adjugate7[NQ * VS];
-        s_t bjacobian_adjugate8[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
-        s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
             bh_streams[stream] = bh_data[stream];
@@ -2226,7 +2226,7 @@ static int laplace_tet4_hessian_isoparametric_mesh_soa_assemble_impl(
 
 
         for (int q = 0; q < NQ; ++q) {
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -2326,11 +2326,11 @@ static int laplace_tet4_hessian_isoparametric_mesh_soa_assemble_impl(
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        badj_streams, bdet0, q * VS + lane);
             }
         }
 
-        laplace_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, element_matrix);
+        laplace_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, element_matrix);
 
         if constexpr (FORMAT == 1) {
             laplace_tet4_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

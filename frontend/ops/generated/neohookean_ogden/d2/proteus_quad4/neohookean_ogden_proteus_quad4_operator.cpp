@@ -259,11 +259,11 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_objective_steps_isoparamet
         s_t bh_data[NS * NC][VS];
         s_t bvalue[VS];
         s_t bcoordinate_data[NS * ND][VS];
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -309,9 +309,9 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_objective_steps_isoparamet
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
                 coordinate_grad_ref + 1 * NQ * ND * VS);
 
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
@@ -328,7 +328,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_objective_steps_isoparamet
                 bvalue[lane] = s_t(0);
             }
 
-            neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bvalue);
+            neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bvalue);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -552,11 +552,11 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_gradient_isoparametric_mes
         s_t bu_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -610,11 +610,11 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_gradient_isoparametric_mes
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
                 coordinate_grad_ref + 1 * NQ * ND * VS);
 
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-        neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
+        neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
@@ -843,11 +843,11 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_s
         s_t bh_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -907,11 +907,11 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_apply_isoparametric_mesh_s
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
                 coordinate_grad_ref + 1 * NQ * ND * VS);
 
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-        neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
+        neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
@@ -1075,12 +1075,12 @@ static int neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_assembl
         s_t bcoordinate_data[NS * ND][VS];
         static constexpr int nelems = VS;
         s_t bu_data[NS * NC][VS];
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
-        s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
             bu_streams[stream] = bu_data[stream];
@@ -1111,9 +1111,9 @@ static int neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_assembl
                 nelems, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
                 coordinate_grad_ref + 1 * NQ * ND * VS);
 
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
+                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
         for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {
             element_matrix[entry] = s_t(0);
@@ -1126,7 +1126,7 @@ static int neohookean_ogden_proteus_quad4_hessian_isoparametric_mesh_soa_assembl
                     bout_data[stream][0] = s_t(0);
                 }
                 bh_data[trial_shape * NC + trial_component][0] = s_t(1);
-                neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(1, 1, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
+                neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(1, 1, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
                 const int col = trial_component * NS + trial_shape;
                 for (int test_component = 0; test_component < NC; ++test_component) {
                     for (int test_shape = 0; test_shape < NS; ++test_shape) {

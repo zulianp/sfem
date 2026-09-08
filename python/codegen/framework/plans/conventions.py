@@ -75,10 +75,39 @@ PREFIXES = {
 #: `plans/geometry_quantities.py`.  Listing them here records the pairing so a
 #: rename cannot move one without the other.
 STREAMS = {
-    "adjugate": "jacobian_adjugate",
-    "determinant": "jacobian_determinant",
+    "adjugate": "adj",
+    "determinant": "det",
     "reference_gradient": "grad_ref",
 }
+
+
+#: The frozen C ABI spelling of each geometry stream.
+#:
+#: The local name and the ABI name used to be the same string with a `g_` in
+#: front, which meant the local one could not be shortened without moving a
+#: parameter name that `tools/reproducibility.py` binds by regex -- and that
+#: binding seeds the test input, so moving it would have silently changed every
+#: recorded digest.  They are two names for one quantity with two different
+#: owners, and this is where they are told apart.
+ABI_GEOMETRY = (
+    ("adj", "jacobian_adjugate"),
+    ("det", "jacobian_determinant"),
+    ("geom_metric", "geom_metric"),
+)
+
+
+def abi_geometry_name(local):
+    """The frozen C ABI parameter name for a local geometry stream name.
+
+    `adj0` -> `g_jacobian_adjugate0`.  Call this wherever the ABI parameter is
+    spelled; never `"g_%s" % stream`, which derives the frozen name from the one
+    that is free to change.
+    """
+    local = str(local)
+    for short, frozen in ABI_GEOMETRY:
+        if local.startswith(short) and local[len(short):].isdigit():
+            return "g_%s%s" % (frozen, local[len(short):])
+    return "g_%s" % local
 
 
 def compose(prefix, stream):

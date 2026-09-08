@@ -28,11 +28,11 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d2_simplex_direct_hessian_reference_element_matrix(
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT bjacobian_determinant0,
+        const s_t *const SFEM_RESTRICT badj0,
+        const s_t *const SFEM_RESTRICT badj1,
+        const s_t *const SFEM_RESTRICT badj2,
+        const s_t *const SFEM_RESTRICT badj3,
+        const s_t *const SFEM_RESTRICT bdet0,
         const s_t *const SFEM_RESTRICT grad_ref_x,
         const s_t *const SFEM_RESTRICT grad_ref_y,
         const s_t *const SFEM_RESTRICT q_weight,
@@ -53,12 +53,12 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_direct_hessian_reference_el
         const s_t qw = q_weight[q];
         const int lane = 0;
         const ptrdiff_t goff = q * VS + lane;
-        const s_t jacobian_adjugate_lane0 = bjacobian_adjugate0[goff];
-        const s_t jacobian_adjugate_lane1 = bjacobian_adjugate1[goff];
-        const s_t jacobian_adjugate_lane2 = bjacobian_adjugate2[goff];
-        const s_t jacobian_adjugate_lane3 = bjacobian_adjugate3[goff];
-        const s_t jacobian_determinant_lane0 = bjacobian_determinant0[goff];
-        const s_t idet = s_t(1) / jacobian_determinant_lane0;
+        const s_t adj_lane0 = badj0[goff];
+        const s_t adj_lane1 = badj1[goff];
+        const s_t adj_lane2 = badj2[goff];
+        const s_t adj_lane3 = badj3[goff];
+        const s_t det_lane0 = bdet0[goff];
+        const s_t idet = s_t(1) / det_lane0;
         for (int trial_component = 0; trial_component < NC; ++trial_component) {
             for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
                 const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial_shape];
@@ -67,8 +67,8 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_direct_hessian_reference_el
                 for (int i = 0; i < NC * ND; ++i) {
                     trial_grad[i] = s_t(0);
                 }
-                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane2) * idet;
-                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane3) * idet;
+                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * adj_lane0 + trial_grad_ref1 * adj_lane2) * idet;
+                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * adj_lane1 + trial_grad_ref1 * adj_lane3) * idet;
                 s_t material[NC * ND];
                 const s_t weak_hess_tmp0 = s_t(2)*trial_grad[0];
                 const s_t weak_hess_tmp1 = s_t(2)*trial_grad[3];
@@ -83,8 +83,8 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_direct_hessian_reference_el
                         const s_t test_grad_ref0 = grad_ref_x[q * NS + test_shape];
                         const s_t test_grad_ref1 = grad_ref_y[q * NS + test_shape];
                         s_t entry = s_t(0);
-                        entry += test_grad_ref0 * qw * (material[test_component * ND + 0] * jacobian_adjugate_lane0 + material[test_component * ND + 1] * jacobian_adjugate_lane1);
-                        entry += test_grad_ref1 * qw * (material[test_component * ND + 0] * jacobian_adjugate_lane2 + material[test_component * ND + 1] * jacobian_adjugate_lane3);
+                        entry += test_grad_ref0 * qw * (material[test_component * ND + 0] * adj_lane0 + material[test_component * ND + 1] * adj_lane1);
+                        entry += test_grad_ref1 * qw * (material[test_component * ND + 0] * adj_lane2 + material[test_component * ND + 1] * adj_lane3);
                         const int row = test_component * NS + test_shape;
                         const int col = trial_component * NS + trial_shape;
                         element_matrix[row * NDOFS + col] += entry;

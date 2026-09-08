@@ -265,8 +265,8 @@ class SfemSoAElementSpecialization:
     def adjugate_geometry_inputs(
         self,
         grad_ref_name="grad_ref",
-        adjugate_name="jacobian_adjugate",
-        determinant_name="jacobian_determinant",
+        adjugate_name="adj",
+        determinant_name="det",
     ):
         return sfem_soa_adjugate_geometry_inputs(
             self,
@@ -279,8 +279,8 @@ class SfemSoAElementSpecialization:
 def sfem_soa_adjugate_geometry_inputs(
     specialization,
     grad_ref_name="grad_ref",
-    adjugate_name="jacobian_adjugate",
-    determinant_name="jacobian_determinant",
+    adjugate_name="adj",
+    determinant_name="det",
 ):
     if isinstance(specialization, SfemSoAElementSpecialization):
         dim = specialization.dim

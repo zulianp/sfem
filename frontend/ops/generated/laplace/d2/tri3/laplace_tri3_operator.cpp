@@ -877,12 +877,12 @@ static int laplace_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
         static constexpr int nelems = VS;
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
-        s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
             bh_streams[stream] = bh_data[stream];
@@ -902,7 +902,7 @@ static int laplace_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
 
 
         for (int q = 0; q < NQ; ++q) {
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -950,11 +950,11 @@ static int laplace_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
             }
         }
 
-        laplace_d2_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, kappa, element_matrix);
+        laplace_d2_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, kappa, element_matrix);
 
         if constexpr (FORMAT == 1) {
             laplace_tri3_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

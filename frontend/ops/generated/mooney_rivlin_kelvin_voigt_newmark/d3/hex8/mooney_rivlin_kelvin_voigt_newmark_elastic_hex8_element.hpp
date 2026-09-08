@@ -9,8 +9,8 @@ namespace codegen {
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_energy_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -29,7 +29,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_energy_el
             ordered_u_streams[shape * NC + component] = u_streams[source_shape * NC + component];
         }
     }
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_energy_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, ordered_u_streams, values);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_energy_element_geometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, values);
 }
 
 template <typename s_t, int VS = 16>
@@ -99,8 +99,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_energy_el
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -126,7 +126,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_
             ordered_out_streams[shape * NC + component] = out_streams[source_shape * NC + component];
         }
     }
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, ordered_u_streams, ordered_out_streams);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_element_geometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, ordered_out_streams);
 }
 
 template <typename s_t, int VS = 16>
@@ -210,8 +210,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_gradient_
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_hessian_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -246,7 +246,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_hessian_e
             }
         }
     }
-    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_element_geometry_soa<s_t, VS>(nelements, jacobian_adjugate, jacobian_determinant, lmbda, mu, ordered_u_streams, ordered_matrix_streams);
+    return mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_hessian_element_geometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, ordered_matrix_streams);
 }
 
 template <typename s_t, int VS = 16>

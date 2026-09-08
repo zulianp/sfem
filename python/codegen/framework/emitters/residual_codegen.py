@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import sympy as sp
 
-from codegen.framework.plans.conventions import PREFIXES
+from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name
 
 #: The staged-buffer and per-thread-scratch prefixes, from the one
 #: table that owns them.  Spelling either here again is what made the
@@ -317,7 +317,7 @@ def _affine_geometry_stream_conversion_lines(streams, indent):
         % (
             indent,
             n_streams,
-            ", ".join("g_%s + evb" % stream for stream in streams),
+            ", ".join(abi_geometry_name(stream) + " + evb" for stream in streams),
         ),
         "%ss_t baffine_geometry_data[%d][VS];"
         % (indent, n_streams),
@@ -2662,10 +2662,10 @@ def _affine_block_names(geometry_stream_indices, uses_cached_affine_metric, name
     offered only for a stream that is actually there.
     """
     spelled = dict(names or {})
-    if "jacobian_determinant0" in geometry_stream_indices:
+    if "det0" in geometry_stream_indices:
         spelled["determinant"] = (
             "bageom_streams[%d]"
-            % geometry_stream_indices["jacobian_determinant0"]
+            % geometry_stream_indices["det0"]
         )
     if uses_cached_affine_metric:
         spelled["q_weight"] = "cached_affine_metric_q_weight"
@@ -4617,9 +4617,9 @@ def _mixed_affine_function(
         lines.extend(["", *field_gather])
     lines.extend(["", *_zero_block_output_lines("boutput", layout.total_streams, "        ")])
     affine_geometry_streams = tuple(
-        "jacobian_adjugate%d" % i
+        "adj%d" % i
         for i in _adjugate_components(dependencies, dim)
-    ) + ("jacobian_determinant0",)
+    ) + ("det0",)
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
     }
@@ -4651,7 +4651,7 @@ def _mixed_affine_function(
         "nelems",
         "0",
         "bageom_streams[%d]"
-        % affine_geometry_stream_indices["jacobian_determinant0"],
+        % affine_geometry_stream_indices["det0"],
     ]
     call_args.extend(
         _geometry_buffer_arguments(dependencies, dim, {"adjugate": "badjugate"})
@@ -5489,11 +5489,11 @@ def _mesh_operator_source(
                 for i in range(gradient_metric.metric_components)
             )
             if uses_cached_affine_metric
-            else tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+            else tuple("adj%d" % i for i in range(dim * dim))
             if dependencies.uses_adjugate
             else ()
         )
-        + (() if uses_cached_affine_metric else ("jacobian_determinant0",))
+        + (() if uses_cached_affine_metric else ("det0",))
     )
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
@@ -5534,9 +5534,9 @@ def _mesh_operator_source(
             _geometry_metric_grouping_lines(
                 dim,
                 "bageom_streams[%d][lane]"
-                % affine_geometry_stream_indices["jacobian_determinant0"],
+                % affine_geometry_stream_indices["det0"],
                 lambda component: "bageom_streams[%d][lane]"
-                % affine_geometry_stream_indices["jacobian_adjugate%d" % component],
+                % affine_geometry_stream_indices["adj%d" % component],
                 lambda component: "bgeom_metric_data[%d][lane]" % component,
                 "            ",
                 "metric",
@@ -8366,11 +8366,11 @@ def _scalar_packed_affine_jacobian_action_source(
                 for i in range(gradient_metric.metric_components)
             )
             if uses_cached_affine_metric
-            else tuple("jacobian_adjugate%d" % i for i in range(dim * dim))
+            else tuple("adj%d" % i for i in range(dim * dim))
             if dependencies.uses_adjugate
             else ()
         )
-        + (() if uses_cached_affine_metric else ("jacobian_determinant0",))
+        + (() if uses_cached_affine_metric else ("det0",))
     )
     affine_geometry_stream_indices = {
         stream: index for index, stream in enumerate(affine_geometry_streams)
@@ -8666,9 +8666,9 @@ def _scalar_packed_affine_jacobian_action_source(
             _geometry_metric_grouping_lines(
                 dim,
                 "bageom_streams[%d][lane]"
-                % affine_geometry_stream_indices["jacobian_determinant0"],
+                % affine_geometry_stream_indices["det0"],
                 lambda component: "bageom_streams[%d][lane]"
-                % affine_geometry_stream_indices["jacobian_adjugate%d" % component],
+                % affine_geometry_stream_indices["adj%d" % component],
                 lambda component: "bgeom_metric_data[%d][lane]" % component,
                 "                    ",
                 "metric",

@@ -30,16 +30,16 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_objective_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate4,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate5,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate6,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate7,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate8,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT adj4,
+        const s_t *const SFEM_RESTRICT adj5,
+        const s_t *const SFEM_RESTRICT adj6,
+        const s_t *const SFEM_RESTRICT adj7,
+        const s_t *const SFEM_RESTRICT adj8,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT grad_ref_x,
         const s_t *const SFEM_RESTRICT grad_ref_y,
         const s_t *const SFEM_RESTRICT grad_ref_z,
@@ -84,24 +84,24 @@ static SFEM_INLINE void laplace_d3_simplex_objective_block(
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t adj_lane4 = adj4[goff];
+            const s_t adj_lane5 = adj5[goff];
+            const s_t adj_lane6 = adj6[goff];
+            const s_t adj_lane7 = adj7[goff];
+            const s_t adj_lane8 = adj8[goff];
+            const s_t det_lane0 = det0[goff];
             const s_t gu_ref0 = gu_ref0_values[lane];
             const s_t gu_ref1 = gu_ref1_values[lane];
             const s_t gu_ref2 = gu_ref2_values[lane];
-        const s_t idet = s_t(1) / jacobian_determinant_lane0;
-        const s_t gu0 = (gu_ref0 * jacobian_adjugate_lane0 + gu_ref1 * jacobian_adjugate_lane3 + gu_ref2 * jacobian_adjugate_lane6) * idet;
-        const s_t gu1 = (gu_ref0 * jacobian_adjugate_lane1 + gu_ref1 * jacobian_adjugate_lane4 + gu_ref2 * jacobian_adjugate_lane7) * idet;
-        const s_t gu2 = (gu_ref0 * jacobian_adjugate_lane2 + gu_ref1 * jacobian_adjugate_lane5 + gu_ref2 * jacobian_adjugate_lane8) * idet;
-        value[lane] += qw * jacobian_determinant_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1) + pow_2(gu2)));
+        const s_t idet = s_t(1) / det_lane0;
+        const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
+        const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
+        const s_t gu2 = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
+        value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1) + pow_2(gu2)));
             }
         }
 }
@@ -110,16 +110,16 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_tet4_objective_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate4,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate5,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate6,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate7,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate8,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT adj4,
+        const s_t *const SFEM_RESTRICT adj5,
+        const s_t *const SFEM_RESTRICT adj6,
+        const s_t *const SFEM_RESTRICT adj7,
+        const s_t *const SFEM_RESTRICT adj8,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT q_weight,
         const s_t kappa,
         const s_t *const SFEM_RESTRICT u_streams[NS * 1],
@@ -132,24 +132,24 @@ static SFEM_INLINE void laplace_d3_simplex_tet4_objective_block(
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t adj_lane4 = adj4[goff];
+            const s_t adj_lane5 = adj5[goff];
+            const s_t adj_lane6 = adj6[goff];
+            const s_t adj_lane7 = adj7[goff];
+            const s_t adj_lane8 = adj8[goff];
+            const s_t det_lane0 = det0[goff];
             const s_t gu_ref0 = -(u_streams[0 * 1 + 0][lane]) + u_streams[1 * 1 + 0][lane];
             const s_t gu_ref1 = -(u_streams[0 * 1 + 0][lane]) + u_streams[2 * 1 + 0][lane];
             const s_t gu_ref2 = -(u_streams[0 * 1 + 0][lane]) + u_streams[3 * 1 + 0][lane];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            const s_t gu0 = (gu_ref0 * jacobian_adjugate_lane0 + gu_ref1 * jacobian_adjugate_lane3 + gu_ref2 * jacobian_adjugate_lane6) * idet;
-            const s_t gu1 = (gu_ref0 * jacobian_adjugate_lane1 + gu_ref1 * jacobian_adjugate_lane4 + gu_ref2 * jacobian_adjugate_lane7) * idet;
-            const s_t gu2 = (gu_ref0 * jacobian_adjugate_lane2 + gu_ref1 * jacobian_adjugate_lane5 + gu_ref2 * jacobian_adjugate_lane8) * idet;
-        value[lane] += qw * jacobian_determinant_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1) + pow_2(gu2)));
+            const s_t idet = s_t(1) / det_lane0;
+            const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
+            const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
+            const s_t gu2 = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
+        value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1) + pow_2(gu2)));
             }
         }
 }
@@ -194,16 +194,16 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_gradient_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate4,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate5,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate6,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate7,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate8,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT adj4,
+        const s_t *const SFEM_RESTRICT adj5,
+        const s_t *const SFEM_RESTRICT adj6,
+        const s_t *const SFEM_RESTRICT adj7,
+        const s_t *const SFEM_RESTRICT adj8,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT grad_ref_x,
         const s_t *const SFEM_RESTRICT grad_ref_y,
         const s_t *const SFEM_RESTRICT grad_ref_z,
@@ -251,29 +251,29 @@ static SFEM_INLINE void laplace_d3_simplex_gradient_block(
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t adj_lane4 = adj4[goff];
+            const s_t adj_lane5 = adj5[goff];
+            const s_t adj_lane6 = adj6[goff];
+            const s_t adj_lane7 = adj7[goff];
+            const s_t adj_lane8 = adj8[goff];
+            const s_t det_lane0 = det0[goff];
             const s_t gu_ref0 = gu_ref0_values[lane];
             const s_t gu_ref1 = gu_ref1_values[lane];
             const s_t gu_ref2 = gu_ref2_values[lane];
-        const s_t idet = s_t(1) / jacobian_determinant_lane0;
-        const s_t gu0 = (gu_ref0 * jacobian_adjugate_lane0 + gu_ref1 * jacobian_adjugate_lane3 + gu_ref2 * jacobian_adjugate_lane6) * idet;
-        const s_t gu1 = (gu_ref0 * jacobian_adjugate_lane1 + gu_ref1 * jacobian_adjugate_lane4 + gu_ref2 * jacobian_adjugate_lane7) * idet;
-        const s_t gu2 = (gu_ref0 * jacobian_adjugate_lane2 + gu_ref1 * jacobian_adjugate_lane5 + gu_ref2 * jacobian_adjugate_lane8) * idet;
+        const s_t idet = s_t(1) / det_lane0;
+        const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
+        const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
+        const s_t gu2 = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
         const s_t material0 = gu0*kappa;
         const s_t material1 = gu1*kappa;
         const s_t material2 = gu2*kappa;
-        const s_t loperand0 = qw * (material0 * jacobian_adjugate_lane0 + material1 * jacobian_adjugate_lane1 + material2 * jacobian_adjugate_lane2);
-        const s_t loperand1 = qw * (material0 * jacobian_adjugate_lane3 + material1 * jacobian_adjugate_lane4 + material2 * jacobian_adjugate_lane5);
-        const s_t loperand2 = qw * (material0 * jacobian_adjugate_lane6 + material1 * jacobian_adjugate_lane7 + material2 * jacobian_adjugate_lane8);
+        const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
+        const s_t loperand1 = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
+        const s_t loperand2 = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
             loperand0_values[lane] = loperand0;
             loperand1_values[lane] = loperand1;
             loperand2_values[lane] = loperand2;
@@ -291,16 +291,16 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_tet4_gradient_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate4,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate5,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate6,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate7,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate8,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT adj4,
+        const s_t *const SFEM_RESTRICT adj5,
+        const s_t *const SFEM_RESTRICT adj6,
+        const s_t *const SFEM_RESTRICT adj7,
+        const s_t *const SFEM_RESTRICT adj8,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT q_weight,
         const s_t kappa,
         const s_t *const SFEM_RESTRICT u_streams[NS * 1],
@@ -313,29 +313,29 @@ static SFEM_INLINE void laplace_d3_simplex_tet4_gradient_block(
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t adj_lane4 = adj4[goff];
+            const s_t adj_lane5 = adj5[goff];
+            const s_t adj_lane6 = adj6[goff];
+            const s_t adj_lane7 = adj7[goff];
+            const s_t adj_lane8 = adj8[goff];
+            const s_t det_lane0 = det0[goff];
             const s_t gu_ref0 = -(u_streams[0 * 1 + 0][lane]) + u_streams[1 * 1 + 0][lane];
             const s_t gu_ref1 = -(u_streams[0 * 1 + 0][lane]) + u_streams[2 * 1 + 0][lane];
             const s_t gu_ref2 = -(u_streams[0 * 1 + 0][lane]) + u_streams[3 * 1 + 0][lane];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            const s_t gu0 = (gu_ref0 * jacobian_adjugate_lane0 + gu_ref1 * jacobian_adjugate_lane3 + gu_ref2 * jacobian_adjugate_lane6) * idet;
-            const s_t gu1 = (gu_ref0 * jacobian_adjugate_lane1 + gu_ref1 * jacobian_adjugate_lane4 + gu_ref2 * jacobian_adjugate_lane7) * idet;
-            const s_t gu2 = (gu_ref0 * jacobian_adjugate_lane2 + gu_ref1 * jacobian_adjugate_lane5 + gu_ref2 * jacobian_adjugate_lane8) * idet;
+            const s_t idet = s_t(1) / det_lane0;
+            const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
+            const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
+            const s_t gu2 = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
         const s_t material0 = gu0*kappa;
         const s_t material1 = gu1*kappa;
         const s_t material2 = gu2*kappa;
-        const s_t loperand0 = qw * (material0 * jacobian_adjugate_lane0 + material1 * jacobian_adjugate_lane1 + material2 * jacobian_adjugate_lane2);
-        const s_t loperand1 = qw * (material0 * jacobian_adjugate_lane3 + material1 * jacobian_adjugate_lane4 + material2 * jacobian_adjugate_lane5);
-        const s_t loperand2 = qw * (material0 * jacobian_adjugate_lane6 + material1 * jacobian_adjugate_lane7 + material2 * jacobian_adjugate_lane8);
+        const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
+        const s_t loperand1 = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
+        const s_t loperand2 = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
             out_streams[0 * 1 + 0][lane] += -(loperand0) - loperand1 - loperand2;
             out_streams[1 * 1 + 0][lane] += loperand0;
             out_streams[2 * 1 + 0][lane] += loperand1;
@@ -387,16 +387,16 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_apply_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate4,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate5,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate6,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate7,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate8,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT adj4,
+        const s_t *const SFEM_RESTRICT adj5,
+        const s_t *const SFEM_RESTRICT adj6,
+        const s_t *const SFEM_RESTRICT adj7,
+        const s_t *const SFEM_RESTRICT adj8,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT grad_ref_x,
         const s_t *const SFEM_RESTRICT grad_ref_y,
         const s_t *const SFEM_RESTRICT grad_ref_z,
@@ -444,29 +444,29 @@ static SFEM_INLINE void laplace_d3_simplex_apply_block(
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t adj_lane4 = adj4[goff];
+            const s_t adj_lane5 = adj5[goff];
+            const s_t adj_lane6 = adj6[goff];
+            const s_t adj_lane7 = adj7[goff];
+            const s_t adj_lane8 = adj8[goff];
+            const s_t det_lane0 = det0[goff];
             const s_t grad_h_ref0 = grad_h_ref0_values[lane];
             const s_t grad_h_ref1 = grad_h_ref1_values[lane];
             const s_t grad_h_ref2 = grad_h_ref2_values[lane];
-        const s_t idet = s_t(1) / jacobian_determinant_lane0;
-        const s_t trial_grad0 = (grad_h_ref0 * jacobian_adjugate_lane0 + grad_h_ref1 * jacobian_adjugate_lane3 + grad_h_ref2 * jacobian_adjugate_lane6) * idet;
-        const s_t trial_grad1 = (grad_h_ref0 * jacobian_adjugate_lane1 + grad_h_ref1 * jacobian_adjugate_lane4 + grad_h_ref2 * jacobian_adjugate_lane7) * idet;
-        const s_t trial_grad2 = (grad_h_ref0 * jacobian_adjugate_lane2 + grad_h_ref1 * jacobian_adjugate_lane5 + grad_h_ref2 * jacobian_adjugate_lane8) * idet;
+        const s_t idet = s_t(1) / det_lane0;
+        const s_t trial_grad0 = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane3 + grad_h_ref2 * adj_lane6) * idet;
+        const s_t trial_grad1 = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane4 + grad_h_ref2 * adj_lane7) * idet;
+        const s_t trial_grad2 = (grad_h_ref0 * adj_lane2 + grad_h_ref1 * adj_lane5 + grad_h_ref2 * adj_lane8) * idet;
         const s_t material0 = kappa*trial_grad0;
         const s_t material1 = kappa*trial_grad1;
         const s_t material2 = kappa*trial_grad2;
-        const s_t loperand0 = qw * (material0 * jacobian_adjugate_lane0 + material1 * jacobian_adjugate_lane1 + material2 * jacobian_adjugate_lane2);
-        const s_t loperand1 = qw * (material0 * jacobian_adjugate_lane3 + material1 * jacobian_adjugate_lane4 + material2 * jacobian_adjugate_lane5);
-        const s_t loperand2 = qw * (material0 * jacobian_adjugate_lane6 + material1 * jacobian_adjugate_lane7 + material2 * jacobian_adjugate_lane8);
+        const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
+        const s_t loperand1 = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
+        const s_t loperand2 = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
             loperand0_values[lane] = loperand0;
             loperand1_values[lane] = loperand1;
             loperand2_values[lane] = loperand2;
@@ -484,16 +484,16 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_tet4_apply_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate4,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate5,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate6,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate7,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate8,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT adj4,
+        const s_t *const SFEM_RESTRICT adj5,
+        const s_t *const SFEM_RESTRICT adj6,
+        const s_t *const SFEM_RESTRICT adj7,
+        const s_t *const SFEM_RESTRICT adj8,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT q_weight,
         const s_t kappa,
         const s_t *const SFEM_RESTRICT h_streams[NS * 1],
@@ -506,29 +506,29 @@ static SFEM_INLINE void laplace_d3_simplex_tet4_apply_block(
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_adjugate_lane4 = jacobian_adjugate4[goff];
-            const s_t jacobian_adjugate_lane5 = jacobian_adjugate5[goff];
-            const s_t jacobian_adjugate_lane6 = jacobian_adjugate6[goff];
-            const s_t jacobian_adjugate_lane7 = jacobian_adjugate7[goff];
-            const s_t jacobian_adjugate_lane8 = jacobian_adjugate8[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t adj_lane4 = adj4[goff];
+            const s_t adj_lane5 = adj5[goff];
+            const s_t adj_lane6 = adj6[goff];
+            const s_t adj_lane7 = adj7[goff];
+            const s_t adj_lane8 = adj8[goff];
+            const s_t det_lane0 = det0[goff];
             const s_t grad_h_ref0 = -(h_streams[0 * 1 + 0][lane]) + h_streams[1 * 1 + 0][lane];
             const s_t grad_h_ref1 = -(h_streams[0 * 1 + 0][lane]) + h_streams[2 * 1 + 0][lane];
             const s_t grad_h_ref2 = -(h_streams[0 * 1 + 0][lane]) + h_streams[3 * 1 + 0][lane];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            const s_t trial_grad0 = (grad_h_ref0 * jacobian_adjugate_lane0 + grad_h_ref1 * jacobian_adjugate_lane3 + grad_h_ref2 * jacobian_adjugate_lane6) * idet;
-            const s_t trial_grad1 = (grad_h_ref0 * jacobian_adjugate_lane1 + grad_h_ref1 * jacobian_adjugate_lane4 + grad_h_ref2 * jacobian_adjugate_lane7) * idet;
-            const s_t trial_grad2 = (grad_h_ref0 * jacobian_adjugate_lane2 + grad_h_ref1 * jacobian_adjugate_lane5 + grad_h_ref2 * jacobian_adjugate_lane8) * idet;
+            const s_t idet = s_t(1) / det_lane0;
+            const s_t trial_grad0 = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane3 + grad_h_ref2 * adj_lane6) * idet;
+            const s_t trial_grad1 = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane4 + grad_h_ref2 * adj_lane7) * idet;
+            const s_t trial_grad2 = (grad_h_ref0 * adj_lane2 + grad_h_ref1 * adj_lane5 + grad_h_ref2 * adj_lane8) * idet;
         const s_t material0 = kappa*trial_grad0;
         const s_t material1 = kappa*trial_grad1;
         const s_t material2 = kappa*trial_grad2;
-        const s_t loperand0 = qw * (material0 * jacobian_adjugate_lane0 + material1 * jacobian_adjugate_lane1 + material2 * jacobian_adjugate_lane2);
-        const s_t loperand1 = qw * (material0 * jacobian_adjugate_lane3 + material1 * jacobian_adjugate_lane4 + material2 * jacobian_adjugate_lane5);
-        const s_t loperand2 = qw * (material0 * jacobian_adjugate_lane6 + material1 * jacobian_adjugate_lane7 + material2 * jacobian_adjugate_lane8);
+        const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
+        const s_t loperand1 = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
+        const s_t loperand2 = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
             out_streams[0 * 1 + 0][lane] += -(loperand0) - loperand1 - loperand2;
             out_streams[1 * 1 + 0][lane] += loperand0;
             out_streams[2 * 1 + 0][lane] += loperand1;

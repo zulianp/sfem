@@ -289,21 +289,21 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_imp
                 }
             }
         }
-        s_t bjacobian_adjugate0_data[VS];
-        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate1_data[VS];
-        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate2_data[VS];
-        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate3_data[VS];
-        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_determinant0_data[VS];
-        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
@@ -320,7 +320,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_affine_mesh_soa_imp
                 bvalue[lane] = s_t(0);
             }
 
-            neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
+            neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -582,23 +582,23 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_affine_mesh_soa_impl(
         for (int stream = 0; stream < NS * NC; ++stream) {
             bout_streams[stream] = bout_data[stream];
         }
-        s_t bjacobian_adjugate0_data[VS];
-        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate1_data[VS];
-        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate2_data[VS];
-        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate3_data[VS];
-        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_determinant0_data[VS];
-        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-        neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+        neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
@@ -871,23 +871,23 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_affine_mesh_soa_impl(
         for (int stream = 0; stream < NS * NC; ++stream) {
             bout_streams[stream] = bout_data[stream];
         }
-        s_t bjacobian_adjugate0_data[VS];
-        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate1_data[VS];
-        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate2_data[VS];
-        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate3_data[VS];
-        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_determinant0_data[VS];
-        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-        neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+        neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx, outy};
 
@@ -1059,12 +1059,12 @@ static int neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
         s_t bcoordinate_data[NS * ND][VS];
         static constexpr int nelems = VS;
         s_t bu_data[NS * NC][VS];
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
-        s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
         const s_t *bu_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
             bu_streams[stream] = bu_data[stream];
@@ -1089,7 +1089,7 @@ static int neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
 
 
         for (int q = 0; q < NQ; ++q) {
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J10_values[VS];
@@ -1137,7 +1137,7 @@ static int neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
                 const s_t J10 = J10_values[lane];
                 const s_t J11 = J11_values[lane];
                 geometry_jacobian_adjugate_and_determinant_2<s_t>(
-                        J00, J01, J10, J11, bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
             }
         }
 
@@ -1152,7 +1152,7 @@ static int neohookean_ogden_tri3_hessian_isoparametric_mesh_soa_assemble_impl(
                     bout_data[stream][0] = s_t(0);
                 }
                 bh_data[trial_shape * NC + trial_component][0] = s_t(1);
-                neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(1, 1, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, isoparametric_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
+                neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(1, 1, badj0, badj1, badj2, badj3, bdet0, isoparametric_q_weight, lmbda, mu, bu_streams, bh_streams, bout_streams);
                 const int col = trial_component * NS + trial_shape;
                 for (int test_component = 0; test_component < NC; ++test_component) {
                     for (int test_shape = 0; test_shape < NS; ++test_shape) {

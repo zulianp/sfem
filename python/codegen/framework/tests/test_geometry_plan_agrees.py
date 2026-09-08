@@ -31,13 +31,22 @@ about the elements it passes on.
 
 import unittest
 
+from codegen.framework.plans import conventions
+
 from codegen.framework.fem.geometry import GeometryMode
 from codegen.framework.fem.reference import sfem_supported_element_types
 from codegen.framework.plans.emission import emission_plan_for_element
 
 
 #: Streams that are geometry.  `grad_ref` is reference basis data and is excluded.
-GEOMETRY_STREAM_NAMES = ("jacobian_adjugate", "jacobian_determinant")
+#: Read from the naming table rather than spelled here: these are the local
+#: geometry stream names, and `plans/conventions.py` owns them.  Hardcoding them
+#: is what made this test fail when they were shortened, even though the plan and
+#: the specialization still agreed.
+GEOMETRY_STREAM_NAMES = (
+    conventions.STREAMS["adjugate"],
+    conventions.STREAMS["determinant"],
+)
 
 VS = 8
 

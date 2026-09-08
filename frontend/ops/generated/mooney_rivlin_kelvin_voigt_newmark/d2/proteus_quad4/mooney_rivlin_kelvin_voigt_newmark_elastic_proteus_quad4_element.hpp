@@ -40,8 +40,8 @@ struct mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_re
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_energy_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -64,22 +64,22 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         for (int lane = 0; lane < nelems; ++lane) {
             bvalue[lane] = s_t(0);
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
+                badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
+                badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
+                badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
+                bdet0[q * VS + lane] = det[q * nelements + evb + lane];
             }
         }
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -117,17 +117,17 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
-        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -165,17 +165,17 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
-        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
     }
     return SFEM_SUCCESS;
 }
@@ -184,8 +184,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_gradient_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -211,22 +211,22 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                 bout_streams[stream][lane] = s_t(0);
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
+                badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
+                badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
+                badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
+                bdet0[q * VS + lane] = det[q * nelements + evb + lane];
             }
         }
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -267,17 +267,17 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
-        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -318,17 +318,17 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
-        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
-        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+        mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
     }
     return SFEM_SUCCESS;
 }
@@ -337,8 +337,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
 template <typename s_t, int VS = 16>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_hessian_element_geometry_soa(
         const ptrdiff_t nelements,
-        const s_t *const *const SFEM_RESTRICT jacobian_adjugate,
-        const s_t *const SFEM_RESTRICT jacobian_determinant,
+        const s_t *const *const SFEM_RESTRICT adj,
+        const s_t *const SFEM_RESTRICT det,
         const s_t lmbda,
         const s_t mu,
         const s_t *const *const SFEM_RESTRICT u_streams,
@@ -354,19 +354,19 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
         const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);
         const s_t *bu_streams[NDOFS];
         for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         for (int q = 0; q < NQ; ++q) {
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
-                bjacobian_adjugate0[q * VS + lane] = jacobian_adjugate[0][q * nelements + evb + lane];
-                bjacobian_adjugate1[q * VS + lane] = jacobian_adjugate[1][q * nelements + evb + lane];
-                bjacobian_adjugate2[q * VS + lane] = jacobian_adjugate[2][q * nelements + evb + lane];
-                bjacobian_adjugate3[q * VS + lane] = jacobian_adjugate[3][q * nelements + evb + lane];
-                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];
+                badj0[q * VS + lane] = adj[0][q * nelements + evb + lane];
+                badj1[q * VS + lane] = adj[1][q * nelements + evb + lane];
+                badj2[q * VS + lane] = adj[2][q * nelements + evb + lane];
+                badj3[q * VS + lane] = adj[3][q * nelements + evb + lane];
+                bdet0[q * VS + lane] = det[q * nelements + evb + lane];
             }
         }
         s_t bh_data[NDOFS][VS];
@@ -385,7 +385,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
@@ -424,16 +424,16 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
-        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
         s_t bh_data[NDOFS][VS];
         s_t bout_data[NDOFS][VS];
         const s_t *bh_streams[NDOFS];
@@ -450,7 +450,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd
@@ -489,16 +489,16 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                 bcoordinate_data[stream][lane] = coords[stream][evb + lane];
             }
         }
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t bdet0[NQ * VS];
         s_t coordinate_grad_ref[ND * NQ * ND * VS];
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0 * NQ * ND * VS);
         tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(nelems, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + 1 * NQ * ND * VS);
-        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3};
-        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);
+        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
         s_t bh_data[NDOFS][VS];
         s_t bout_data[NDOFS][VS];
         const s_t *bh_streams[NDOFS];
@@ -515,7 +515,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_
                     bout_data[stream][lane] = s_t(0);
                 }
             }
-            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_determinant0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+            mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::shape_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::grad_1d(), sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_isoparametric_reference_data<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bh_streams, bout_streams);
             for (int row = 0; row < NDOFS; ++row) {
                 s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
                 #pragma omp simd

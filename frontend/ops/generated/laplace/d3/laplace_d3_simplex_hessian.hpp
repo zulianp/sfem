@@ -28,16 +28,16 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_direct_hessian_reference_element_matrix(
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate4,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate5,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate6,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate7,
-        const s_t *const SFEM_RESTRICT bjacobian_adjugate8,
-        const s_t *const SFEM_RESTRICT bjacobian_determinant0,
+        const s_t *const SFEM_RESTRICT badj0,
+        const s_t *const SFEM_RESTRICT badj1,
+        const s_t *const SFEM_RESTRICT badj2,
+        const s_t *const SFEM_RESTRICT badj3,
+        const s_t *const SFEM_RESTRICT badj4,
+        const s_t *const SFEM_RESTRICT badj5,
+        const s_t *const SFEM_RESTRICT badj6,
+        const s_t *const SFEM_RESTRICT badj7,
+        const s_t *const SFEM_RESTRICT badj8,
+        const s_t *const SFEM_RESTRICT bdet0,
         const s_t *const SFEM_RESTRICT grad_ref_x,
         const s_t *const SFEM_RESTRICT grad_ref_y,
         const s_t *const SFEM_RESTRICT grad_ref_z,
@@ -58,17 +58,17 @@ static SFEM_INLINE void laplace_d3_simplex_direct_hessian_reference_element_matr
         const s_t qw = q_weight[q];
         const int lane = 0;
         const ptrdiff_t goff = q * VS + lane;
-        const s_t jacobian_adjugate_lane0 = bjacobian_adjugate0[goff];
-        const s_t jacobian_adjugate_lane1 = bjacobian_adjugate1[goff];
-        const s_t jacobian_adjugate_lane2 = bjacobian_adjugate2[goff];
-        const s_t jacobian_adjugate_lane3 = bjacobian_adjugate3[goff];
-        const s_t jacobian_adjugate_lane4 = bjacobian_adjugate4[goff];
-        const s_t jacobian_adjugate_lane5 = bjacobian_adjugate5[goff];
-        const s_t jacobian_adjugate_lane6 = bjacobian_adjugate6[goff];
-        const s_t jacobian_adjugate_lane7 = bjacobian_adjugate7[goff];
-        const s_t jacobian_adjugate_lane8 = bjacobian_adjugate8[goff];
-        const s_t jacobian_determinant_lane0 = bjacobian_determinant0[goff];
-        const s_t idet = s_t(1) / jacobian_determinant_lane0;
+        const s_t adj_lane0 = badj0[goff];
+        const s_t adj_lane1 = badj1[goff];
+        const s_t adj_lane2 = badj2[goff];
+        const s_t adj_lane3 = badj3[goff];
+        const s_t adj_lane4 = badj4[goff];
+        const s_t adj_lane5 = badj5[goff];
+        const s_t adj_lane6 = badj6[goff];
+        const s_t adj_lane7 = badj7[goff];
+        const s_t adj_lane8 = badj8[goff];
+        const s_t det_lane0 = bdet0[goff];
+        const s_t idet = s_t(1) / det_lane0;
         for (int trial_component = 0; trial_component < NC; ++trial_component) {
             for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {
                 const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial_shape];
@@ -78,9 +78,9 @@ static SFEM_INLINE void laplace_d3_simplex_direct_hessian_reference_element_matr
                 for (int i = 0; i < NC * ND; ++i) {
                     trial_grad[i] = s_t(0);
                 }
-                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * jacobian_adjugate_lane0 + trial_grad_ref1 * jacobian_adjugate_lane3 + trial_grad_ref2 * jacobian_adjugate_lane6) * idet;
-                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * jacobian_adjugate_lane1 + trial_grad_ref1 * jacobian_adjugate_lane4 + trial_grad_ref2 * jacobian_adjugate_lane7) * idet;
-                trial_grad[trial_component * ND + 2] = (trial_grad_ref0 * jacobian_adjugate_lane2 + trial_grad_ref1 * jacobian_adjugate_lane5 + trial_grad_ref2 * jacobian_adjugate_lane8) * idet;
+                trial_grad[trial_component * ND + 0] = (trial_grad_ref0 * adj_lane0 + trial_grad_ref1 * adj_lane3 + trial_grad_ref2 * adj_lane6) * idet;
+                trial_grad[trial_component * ND + 1] = (trial_grad_ref0 * adj_lane1 + trial_grad_ref1 * adj_lane4 + trial_grad_ref2 * adj_lane7) * idet;
+                trial_grad[trial_component * ND + 2] = (trial_grad_ref0 * adj_lane2 + trial_grad_ref1 * adj_lane5 + trial_grad_ref2 * adj_lane8) * idet;
                 s_t material[NC * ND];
                 material[0] = kappa*trial_grad[0];
                 material[1] = kappa*trial_grad[1];
@@ -91,9 +91,9 @@ static SFEM_INLINE void laplace_d3_simplex_direct_hessian_reference_element_matr
                         const s_t test_grad_ref1 = grad_ref_y[q * NS + test_shape];
                         const s_t test_grad_ref2 = grad_ref_z[q * NS + test_shape];
                         s_t entry = s_t(0);
-                        entry += test_grad_ref0 * qw * (material[test_component * ND + 0] * jacobian_adjugate_lane0 + material[test_component * ND + 1] * jacobian_adjugate_lane1 + material[test_component * ND + 2] * jacobian_adjugate_lane2);
-                        entry += test_grad_ref1 * qw * (material[test_component * ND + 0] * jacobian_adjugate_lane3 + material[test_component * ND + 1] * jacobian_adjugate_lane4 + material[test_component * ND + 2] * jacobian_adjugate_lane5);
-                        entry += test_grad_ref2 * qw * (material[test_component * ND + 0] * jacobian_adjugate_lane6 + material[test_component * ND + 1] * jacobian_adjugate_lane7 + material[test_component * ND + 2] * jacobian_adjugate_lane8);
+                        entry += test_grad_ref0 * qw * (material[test_component * ND + 0] * adj_lane0 + material[test_component * ND + 1] * adj_lane1 + material[test_component * ND + 2] * adj_lane2);
+                        entry += test_grad_ref1 * qw * (material[test_component * ND + 0] * adj_lane3 + material[test_component * ND + 1] * adj_lane4 + material[test_component * ND + 2] * adj_lane5);
+                        entry += test_grad_ref2 * qw * (material[test_component * ND + 0] * adj_lane6 + material[test_component * ND + 1] * adj_lane7 + material[test_component * ND + 2] * adj_lane8);
                         const int row = test_component * NS + test_shape;
                         const int col = trial_component * NS + trial_shape;
                         element_matrix[row * NDOFS + col] += entry;

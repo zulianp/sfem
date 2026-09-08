@@ -30,11 +30,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT shape_1d,
         const s_t *const SFEM_RESTRICT grad_1d,
         const s_t *const SFEM_RESTRICT q_weight_1d,
@@ -59,22 +59,22 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_pro
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t det_lane0 = det0[goff];
             s_t gu_ref[4];
             gu_ref[0] = gu_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[1] = gu_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
             gu_ref[2] = gu_ref_q[((1 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[3] = gu_ref_q[((1 * NQ + q) * 2 + 1) * VS + lane];
             s_t gu[4];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            gu[0] = (gu_ref[0] * jacobian_adjugate_lane0 + gu_ref[1] * jacobian_adjugate_lane2) * idet;
-            gu[1] = (gu_ref[0] * jacobian_adjugate_lane1 + gu_ref[1] * jacobian_adjugate_lane3) * idet;
-            gu[2] = (gu_ref[2] * jacobian_adjugate_lane0 + gu_ref[3] * jacobian_adjugate_lane2) * idet;
-            gu[3] = (gu_ref[2] * jacobian_adjugate_lane1 + gu_ref[3] * jacobian_adjugate_lane3) * idet;
+            const s_t idet = s_t(1) / det_lane0;
+            gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
+            gu[1] = (gu_ref[0] * adj_lane1 + gu_ref[1] * adj_lane3) * idet;
+            gu[2] = (gu_ref[2] * adj_lane0 + gu_ref[3] * adj_lane2) * idet;
+            gu[3] = (gu_ref[2] * adj_lane1 + gu_ref[3] * adj_lane3) * idet;
         const s_t weak_obj_tmp0 = gu[1]*gu[2];
         const s_t weak_obj_tmp1 = gu[0] + s_t(1);
         const s_t weak_obj_tmp2 = gu[3] + s_t(1);
@@ -84,7 +84,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_pro
         const s_t weak_obj_tmp6 = pow_2(weak_obj_tmp2);
         const s_t weak_obj_tmp7 = weak_obj_tmp3 + weak_obj_tmp6;
         const s_t weak_obj_tmp8 = weak_obj_tmp4 + weak_obj_tmp5;
-        value[lane] += qw * jacobian_determinant_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(-weak_obj_tmp0 + weak_obj_tmp1*weak_obj_tmp2 + s_t(-1)) + mu*(s_t(6)*weak_obj_tmp0 - s_t(6)*weak_obj_tmp1*weak_obj_tmp2 + s_t(2)*weak_obj_tmp3 + s_t(2)*weak_obj_tmp4 + s_t(2)*weak_obj_tmp5 + s_t(2)*weak_obj_tmp6 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp7 + weak_obj_tmp8) - pow_2(gu[1]*weak_obj_tmp1 + gu[2]*weak_obj_tmp2) + s_t(1)));
+        value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(-weak_obj_tmp0 + weak_obj_tmp1*weak_obj_tmp2 + s_t(-1)) + mu*(s_t(6)*weak_obj_tmp0 - s_t(6)*weak_obj_tmp1*weak_obj_tmp2 + s_t(2)*weak_obj_tmp3 + s_t(2)*weak_obj_tmp4 + s_t(2)*weak_obj_tmp5 + s_t(2)*weak_obj_tmp6 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp7 + weak_obj_tmp8) - pow_2(gu[1]*weak_obj_tmp1 + gu[2]*weak_obj_tmp2) + s_t(1)));
         }
     }
 }
@@ -93,11 +93,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_gradient_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT shape_1d,
         const s_t *const SFEM_RESTRICT grad_1d,
         const s_t *const SFEM_RESTRICT q_weight_1d,
@@ -123,22 +123,22 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_pro
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t det_lane0 = det0[goff];
             s_t gu_ref[4];
             gu_ref[0] = gu_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[1] = gu_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
             gu_ref[2] = gu_ref_q[((1 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[3] = gu_ref_q[((1 * NQ + q) * 2 + 1) * VS + lane];
             s_t gu[4];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            gu[0] = (gu_ref[0] * jacobian_adjugate_lane0 + gu_ref[1] * jacobian_adjugate_lane2) * idet;
-            gu[1] = (gu_ref[0] * jacobian_adjugate_lane1 + gu_ref[1] * jacobian_adjugate_lane3) * idet;
-            gu[2] = (gu_ref[2] * jacobian_adjugate_lane0 + gu_ref[3] * jacobian_adjugate_lane2) * idet;
-            gu[3] = (gu_ref[2] * jacobian_adjugate_lane1 + gu_ref[3] * jacobian_adjugate_lane3) * idet;
+            const s_t idet = s_t(1) / det_lane0;
+            gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
+            gu[1] = (gu_ref[0] * adj_lane1 + gu_ref[1] * adj_lane3) * idet;
+            gu[2] = (gu_ref[2] * adj_lane0 + gu_ref[3] * adj_lane2) * idet;
+            gu[3] = (gu_ref[2] * adj_lane1 + gu_ref[3] * adj_lane3) * idet;
             s_t loperand[4];
         s_t material[4];
         const s_t weak_mat_tmp0 = gu[3] + s_t(1);
@@ -156,10 +156,10 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_pro
         material[1] = -gu[2]*weak_mat_tmp2 + mu*(s_t(4)*gu[1] + s_t(6)*gu[2] - weak_mat_tmp3*weak_mat_tmp6 - weak_mat_tmp4*weak_mat_tmp7 + weak_mat_tmp4*weak_mat_tmp8);
         material[2] = -gu[1]*weak_mat_tmp2 + mu*(s_t(6)*gu[1] + s_t(4)*gu[2] - weak_mat_tmp10*weak_mat_tmp3 - weak_mat_tmp5*weak_mat_tmp9 + weak_mat_tmp8*weak_mat_tmp9);
         material[3] = mu*(-s_t(6)*gu[0] + s_t(4)*gu[3] + s_t(2)*weak_mat_tmp0*weak_mat_tmp8 - weak_mat_tmp10*weak_mat_tmp7 - weak_mat_tmp3*weak_mat_tmp9 + s_t(-2)) + weak_mat_tmp1*weak_mat_tmp2;
-        loperand[0] = qw * (material[0] * jacobian_adjugate_lane0 + material[1] * jacobian_adjugate_lane1);
-        loperand[1] = qw * (material[0] * jacobian_adjugate_lane2 + material[1] * jacobian_adjugate_lane3);
-        loperand[2] = qw * (material[2] * jacobian_adjugate_lane0 + material[3] * jacobian_adjugate_lane1);
-        loperand[3] = qw * (material[2] * jacobian_adjugate_lane2 + material[3] * jacobian_adjugate_lane3);
+        loperand[0] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1);
+        loperand[1] = qw * (material[0] * adj_lane2 + material[1] * adj_lane3);
+        loperand[2] = qw * (material[2] * adj_lane0 + material[3] * adj_lane1);
+        loperand[3] = qw * (material[2] * adj_lane2 + material[3] * adj_lane3);
             loperand_q[((0 * NQ + q) * 2 + 0) * VS + lane] = loperand[0];
             loperand_q[((0 * NQ + q) * 2 + 1) * VS + lane] = loperand[1];
             loperand_q[((1 * NQ + q) * 2 + 0) * VS + lane] = loperand[2];
@@ -174,11 +174,11 @@ template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_apply_block(
         const int nelems,
         const ptrdiff_t geometry_stride,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate0,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate1,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate2,
-        const s_t *const SFEM_RESTRICT jacobian_adjugate3,
-        const s_t *const SFEM_RESTRICT jacobian_determinant0,
+        const s_t *const SFEM_RESTRICT adj0,
+        const s_t *const SFEM_RESTRICT adj1,
+        const s_t *const SFEM_RESTRICT adj2,
+        const s_t *const SFEM_RESTRICT adj3,
+        const s_t *const SFEM_RESTRICT det0,
         const s_t *const SFEM_RESTRICT shape_1d,
         const s_t *const SFEM_RESTRICT grad_1d,
         const s_t *const SFEM_RESTRICT q_weight_1d,
@@ -208,11 +208,11 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_pro
         #pragma omp simd
         for (int lane = 0; lane < nelems; ++lane) {
             const ptrdiff_t goff = q * geometry_stride + lane;
-            const s_t jacobian_adjugate_lane0 = jacobian_adjugate0[goff];
-            const s_t jacobian_adjugate_lane1 = jacobian_adjugate1[goff];
-            const s_t jacobian_adjugate_lane2 = jacobian_adjugate2[goff];
-            const s_t jacobian_adjugate_lane3 = jacobian_adjugate3[goff];
-            const s_t jacobian_determinant_lane0 = jacobian_determinant0[goff];
+            const s_t adj_lane0 = adj0[goff];
+            const s_t adj_lane1 = adj1[goff];
+            const s_t adj_lane2 = adj2[goff];
+            const s_t adj_lane3 = adj3[goff];
+            const s_t det_lane0 = det0[goff];
             s_t gu_ref[4];
             gu_ref[0] = gu_ref_q[((0 * NQ + q) * 2 + 0) * VS + lane];
             gu_ref[1] = gu_ref_q[((0 * NQ + q) * 2 + 1) * VS + lane];
@@ -225,15 +225,15 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_pro
             grad_h_ref[3] = grad_h_ref_q[((1 * NQ + q) * 2 + 1) * VS + lane];
             s_t gu[4];
             s_t trial_grad[4];
-            const s_t idet = s_t(1) / jacobian_determinant_lane0;
-            gu[0] = (gu_ref[0] * jacobian_adjugate_lane0 + gu_ref[1] * jacobian_adjugate_lane2) * idet;
-            trial_grad[0] = (grad_h_ref[0] * jacobian_adjugate_lane0 + grad_h_ref[1] * jacobian_adjugate_lane2) * idet;
-            gu[1] = (gu_ref[0] * jacobian_adjugate_lane1 + gu_ref[1] * jacobian_adjugate_lane3) * idet;
-            trial_grad[1] = (grad_h_ref[0] * jacobian_adjugate_lane1 + grad_h_ref[1] * jacobian_adjugate_lane3) * idet;
-            gu[2] = (gu_ref[2] * jacobian_adjugate_lane0 + gu_ref[3] * jacobian_adjugate_lane2) * idet;
-            trial_grad[2] = (grad_h_ref[2] * jacobian_adjugate_lane0 + grad_h_ref[3] * jacobian_adjugate_lane2) * idet;
-            gu[3] = (gu_ref[2] * jacobian_adjugate_lane1 + gu_ref[3] * jacobian_adjugate_lane3) * idet;
-            trial_grad[3] = (grad_h_ref[2] * jacobian_adjugate_lane1 + grad_h_ref[3] * jacobian_adjugate_lane3) * idet;
+            const s_t idet = s_t(1) / det_lane0;
+            gu[0] = (gu_ref[0] * adj_lane0 + gu_ref[1] * adj_lane2) * idet;
+            trial_grad[0] = (grad_h_ref[0] * adj_lane0 + grad_h_ref[1] * adj_lane2) * idet;
+            gu[1] = (gu_ref[0] * adj_lane1 + gu_ref[1] * adj_lane3) * idet;
+            trial_grad[1] = (grad_h_ref[0] * adj_lane1 + grad_h_ref[1] * adj_lane3) * idet;
+            gu[2] = (gu_ref[2] * adj_lane0 + gu_ref[3] * adj_lane2) * idet;
+            trial_grad[2] = (grad_h_ref[2] * adj_lane0 + grad_h_ref[3] * adj_lane2) * idet;
+            gu[3] = (gu_ref[2] * adj_lane1 + gu_ref[3] * adj_lane3) * idet;
+            trial_grad[3] = (grad_h_ref[2] * adj_lane1 + grad_h_ref[3] * adj_lane3) * idet;
             s_t loperand[4];
         s_t material[4];
         const s_t weak_mat_tmp0 = gu[3] + s_t(1);
@@ -260,10 +260,10 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_pro
         material[1] = trial_grad[0]*weak_mat_tmp4 + trial_grad[1]*(lmbda*weak_mat_tmp12 + mu*(s_t(2)*weak_mat_tmp12 + s_t(4))) + trial_grad[2]*weak_mat_tmp16 + trial_grad[3]*weak_mat_tmp15;
         material[2] = trial_grad[0]*weak_mat_tmp5 + trial_grad[1]*weak_mat_tmp16 + trial_grad[2]*(lmbda*weak_mat_tmp17 + mu*(s_t(2)*weak_mat_tmp17 + s_t(4))) + trial_grad[3]*weak_mat_tmp18;
         material[3] = trial_grad[0]*weak_mat_tmp11 + trial_grad[1]*weak_mat_tmp15 + trial_grad[2]*weak_mat_tmp18 + trial_grad[3]*(lmbda*weak_mat_tmp19 + mu*(s_t(2)*weak_mat_tmp19 + s_t(4)));
-        loperand[0] = qw * (material[0] * jacobian_adjugate_lane0 + material[1] * jacobian_adjugate_lane1);
-        loperand[1] = qw * (material[0] * jacobian_adjugate_lane2 + material[1] * jacobian_adjugate_lane3);
-        loperand[2] = qw * (material[2] * jacobian_adjugate_lane0 + material[3] * jacobian_adjugate_lane1);
-        loperand[3] = qw * (material[2] * jacobian_adjugate_lane2 + material[3] * jacobian_adjugate_lane3);
+        loperand[0] = qw * (material[0] * adj_lane0 + material[1] * adj_lane1);
+        loperand[1] = qw * (material[0] * adj_lane2 + material[1] * adj_lane3);
+        loperand[2] = qw * (material[2] * adj_lane0 + material[3] * adj_lane1);
+        loperand[3] = qw * (material[2] * adj_lane2 + material[3] * adj_lane3);
             loperand_q[((0 * NQ + q) * 2 + 0) * VS + lane] = loperand[0];
             loperand_q[((0 * NQ + q) * 2 + 1) * VS + lane] = loperand[1];
             loperand_q[((1 * NQ + q) * 2 + 0) * VS + lane] = loperand[2];

@@ -303,36 +303,36 @@ static SFEM_INLINE int laplace_tet10_objective_steps_affine_mesh_soa_impl(
                 }
             }
         }
-        s_t bjacobian_adjugate0_data[VS];
-        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate1_data[VS];
-        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate2_data[VS];
-        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate3_data[VS];
-        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate4_data[VS];
-        const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate5_data[VS];
-        const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate6_data[VS];
-        const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate7_data[VS];
-        const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate8_data[VS];
-        const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_determinant0_data[VS];
-        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<g_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<g_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<g_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<g_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<g_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
             const s_t alpha = steps[step];
@@ -349,7 +349,7 @@ static SFEM_INLINE int laplace_tet10_objective_steps_affine_mesh_soa_impl(
                 bvalue[lane] = s_t(0);
             }
 
-            laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bvalue);
+            laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bvalue);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -514,36 +514,36 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
                 for (int step = 0; step < nsteps; ++step) {
                     const s_t alpha = steps[step];
@@ -560,7 +560,7 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa(
                         bvalue[lane] = s_t(0);
                     }
 
-                    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bvalue);
+                    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bvalue);
 
 #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
@@ -668,36 +668,36 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa_float(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
                 for (int step = 0; step < nsteps; ++step) {
                     const s_t alpha = steps[step];
@@ -714,7 +714,7 @@ extern "C" int laplace_tet10_objective_steps_packed_affine_mesh_soa_float(
                         bvalue[lane] = s_t(0);
                     }
 
-                    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bvalue);
+                    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bvalue);
 
 #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
@@ -772,16 +772,16 @@ static SFEM_INLINE int laplace_tet10_objective_steps_isoparametric_mesh_soa_impl
         s_t bh_data[NS * NC][VS];
         s_t bvalue[VS];
         s_t bcoordinate_data[NS * ND][VS];
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_adjugate4[NQ * VS];
-        s_t bjacobian_adjugate5[NQ * VS];
-        s_t bjacobian_adjugate6[NQ * VS];
-        s_t bjacobian_adjugate7[NQ * VS];
-        s_t bjacobian_adjugate8[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -820,7 +820,7 @@ static SFEM_INLINE int laplace_tet10_objective_steps_isoparametric_mesh_soa_impl
         }
 
         for (int q = 0; q < NQ; ++q) {
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -920,7 +920,7 @@ static SFEM_INLINE int laplace_tet10_objective_steps_isoparametric_mesh_soa_impl
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        badj_streams, bdet0, q * VS + lane);
             }
         }
 
@@ -939,7 +939,7 @@ static SFEM_INLINE int laplace_tet10_objective_steps_isoparametric_mesh_soa_impl
                 bvalue[lane] = s_t(0);
             }
 
-            laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bvalue);
+            laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bvalue);
 
             #pragma omp simd
             for (int lane = 0; lane < nelems; ++lane) {
@@ -1081,17 +1081,17 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
                 s_t bh_data[NS * NC][VS];
                 s_t bvalue[VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9]};
 
@@ -1116,7 +1116,7 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -1216,7 +1216,7 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
@@ -1235,7 +1235,7 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa(
                         bvalue[lane] = s_t(0);
                     }
 
-                    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bvalue);
+                    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bvalue);
 
 #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
@@ -1338,17 +1338,17 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
                 s_t bh_data[NS * NC][VS];
                 s_t bvalue[VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
                 const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9]};
 
@@ -1373,7 +1373,7 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -1473,7 +1473,7 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
@@ -1492,7 +1492,7 @@ extern "C" int laplace_tet10_objective_steps_packed_isoparametric_mesh_soa_float
                         bvalue[lane] = s_t(0);
                     }
 
-                    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bvalue);
+                    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bvalue);
 
 #pragma omp simd
                     for (int lane = 0; lane < nelems; ++lane) {
@@ -1712,38 +1712,38 @@ static SFEM_INLINE int laplace_tet10_gradient_affine_mesh_soa_impl(
         for (int stream = 0; stream < NS * NC; ++stream) {
             bout_streams[stream] = bout_data[stream];
         }
-        s_t bjacobian_adjugate0_data[VS];
-        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate1_data[VS];
-        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate2_data[VS];
-        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate3_data[VS];
-        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate4_data[VS];
-        const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate5_data[VS];
-        const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate6_data[VS];
-        const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate7_data[VS];
-        const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate8_data[VS];
-        const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_determinant0_data[VS];
-        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<g_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<g_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<g_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<g_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<g_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
+        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx};
 
@@ -1912,38 +1912,38 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
+                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -2077,38 +2077,38 @@ extern "C" int laplace_tet10_gradient_packed_affine_mesh_soa_float(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
+                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -2248,38 +2248,38 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
+                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -2430,38 +2430,38 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_affine_mesh_soa_float(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
+                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -2548,16 +2548,16 @@ static SFEM_INLINE int laplace_tet10_gradient_isoparametric_mesh_soa_impl(
         s_t bu_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_adjugate4[NQ * VS];
-        s_t bjacobian_adjugate5[NQ * VS];
-        s_t bjacobian_adjugate6[NQ * VS];
-        s_t bjacobian_adjugate7[NQ * VS];
-        s_t bjacobian_adjugate8[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -2604,7 +2604,7 @@ static SFEM_INLINE int laplace_tet10_gradient_isoparametric_mesh_soa_impl(
         }
 
         for (int q = 0; q < NQ; ++q) {
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -2704,11 +2704,11 @@ static SFEM_INLINE int laplace_tet10_gradient_isoparametric_mesh_soa_impl(
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        badj_streams, bdet0, q * VS + lane);
             }
         }
 
-        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
+        laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx};
 
@@ -2840,17 +2840,17 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
                 s_t bu_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 const s_t *bu_streams[NS * NC];
                 for (int stream = 0; stream < NS * NC; ++stream) {
                     bu_streams[stream] = bu_data[stream];
@@ -2881,7 +2881,7 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -2981,11 +2981,11 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa(
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
-                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
+                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -3100,17 +3100,17 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
                 s_t bu_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 const s_t *bu_streams[NS * NC];
                 for (int stream = 0; stream < NS * NC; ++stream) {
                     bu_streams[stream] = bu_data[stream];
@@ -3141,7 +3141,7 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -3241,11 +3241,11 @@ extern "C" int laplace_tet10_gradient_packed_isoparametric_mesh_soa_float(
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
-                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
+                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -3366,17 +3366,17 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
                 s_t bu_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 const s_t *bu_streams[NS * NC];
                 for (int stream = 0; stream < NS * NC; ++stream) {
                     bu_streams[stream] = bu_data[stream];
@@ -3407,7 +3407,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -3507,11 +3507,11 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa(
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
-                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
+                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -3643,17 +3643,17 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
                 s_t bu_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 const s_t *bu_streams[NS * NC];
                 for (int stream = 0; stream < NS * NC; ++stream) {
                     bu_streams[stream] = bu_data[stream];
@@ -3684,7 +3684,7 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -3784,11 +3784,11 @@ extern "C" int laplace_tet10_gradient_packed_two_pass_isoparametric_mesh_soa_flo
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
-                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
+                laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -4042,38 +4042,38 @@ static SFEM_INLINE int laplace_tet10_apply_affine_mesh_soa_impl(
         for (int stream = 0; stream < NS * NC; ++stream) {
             bout_streams[stream] = bout_data[stream];
         }
-        s_t bjacobian_adjugate0_data[VS];
-        const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate1_data[VS];
-        const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate2_data[VS];
-        const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate3_data[VS];
-        const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate4_data[VS];
-        const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate5_data[VS];
-        const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate6_data[VS];
-        const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate7_data[VS];
-        const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_adjugate8_data[VS];
-        const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<g_t, s_t>());
-        s_t bjacobian_determinant0_data[VS];
-        const s_t *const bjacobian_determinant0 = ageom_stream<s_t, g_t, VS>(
-                nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<g_t, s_t>());
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<g_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<g_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<g_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<g_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<g_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<g_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<g_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<g_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<g_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+                nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-        laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
+        laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx};
 
@@ -4242,38 +4242,38 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
+                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -4407,38 +4407,38 @@ extern "C" int laplace_tet10_apply_packed_affine_mesh_soa_float(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
+                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -4578,38 +4578,38 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
+                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -4760,38 +4760,38 @@ extern "C" int laplace_tet10_apply_packed_two_pass_affine_mesh_soa_float(
                     }
                 }
 
-                s_t bjacobian_adjugate0_data[VS];
-                const s_t *const bjacobian_adjugate0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate0 + evb, bjacobian_adjugate0_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate1_data[VS];
-                const s_t *const bjacobian_adjugate1 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate1 + evb, bjacobian_adjugate1_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate2_data[VS];
-                const s_t *const bjacobian_adjugate2 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate2 + evb, bjacobian_adjugate2_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate3_data[VS];
-                const s_t *const bjacobian_adjugate3 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate3 + evb, bjacobian_adjugate3_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate4_data[VS];
-                const s_t *const bjacobian_adjugate4 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate4 + evb, bjacobian_adjugate4_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate5_data[VS];
-                const s_t *const bjacobian_adjugate5 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate5 + evb, bjacobian_adjugate5_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate6_data[VS];
-                const s_t *const bjacobian_adjugate6 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate6 + evb, bjacobian_adjugate6_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate7_data[VS];
-                const s_t *const bjacobian_adjugate7 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate7 + evb, bjacobian_adjugate7_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_adjugate8_data[VS];
-                const s_t *const bjacobian_adjugate8 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_adjugate8 + evb, bjacobian_adjugate8_data, std::is_same<geom_t, s_t>());
-                s_t bjacobian_determinant0_data[VS];
-                const s_t *const bjacobian_determinant0 = ageom_stream<s_t, geom_t, VS>(
-                        nelems, g_jacobian_determinant0 + evb, bjacobian_determinant0_data, std::is_same<geom_t, s_t>());
+                s_t badj0_data[VS];
+                const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+                s_t badj1_data[VS];
+                const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+                s_t badj2_data[VS];
+                const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+                s_t badj3_data[VS];
+                const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+                s_t badj4_data[VS];
+                const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+                s_t badj5_data[VS];
+                const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+                s_t badj6_data[VS];
+                const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+                s_t badj7_data[VS];
+                const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+                s_t badj8_data[VS];
+                const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_adjugate8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+                s_t bdet0_data[VS];
+                const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+                        nelems, g_jacobian_determinant0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
+                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -4878,16 +4878,16 @@ static SFEM_INLINE int laplace_tet10_apply_isoparametric_mesh_soa_impl(
         s_t bh_data[NS * NC][VS];
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_adjugate4[NQ * VS];
-        s_t bjacobian_adjugate5[NQ * VS];
-        s_t bjacobian_adjugate6[NQ * VS];
-        s_t bjacobian_adjugate7[NQ * VS];
-        s_t bjacobian_adjugate8[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
 
         for (int element_node = 0; element_node < NS; ++element_node) {
             const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
@@ -4934,7 +4934,7 @@ static SFEM_INLINE int laplace_tet10_apply_isoparametric_mesh_soa_impl(
         }
 
         for (int q = 0; q < NQ; ++q) {
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -5034,11 +5034,11 @@ static SFEM_INLINE int laplace_tet10_apply_isoparametric_mesh_soa_impl(
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        badj_streams, bdet0, q * VS + lane);
             }
         }
 
-        laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
+        laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
         s_t *const out_components[NC] = {outx};
 
@@ -5170,17 +5170,17 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
                 s_t bh_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 const s_t *bh_streams[NS * NC];
                 for (int stream = 0; stream < NS * NC; ++stream) {
                     bh_streams[stream] = bh_data[stream];
@@ -5211,7 +5211,7 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -5311,11 +5311,11 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa(
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
-                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
+                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -5430,17 +5430,17 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
                 s_t bh_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 const s_t *bh_streams[NS * NC];
                 for (int stream = 0; stream < NS * NC; ++stream) {
                     bh_streams[stream] = bh_data[stream];
@@ -5471,7 +5471,7 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -5571,11 +5571,11 @@ extern "C" int laplace_tet10_apply_packed_isoparametric_mesh_soa_float(
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
-                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
+                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -5696,17 +5696,17 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
                 s_t bh_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 const s_t *bh_streams[NS * NC];
                 for (int stream = 0; stream < NS * NC; ++stream) {
                     bh_streams[stream] = bh_data[stream];
@@ -5737,7 +5737,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -5837,11 +5837,11 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa(
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
-                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
+                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -5973,17 +5973,17 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
                 s_t bh_data[NS * NC][VS];
                 s_t bout_data[NS * NC][VS];
                 s_t bcoordinate_data[NS * ND][VS];
-                s_t bjacobian_adjugate0[NQ * VS];
-                s_t bjacobian_adjugate1[NQ * VS];
-                s_t bjacobian_adjugate2[NQ * VS];
-                s_t bjacobian_adjugate3[NQ * VS];
-                s_t bjacobian_adjugate4[NQ * VS];
-                s_t bjacobian_adjugate5[NQ * VS];
-                s_t bjacobian_adjugate6[NQ * VS];
-                s_t bjacobian_adjugate7[NQ * VS];
-                s_t bjacobian_adjugate8[NQ * VS];
-                s_t bjacobian_determinant0[NQ * VS];
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t badj0[NQ * VS];
+                s_t badj1[NQ * VS];
+                s_t badj2[NQ * VS];
+                s_t badj3[NQ * VS];
+                s_t badj4[NQ * VS];
+                s_t badj5[NQ * VS];
+                s_t badj6[NQ * VS];
+                s_t badj7[NQ * VS];
+                s_t badj8[NQ * VS];
+                s_t bdet0[NQ * VS];
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 const s_t *bh_streams[NS * NC];
                 for (int stream = 0; stream < NS * NC; ++stream) {
                     bh_streams[stream] = bh_data[stream];
@@ -6014,7 +6014,7 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
 
 
                 for (int q = 0; q < NQ; ++q) {
-                s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+                s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
                 s_t J00_values[VS];
                 s_t J01_values[VS];
                 s_t J02_values[VS];
@@ -6114,11 +6114,11 @@ extern "C" int laplace_tet10_apply_packed_two_pass_isoparametric_mesh_soa_float(
                     const s_t J22 = J22_values[lane];
                     geometry_jacobian_adjugate_and_determinant_3<s_t>(
                             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                            bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                            badj_streams, bdet0, q * VS + lane);
                 }
                 }
 
-                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
+                laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(nelems, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bh_streams, bout_streams);
 
                 for (int shape = 0; shape < NS; ++shape) {
                     const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
@@ -6306,17 +6306,17 @@ static int laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
         s_t bout_data[NS * NC][VS];
         s_t bcoordinate_data[NS * ND][VS];
         static constexpr int nelems = VS;
-        s_t bjacobian_adjugate0[NQ * VS];
-        s_t bjacobian_adjugate1[NQ * VS];
-        s_t bjacobian_adjugate2[NQ * VS];
-        s_t bjacobian_adjugate3[NQ * VS];
-        s_t bjacobian_adjugate4[NQ * VS];
-        s_t bjacobian_adjugate5[NQ * VS];
-        s_t bjacobian_adjugate6[NQ * VS];
-        s_t bjacobian_adjugate7[NQ * VS];
-        s_t bjacobian_adjugate8[NQ * VS];
-        s_t bjacobian_determinant0[NQ * VS];
-        s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
         const s_t *bh_streams[NS * NC];
         for (int stream = 0; stream < NS * NC; ++stream) {
             bh_streams[stream] = bh_data[stream];
@@ -6336,7 +6336,7 @@ static int laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
 
 
         for (int q = 0; q < NQ; ++q) {
-            s_t *bjacobian_adjugate_streams[ND * ND] = {bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8};
+            s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
             s_t J00_values[VS];
             s_t J01_values[VS];
             s_t J02_values[VS];
@@ -6436,11 +6436,11 @@ static int laplace_tet10_hessian_isoparametric_mesh_soa_assemble_impl(
                 const s_t J22 = J22_values[lane];
                 geometry_jacobian_adjugate_and_determinant_3<s_t>(
                         J00, J01, J02, J10, J11, J12, J20, J21, J22,
-                        bjacobian_adjugate_streams, bjacobian_determinant0, q * VS + lane);
+                        badj_streams, bdet0, q * VS + lane);
             }
         }
 
-        laplace_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(bjacobian_adjugate0, bjacobian_adjugate1, bjacobian_adjugate2, bjacobian_adjugate3, bjacobian_adjugate4, bjacobian_adjugate5, bjacobian_adjugate6, bjacobian_adjugate7, bjacobian_adjugate8, bjacobian_determinant0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, element_matrix);
+        laplace_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, element_matrix);
 
         if constexpr (FORMAT == 1) {
             laplace_tet10_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
