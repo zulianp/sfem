@@ -46,8 +46,11 @@ Use `--end-time 5.1` to also exercise release at 5 s. A startup-only smoke test 
 release stability or long-time accuracy. The override must be an integer multiple of dt and
 cannot extend beyond the source YAML's end time. Omit it for the full experiment.
 
-`SFEM_HISTORY_CHECK=1` is enabled for every run. These are accuracy/diagnostic runs, not timing
-benchmarks. A nonzero process exit, non-finite history, missing time steps, incorrect release
+Detailed history diagnostics default to `SFEM_HISTORY_CHECK=1`; set `SFEM_HISTORY_CHECK=0`
+before invoking the runner to disable them. The actual setting is saved in `manifest.json`.
+The scale floor and zero-history handling remain active regardless of this switch.
+Use diagnostics for validation; disable them for timing runs (the comparison workflow itself
+is not a dedicated timing benchmark). A nonzero process exit, non-finite history, missing time steps, incorrect release
 schedule or recorded Newton residual above tolerance stops the batch. Logs and partial data
 remain for diagnosis. A successful process exit alone is not treated as proof of convergence.
 

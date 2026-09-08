@@ -1,6 +1,10 @@
 """Run with: venv/bin/python scripts/test_torsion_history_compare.py."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
+import json
+import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -10,6 +14,25 @@ from run_torsion_history_compare import CASE, POLICIES, compare_runs, load_case,
 
 
 def check(root):
+    for setting in (None, "0", "1"):
+        environment = dict(os.environ)
+        environment.pop("SFEM_HISTORY_CHECK", None)
+        if setting is not None:
+            environment["SFEM_HISTORY_CHECK"] = setting
+        expected = "1" if setting is None else setting
+        folder = root / f"diagnostics_{setting}"
+        with patch.dict(os.environ, environment, clear=True), \
+             patch("run_torsion_history_compare.subprocess.run") as launch, \
+             patch("run_torsion_history_compare.subprocess.check_output", return_value="test-commit"), \
+             patch("run_torsion_history_compare.read_history"), \
+             patch("run_torsion_history_compare.compare_runs"):
+            launch.return_value.returncode = 0
+            run(folder, Path(sys.executable), 0.025)
+            assert launch.call_count == 1 + len(POLICIES)
+            assert all(call.kwargs["env"]["SFEM_HISTORY_CHECK"] == expected
+                       for call in launch.call_args_list)
+        assert json.loads((folder / "manifest.json").read_text())["history_check"] == expected
+
     original = yaml.safe_load(CASE.read_text())
     assert original["dynamics"] == {"type": "newmark", "density": 1.0, "beta": 0.64, "gamma": 0.6}
     assert original["material"]["prony"] == [

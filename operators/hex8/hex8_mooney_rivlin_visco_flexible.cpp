@@ -95,8 +95,6 @@ int hex8_mooney_rivlin_visco_update_history_unique_hi(
     const real_t *const SFEM_RESTRICT uy,
     const real_t *const SFEM_RESTRICT uz) {
     const bool check_history = sfem_history_checks_enabled();
-    if (check_history) fprintf(stderr, "[history-check] update begin: elements=%td history_stride=%td scale_stride=%td\n",
-                               nelements, history_stride, history_scale_stride);
     auto run = [&](const auto *const history, auto *const new_history) -> int {
     SFEM_UNUSED(nnodes);
     
