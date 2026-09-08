@@ -157,9 +157,13 @@ echo "### discarding one warm-up invocation"
 OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=close OMP_PLACES=cores \
     "$BIN" --n 96 --repeat 3 --warmup 1 --layout packed --kernel sumfact >/dev/null 2>&1
 
-for rep in $(seq 1 "$REPS"); do
+# Runs every configuration REPS times, or only the keys named in $1 (newline separated).
+sweep() {
+    local only="${1:-}"
+    for rep in $(seq 1 "$REPS"); do
     for cfg in "${CONFIGS[@]}"; do
         IFS='|' read -r key op layout kernel n band bband <<<"$cfg"
+        if [ -n "$only" ] && ! printf '%s\n' "$only" | grep -qx -- "$key"; then continue; fi
         echo "### rep $rep  $key"
         if [ "$MODE" = against ]; then
             # Alternate which side goes first, so position-in-pair is balanced.
@@ -174,14 +178,18 @@ for rep in $(seq 1 "$REPS"); do
             measure "$BIN" "" "$key" "$op" "$layout" "$kernel" "$n"
         fi
     done
-done
+    done
+}
+
+sweep
 
 [ -s "$CSV" ] || { echo "error: no measurements were produced" >&2; exit 2; }
 
 CONFIG_SPEC=$(printf '%s\n' "${CONFIGS[@]}")
-export CONFIG_SPEC CSV BASELINE MODE THREADS REPS BIN REF_BIN
+FAILED="$OUT/failing_keys.txt"
+export CONFIG_SPEC CSV BASELINE MODE THREADS REPS BIN REF_BIN FAILED
 
-python3 - <<'PY'
+cat > "$OUT/analyse.py" <<'PY'
 import csv, os, statistics as st, sys, subprocess, datetime
 from pathlib import Path
 
@@ -207,16 +215,22 @@ if mode == "against":
     print()
     print(f"{'config':<28}{'ndof':>10}{'ref':>9}{'new':>9}{'new/ref':>9}{'band':>7}  verdict")
     fail = 0
+    failing = []
+    only = {k for k in os.environ.get("CONFIRM_ONLY", "").split() if k}
     for key, op, layout, kernel, n, band, bband in configs:
+        if only and key not in only: continue
         r, m, b = med("ref_" + key), med("new_" + key), float(band)
         if r is None or m is None:
             print(f"{key:<28}{'':>10}{'':>9}{'':>9}{'':>9}{'':>7}  MISSING"); fail += 1; continue
         d = (m - r) / r * 100
         verdict = "REGRESSION" if d < -b else ("faster than band" if d > b else "ok")
-        if d < -b: fail += 1
+        if d < -b:
+            fail += 1
+            failing.append(key)
         print(f"{key:<28}{dofs['new_'+key]:>10}{r:>9.1f}{m:>9.1f}{d:>8.1f}%{b:>6.0f}%  {verdict}")
     print(f"\nboth sides measured in one allocation, order alternating every rep, "
           f"medians of {os.environ['REPS']}")
+    Path(os.environ["FAILED"]).write_text("\n".join(failing) + ("\n" if failing else ""))
     if fail:
         print(f"\nFAILED: {fail} configuration(s) outside band", file=sys.stderr); sys.exit(1)
     print("\nPASSED: packed throughput unchanged against the reference binary")
@@ -302,3 +316,43 @@ if fail:
     sys.exit(1)
 print(f"\nPASSED{f' ({notes} note(s))' if notes else ''}")
 PY
+
+# ------------------------------------------------------------------- confirmation pass
+#
+# A configuration that fails is re-measured before it is believed. This is not leniency:
+# residual_packed_sympy has now produced two wild low readings on this machine in a
+# handful of runs -- 1690 against a usual 2050 while recording a baseline, and 1260 in an
+# A/B whose immediate rerun came back at +0.1% -- so a single failing sample is not
+# evidence of a regression, and reporting it as one teaches people to ignore the gate.
+#
+# The cost is zero unless something fails, and the discipline is the one that caught the
+# run-order artifact earlier: measure it again before you believe it.
+set +e
+python3 "$OUT/analyse.py"
+rc=$?
+set -e
+
+if [ "$rc" -ne 0 ] && [ "$MODE" = against ] && [ -s "$FAILED" ]; then
+    echo
+    echo "### $(wc -l < "$FAILED" | tr -d ' ') configuration(s) failed; re-measuring to confirm"
+    keys=$(cat "$FAILED")
+    CSV="$OUT/perf_regression_confirm.csv"; rm -f "$CSV"; export CSV
+    CONFIRM_ONLY="$(tr '\n' ' ' < "$FAILED")"; export CONFIRM_ONLY
+    sweep "$keys"
+    echo
+    echo "### confirmation pass"
+    set +e
+    python3 "$OUT/analyse.py"
+    rc2=$?
+    set -e
+    if [ "$rc2" -eq 0 ]; then
+        echo
+        echo "NOT CONFIRMED: the regression did not reproduce when those configurations were"
+        echo "measured again. Treating it as measurement noise, not a regression."
+        rc=0
+    else
+        echo
+        echo "CONFIRMED: the regression reproduced on a second measurement."
+    fi
+fi
+exit $rc
