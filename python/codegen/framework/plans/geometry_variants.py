@@ -60,6 +60,8 @@ class GeometryVariantPlan:
     #: kernel holds an adjugate, so the two modes need different kernels rather
     #: than different arguments.
     cached_metric: object = None
+    #: Whether this form also emits matrix-assembly kernels.
+    assembles_matrix: bool = False
 
     @property
     def emits_metric(self):
@@ -88,6 +90,18 @@ class GeometryVariantPlan:
         """`("isoparametric",)` or `()`.  Empty for a constant-P1 simplex, whose
         affine kernel already computes what this one would."""
         return ("isoparametric",) if self.emits_isoparametric else ()
+
+    @property
+    def assembly_modes(self):
+        """The matrix-assembly kernel to emit, as a sequence.
+
+        Assembly used to be emitted inside the isoparametric mesh operator, so
+        a form that published no isoparametric mode lost `hessian_crs` and
+        `hessian_bsr` with it -- which is why the P1 rule had to keep that mode
+        alive for anything that assembles.  It is its own axis now, and the
+        matrix-free rule can say what it means.
+        """
+        return ("isoparametric",) if self.assembles_matrix else ()
 
     @property
     def geometry_modes(self):
@@ -121,45 +135,22 @@ def geometry_variant_plan(weak_form, rule, *, specialized=True, assembles_matrix
     because it is a fact about the emission unit, not about the form.
 
     `assembles_matrix` says whether this form also emits matrix-assembly
-    kernels.  It has to, and the reason is a wrinkle rather than a principle:
-    assembly is emitted *inside* the isoparametric mesh operator rather than as
-    an axis of its own, so a P1 element that published no isoparametric mode
-    lost its `hessian_crs` and `hessian_bsr` entry points along with the
-    matrix-free kernel it meant to drop.  The equivalence argument -- that a
-    constant Jacobian makes the two kernels compute the same numbers -- is
-    about the matrix-free kernels, and applies only to them until assembly gets
-    an axis of its own.
+    kernels.  Assembly used to ride inside the isoparametric mesh operator, so
+    a P1 element that published no isoparametric mode lost `hessian_crs` and
+    `hessian_bsr` along with the matrix-free kernel it meant to drop.  It has
+    `assembly_modes` of its own now, which is what lets `emits_isoparametric`
+    say what it means: a constant Jacobian makes the two matrix-free kernels
+    compute the same numbers, so only one is worth emitting.
     """
     if rule is None:
-        return GeometryVariantPlan(True, True, True, None)
+        return GeometryVariantPlan(True, True, True, None, assembles_matrix)
     dim = int(rule.dim)
     constant_p1 = _is_constant_p1_simplex_rule(rule)
     metric = cached_metric_geometry(weak_form, rule) if specialized else None
     return GeometryVariantPlan(
-        # Both geometry modes, for now.  The rules are written down and the
-        # emitters already iterate them; what is missing is one change in the
-        # wrapper layer.
-        #
-        #     emits_affine=constant_p1 or dim == 3,
-        #     emits_isoparametric=(not constant_p1) or assembles_matrix,
-        #
-        # An energy form's dimension-level dispatch is emitted as an
-        # affine/isoparametric *pair* in `package/op_wrappers.py`: one `if
-        # (impl_->..._uses_affine) { affine } else { isoparametric }`, built
-        # from both names together.  Drop either variant and the wrapper stops
-        # calling the other one too -- the entry point is still generated and
-        # still in the dispatch file, but nothing reaches it.  That is what
-        # made `poro_hyperelasticity_solid_gradient_2d_isoparametric_mesh_soa`
-        # look like it had disappeared on TRI6_TRI3 when only the 2D *affine*
-        # kernel had been dropped.  TRI6 is not a constant-P1 simplex and the
-        # P1 rule never touched it.
-        #
-        # So the prerequisite is to emit those two branches independently,
-        # each guarded on its own entry point existing, the way the packed
-        # dispatch already is.  That is why packed could be switched on and
-        # these two cannot yet.
         emits_affine=constant_p1 or dim == 3,
-        emits_isoparametric=(not constant_p1) or assembles_matrix,
+        emits_isoparametric=not constant_p1,
         emits_packed=dim == 3,
         cached_metric=metric,
+        assembles_matrix=assembles_matrix,
     )

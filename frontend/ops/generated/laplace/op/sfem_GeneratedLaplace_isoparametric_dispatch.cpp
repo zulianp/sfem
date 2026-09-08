@@ -55,28 +55,6 @@ extern "C" int laplace_quad4_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx
 );
-extern "C" int laplace_tri3_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_tri3_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
 extern "C" int laplace_hex8_apply_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -143,28 +121,6 @@ extern "C" int laplace_tet10_apply_isoparametric_mesh_soa_float(
         const ptrdiff_t out_stride,
         float *const SFEM_RESTRICT outx
 );
-extern "C" int laplace_tet4_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_tet4_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
 extern "C" int laplace_proteus_quad4_gradient_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -199,28 +155,6 @@ extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outx
 );
 extern "C" int laplace_quad4_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_tri3_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_tri3_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -287,28 +221,6 @@ extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa(
         double *const SFEM_RESTRICT outx
 );
 extern "C" int laplace_tet10_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_tet4_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx
-);
-extern "C" int laplace_tet4_gradient_isoparametric_mesh_soa_float(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const SFEM_RESTRICT elements,
@@ -655,34 +567,6 @@ extern "C" int laplace_quad4_objective_steps_isoparametric_mesh_soa_float(
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int laplace_tri3_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_tri3_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
 extern "C" int laplace_hex8_objective_steps_isoparametric_mesh_soa(
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -767,34 +651,6 @@ extern "C" int laplace_tet10_objective_steps_isoparametric_mesh_soa_float(
         const float *const SFEM_RESTRICT steps,
         float *const SFEM_RESTRICT value
 );
-extern "C" int laplace_tet4_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int laplace_tet4_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa(
         const smesh::ElemType element_type,
@@ -831,17 +687,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_isoparametric_mesh_soa
                     return laplace_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
                 case smesh::SMESH_FLOAT32:
                     return laplace_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TRI3: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri3_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri3_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
                 default:
                     break;
             }
@@ -908,17 +753,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_isoparametric_mesh_soa
             }
             break;
         }
-        case smesh::TET4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tet4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tet4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
         default:
             break;
     }
@@ -964,17 +798,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_isoparametric_mesh_
                     return laplace_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
                 case smesh::SMESH_FLOAT32:
                     return laplace_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TRI3: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri3_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri3_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
                 default:
                     break;
             }
@@ -1036,17 +859,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_3d_isoparametric_mesh_
                     return laplace_tet10_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
                 case smesh::SMESH_FLOAT32:
                     return laplace_tet10_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tet4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tet4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
                 default:
                     break;
             }
@@ -1367,17 +1179,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_2d_isoparametri
             }
             break;
         }
-        case smesh::TRI3: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tri3_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tri3_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
         default:
             break;
     }
@@ -1437,17 +1238,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_objective_steps_3d_isoparametri
                     return laplace_tet10_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
                 case smesh::SMESH_FLOAT32:
                     return laplace_tet10_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-                default:
-                    break;
-            }
-            break;
-        }
-        case smesh::TET4: {
-            switch (resolved_real_type) {
-                case smesh::SMESH_FLOAT64:
-                    return laplace_tet4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-                case smesh::SMESH_FLOAT32:
-                    return laplace_tet4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
                 default:
                     break;
             }

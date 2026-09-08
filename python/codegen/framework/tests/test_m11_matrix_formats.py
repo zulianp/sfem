@@ -553,7 +553,10 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             result = gen.generate(
                 neohookean_ogden,
                 out_dir,
-                elements=("TET4",),
+                # TET10: a simplex, so the packed internals this checks are the
+                # same ones, and not constant-P1, so it still publishes an
+                # isoparametric kernel for the ABI assertions below.
+                elements=("TET10",),
                 clean=True,
                 matrix_formats=("crs", "bsr", "block_diag_sym"),
                 matrix_mesh_layouts=("standard", "packed"),
@@ -585,20 +588,20 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             operator_source = (
                 Path(out_dir)
                 / "d3"
-                / "tet4"
-                / "neohookean_ogden_tet4_operator.cpp"
+                / "tet10"
+                / "neohookean_ogden_tet10_operator.cpp"
             ).read_text()
             for matrix_format in ("bsr",):
                 self.assertNotIn("_%s_apply_" % matrix_format, operator_source)
             self.assertIn(
-                'extern "C" int neohookean_ogden_tet4_apply_isoparametric_mesh_soa(',
+                'extern "C" int neohookean_ogden_tet10_apply_isoparametric_mesh_soa(',
                 operator_source,
             )
             packed_apply_begin = operator_source.index(
-                "neohookean_ogden_tet4_apply_packed_isoparametric_mesh_soa"
+                "neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa"
             )
             packed_apply_end = operator_source.index(
-                'extern "C" int neohookean_ogden_tet4_apply_packed_isoparametric_mesh_soa_float',
+                'extern "C" int neohookean_ogden_tet10_apply_packed_isoparametric_mesh_soa_float',
                 packed_apply_begin,
             )
             packed_apply = operator_source[packed_apply_begin:packed_apply_end]
@@ -606,33 +609,35 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             self.assertNotIn("std::malloc", packed_apply)
             self.assertNotIn("std::free", packed_apply)
             self.assertIn(
-                "neohookean_ogden_tet4_hessian_crs_packed_one_pass_isoparametric_mesh_soa",
+                "neohookean_ogden_tet10_hessian_crs_packed_one_pass_isoparametric_mesh_soa",
                 operator_source,
             )
             self.assertIn(
-                "neohookean_ogden_tet4_hessian_crs_packed_two_pass_isoparametric_mesh_soa",
+                "neohookean_ogden_tet10_hessian_crs_packed_two_pass_isoparametric_mesh_soa",
                 operator_source,
             )
             self.assertIn(
-                "neohookean_ogden_tet4_hessian_isoparametric_mesh_soa_packed_global_node",
+                "neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_packed_global_node",
                 operator_source,
             )
             self.assertIn(
-                "neohookean_ogden_tet4_hessian_isoparametric_mesh_soa_scatter_packed_crs_entries",
+                "neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_scatter_packed_crs_entries",
                 operator_source,
             )
             packed_fill_begin = operator_source.index(
-                "neohookean_ogden_tet4_hessian_isoparametric_mesh_soa_packed_fill_impl"
+                "neohookean_ogden_tet10_hessian_isoparametric_mesh_soa_packed_fill_impl"
             )
             packed_fill_end = operator_source.index(
-                'extern "C" int neohookean_ogden_tet4_hessian_crs_isoparametric_mesh_soa',
+                'extern "C" int neohookean_ogden_tet10_hessian_crs_isoparametric_mesh_soa',
                 packed_fill_begin,
             )
             packed_fill = operator_source[packed_fill_begin:packed_fill_end]
             self.assertIn("sfem::codegen::thread_scratch<scalar_t>", packed_fill)
             self.assertNotIn("std::malloc", packed_fill)
             self.assertNotIn("std::free", packed_fill)
-            self.assertIn("neohookean_ogden_d3_simplex_tet4_apply_block", packed_fill)
+            # Which local kernel the packed fill reuses is the closed-form
+            # simplex path's business and TET10 does not take it; what this
+            # test is about is the C ABI and the manifest.
             self.assertIn("scatter_packed_crs_entries(element_matrix, entries, values);", packed_fill)
             self.assertNotIn("find_col", packed_fill)
             hessian_crs_functions = {

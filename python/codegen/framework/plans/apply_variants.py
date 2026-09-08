@@ -241,12 +241,28 @@ def apply_variant_plan(
     shape of what has yet to converge.  Writing it down is what lets the
     difference shrink under a test instead of drifting.
     """
-    shapes = list(BASE_VARIANTS)
+    # On the energy path an affine-equivalent element publishes no
+    # isoparametric kernel at all, not merely no packed one.  The reason was
+    # already written down for the packed case -- a linear simplex's
+    # isoparametric geometry *is* affine, one Jacobian for the cell -- and it
+    # is the same reason at standard traversal: the two kernels compute the
+    # same numbers, so only one is worth emitting.
+    #
+    # The residual path still publishes both, because `geometry_variant_plan`
+    # drives the energy emitter only.  That is another line in this file's
+    # table of what has yet to converge, not a design.
+    drops_isoparametric = affine_equivalent_element and from_energy
+    shapes = [
+        shape
+        for shape in BASE_VARIANTS
+        if not (drops_isoparametric and shape[1] is Geometry.ISOPARAMETRIC)
+    ]
     if from_energy:
         if supports_packed:
             shapes.extend(PACKED_AFFINE_VARIANTS)
             shapes.extend(PACKED_TWO_PASS_AFFINE_VARIANTS)
-            shapes.extend(PACKED_ISOPARAMETRIC_VARIANTS)
+            if not affine_equivalent_element:
+                shapes.extend(PACKED_ISOPARAMETRIC_VARIANTS)
     else:
         if not mixed_order:
             shapes.extend(EQUAL_ORDER_VARIANTS)
