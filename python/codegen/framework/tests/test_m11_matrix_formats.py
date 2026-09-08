@@ -111,13 +111,13 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
         self.assertIn("static constexpr int VS = 1;", hessian_source)
         self.assertNotIn("ordered_shape_index", hessian_source)
         self.assertNotIn("matrix_coordinate_streams", hessian_source)
-        self.assertNotIn("block_coordinate_streams", hessian_source)
+        self.assertNotIn("bcoordinate_streams", hessian_source)
         self.assertNotIn("coordinate_value", hessian_source)
         self.assertIn(
             "tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>",
             hessian_source,
         )
-        self.assertIn("isoparametric_grad_1d, block_coordinate_data,", hessian_source)
+        self.assertIn("isoparametric_grad_1d, bcoordinate_data,", hessian_source)
         self.assertNotIn("neohookean_ogden_proteus_hex8_hessian_crs_isoparametric_mesh_soa", source)
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_bsr_isoparametric_mesh_soa", source)
         bsr_scatter = _static_function_body(
@@ -446,8 +446,8 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             self.assertIn("static constexpr int NC = 2;", source)
             self.assertIn("static constexpr int N_ROW_STREAMS = 3;", source)
             self.assertIn("static constexpr int N_COL_STREAMS = 3;", source)
-            self.assertIn("block_current[0 * NS + shape][0] = p_w[node * current_stride];", source)
-            self.assertIn("block_current[1 * NS + shape][0] = p_c[node * current_stride];", source)
+            self.assertIn("bcurrent[0 * NS + shape][0] = p_w[node * current_stride];", source)
+            self.assertIn("bcurrent[1 * NS + shape][0] = p_c[node * current_stride];", source)
             self.assertIn("block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];", source)
             self.assertNotIn("ROW_STREAMS[", source)
             self.assertNotIn("COL_STREAMS[", source)

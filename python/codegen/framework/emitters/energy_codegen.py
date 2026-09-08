@@ -1,5 +1,13 @@
 import sympy as sp
 
+from codegen.framework.plans.conventions import PREFIXES
+
+#: The staged-buffer and per-thread-scratch prefixes, from the one
+#: table that owns them.  Spelling either here again is what made the
+#: declaration and the use disagree six times over.
+_BLOCK_FMT = PREFIXES["block"] + "%s"
+_PACK_FMT = PREFIXES["pack"] + "%s"
+
 from codegen.framework.plans.affine_element_kernel import (
     dof_symbols,
     metric_symbols,
@@ -241,10 +249,10 @@ def _sfem_soa_affine_geometry_stream_lines(
         for stream in _soa_array_stream_names(array_input):
             lines.extend(
                 [
-                    "%ss_t block_%s_data[VS];" % (indent, stream),
-                    "%sconst s_t *const block_%s = ageom_stream<s_t, %s, VS>("
+                    "%ss_t b%s_data[VS];" % (indent, stream),
+                    "%sconst s_t *const b%s = ageom_stream<s_t, %s, VS>("
                     % (indent, stream, geometry_scalar_type),
-                    "%s        nelems, g_%s + evb, block_%s_data, std::is_same<%s, s_t>());"
+                    "%s        nelems, g_%s + evb, b%s_data, std::is_same<%s, s_t>());"
                     % (indent, stream, stream, geometry_scalar_type),
                 ]
             )
@@ -981,10 +989,10 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     n_field_components = form_n_field_components(form, dim)
     params = [
         *(
-            "const s_t *const SFEM_RESTRICT block_jacobian_adjugate%d" % component
+            "const s_t *const SFEM_RESTRICT bjacobian_adjugate%d" % component
             for component in range(dim * dim)
         ),
-        "const s_t *const SFEM_RESTRICT block_jacobian_determinant0",
+        "const s_t *const SFEM_RESTRICT bjacobian_determinant0",
     ]
     if use_tensor_product_reference:
         params.extend(
@@ -2813,19 +2821,19 @@ def _sfem_soa_isoparametric_geometry_lines(
     q_major=False,
     reference_prefix="",
     source_builder=None,
-    coordinate_streams="block_coordinate_data",
+    coordinate_streams="bcoordinate_data",
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     work_item = _work_item_index(source_builder)
-    stream_array_name = "block_jacobian_adjugate_streams"
+    stream_array_name = "bjacobian_adjugate_streams"
     lines = isoparametric_adjugate_stream_array_lines(
         dim_name="ND",
         dim=dim,
         indent="            ",
         stream_array_name=stream_array_name,
         adjugate_streams=tuple(
-            "block_jacobian_adjugate%d" % component
+            "bjacobian_adjugate%d" % component
             for component in range(dim * dim)
         ),
     )
@@ -2884,7 +2892,7 @@ def _sfem_soa_isoparametric_geometry_lines(
             indent="                ",
             index=output_index,
             stream_array_name=stream_array_name,
-            determinant_stream="block_jacobian_determinant0",
+            determinant_stream="bjacobian_determinant0",
         )
     )
     lines.append("            }")
@@ -3401,11 +3409,11 @@ def _expanded_simplex_metric_packed_value_body(plan):
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "                const s_t x%d = pack_u_base[ev%d];" % (shape, shape)
+        "                const s_t x%d = pk_u_base[ev%d];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "                const s_t h%d = pack_h[ev%d];" % (shape, shape)
+        "                const s_t h%d = pk_h[ev%d];" % (shape, shape)
         for shape in range(plan.n_shape)
     )
     for component in range(symmetric_metric_component_count(plan.dim)):
@@ -3586,12 +3594,12 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         )
         if not is_affine:
             lines.append(
-                "        s_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
+                "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
             )
         lines.extend(
             [
-                "        s_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);",
-                "        s_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);",
+                "        s_t *const SFEM_RESTRICT pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);",
+                "        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);",
                 "",
                 "#pragma omp for schedule(static)",
                 "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
@@ -3615,15 +3623,15 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             lines.extend(
                 [
                     "            for (int d = 0; d < ND; ++d) {",
-                    "                s_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;",
+                    "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
                     "                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
                     "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                     "                    const idx_t node = owned_nodes_ptr[pack] + k;",
-                    "                    pack_coordinate[k] = s_t(coordinate_component[node]);",
+                    "                    pk_coordinate[k] = s_t(coordinate_component[node]);",
                     "                }",
                     "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
                     "                    const idx_t node = ghosts[k];",
-                    "                    pack_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);",
+                    "                    pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);",
                     "                }",
                     "            }",
                 ]
@@ -3635,19 +3643,19 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "            const s_t *const h_components[NC] = {%s};"
                 % ", ".join("h%s" % _component_name(d) for d in range(n_field_components)),
                 "            for (int d = 0; d < NC; ++d) {",
-                "                s_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;",
-                "                s_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;",
+                "                s_t *const SFEM_RESTRICT pk_u_base_component = pk_u_base + d * max_nodes_per_pack;",
+                "                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;",
                 "                const s_t *const SFEM_RESTRICT u_component = u_components[d];",
                 "                const s_t *const SFEM_RESTRICT h_component = h_components[d];",
                 "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                    const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                    pack_u_base_component[k] = u_component[node * u_stride];",
-                "                    pack_h_component[k] = h_component[node * h_stride];",
+                "                    pk_u_base_component[k] = u_component[node * u_stride];",
+                "                    pk_h_component[k] = h_component[node * h_stride];",
                 "                }",
                 "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
                 "                    const idx_t node = ghosts[k];",
-                "                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];",
-                "                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];",
+                "                    pk_u_base_component[n_contiguous + k] = u_component[node * u_stride];",
+                "                    pk_h_component[n_contiguous + k] = h_component[node * h_stride];",
                 "                }",
                 "            }",
             ]
@@ -3658,29 +3666,29 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             [
                 "            for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
                 "                const int nelems = (int)MIN((ptrdiff_t)VS, e_end - evb);",
-                "                s_t block_u_data[NS * NC][VS];",
-                "                s_t block_u_base_data[NS * NC][VS];",
-                "                s_t block_h_data[NS * NC][VS];",
-                "                s_t block_value[VS];",
+                "                s_t bu_data[NS * NC][VS];",
+                "                s_t bu_base_data[NS * NC][VS];",
+                "                s_t bh_data[NS * NC][VS];",
+                "                s_t bvalue[VS];",
             ]
         )
         if not is_affine:
-            lines.append("                s_t block_coordinate_data[NS * ND][VS];")
+            lines.append("                s_t bcoordinate_data[NS * ND][VS];")
             for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                lines.append("                s_t block_%s[NQ * VS];" % stream)
+                lines.append("                s_t b%s[NQ * VS];" % stream)
             lines.extend(
                 [
-                    "                s_t block_jacobian_determinant0[NQ * VS];",
-                    "                s_t *block_jacobian_adjugate_streams[ND * ND] = {%s};"
-                    % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
+                    "                s_t bjacobian_determinant0[NQ * VS];",
+                    "                s_t *bjacobian_adjugate_streams[ND * ND] = {%s};"
+                    % ", ".join("bjacobian_adjugate%d" % i for i in range(dim * dim)),
                 ]
             )
         lines.extend(
             [
                 "",
-                "                const s_t *block_u_streams[NS * NC] = {%s};"
+                "                const s_t *bu_streams[NS * NC] = {%s};"
                 % ", ".join(
-                    "block_u_data[%d]" % stream
+                    "bu_data[%d]" % stream
                     for stream in streams_in_shape_order(
                         tuple(range(n_field_components * n_nodes)),
                         n_field_components,
@@ -3715,7 +3723,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                         coordinate_node,
                         "element_shape" if identity_stream_shape_order else "coordinate_shape",
                     ),
-                    "                            block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + %s];"
+                    "                            bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + %s];"
                     % coordinate_node,
                     "                        }",
                     "                    }",
@@ -3727,8 +3735,8 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 *source_builder.simd_lines(),
                 "                        for (int lane = 0; lane < nelems; ++lane) {",
                 "                            const uint16_t packed_node = element_shape[evb + lane];",
-                "                            block_u_base_data[shape * NC + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];",
-                "                            block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];",
+                "                            bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];",
+                "                            bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];",
                 "                        }",
                 "                    }",
                 "                }",
@@ -3752,12 +3760,12 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                     n_shape=n_nodes,
                     n_qp=quadrature_rule.n_qp,
                     local_prefix=local_prefix,
-                    coordinate_streams="block_coordinate_data",
+                    coordinate_streams="bcoordinate_data",
                     contiguous_coordinate_streams=True,
-                    adjugate_target=lambda component, index: "block_jacobian_adjugate%d[%s]" % (component, index),
-                    determinant_target=lambda index: "block_jacobian_determinant0[%s]" % index,
-                    adjugate_streams=tuple("block_jacobian_adjugate%d" % component for component in range(dim * dim)),
-                    determinant_stream="block_jacobian_determinant0",
+                    adjugate_target=lambda component, index: "bjacobian_adjugate%d[%s]" % (component, index),
+                    determinant_target=lambda index: "bjacobian_determinant0[%s]" % index,
+                    adjugate_streams=tuple("bjacobian_adjugate%d" % component for component in range(dim * dim)),
+                    determinant_stream="bjacobian_determinant0",
                     shape_name=tensor_shape_name,
                     grad_name=tensor_grad_name,
                 )
@@ -3774,21 +3782,21 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 q_major=True,
                 reference_prefix=reference_prefix,
                 source_builder=source_builder,
-                coordinate_streams="block_coordinate_data",
+                coordinate_streams="bcoordinate_data",
             )
             lines.extend("    %s" % line if line else line for line in geometry_lines)
             lines.append("                }")
         call_args = ["nelems", "0" if is_affine else "VS"]
         if is_affine:
             call_args.extend(
-                "block_%s" % stream
+                _BLOCK_FMT % stream
                 for array_input in _packed_affine_geometry_inputs(dim, metric)
                 for stream in _soa_array_stream_names(array_input)
             )
         else:
             call_args.extend(
-                ["block_jacobian_adjugate%d" % i for i in range(dim * dim)]
-                + ["block_jacobian_determinant0"]
+                ["bjacobian_adjugate%d" % i for i in range(dim * dim)]
+                + ["bjacobian_determinant0"]
             )
         if omit_reference_basis_inputs:
             pass
@@ -3806,7 +3814,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             )
         call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
         call_args.extend(material_parameter_names)
-        call_args.extend(("block_u_streams", "block_value"))
+        call_args.extend(("bu_streams", "bvalue"))
         lines.extend(
             [
                 "",
@@ -3816,13 +3824,13 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "                        for (int d = 0; d < NC; ++d) {",
                 *source_builder.simd_lines(),
                 "                            for (int lane = 0; lane < nelems; ++lane) {",
-                "                                block_u_data[shape * NC + d][lane] = block_u_base_data[shape * NC + d][lane] + alpha * block_h_data[shape * NC + d][lane];",
+                "                                bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];",
                 "                            }",
                 "                        }",
                 "                    }",
                 *source_builder.simd_lines(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        block_value[lane] = s_t(0);",
+                "                        bvalue[lane] = s_t(0);",
                 "                    }",
                 "",
                 "                    %s<s_t, NQ, NS, VS>(%s);"
@@ -3830,7 +3838,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "",
                 *source_builder.simd_lines(),
                 "                    for (int lane = 0; lane < nelems; ++lane) {",
-                "                        value[(ptrdiff_t)step * nelements + evb + lane] = block_value[lane];",
+                "                        value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];",
                 "                    }",
                 "                }",
                 "            }",
@@ -3956,8 +3964,8 @@ def _append_mesh_operator_stream_arrays(
             lines.extend(
                 _ordered_stream_pointer_array_lines(
                     "const s_t *",
-                    "block_u_streams",
-                    "block_u_data",
+                    "bu_streams",
+                    "bu_data",
                     dim,
                     stream_shape_order,
                     "        ",
@@ -3965,11 +3973,11 @@ def _append_mesh_operator_stream_arrays(
             )
         elif uses_current:
             lines.append(
-                "        const s_t *const block_u_streams[NS * %d] = {%s};"
+                "        const s_t *const bu_streams[NS * %d] = {%s};"
                 % (
                     dim,
                     ", ".join(
-                        "block_%s" % stream
+                        _BLOCK_FMT % stream
                         for stream in streams_in_shape_order(
                             _field_stream_names("u", n_field_components, n_nodes),
                             n_field_components,
@@ -3983,8 +3991,8 @@ def _append_mesh_operator_stream_arrays(
                 lines.extend(
                     _ordered_stream_pointer_array_lines(
                         "const s_t *",
-                        "block_h_streams",
-                        "block_h_data",
+                        "bh_streams",
+                        "bh_data",
                         dim,
                         stream_shape_order,
                         "        ",
@@ -3992,11 +4000,11 @@ def _append_mesh_operator_stream_arrays(
                 )
             else:
                 lines.append(
-                    "        const s_t *const block_h_streams[NS * %d] = {%s};"
+                    "        const s_t *const bh_streams[NS * %d] = {%s};"
                     % (
                         dim,
                         ", ".join(
-                            "block_%s" % stream
+                            _BLOCK_FMT % stream
                             for stream in streams_in_shape_order(
                                 _field_stream_names("h", n_field_components, n_nodes),
                                 n_field_components,
@@ -4010,8 +4018,8 @@ def _append_mesh_operator_stream_arrays(
                 lines.extend(
                     _ordered_stream_pointer_array_lines(
                         "s_t *",
-                        "block_out_streams",
-                        "block_out_data",
+                        "bout_streams",
+                        "bout_data",
                         dim,
                         stream_shape_order,
                         "        ",
@@ -4019,11 +4027,11 @@ def _append_mesh_operator_stream_arrays(
                 )
             else:
                 lines.append(
-                    "        s_t *const block_out_streams[NS * %d] = {%s};"
+                    "        s_t *const bout_streams[NS * %d] = {%s};"
                     % (
                         dim,
                         ", ".join(
-                            "block_%s" % stream
+                            _BLOCK_FMT % stream
                             for stream in streams_in_shape_order(
                                 _output_stream_names(form, n_field_components, n_nodes),
                                 n_field_components,
@@ -4054,7 +4062,7 @@ def _append_mesh_operator_scalar_output(
     n_field_components = form_n_field_components(form, dim)
     if not writes_per_shape(form):
         lines.extend(_work_item_loop_lines(source_builder, "        "))
-        lines.append("            value[evb + %s] += block_value[%s];" % (work_item, work_item))
+        lines.append("            value[evb + %s] += bvalue[%s];" % (work_item, work_item))
         lines.append("        }")
     else:
         if compact_stream_buffers:
@@ -4068,7 +4076,7 @@ def _append_mesh_operator_scalar_output(
                         source_builder,
                         "out_components[d]",
                         "ev[shape * VS + %s] * out_stride",
-                        "block_out_data[shape * NC + d][%s]",
+                        "bout_data[shape * NC + d][%s]",
                         "                ",
                     ),
                     "            }",
@@ -4085,7 +4093,7 @@ def _append_mesh_operator_scalar_output(
                                 source_builder,
                                 "out%s" % component,
                                 "ev[%d * VS + %%s] * out_stride" % shape,
-                                "block_out%s%d[%%s]" % (component, shape),
+                                "bout%s%d[%%s]" % (component, shape),
                                 "        ",
                             )
                         )
@@ -4113,20 +4121,20 @@ def _append_mesh_operator_compact_buffers(
     """
     if compact_stream_buffers:
         if uses_current:
-            lines.append("        s_t block_u_data[NS * NC][VS];")
+            lines.append("        s_t bu_data[NS * NC][VS];")
         if uses_direction:
-            lines.append("        s_t block_h_data[NS * NC][VS];")
+            lines.append("        s_t bh_data[NS * NC][VS];")
         if writes_per_shape(form):
-            lines.append("        s_t block_out_data[NS * NC][VS];")
+            lines.append("        s_t bout_data[NS * NC][VS];")
         else:
-            lines.append("        s_t block_value[VS];")
+            lines.append("        s_t bvalue[VS];")
         if compact_coordinate_buffers:
-            lines.append("        s_t block_coordinate_data[NS * ND][VS];")
+            lines.append("        s_t bcoordinate_data[NS * ND][VS];")
     elif compact_coordinate_buffers:
-        lines.append("        s_t block_coordinate_data[NS * ND][VS];")
+        lines.append("        s_t bcoordinate_data[NS * ND][VS];")
     elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
-            lines.append("        s_t block_%s[VS];" % stream)
+            lines.append("        s_t b%s[VS];" % stream)
 
 
 def _append_mesh_operator_isoparametric_flux(
@@ -4169,19 +4177,19 @@ def _append_mesh_operator_isoparametric_flux(
                 n_shape=n_nodes,
                 n_qp=quadrature_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams="block_coordinate_data",
+                coordinate_streams="bcoordinate_data",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "block_jacobian_adjugate%d[%s]" % (component, index)
+                    "bjacobian_adjugate%d[%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "block_jacobian_determinant0[%s]" % index
+                    "bjacobian_determinant0[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "block_jacobian_adjugate%d" % component
+                    "bjacobian_adjugate%d" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="block_jacobian_determinant0",
+                determinant_stream="bjacobian_determinant0",
                 shape_name=tensor_shape_name,
                 grad_name=tensor_grad_name,
             )
@@ -4294,19 +4302,19 @@ def _append_mesh_operator_stream_buffer_views(
             ]
         )
         if uses_current:
-            lines.append("                    block_u_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item)
+            lines.append("                    bu_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item)
         if uses_direction:
-            lines.append("                    block_h_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item)
+            lines.append("                    bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item)
         lines.extend(["                }", "            }", "        }"])
         if not writes_per_shape(form):
             lines.extend(_work_item_loop_lines(source_builder, "        "))
-            lines.extend(["            block_value[%s] = s_t(0);" % work_item, "        }"])
+            lines.extend(["            bvalue[%s] = s_t(0);" % work_item, "        }"])
         else:
             lines.extend(
                 [
                     "        for (int stream = 0; stream < NS * NC; ++stream) {",
                     *_work_item_loop_lines(source_builder, "            "),
-                    "                block_out_data[stream][%s] = s_t(0);" % work_item,
+                    "                bout_data[stream][%s] = s_t(0);" % work_item,
                     "            }",
                     "        }",
                 ]
@@ -4319,16 +4327,16 @@ def _append_mesh_operator_stream_buffer_views(
                 component = _component_name(d)
                 if uses_current:
                     lines.append(
-                        "            block_u%s%d[%s] = u%s[ev[%d * VS + %s] * u_stride];"
+                        "            bu%s%d[%s] = u%s[ev[%d * VS + %s] * u_stride];"
                         % (component, shape, work_item, component, shape, work_item)
                     )
                 if uses_direction:
                     lines.append(
-                        "            block_h%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
+                        "            bh%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
                         % (component, shape, work_item, component, shape, work_item)
                     )
         for stream in _output_stream_names(form, n_field_components, n_nodes):
-            lines.append("            block_%s[%s] = s_t(0);" % (stream, work_item))
+            lines.append("            b%s[%s] = s_t(0);" % (stream, work_item))
         lines.append("        }")
 
 
@@ -4356,7 +4364,7 @@ def _append_mesh_operator_isoparametric_jacobian(
                     *([] if identity_stream_shape_order else ["            const idx_t *const SFEM_RESTRICT coordinate_element_shape = coordinate_elements[shape];"]),
                     "            for (int d = 0; d < ND; ++d) {",
                     *_work_item_loop_lines(source_builder, "                "),
-                    "                    block_coordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
+                    "                    bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
                     % (
                         work_item,
                         "ev[shape * VS + %s]" % work_item
@@ -4375,7 +4383,7 @@ def _append_mesh_operator_isoparametric_jacobian(
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "            block_%s[%s] = %s[ev[%d * VS + %s]];"
+                        "            b%s[%s] = %s[ev[%d * VS + %s]];"
                         % (stream, work_item, _component_name(d), shape, work_item)
                     )
             lines.append("        }")
@@ -4634,7 +4642,7 @@ def _sfem_soa_mesh_operator_function(
         else tuple(range(n_nodes))
     )
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
-    coordinate_streams_name = "block_coordinate_data"
+    coordinate_streams_name = "bcoordinate_data"
 
     impl_params, wrapper_params = _mesh_operator_parameters(
         form,
@@ -4740,16 +4748,16 @@ def _sfem_soa_mesh_operator_function(
         for array_input in element_inputs:
             for stream in _soa_array_stream_names(array_input):
                 extent = "NQ * VS" if form.weak_form is not None else "VS"
-                lines.append("        s_t block_%s[%s];" % (stream, extent))
+                lines.append("        s_t b%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
         if uses_current:
             for stream in _field_stream_names("u", n_field_components, n_nodes):
-                lines.append("        s_t block_%s[VS];" % stream)
+                lines.append("        s_t b%s[VS];" % stream)
         if uses_direction:
             for stream in _field_stream_names("h", n_field_components, n_nodes):
-                lines.append("        s_t block_%s[VS];" % stream)
+                lines.append("        s_t b%s[VS];" % stream)
         for stream in _output_stream_names(form, n_field_components, n_nodes):
-            lines.append("        s_t block_%s[VS];" % stream)
+            lines.append("        s_t b%s[VS];" % stream)
 
     lines.extend(
         [
@@ -4833,13 +4841,13 @@ def _sfem_soa_mesh_operator_function(
         call_args.append("q")
     if geometry_mode == "affine":
         call_args.extend(
-            "block_%s" % stream
+            _BLOCK_FMT % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
     else:
         call_args.extend(
-            "block_%s" % stream
+            _BLOCK_FMT % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
@@ -4865,19 +4873,19 @@ def _sfem_soa_mesh_operator_function(
         call_args.extend(material_parameter_names)
     if use_stream_arrays:
         if uses_current:
-            call_args.append("block_u_streams")
+            call_args.append("bu_streams")
         if uses_direction:
-            call_args.append("block_h_streams")
+            call_args.append("bh_streams")
         if not writes_per_shape(form):
-            call_args.append("block_value")
+            call_args.append("bvalue")
         else:
-            call_args.append("block_out_streams")
+            call_args.append("bout_streams")
     else:
         if uses_current:
-            call_args.extend("block_%s" % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
+            call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
         if uses_direction:
-            call_args.extend("block_%s" % stream for stream in _field_stream_names("h", n_field_components, n_nodes))
-        call_args.extend("block_%s" % stream for stream in _output_stream_names(form, n_field_components, n_nodes))
+            call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("h", n_field_components, n_nodes))
+        call_args.extend(_BLOCK_FMT % stream for stream in _output_stream_names(form, n_field_components, n_nodes))
     call_indent = "        " if form.weak_form is not None else "            "
     lines.extend(
         [
@@ -5007,7 +5015,7 @@ def _expanded_simplex_metric_packed_body(plan, uses_current, uses_direction):
     pointers and scattering back.  On a TET4 carrying one scalar per node that
     staging is the whole cost, exactly as it was on the unpacked path.
 
-    Writing straight into ``pack_out`` needs no atomic: the pack's scratch is
+    Writing straight into ``pk_out`` needs no atomic: the pack's scratch is
     thread-private, which is what the packed traversal buys.  The reduction to
     the global vector happens once per pack afterwards, and that code is shared.
 
@@ -5030,7 +5038,7 @@ def _expanded_simplex_metric_packed_body(plan, uses_current, uses_direction):
         for shape in range(plan.n_shape)
     )
     lines.extend(
-        "                const s_t u%d = pack_%s[ev%d];" % (shape, prefix, shape)
+        "                const s_t u%d = pk_%s[ev%d];" % (shape, prefix, shape)
         for shape in range(plan.n_shape)
     )
     for component in range(symmetric_metric_component_count(plan.dim)):
@@ -5046,7 +5054,7 @@ def _expanded_simplex_metric_packed_body(plan, uses_current, uses_direction):
         lines.append(
             "                const s_t e%d = %s;" % (shape, _sfem_ccode(expression))
         )
-        lines.append("                pack_out[ev%d] += e%d;" % (shape, shape))
+        lines.append("                pk_out[ev%d] += e%d;" % (shape, shape))
     lines.extend(["            }", ""])
     return lines
 
@@ -5123,7 +5131,7 @@ def _sfem_soa_packed_apply_public_wrappers(
     tensor_grad_name = "%sgrad_1d" % reference_prefix
     tensor_weight_name = "%sq_weight_1d" % reference_prefix
     scalar_weight_name = "%sq_weight" % reference_prefix
-    coordinate_streams_name = "block_coordinate_data"
+    coordinate_streams_name = "bcoordinate_data"
     lines = ["namespace sfem {", "namespace codegen {", ""]
 
     for pass_mode in ("one_pass", "two_pass"):
@@ -5249,19 +5257,19 @@ def _sfem_soa_packed_apply_public_wrappers(
             )
             if not is_affine:
                 lines.append(
-                    "        s_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
+                    "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);"
                 )
             if uses_current:
                 lines.append(
-                    "        s_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
+                    "        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
                 )
             if uses_direction:
                 lines.append(
-                    "        s_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);"
+                    "        s_t *const SFEM_RESTRICT pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);"
                 )
             lines.extend(
                 [
-                    "        s_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);",
+                    "        s_t *const SFEM_RESTRICT pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);",
                     "",
                     "#pragma omp for schedule(static)",
                     "        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
@@ -5310,20 +5318,20 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "            s_t *const out_components[NC] = {%s};"
                     % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)),
                     "            for (int d = 0; d < NC; ++d) {",
-                    "                s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
+                    "                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;",
                 ]
             )
             if not is_affine:
                 lines.append(
-                    "                s_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;"
+                    "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;"
                 )
             if uses_current:
                 lines.append(
-                    "                s_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;"
+                    "                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;"
                 )
             if uses_direction:
                 lines.append(
-                    "                s_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;"
+                    "                s_t *const SFEM_RESTRICT pk_h_component = pk_h + d * max_nodes_per_pack;"
                 )
             if not is_affine:
                 lines.append(
@@ -5338,18 +5346,18 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 [
                     "                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {",
-                    "                    pack_component_out[k] = s_t(0);",
+                    "                    pk_component_out[k] = s_t(0);",
                     "                }",
                     "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                     "                    const idx_t node = owned_nodes_ptr[pack] + k;",
                 ]
             )
             if not is_affine:
-                lines.append("                    pack_coordinate[k] = s_t(coordinate_component[node]);")
+                lines.append("                    pk_coordinate[k] = s_t(coordinate_component[node]);")
             if uses_current:
-                lines.append("                    pack_u_component[k] = u_component[node * u_stride];")
+                lines.append("                    pk_u_component[k] = u_component[node * u_stride];")
             if uses_direction:
-                lines.append("                    pack_h_component[k] = h_component[node * h_stride];")
+                lines.append("                    pk_h_component[k] = h_component[node * h_stride];")
             lines.extend(
                 [
                     "                }",
@@ -5359,15 +5367,15 @@ def _sfem_soa_packed_apply_public_wrappers(
             )
             if not is_affine:
                 lines.append(
-                    "                    pack_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);"
+                    "                    pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);"
                 )
             if uses_current:
                 lines.append(
-                    "                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];"
+                    "                    pk_u_component[n_contiguous + k] = u_component[node * u_stride];"
                 )
             if uses_direction:
                 lines.append(
-                    "                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];"
+                    "                    pk_h_component[n_contiguous + k] = h_component[node * h_stride];"
                 )
             lines.extend(
                 [
@@ -5384,31 +5392,31 @@ def _sfem_soa_packed_apply_public_wrappers(
                 ]
             )
             if uses_current:
-                lines.append("                s_t block_u_data[NS * NC][VS];")
+                lines.append("                s_t bu_data[NS * NC][VS];")
             if uses_direction:
-                lines.append("                s_t block_h_data[NS * NC][VS];")
+                lines.append("                s_t bh_data[NS * NC][VS];")
             lines.extend(
                 [
-                    "                s_t block_out_data[NS * NC][VS];",
+                    "                s_t bout_data[NS * NC][VS];",
                 ]
             )
             if not is_affine:
-                lines.append("                s_t block_coordinate_data[NS * ND][VS];")
+                lines.append("                s_t bcoordinate_data[NS * ND][VS];")
                 for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                    lines.append("                s_t block_%s[NQ * VS];" % stream)
+                    lines.append("                s_t b%s[NQ * VS];" % stream)
                 lines.extend(
                     [
-                        "                s_t block_jacobian_determinant0[NQ * VS];",
-                        "                s_t *block_jacobian_adjugate_streams[ND * ND] = {%s};"
-                        % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
+                        "                s_t bjacobian_determinant0[NQ * VS];",
+                        "                s_t *bjacobian_adjugate_streams[ND * ND] = {%s};"
+                        % ", ".join("bjacobian_adjugate%d" % i for i in range(dim * dim)),
                     ]
                 )
             if uses_current:
                 lines.extend(
                     _ordered_stream_pointer_array_lines(
                             "const s_t *",
-                            "block_u_streams",
-                            "block_u_data",
+                            "bu_streams",
+                            "bu_data",
                             dim,
                             stream_shape_order,
                             "                ",
@@ -5418,8 +5426,8 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend(
                     _ordered_stream_pointer_array_lines(
                             "const s_t *",
-                            "block_h_streams",
-                            "block_h_data",
+                            "bh_streams",
+                            "bh_data",
                             dim,
                             stream_shape_order,
                             "                ",
@@ -5429,8 +5437,8 @@ def _sfem_soa_packed_apply_public_wrappers(
                 [
                     *_ordered_stream_pointer_array_lines(
                         "s_t *",
-                        "block_out_streams",
-                        "block_out_data",
+                        "bout_streams",
+                        "bout_data",
                         dim,
                         stream_shape_order,
                         "                ",
@@ -5462,7 +5470,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                             if identity_stream_shape_order
                             else "coordinate_shape",
                         ),
-                        "                            block_coordinate_data[shape * ND + d][lane] = pack_coordinates[d * max_nodes_per_pack + %s];"
+                        "                            bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + %s];"
                         % coordinate_node,
                         "                        }",
                         "                    }",
@@ -5478,15 +5486,15 @@ def _sfem_soa_packed_apply_public_wrappers(
             )
             if uses_current:
                 lines.append(
-                    "                            block_u_data[shape * NC + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];"
+                    "                            bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];"
                 )
             if uses_direction:
                 lines.append(
-                    "                            block_h_data[shape * NC + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];"
+                    "                            bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];"
                 )
             lines.extend(
                 [
-                    "                            block_out_data[shape * NC + d][lane] = s_t(0);",
+                    "                            bout_data[shape * NC + d][lane] = s_t(0);",
                     "                        }",
                     "                    }",
                     "                }",
@@ -5510,19 +5518,19 @@ def _sfem_soa_packed_apply_public_wrappers(
                         n_shape=n_nodes,
                         n_qp=quadrature_rule.n_qp,
                         local_prefix=local_prefix,
-                        coordinate_streams="block_coordinate_data",
+                        coordinate_streams="bcoordinate_data",
                         contiguous_coordinate_streams=True,
                         adjugate_target=lambda component, index: (
-                            "block_jacobian_adjugate%d[%s]" % (component, index)
+                            "bjacobian_adjugate%d[%s]" % (component, index)
                         ),
                         determinant_target=lambda index: (
-                            "block_jacobian_determinant0[%s]" % index
+                            "bjacobian_determinant0[%s]" % index
                         ),
                         adjugate_streams=tuple(
-                            "block_jacobian_adjugate%d" % component
+                            "bjacobian_adjugate%d" % component
                             for component in range(dim * dim)
                         ),
-                        determinant_stream="block_jacobian_determinant0",
+                        determinant_stream="bjacobian_determinant0",
                         shape_name=tensor_shape_name,
                         grad_name=tensor_grad_name,
                     )
@@ -5547,14 +5555,14 @@ def _sfem_soa_packed_apply_public_wrappers(
             call_args = ["nelems", "0" if is_affine else "VS"]
             if is_affine:
                 call_args.extend(
-                    "block_%s" % stream
+                    _BLOCK_FMT % stream
                     for array_input in _packed_affine_geometry_inputs(dim, metric)
                     for stream in _soa_array_stream_names(array_input)
                 )
             else:
                 call_args.extend(
-                    ["block_jacobian_adjugate%d" % i for i in range(dim * dim)]
-                    + ["block_jacobian_determinant0"]
+                    ["bjacobian_adjugate%d" % i for i in range(dim * dim)]
+                    + ["bjacobian_determinant0"]
                 )
             if omit_reference_basis_inputs:
                 pass
@@ -5573,10 +5581,10 @@ def _sfem_soa_packed_apply_public_wrappers(
             call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
             call_args.extend(material_parameter_names)
             if uses_current:
-                call_args.append("block_u_streams")
+                call_args.append("bu_streams")
             if uses_direction:
-                call_args.append("block_h_streams")
-            call_args.append("block_out_streams")
+                call_args.append("bh_streams")
+            call_args.append("bout_streams")
             lines.extend(
                 [
                     "",
@@ -5586,9 +5594,9 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "                for (int shape = 0; shape < NS; ++shape) {",
                     "                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];",
                     "                    for (int d = 0; d < NC; ++d) {",
-                    "                        s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
+                    "                        s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;",
                     "                        for (int lane = 0; lane < nelems; ++lane) {",
-                    "                            pack_component_out[element_shape[evb + lane]] += block_out_data[shape * NC + d][lane];",
+                    "                            pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];",
                     "                        }",
                     "                    }",
                     "                }",
@@ -5609,16 +5617,16 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend(
                     [
                         "            for (int d = 0; d < NC; ++d) {",
-                        "                s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
+                        "                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;",
                         "                s_t *const SFEM_RESTRICT global_out = out_components[d];",
                         "                s_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;",
                         "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
-                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];",
-                        "                    pack_component_out[k] = s_t(0);",
+                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
+                        "                    pk_component_out[k] = s_t(0);",
                         "                }",
                         "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
-                        "                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];",
-                        "                    pack_component_out[n_contiguous + k] = s_t(0);",
+                        "                    ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];",
+                        "                    pk_component_out[n_contiguous + k] = s_t(0);",
                         "                }",
                         "            }",
                         "        }",
@@ -5628,21 +5636,21 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend(
                     [
                         "            for (int d = 0; d < NC; ++d) {",
-                        "                s_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;",
+                        "                s_t *const SFEM_RESTRICT pk_component_out = pk_out + d * max_nodes_per_pack;",
                         "                s_t *const SFEM_RESTRICT global_out = out_components[d];",
                         "                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {",
-                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];",
-                        "                    pack_component_out[k] = s_t(0);",
+                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
+                        "                    pk_component_out[k] = s_t(0);",
                         "                }",
                         "                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {",
                         *source_builder.atomic_update_lines(),
-                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];",
-                        "                    pack_component_out[k] = s_t(0);",
+                        "                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];",
+                        "                    pk_component_out[k] = s_t(0);",
                         "                }",
                         "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
                         *source_builder.atomic_update_lines(),
-                        "                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];",
-                        "                    pack_component_out[n_contiguous + k] = s_t(0);",
+                        "                    global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];",
+                        "                    pk_component_out[n_contiguous + k] = s_t(0);",
                         "                }",
                         "            }",
                         "        }",
@@ -5870,7 +5878,7 @@ def _sfem_soa_mesh_objective_steps_function(
         else tuple(range(n_nodes))
     )
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
-    coordinate_streams_name = "block_coordinate_data"
+    coordinate_streams_name = "bcoordinate_data"
 
     base_params = [
         "const ptrdiff_t nelements",
@@ -5991,29 +5999,29 @@ def _sfem_soa_mesh_objective_steps_function(
 
     compact_stream_buffers = use_stream_arrays
     if compact_stream_buffers:
-        lines.append("        s_t block_u_data[NS * NC][VS];")
-        lines.append("        s_t block_u_base_data[NS * NC][VS];")
-        lines.append("        s_t block_h_data[NS * NC][VS];")
-        lines.append("        s_t block_value[VS];")
+        lines.append("        s_t bu_data[NS * NC][VS];")
+        lines.append("        s_t bu_base_data[NS * NC][VS];")
+        lines.append("        s_t bh_data[NS * NC][VS];")
+        lines.append("        s_t bvalue[VS];")
         if compact_coordinate_buffers:
-            lines.append("        s_t block_coordinate_data[NS * ND][VS];")
+            lines.append("        s_t bcoordinate_data[NS * ND][VS];")
     elif compact_coordinate_buffers:
-        lines.append("        s_t block_coordinate_data[NS * ND][VS];")
+        lines.append("        s_t bcoordinate_data[NS * ND][VS];")
     elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
-            lines.append("        s_t block_%s[VS];" % stream)
+            lines.append("        s_t b%s[VS];" % stream)
     if geometry_mode == "isoparametric":
         for array_input in element_inputs:
             for stream in _soa_array_stream_names(array_input):
                 extent = "NQ * VS"
-                lines.append("        s_t block_%s[%s];" % (stream, extent))
+                lines.append("        s_t b%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
         for stream in _field_stream_names("u", n_field_components, n_nodes):
-            lines.append("        s_t block_%s[VS];" % stream)
-            lines.append("        s_t block_%s_base[VS];" % stream)
+            lines.append("        s_t b%s[VS];" % stream)
+            lines.append("        s_t b%s_base[VS];" % stream)
         for stream in _field_stream_names("h", n_field_components, n_nodes):
-            lines.append("        s_t block_%s[VS];" % stream)
-        lines.append("        s_t block_value[VS];")
+            lines.append("        s_t b%s[VS];" % stream)
+        lines.append("        s_t bvalue[VS];")
 
     lines.extend(
         [
@@ -6038,7 +6046,7 @@ def _sfem_soa_mesh_objective_steps_function(
                     *([] if identity_stream_shape_order else ["            const idx_t *const SFEM_RESTRICT coordinate_element_shape = coordinate_elements[shape];"]),
                     "            for (int d = 0; d < ND; ++d) {",
                     *_work_item_loop_lines(source_builder, "                "),
-                    "                    block_coordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
+                    "                    bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
                     % (
                         work_item,
                         "ev[shape * VS + %s]" % work_item
@@ -6056,7 +6064,7 @@ def _sfem_soa_mesh_objective_steps_function(
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "            block_%s[%s] = %s[ev[%d * VS + %s]];"
+                        "            b%s[%s] = %s[ev[%d * VS + %s]];"
                         % (stream, work_item, _component_name(d), shape, work_item)
                     )
             lines.append("        }")
@@ -6069,8 +6077,8 @@ def _sfem_soa_mesh_objective_steps_function(
             [
                 *_ordered_stream_pointer_array_lines(
                     "const s_t *",
-                    "block_u_streams",
-                    "block_u_data",
+                    "bu_streams",
+                    "bu_data",
                     dim,
                     stream_shape_order,
                     "        ",
@@ -6084,8 +6092,8 @@ def _sfem_soa_mesh_objective_steps_function(
                 "            for (int d = 0; d < NC; ++d) {",
                 *_work_item_loop_lines(source_builder, "                "),
                 "                    const idx_t node = ev[shape * VS + %s];" % work_item,
-                "                    block_u_base_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item,
-                "                    block_h_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item,
+                "                    bu_base_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item,
+                "                    bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item,
                 "                }",
                 "            }",
                 "        }",
@@ -6093,11 +6101,11 @@ def _sfem_soa_mesh_objective_steps_function(
         )
     else:
         lines.append(
-            "        const s_t *const block_u_streams[NS * %d] = {%s};"
+            "        const s_t *const bu_streams[NS * %d] = {%s};"
             % (
                 dim,
                 ", ".join(
-                    "block_%s" % stream
+                    _BLOCK_FMT % stream
                     for stream in streams_in_shape_order(
                         _field_stream_names("u", n_field_components, n_nodes),
                         n_field_components,
@@ -6111,11 +6119,11 @@ def _sfem_soa_mesh_objective_steps_function(
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "            block_u%s%d_base[%s] = u%s[ev[%d * VS + %s] * u_stride];"
+                    "            bu%s%d_base[%s] = u%s[ev[%d * VS + %s] * u_stride];"
                     % (component, shape, work_item, component, shape, work_item)
                 )
                 lines.append(
-                    "            block_h%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
+                    "            bh%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
                     % (component, shape, work_item, component, shape, work_item)
                 )
         lines.append("        }")
@@ -6129,19 +6137,19 @@ def _sfem_soa_mesh_objective_steps_function(
                 n_shape=n_nodes,
                 n_qp=quadrature_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams="block_coordinate_data",
+                coordinate_streams="bcoordinate_data",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "block_jacobian_adjugate%d[%s]" % (component, index)
+                    "bjacobian_adjugate%d[%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "block_jacobian_determinant0[%s]" % index
+                    "bjacobian_determinant0[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "block_jacobian_adjugate%d" % component
+                    "bjacobian_adjugate%d" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="block_jacobian_determinant0",
+                determinant_stream="bjacobian_determinant0",
                 shape_name=tensor_shape_name,
                 grad_name=tensor_grad_name,
             )
@@ -6178,13 +6186,13 @@ def _sfem_soa_mesh_objective_steps_function(
     call_args.append("0" if geometry_mode == "affine" else "VS")
     if geometry_mode == "affine":
         call_args.extend(
-            "block_%s" % stream
+            _BLOCK_FMT % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
     else:
         call_args.extend(
-            "block_%s" % stream
+            _BLOCK_FMT % stream
             for array_input in element_inputs
             for stream in _soa_array_stream_names(array_input)
         )
@@ -6202,10 +6210,10 @@ def _sfem_soa_mesh_objective_steps_function(
     call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
     call_args.extend(material_parameter_names)
     if use_stream_arrays:
-        call_args.append("block_u_streams")
+        call_args.append("bu_streams")
     else:
-        call_args.extend("block_%s" % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
-    call_args.append("block_value")
+        call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
+    call_args.append("bvalue")
 
     lines.extend(
         [
@@ -6220,7 +6228,7 @@ def _sfem_soa_mesh_objective_steps_function(
                 "            for (int shape = 0; shape < NS; ++shape) {",
                 "                for (int d = 0; d < NC; ++d) {",
                 *_work_item_loop_lines(source_builder, "                    "),
-                "                        block_u_data[shape * NC + d][%s] = block_u_base_data[shape * NC + d][%s] + alpha * block_h_data[shape * NC + d][%s];"
+                "                        bu_data[shape * NC + d][%s] = bu_base_data[shape * NC + d][%s] + alpha * bh_data[shape * NC + d][%s];"
                 % (work_item, work_item, work_item),
                 "                    }",
                 "                }",
@@ -6233,7 +6241,7 @@ def _sfem_soa_mesh_objective_steps_function(
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "                block_u%s%d[%s] = block_u%s%d_base[%s] + alpha * block_h%s%d[%s];"
+                    "                bu%s%d[%s] = bu%s%d_base[%s] + alpha * bh%s%d[%s];"
                     % (
                         component,
                         shape,
@@ -6250,14 +6258,14 @@ def _sfem_soa_mesh_objective_steps_function(
     lines.extend(
         [
             *_work_item_loop_lines(source_builder, "            "),
-            "                block_value[%s] = s_t(0);" % work_item,
+            "                bvalue[%s] = s_t(0);" % work_item,
             "            }",
             "",
             "            %s<s_t, NQ, NS, VS>(%s);"
             % (block_name, ", ".join(call_args)),
             "",
             *_work_item_loop_lines(source_builder, "            "),
-            "                value[(ptrdiff_t)step * nelements + evb + %s] = block_value[%s];"
+            "                value[(ptrdiff_t)step * nelements + evb + %s] = bvalue[%s];"
             % (work_item, work_item),
             "            }",
             "        }",
@@ -6402,12 +6410,12 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     )
     for component in range(dim * dim):
         lines.append(
-            "%s    const s_t jacobian_adjugate_lane%d = block_jacobian_adjugate%d[goff];"
+            "%s    const s_t jacobian_adjugate_lane%d = bjacobian_adjugate%d[goff];"
             % (indent, component, component)
         )
     lines.extend(
         [
-            "%s    const s_t jacobian_determinant_lane0 = block_jacobian_determinant0[goff];"
+            "%s    const s_t jacobian_determinant_lane0 = bjacobian_determinant0[goff];"
             % indent,
             "%s    const s_t idet = s_t(1) / jacobian_determinant_lane0;"
             % indent,
@@ -6556,8 +6564,8 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
     indent,
 ):
     args = [
-        *("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
-        "block_jacobian_determinant0",
+        *("bjacobian_adjugate%d" % i for i in range(dim * dim)),
+        "bjacobian_determinant0",
     ]
     if use_tensor_product_reference:
         args.extend((tensor_shape_name, tensor_grad_name, tensor_weight_name))
@@ -6752,12 +6760,12 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "",
                 "#pragma omp parallel",
                 "    {",
-                "        s_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
+                "        s_t *const SFEM_RESTRICT pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
             ]
         )
         if uses_current:
             lines.append(
-                "        s_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
+                "        s_t *const SFEM_RESTRICT pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);"
             )
         lines.extend(
             [
@@ -6781,14 +6789,14 @@ def _sfem_soa_hessian_packed_crs_passes(
         lines.extend(
             [
                 "            for (int d = 0; d < ND; ++d) {",
-                "                s_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;",
+                "                s_t *const SFEM_RESTRICT pk_coordinate = pk_coordinates + d * max_nodes_per_pack;",
                 "                const g_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];",
             ]
         )
         if uses_current:
             lines.extend(
                 [
-                    "                s_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;",
+                    "                s_t *const SFEM_RESTRICT pk_u_component = pk_u + d * max_nodes_per_pack;",
                     "                const s_t *const SFEM_RESTRICT u_component = u_components[d];",
                 ]
             )
@@ -6796,21 +6804,21 @@ def _sfem_soa_hessian_packed_crs_passes(
             [
                 "                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {",
                 "                    const idx_t node = owned_nodes_ptr[pack] + k;",
-                "                    pack_coordinate[k] = s_t(coordinate_component[node]);",
+                "                    pk_coordinate[k] = s_t(coordinate_component[node]);",
             ]
         )
         if uses_current:
-            lines.append("                    pack_u_component[k] = u_component[node * u_stride];")
+            lines.append("                    pk_u_component[k] = u_component[node * u_stride];")
         lines.extend(
             [
                 "                }",
                 "                for (ptrdiff_t k = 0; k < n_ghost; ++k) {",
                 "                    const idx_t node = ghosts[k];",
-                "                    pack_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);",
+                "                    pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);",
             ]
         )
         if uses_current:
-            lines.append("                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];")
+            lines.append("                    pk_u_component[n_contiguous + k] = u_component[node * u_stride];")
         lines.extend(
             [
                 "                }",
@@ -6818,27 +6826,27 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "",
                 "            for (ptrdiff_t element = e_start; element < e_end; ++element) {",
                 "                s_t element_matrix[NDOFS * NDOFS];",
-                "                s_t block_h_data[NS * NC][VS];",
-                "                s_t block_out_data[NS * NC][VS];",
-                "                s_t block_coordinate_data[NS * ND][VS];",
+                "                s_t bh_data[NS * NC][VS];",
+                "                s_t bout_data[NS * NC][VS];",
+                "                s_t bcoordinate_data[NS * ND][VS];",
                 "                static constexpr int nelems = VS;",
             ]
         )
         if uses_current:
-            lines.append("                s_t block_u_data[NS * NC][VS];")
+            lines.append("                s_t bu_data[NS * NC][VS];")
         for stream in _soa_array_stream_names(_adjugate_input(dim)):
-            lines.append("                s_t block_%s[NQ * VS];" % stream)
-        lines.append("                s_t block_jacobian_determinant0[NQ * VS];")
+            lines.append("                s_t b%s[NQ * VS];" % stream)
+        lines.append("                s_t bjacobian_determinant0[NQ * VS];")
         lines.append(
-            "                s_t *block_jacobian_adjugate_streams[ND * ND] = {%s};"
-            % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim))
+            "                s_t *bjacobian_adjugate_streams[ND * ND] = {%s};"
+            % ", ".join("bjacobian_adjugate%d" % i for i in range(dim * dim))
         )
         if uses_current:
             lines.extend(
                 _ordered_stream_pointer_array_lines(
                     "const s_t *",
-                    "block_u_streams",
-                    "block_u_data",
+                    "bu_streams",
+                    "bu_data",
                     dim,
                     stream_shape_order,
                     "                ",
@@ -6848,16 +6856,16 @@ def _sfem_soa_hessian_packed_crs_passes(
             [
                 *_ordered_stream_pointer_array_lines(
                     "const s_t *",
-                    "block_h_streams",
-                    "block_h_data",
+                    "bh_streams",
+                    "bh_data",
                     dim,
                     stream_shape_order,
                     "                ",
                 ),
                 *_ordered_stream_pointer_array_lines(
                     "s_t *",
-                    "block_out_streams",
-                    "block_out_data",
+                    "bout_streams",
+                    "bout_data",
                     dim,
                     stream_shape_order,
                     "                ",
@@ -6867,11 +6875,11 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "                    const uint16_t packed_node = elements[shape][element];",
                 *([] if identity_stream_shape_order else ["                    const uint16_t coordinate_packed_node = coordinate_elements[shape][element];"]),
                 "                    for (int d = 0; d < ND; ++d) {",
-                "                        block_coordinate_data[shape * ND + d][0] = pack_coordinates[d * max_nodes_per_pack + %s];" % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node"),
+                "                        bcoordinate_data[shape * ND + d][0] = pk_coordinates[d * max_nodes_per_pack + %s];" % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node"),
             ]
         )
         if uses_current:
-            lines.append("                        block_u_data[shape * NC + d][0] = pack_u[d * max_nodes_per_pack + packed_node];")
+            lines.append("                        bu_data[shape * NC + d][0] = pk_u[d * max_nodes_per_pack + packed_node];")
         lines.extend(
             [
                 "                    }",
@@ -6887,19 +6895,19 @@ def _sfem_soa_hessian_packed_crs_passes(
                     n_shape=n_nodes,
                     n_qp=quadrature_rule.n_qp,
                     local_prefix=local_prefix,
-                    coordinate_streams="block_coordinate_data",
+                    coordinate_streams="bcoordinate_data",
                     contiguous_coordinate_streams=True,
                     adjugate_target=lambda component, index: (
-                        "block_jacobian_adjugate%d[%s]" % (component, index)
+                        "bjacobian_adjugate%d[%s]" % (component, index)
                     ),
                     determinant_target=lambda index: (
-                        "block_jacobian_determinant0[%s]" % index
+                        "bjacobian_determinant0[%s]" % index
                     ),
                     adjugate_streams=tuple(
-                        "block_jacobian_adjugate%d" % component
+                        "bjacobian_adjugate%d" % component
                         for component in range(dim * dim)
                     ),
-                    determinant_stream="block_jacobian_determinant0",
+                    determinant_stream="bjacobian_determinant0",
                     shape_name=tensor_shape_name,
                     grad_name=tensor_grad_name,
                 )
@@ -6923,8 +6931,8 @@ def _sfem_soa_hessian_packed_crs_passes(
         packed_call_args = [
             "1",
             "1",
-            *("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
-            "block_jacobian_determinant0",
+            *("bjacobian_adjugate%d" % i for i in range(dim * dim)),
+            "bjacobian_determinant0",
         ]
         if omit_reference_basis_inputs:
             pass
@@ -6943,8 +6951,8 @@ def _sfem_soa_hessian_packed_crs_passes(
         packed_call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
         packed_call_args.extend(material_parameter_names)
         if uses_current:
-            packed_call_args.append("block_u_streams")
-        packed_call_args.extend(("block_h_streams", "block_out_streams"))
+            packed_call_args.append("bu_streams")
+        packed_call_args.extend(("bh_streams", "bout_streams"))
         lines.append("")
         if direct_hessian_assembly:
             lines.extend(
@@ -6973,17 +6981,17 @@ def _sfem_soa_hessian_packed_crs_passes(
                     "            for (int trial_component = 0; trial_component < NC; ++trial_component) {",
                     "                for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {",
                     "                    for (int stream = 0; stream < NS * NC; ++stream) {",
-                    "                        block_h_data[stream][0] = s_t(0);",
-                    "                        block_out_data[stream][0] = s_t(0);",
+                    "                        bh_data[stream][0] = s_t(0);",
+                    "                        bout_data[stream][0] = s_t(0);",
                     "                    }",
-                    "                    block_h_data[trial_shape * NC + trial_component][0] = s_t(1);",
+                    "                    bh_data[trial_shape * NC + trial_component][0] = s_t(1);",
                     "                    %s<s_t, NQ, NS, VS>(%s);"
                     % (block_name, ", ".join(packed_call_args)),
                     "                    const int col = trial_component * NS + trial_shape;",
                     "                    for (int test_component = 0; test_component < NC; ++test_component) {",
                     "                        for (int test_shape = 0; test_shape < NS; ++test_shape) {",
                     "                            const int row = test_component * NS + test_shape;",
-                    "                            element_matrix[row * NDOFS + col] = block_out_data[test_shape * NC + test_component][0];",
+                    "                            element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];",
                     "                        }",
                     "                    }",
                     "                }",
@@ -7053,17 +7061,17 @@ def _sfem_soa_hessian_direct_assembly(
                 "        for (int trial_component = 0; trial_component < NC; ++trial_component) {",
                 "            for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {",
                 "                for (int stream = 0; stream < NS * NC; ++stream) {",
-                "                    block_h_data[stream][0] = s_t(0);",
-                "                    block_out_data[stream][0] = s_t(0);",
+                "                    bh_data[stream][0] = s_t(0);",
+                "                    bout_data[stream][0] = s_t(0);",
                 "                }",
-                "                block_h_data[trial_shape * NC + trial_component][0] = s_t(1);",
+                "                bh_data[trial_shape * NC + trial_component][0] = s_t(1);",
                 "                %s<s_t, NQ, NS, VS>(%s);"
                 % (block_name, ", ".join(call_args)),
                 "                const int col = trial_component * NS + trial_shape;",
                 "                for (int test_component = 0; test_component < NC; ++test_component) {",
                 "                    for (int test_shape = 0; test_shape < NS; ++test_shape) {",
                 "                        const int row = test_component * NS + test_shape;",
-                "                        element_matrix[row * NDOFS + col] = block_out_data[test_shape * NC + test_component][0];",
+                "                        element_matrix[row * NDOFS + col] = bout_data[test_shape * NC + test_component][0];",
                 "                    }",
                 "                }",
                 "            }",
@@ -7122,7 +7130,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         else tuple(range(n_nodes))
     )
     identity_stream_shape_order = tuple(stream_shape_order) == tuple(range(n_nodes))
-    coordinate_streams_name = "block_coordinate_data"
+    coordinate_streams_name = "bcoordinate_data"
     block_name = "%s_apply_block" % local_prefix
     specialized_prefix = _constant_p1_specialized_local_prefix(
         local_prefix,
@@ -7245,27 +7253,27 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "    for (ptrdiff_t element = 0; element < nelements; ++element) {",
             "        idx_t ev[NS];",
             "        s_t element_matrix[NDOFS * NDOFS];",
-            "        s_t block_h_data[NS * NC][VS];",
-            "        s_t block_out_data[NS * NC][VS];",
-            "        s_t block_coordinate_data[NS * ND][VS];",
+            "        s_t bh_data[NS * NC][VS];",
+            "        s_t bout_data[NS * NC][VS];",
+            "        s_t bcoordinate_data[NS * ND][VS];",
             "        static constexpr int nelems = VS;",
         ]
     )
     if uses_current:
-        lines.append("        s_t block_u_data[NS * NC][VS];")
+        lines.append("        s_t bu_data[NS * NC][VS];")
     for stream in _soa_array_stream_names(_adjugate_input(dim)):
-        lines.append("        s_t block_%s[NQ * VS];" % stream)
-    lines.append("        s_t block_jacobian_determinant0[NQ * VS];")
+        lines.append("        s_t b%s[NQ * VS];" % stream)
+    lines.append("        s_t bjacobian_determinant0[NQ * VS];")
     lines.append(
-            "        s_t *block_jacobian_adjugate_streams[ND * ND] = {%s};"
-            % ", ".join("block_jacobian_adjugate%d" % i for i in range(dim * dim))
+            "        s_t *bjacobian_adjugate_streams[ND * ND] = {%s};"
+            % ", ".join("bjacobian_adjugate%d" % i for i in range(dim * dim))
         )
     if uses_current:
         lines.extend(
             _ordered_stream_pointer_array_lines(
                 "const s_t *",
-                "block_u_streams",
-                "block_u_data",
+                "bu_streams",
+                "bu_data",
                 dim,
                 stream_shape_order,
                 "        ",
@@ -7275,16 +7283,16 @@ def _sfem_soa_hessian_matrix_assembly_function(
         [
             *_ordered_stream_pointer_array_lines(
                 "const s_t *",
-                "block_h_streams",
-                "block_h_data",
+                "bh_streams",
+                "bh_data",
                 dim,
                 stream_shape_order,
                 "        ",
             ),
             *_ordered_stream_pointer_array_lines(
                 "s_t *",
-                "block_out_streams",
-                "block_out_data",
+                "bout_streams",
+                "bout_data",
                 dim,
                 stream_shape_order,
                 "        ",
@@ -7295,11 +7303,11 @@ def _sfem_soa_hessian_matrix_assembly_function(
             *([] if identity_stream_shape_order else ["            const idx_t coordinate_node = coordinate_elements[shape][element];"]),
             "            ev[shape] = node;",
             "            for (int d = 0; d < ND; ++d) {",
-            "                block_coordinate_data[shape * ND + d][0] = s_t(points[d][%s]);" % ("node" if identity_stream_shape_order else "coordinate_node"),
+            "                bcoordinate_data[shape * ND + d][0] = s_t(points[d][%s]);" % ("node" if identity_stream_shape_order else "coordinate_node"),
         ]
     )
     if uses_current:
-        lines.append("                block_u_data[shape * NC + d][0] = u_components[d][node * u_stride];")
+        lines.append("                bu_data[shape * NC + d][0] = u_components[d][node * u_stride];")
     lines.extend(
         [
             "            }",
@@ -7315,19 +7323,19 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 n_shape=n_nodes,
                 n_qp=quadrature_rule.n_qp,
                 local_prefix=local_prefix,
-                coordinate_streams="block_coordinate_data",
+                coordinate_streams="bcoordinate_data",
                 contiguous_coordinate_streams=True,
                 adjugate_target=lambda component, index: (
-                    "block_jacobian_adjugate%d[%s]" % (component, index)
+                    "bjacobian_adjugate%d[%s]" % (component, index)
                 ),
                 determinant_target=lambda index: (
-                    "block_jacobian_determinant0[%s]" % index
+                    "bjacobian_determinant0[%s]" % index
                 ),
                 adjugate_streams=tuple(
-                    "block_jacobian_adjugate%d" % component
+                    "bjacobian_adjugate%d" % component
                     for component in range(dim * dim)
                 ),
-                determinant_stream="block_jacobian_determinant0",
+                determinant_stream="bjacobian_determinant0",
                 shape_name=tensor_shape_name,
                 grad_name=tensor_grad_name,
             )
@@ -7353,8 +7361,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
     call_args = [
         "1",
         "1",
-        *("block_jacobian_adjugate%d" % i for i in range(dim * dim)),
-        "block_jacobian_determinant0",
+        *("bjacobian_adjugate%d" % i for i in range(dim * dim)),
+        "bjacobian_determinant0",
     ]
     if omit_reference_basis_inputs:
         pass
@@ -7373,8 +7381,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
     call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
     call_args.extend(material_parameter_names)
     if uses_current:
-        call_args.append("block_u_streams")
-    call_args.extend(("block_h_streams", "block_out_streams"))
+        call_args.append("bu_streams")
+    call_args.extend(("bh_streams", "bout_streams"))
 
     lines.append("")
     _sfem_soa_hessian_direct_assembly(
@@ -9485,8 +9493,8 @@ def _sfem_soa_element_api_reference_args(prefix, quadrature_rule, use_tensor_pro
 
 
 def _sfem_soa_element_api_geometry_args(dim):
-    return tuple("block_jacobian_adjugate%d" % component for component in range(dim * dim)) + (
-        "block_jacobian_determinant0",
+    return tuple("bjacobian_adjugate%d" % component for component in range(dim * dim)) + (
+        "bjacobian_determinant0",
     )
 
 
@@ -9516,9 +9524,9 @@ def _sfem_soa_element_api_block_call(
         *_form_material_parameter_names(form),
     ]
     if _form_uses_current(form, default=True):
-        args.append("block_u_streams")
+        args.append("bu_streams")
     if _form_uses_direction(form, default=form.has_direction):
-        args.append("block_h_streams")
+        args.append("bh_streams")
     args.append(output_arg)
     return "%s<s_t, NQ, NS, VS>(%s);" % (
         block_name,
@@ -9531,23 +9539,23 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
         "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
     ]
     if _form_uses_current(form, default=True):
-        lines.append("        const s_t *block_u_streams[NDOFS];")
+        lines.append("        const s_t *bu_streams[NDOFS];")
         lines.append("        for (int stream = 0; stream < NDOFS; ++stream) {")
-        lines.append("            block_u_streams[stream] = u_streams[stream] + evb;")
+        lines.append("            bu_streams[stream] = u_streams[stream] + evb;")
         lines.append("        }")
     if output_kind == "value":
-        lines.append("        s_t *const block_value = values + evb;")
+        lines.append("        s_t *const bvalue = values + evb;")
         lines.append("        #pragma omp simd")
         lines.append("        for (int lane = 0; lane < nelems; ++lane) {")
-        lines.append("            block_value[lane] = s_t(0);")
+        lines.append("            bvalue[lane] = s_t(0);")
         lines.append("        }")
     elif output_kind == "vector":
-        lines.append("        s_t *block_out_streams[NDOFS];")
+        lines.append("        s_t *bout_streams[NDOFS];")
         lines.append("        for (int stream = 0; stream < NDOFS; ++stream) {")
-        lines.append("            block_out_streams[stream] = out_streams[stream] + evb;")
+        lines.append("            bout_streams[stream] = out_streams[stream] + evb;")
         lines.append("            #pragma omp simd")
         lines.append("            for (int lane = 0; lane < nelems; ++lane) {")
-        lines.append("                block_out_streams[stream][lane] = s_t(0);")
+        lines.append("                bout_streams[stream][lane] = s_t(0);")
         lines.append("            }")
         lines.append("        }")
     return lines
@@ -9556,8 +9564,8 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind):
 def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
     lines = []
     for component in range(dim * dim):
-        lines.append("        s_t block_jacobian_adjugate%d[NQ * VS];" % component)
-    lines.append("        s_t block_jacobian_determinant0[NQ * VS];")
+        lines.append("        s_t bjacobian_adjugate%d[NQ * VS];" % component)
+    lines.append("        s_t bjacobian_determinant0[NQ * VS];")
     # The element API tiles are per element, so the scope the
     # element calls for can be printed here without the shared
     # local header disagreeing with itself about it.
@@ -9568,10 +9576,10 @@ def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule):
     lines.append("            for (int lane = 0; lane < nelems; ++lane) {")
     for component in range(dim * dim):
         lines.append(
-            "                block_jacobian_adjugate%d[q * VS + lane] = jacobian_adjugate[%d][q * nelements + evb + lane];"
+            "                bjacobian_adjugate%d[q * VS + lane] = jacobian_adjugate[%d][q * nelements + evb + lane];"
             % (component, component)
         )
-    lines.append("                block_jacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];")
+    lines.append("                bjacobian_determinant0[q * VS + lane] = jacobian_determinant[q * nelements + evb + lane];")
     lines.append("            }")
     lines.append("        }")
     return lines
@@ -9588,17 +9596,17 @@ def _sfem_soa_element_api_coords_tile_lines(
     source_builder,
 ):
     lines = [
-        "        s_t block_coordinate_data[NDOFS][VS];",
+        "        s_t bcoordinate_data[NDOFS][VS];",
         "        for (int stream = 0; stream < NDOFS; ++stream) {",
         "            #pragma omp simd",
         "            for (int lane = 0; lane < nelems; ++lane) {",
-        "                block_coordinate_data[stream][lane] = coords[stream][evb + lane];",
+        "                bcoordinate_data[stream][lane] = coords[stream][evb + lane];",
         "            }",
         "        }",
     ]
     for component in range(dim * dim):
-        lines.append("        s_t block_jacobian_adjugate%d[NQ * VS];" % component)
-    lines.append("        s_t block_jacobian_determinant0[NQ * VS];")
+        lines.append("        s_t bjacobian_adjugate%d[NQ * VS];" % component)
+    lines.append("        s_t bjacobian_determinant0[NQ * VS];")
     if use_tensor_product_reference:
         lines.extend(
             [
@@ -9607,7 +9615,7 @@ def _sfem_soa_element_api_coords_tile_lines(
         )
         for d in range(dim):
             lines.append(
-                "        tensor_gradient_contiguous<s_t, NQ, NS, VS, %d>(nelems, %s, %s, block_coordinate_data, %d, coordinate_grad_ref + %d * NQ * ND * VS);"
+                "        tensor_gradient_contiguous<s_t, NQ, NS, VS, %d>(nelems, %s, %s, bcoordinate_data, %d, coordinate_grad_ref + %d * NQ * ND * VS);"
                 % (
                     dim,
                     quadrature_reference_accessor(prefix, "isoparametric", "shape_1d"),
@@ -9618,10 +9626,10 @@ def _sfem_soa_element_api_coords_tile_lines(
             )
         lines.append(
             "        s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {%s};"
-            % ", ".join("block_jacobian_adjugate%d" % component for component in range(dim * dim))
+            % ", ".join("bjacobian_adjugate%d" % component for component in range(dim * dim))
         )
         lines.append(
-            "        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);"
+            "        geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bjacobian_determinant0);"
         )
         return lines
     if use_reference_gradient_vectors:
@@ -9655,7 +9663,7 @@ def _sfem_soa_element_api_coords_tile_lines(
             reference_inputs,
             q_major=True,
             source_builder=source_builder,
-            coordinate_streams="block_coordinate_data",
+            coordinate_streams="bcoordinate_data",
         )
     )
     lines.append("        }")
@@ -9732,7 +9740,7 @@ def _sfem_soa_element_api_operation_lines(
                 quadrature_rule,
                 use_tensor_product_reference,
                 use_reference_gradient_vectors,
-                "block_value" if public == "energy" else "block_out_streams",
+                "bvalue" if public == "energy" else "bout_streams",
                 use_shared_weak_local,
             )
         )
@@ -9782,8 +9790,8 @@ def _sfem_soa_element_api_hessian_lines(
             ]
         )
         if _form_uses_current(form, default=True):
-            lines.append("        const s_t *block_u_streams[NDOFS];")
-            lines.append("        for (int stream = 0; stream < NDOFS; ++stream) block_u_streams[stream] = u_streams[stream] + evb;")
+            lines.append("        const s_t *bu_streams[NDOFS];")
+            lines.append("        for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;")
         if include_coords:
             lines.extend(
                 _sfem_soa_element_api_coords_tile_lines(
@@ -9801,20 +9809,20 @@ def _sfem_soa_element_api_hessian_lines(
             lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule))
         lines.extend(
             [
-                "        s_t block_h_data[NDOFS][VS];",
-                "        s_t block_out_data[NDOFS][VS];",
-                "        const s_t *block_h_streams[NDOFS];",
-                "        s_t *block_out_streams[NDOFS];",
+                "        s_t bh_data[NDOFS][VS];",
+                "        s_t bout_data[NDOFS][VS];",
+                "        const s_t *bh_streams[NDOFS];",
+                "        s_t *bout_streams[NDOFS];",
                 "        for (int stream = 0; stream < NDOFS; ++stream) {",
-                "            block_h_streams[stream] = block_h_data[stream];",
-                "            block_out_streams[stream] = block_out_data[stream];",
+                "            bh_streams[stream] = bh_data[stream];",
+                "            bout_streams[stream] = bout_data[stream];",
                 "        }",
                 "        for (int col = 0; col < NDOFS; ++col) {",
                 "            for (int stream = 0; stream < NDOFS; ++stream) {",
                 "                #pragma omp simd",
                 "                for (int lane = 0; lane < nelems; ++lane) {",
-                "                    block_h_data[stream][lane] = stream == col ? s_t(1) : s_t(0);",
-                "                    block_out_data[stream][lane] = s_t(0);",
+                "                    bh_data[stream][lane] = stream == col ? s_t(1) : s_t(0);",
+                "                    bout_data[stream][lane] = s_t(0);",
                 "                }",
                 "            }",
                 "            %s" % _sfem_soa_element_api_block_call(
@@ -9826,14 +9834,14 @@ def _sfem_soa_element_api_hessian_lines(
                     quadrature_rule,
                     use_tensor_product_reference,
                     use_reference_gradient_vectors,
-                    "block_out_streams",
+                    "bout_streams",
                     use_shared_weak_local,
                 ),
                 "            for (int row = 0; row < NDOFS; ++row) {",
                 "                s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;",
                 "                #pragma omp simd",
                 "                for (int lane = 0; lane < nelems; ++lane) {",
-                "                    matrix_stream[lane] = block_out_data[row][lane];",
+                "                    matrix_stream[lane] = bout_data[row][lane];",
                 "                }",
                 "            }",
                 "        }",

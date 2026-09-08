@@ -66,8 +66,8 @@ CONSTANTS = {
 #: move together with the stream names below; `compose` is the only correct way
 #: to spell the result.
 PREFIXES = {
-    "block": "block_",   # staged into a VS-wide block on the stack
-    "pack":  "pack_",    # per-thread scratch for the packed mesh traversal
+    "block": "b",        # staged into a VS-wide block on the stack
+    "pack":  "pk_",      # per-thread scratch for the packed mesh traversal
 }
 
 #: Stream names.  A geometry stream's local spelling is owned by
@@ -145,7 +145,17 @@ def reserved():
     return frozenset(names)
 
 
-RESERVED_PREFIXES = frozenset(list(PREFIXES.values()) + list(SPACES.values()) + ["g_"])
+#: Prefixes a material may not use.  A one-character prefix is deliberately not
+#: reserved: `b` is the staged-buffer prefix in emitted kernels, but reserving it
+#: would refuse a material parameter called `beta` or `b0`, which is far more of
+#: the author's namespace than the generator has any claim to.  The buffers it
+#: forms are protected by name instead, and they are all `b` + a stream name the
+#: generator owns.
+RESERVED_PREFIXES = frozenset(
+    p
+    for p in list(PREFIXES.values()) + list(SPACES.values()) + ["g_"]
+    if len(p) > 1
+)
 
 
 class NameCollision(ValueError):
