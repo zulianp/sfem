@@ -86,9 +86,6 @@ static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho,
         // No rc: the hand-written `current` kernel carries no Rhie-Chow term. --rhie-chow
         // is rejected for this kernel at the CLI, so reaching here with it on is a bug.
         cvfem_hex8_ns_upwind_residual(rho, mu, adj, det, ux, uy, uz, p, r);
-        if (ex.fmask)
-            boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, ex.x, ex.y, ex.z,
-                                      ux, uy, uz, p, r, ex.fmask, 0);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];
@@ -113,9 +110,6 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         scalar_t adj[9], det;
         load_hex8_adj(d, e, adj, &det);
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, ex.rc);
-        if (ex.fmask)
-            boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, ex.x, ex.y, ex.z,
-                                      ux, uy, uz, p, r, ex.fmask, 0);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];

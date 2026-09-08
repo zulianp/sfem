@@ -383,6 +383,78 @@ static SFEM_INLINE void gather_element_coords(const MeshData               &d,
     }
 }
 
+// ---- boundary closure as a post-pass -----------------------------------------
+//
+// The boundary sub-control-surface terms are applied as their own element sweep rather
+// than inside each layout's kernel loop. That is the solver's own arrangement
+// (apply_boundary_scs_residual in cvfem_hex8_ns_core.hpp) and it is the right one here for
+// the same reason apply_body_force gives: the term touches no sub-control-surface flux, so
+// one pass covers the atomic, packed, colored and store sweeps at once instead of being
+// threaded into four of them -- and the packed and colored sweeps are SIMD over a pack,
+// which a per-element face test does not fit.
+//
+// It costs an extra pass over the elements, which is why it is only run with --boundary.
+// The early-out on an all-zero element contribution keeps interior elements to a gather
+// and a compare.
+static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const scalar_t rho, const scalar_t mu,
+                                                           const int isoparam) {
+    if (d.face_mask.empty()) return;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        const int fmask = (int)d.face_mask[(size_t)e];
+        if (!fmask) continue;
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        std::memset(r, 0, sizeof(r));
+        scalar_t adj[9], det = scalar_t(0);
+        if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        boundary_scs_add_residual(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                  ux, uy, uz, p, r, fmask, 0);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(d.rx.data(), g, r[a * 4 + 0]);
+            atomic_add(d.ry.data(), g, r[a * 4 + 1]);
+            atomic_add(d.rz.data(), g, r[a * 4 + 2]);
+            atomic_add(d.rc.data(), g, r[a * 4 + 3]);
+        }
+    }
+}
+
+static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, const scalar_t rho, const scalar_t mu,
+                                                                  const int                           isoparam,
+                                                                  const scalar_t *const SFEM_RESTRICT dir,
+                                                                  scalar_t *const SFEM_RESTRICT       jv) {
+    if (d.face_mask.empty()) return;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        const int fmask = (int)d.face_mask[(size_t)e];
+        if (!fmask) continue;
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_coords(d, e, x, y, z);
+        gather_element_fields(d, e, ux, uy, uz, p);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const ptrdiff_t g = (ptrdiff_t)d.elems[a][e] * N_FIELDS;
+            vx[a]             = dir[g + 0];
+            vy[a]             = dir[g + 1];
+            vz[a]             = dir[g + 2];
+            q[a]              = dir[g + 3];
+        }
+        std::memset(r, 0, sizeof(r));
+        scalar_t adj[9], det = scalar_t(0);
+        if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        boundary_scs_add_jacobian_action(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                         ux, uy, uz, vx, vy, vz, q, r, fmask, 0);
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const ptrdiff_t g = (ptrdiff_t)d.elems[a][e] * N_FIELDS;
+            atomic_add(jv + g + 0, 0, r[a * 4 + 0]);
+            atomic_add(jv + g + 1, 0, r[a * 4 + 1]);
+            atomic_add(jv + g + 2, 0, r[a * 4 + 2]);
+            atomic_add(jv + g + 3, 0, r[a * 4 + 3]);
+        }
+    }
+}
+
 // ---- optional terms: --rhie-chow and --boundary ------------------------------
 //
 // Both are off by default, and the default path must stay exactly as fast as it was --
