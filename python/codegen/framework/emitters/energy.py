@@ -238,7 +238,7 @@ class OpenMPEnergySoASourceBuilder:
         return int(vector_size)
 
     def mesh_loop_lines(self):
-        tile_iterator = iterator("evbegin", "ptrdiff_t")
+        tile_iterator = iterator("evb", "ptrdiff_t")
         lines = render_kernel_ast_lines(
             "openmp_mesh_tile_loop",
             (
@@ -257,7 +257,7 @@ class OpenMPEnergySoASourceBuilder:
                     "const int",
                     "nelems",
                     (),
-                    "(int)MIN((ptrdiff_t)VS, nelements - evbegin)",
+                    "(int)MIN((ptrdiff_t)VS, nelements - evb)",
                 ),
             ),
         )
@@ -371,7 +371,7 @@ class CUDAEnergySoASourceBuilder:
         return 1
 
     def mesh_loop_lines(self):
-        kernel_iterator = iterator("evbegin", "ptrdiff_t")
+        kernel_iterator = iterator("evb", "ptrdiff_t")
         lines = render_kernel_ast_lines(
             "cuda_mesh_grid_stride_loop",
             (

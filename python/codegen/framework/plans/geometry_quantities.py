@@ -30,7 +30,7 @@ from dataclasses import dataclass
 #: The order the quantities are declared in, which is the order the generated
 #: lane bodies have always used: the offset first because the other two index
 #: through it, then the determinant, then the adjugate components.
-GEOMETRY_QUANTITY_ORDER = ("geometry_offset", "determinant", "adjugate")
+GEOMETRY_QUANTITY_ORDER = ("goff", "determinant", "adjugate")
 
 
 @dataclass(frozen=True)
@@ -69,7 +69,7 @@ def local_geometry_quantities(dependencies, dim):
     if not uses_geometry_values(dependencies):
         return ()
     quantities = [
-        GeometryQuantity("geometry_offset"),
+        GeometryQuantity("goff"),
         GeometryQuantity("determinant"),
     ]
     if dependencies.uses_adjugate:

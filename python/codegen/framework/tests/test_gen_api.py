@@ -273,10 +273,10 @@ class GenApiTest(unittest.TestCase):
                 LoopHeaderNode(
                     LoopNode(
                         LoopKind.TILE,
-                        iterator("evbegin", "ptrdiff_t"),
+                        iterator("evb", "ptrdiff_t"),
                         iteration_range(0, expr_ref("nelements", "element_count")),
                         add_assign_increment(
-                            iterator("evbegin", "ptrdiff_t"),
+                            iterator("evb", "ptrdiff_t"),
                             expr_ref("VS", "vector_width"),
                         ),
                     )
@@ -285,7 +285,7 @@ class GenApiTest(unittest.TestCase):
                     "const int",
                     "nelems",
                     (),
-                    "(int)MIN((ptrdiff_t)VS, nelements - evbegin)",
+                    "(int)MIN((ptrdiff_t)VS, nelements - evb)",
                 ),
                 LoopNode(
                     LoopKind.SIMD,
@@ -316,8 +316,8 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(
             printer.print_ast(ast),
             (
-                "for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {",
-                "const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);",
+                "for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
+                "const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
                 "#pragma omp simd",
                 "for (int lane = 0; lane < nelems; ++lane) {",
                 "    block_value[lane] = s_t(0);",
@@ -423,7 +423,7 @@ class GenApiTest(unittest.TestCase):
             self.assertIn("not installed", result.available.reason)
 
     def test_pystencils_adapter_lowers_semantic_loop_and_generates_c(self):
-        tile = iterator("evbegin", "ptrdiff_t")
+        tile = iterator("evb", "ptrdiff_t")
         lane = iterator("lane", "int")
         ast = KernelAST(
             "pystencils_loop",
@@ -456,7 +456,7 @@ class GenApiTest(unittest.TestCase):
             self.assertTrue(result.success)
             self.assertIn("generated C with pystencils", result.diagnostics[-1])
             self.assertIn(
-                "for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS)",
+                "for (ptrdiff_t evb = 0; evb < nelements; evb += VS)",
                 result.lowered,
             )
             self.assertIn("for (int lane = 0; lane < nelems; lane += 1)", result.lowered)
@@ -498,7 +498,7 @@ class GenApiTest(unittest.TestCase):
                     "const int",
                     "nelems",
                     (),
-                    "(int)MIN((ptrdiff_t)VS, nelements - evbegin)",
+                    "(int)MIN((ptrdiff_t)VS, nelements - evb)",
                 ),
             ),
         )
@@ -537,8 +537,8 @@ class GenApiTest(unittest.TestCase):
         self.assertEqual(
             OpenMPEnergySoASourceBuilder().mesh_loop_lines(),
             (
-                "    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VS) {",
-                "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evbegin);",
+                "    for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
+                "        const int nelems = (int)MIN((ptrdiff_t)VS, nelements - evb);",
             ),
         )
 
@@ -1122,7 +1122,7 @@ class GenApiTest(unittest.TestCase):
                 operator_source,
             )
             self.assertIn(
-                "affine_geometry_stream<s_t, g_t, VS>",
+                "ageom_stream<s_t, g_t, VS>",
                 operator_source,
             )
             self.assertNotIn("generated_neohookean_ogden", source)
@@ -1306,7 +1306,7 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
 
             local = read_generated("linear_elasticity_d3_simplex_local.hpp")
             apply_block = local[local.index("linear_elasticity_d3_simplex_apply_block") :]
-            self.assertNotIn("grad_u", apply_block)
+            self.assertNotIn("gu", apply_block)
             self.assertNotIn("u_streams", apply_block)
 
             c_abi = read_generated("sfem_GeneratedLinearElasticity_c_abi.hpp")
@@ -1432,7 +1432,7 @@ extern "C" int demo_tri3_apply_packed_affine_mesh_soa(ptrdiff_t n, idx_t **eleme
             self.assertIn("linear_elasticity_proteus_hex8_hessian_element_soa", le_hex8_header)
             self.assertIn("SHAPE_ORDER[NS] = {0, 1, 3, 2, 4, 5, 7, 6}", le_hex8_header)
             self.assertIn("neohookean_ogden_hex8_hessian_element_soa", nh_hex8_header)
-            self.assertIn("q * nelements + evbegin + lane", le_header)
+            self.assertIn("q * nelements + evb + lane", le_header)
             self.assertIn("template <typename s_t, int VS = 16, typename elem_type_t>", le_dispatch)
             self.assertNotIn("smesh_mesh.hpp", le_dispatch)
             self.assertNotIn("smesh_elem_type.hpp", le_dispatch)
@@ -1594,11 +1594,11 @@ int main() {
             self.assertIn("_ref0_values", block)
 
         self.assertIn(
-            "const s_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+            "const s_t gu_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
             tet4_objective,
         )
         self.assertIn(
-            "const s_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+            "const s_t gu_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
             tet4_gradient,
         )
         self.assertIn(
@@ -1823,7 +1823,7 @@ int main() {
                 source.index("if (ret->initialize(block_names)"),
             )
             self.assertIn(
-                "affine_geometry_stream<s_t, g_t, VS>",
+                "ageom_stream<s_t, g_t, VS>",
                 operator_source,
             )
             self.assertNotIn("two_phase_flow_tri3_residual_isoparametric_mesh_aos", source)
@@ -3625,7 +3625,7 @@ int main() {
             )
             end = contents.index("} // namespace codegen", start)
             block = contents[start:end]
-            self.assertNotIn("const s_t det = determinant[geometry_offset];", block)
+            self.assertNotIn("const s_t det = determinant[goff];", block)
             self.assertNotIn("for (int q = 0; q < NQ; ++q)", block)
             self.assertNotIn("#pragma omp simd", block)
             mesh = os.path.join(
@@ -3638,7 +3638,7 @@ int main() {
                 mesh_contents = input_file.read()
             self.assertGreater(_assert_lane_loops_request_simd(self, mesh), 0)
             self.assertIn(
-                "const idx_t node = element_shape[evbegin + lane];\n"
+                "const idx_t node = element_shape[evb + lane];\n"
                 "                block_current[stream][lane] =",
                 mesh_contents,
             )
@@ -3809,7 +3809,7 @@ int main() {
             self.assertIn("tensor_integrate<", contents)
             self.assertIn("NQ1", contents)
             self.assertNotIn("field_shape[", contents)
-            self.assertNotIn("field_grad_ref[", contents)
+            self.assertNotIn("fgref[", contents)
             self.assertNotIn("for (int trial", contents)
             self.assertNotIn("for (int test", contents)
 
@@ -3972,14 +3972,14 @@ int main() {
             with open(source, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
             self.assertIn("const idx_t *const SFEM_RESTRICT element_shape = elements[local_shape];", operator_source)
-            self.assertIn("const idx_t node = element_shape[evbegin + lane];", operator_source)
-            self.assertIn("out[element_shape[evbegin + scatter] * out_stride]", operator_source)
+            self.assertIn("const idx_t node = element_shape[evb + lane];", operator_source)
+            self.assertIn("out[element_shape[evb + scatter] * out_stride]", operator_source)
             self.assertNotIn("idx_t ev[VS * CELL_NS]", operator_source)
             self.assertNotIn("ev[lane * CELL_NS", operator_source)
             self.assertNotIn("ev[scatter * CELL_NS", operator_source)
             self.assertIn("const g_t *const affine_geometry_sources", operator_source)
             self.assertIn("for (int geometry_stream = 0;", operator_source)
-            self.assertIn("block_affine_geometry_streams[geometry_stream]", operator_source)
+            self.assertIn("bageom_streams[geometry_stream]", operator_source)
             self.assertNotIn("block_jacobian_adjugate0_data", operator_source)
             self.assertNotIn("const s_t *const block_jacobian_adjugate0", operator_source)
             self.assertIn("block_direction, mu, block_output", operator_source)
@@ -4126,7 +4126,7 @@ int main() {
                 self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_y", block)
                 self.assertNotIn("const s_t *const SFEM_RESTRICT grad_ref_z", block)
                 self.assertIn("const s_t metric_factor = q_weight[q] * (kappa);", block)
-                self.assertIn("metric_factor * geom_metric[0][geometry_offset]", block)
+                self.assertIn("metric_factor * geom_metric[0][goff]", block)
                 self.assertNotIn("for (int trial = 0; trial < NS; ++trial)", block)
                 self.assertNotIn("grad_ref_x[q * NS + trial]", block)
                 self.assertNotIn("test_grad0", block)
@@ -4145,8 +4145,8 @@ int main() {
             with open(operator) as source:
                 operator_source = source.read()
             self.assertIn("const idx_t *const SFEM_RESTRICT element_shape = elements[shape];", operator_source)
-            self.assertIn("const idx_t node = element_shape[evbegin + lane];", operator_source)
-            self.assertIn("out[element_shape[evbegin + scatter] * out_stride]", operator_source)
+            self.assertIn("const idx_t node = element_shape[evb + lane];", operator_source)
+            self.assertIn("out[element_shape[evb + scatter] * out_stride]", operator_source)
             self.assertNotIn("idx_t ev[VS * NS]", operator_source)
             self.assertNotIn("ev[lane * NS", operator_source)
             self.assertNotIn("ev[scatter * NS", operator_source)
@@ -4413,11 +4413,11 @@ int main() {
                 self.assertNotIn("grad_ref_x[q * NS + shape]", block)
 
             self.assertIn(
-                "const s_t grad_u_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
+                "const s_t gu_ref0 = -(u_streams[0 * 3 + 0][lane]) + u_streams[1 * 3 + 0][lane];",
                 tet4_objective,
             )
             self.assertIn(
-                "const s_t grad_u_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];",
+                "const s_t gu_ref8 = -(u_streams[0 * 3 + 2][lane]) + u_streams[3 * 3 + 2][lane];",
                 tet4_gradient,
             )
             self.assertIn(
@@ -4561,7 +4561,7 @@ int main() {
                 self.assertNotIn("for (int shape = 0; shape < NS; ++shape)", block)
                 self.assertNotIn("grad_ref_x[q * NS + shape]", block)
             self.assertIn(
-                "const s_t grad_u_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];",
+                "const s_t gu_ref0 = -(u_streams[0 * 2 + 0][lane]) + u_streams[1 * 2 + 0][lane];",
                 tri3_objective,
             )
             self.assertIn(

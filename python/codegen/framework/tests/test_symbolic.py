@@ -485,13 +485,13 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(statement.hoist_scope, ScopeKind.MESH)
 
     def test_symbolic_objects_default_to_soa_layout(self):
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
 
         self.assertEqual(grad_u.layout.kind, LayoutKind.SOA)
 
     def test_graph_data_nodes_carry_symbolic_object_layout(self):
         aos = data_layout(LayoutKind.AOS, components=2)
-        grad_u = DisplacementGradient("grad_u", 2, layout=aos)
+        grad_u = DisplacementGradient("gu", 2, layout=aos)
         G = grad_u.as_matrix()
 
         graph = build_expression_graph(
@@ -501,7 +501,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
         self.assertEqual(graph.graph.nodes[G[0, 0]]["layout_kind"], LayoutKind.AOS)
         self.assertEqual(graph.graph.nodes[G[0, 0]]["layout"].components, 2)
-        self.assertEqual(graph.graph.nodes[G[0, 0]]["symbolic_object"], "grad_u")
+        self.assertEqual(graph.graph.nodes[G[0, 0]]["symbolic_object"], "gu")
 
     def test_aosoa_layout_requires_positive_block_size(self):
         with self.assertRaises(ValueError):
@@ -512,7 +512,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_aosoa_layout_is_preserved_on_derived_operator_objects(self):
         layout = data_layout(LayoutKind.AOSOA, block_size=8, components=4)
-        grad_u = DisplacementGradient("grad_u", 2, layout=layout)
+        grad_u = DisplacementGradient("gu", 2, layout=layout)
         mu, lmbda = sp.symbols("mu lambda")
 
         P = FirstPiolaStress.from_linear_elasticity("P", grad_u, mu, lmbda)
@@ -549,14 +549,14 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_symbolic_object_layout_offset_uses_entry_component(self):
         i = sp.symbols("i")
-        grad_u = DisplacementGradient("grad_u", 2, layout=data_layout(LayoutKind.AOS))
+        grad_u = DisplacementGradient("gu", 2, layout=data_layout(LayoutKind.AOS))
         G = grad_u.as_matrix()
 
         self.assertEqual(grad_u.component_index(G[1, 0]), 2)
         self.assertEqual(grad_u.layout_offset(G[1, 0], i), 4 * i + 2)
 
     def test_graph_data_node_carries_layout_offset(self):
-        grad_u = DisplacementGradient("grad_u", 2, layout=data_layout(LayoutKind.AOS))
+        grad_u = DisplacementGradient("gu", 2, layout=data_layout(LayoutKind.AOS))
         G = grad_u.as_matrix()
 
         graph = build_expression_graph(
@@ -882,7 +882,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_linear_elastic_first_piola_matches_energy_derivative(self):
         mu, lmbda = sp.symbols("mu lambda")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         G = grad_u.as_matrix()
 
         energy = linear_elastic_energy(G, mu, lmbda)
@@ -911,7 +911,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_transformed_first_piola_matches_p_tx_jinv_t_operand(self):
         mu, lmbda, measure = sp.symbols("mu lambda measure")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         Jinv = matrix_symbols("Jinv", 2, 2)
 
         P = linear_elastic_first_piola(grad_u, mu, lmbda)
@@ -934,7 +934,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_transformed_first_piola_object_is_detected_structurally(self):
         mu, lmbda, measure = sp.symbols("mu lambda measure")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         Jinv = matrix_symbols("Jinv", 2, 2)
         P = FirstPiolaStress.from_linear_elasticity("P", grad_u, mu, lmbda)
         operand = TransformedFirstPiola.from_first_piola(
@@ -982,7 +982,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_linearized_first_piola_matches_directional_derivative(self):
         mu, lmbda = sp.symbols("mu lambda")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         direction = matrix_symbols("trial_grad", 2, 2)
         G = grad_u.as_matrix()
         P = linear_elastic_first_piola(G, mu, lmbda)
@@ -1006,7 +1006,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_linearized_transformed_operand_matches_direct_gradient_derivative(self):
         mu, lmbda, measure = sp.symbols("mu lambda measure")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         G = grad_u.as_matrix()
         Jinv = matrix_symbols("Jinv", 2, 2)
         trial_ref = matrix_symbols("trial_ref", 2, 2)
@@ -1035,7 +1035,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_linearized_transformed_first_piola_object_evaluates_hessian_action(self):
         mu, lmbda, measure = sp.symbols("mu lambda measure")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         Jinv = matrix_symbols("Jinv", 2, 2)
         P = FirstPiolaStress.from_linear_elasticity("P", grad_u, mu, lmbda)
         trial_ref = ReferenceShapeGradient("trial_ref", 2)
