@@ -50,6 +50,7 @@ from codegen.framework.fem.tensor_product import (
     tensor_product_sum_factorization_plan,
     tensor_product_test_contraction_plan,
 )
+from codegen.framework.plans import conventions
 from codegen.framework.plans.emission import (
     emission_plan_for_element,
     emission_plan_from_unit_context,
@@ -314,6 +315,7 @@ class CodeGenerator:
             ),
         )
         _validate_op(self.op_name, self.parameter_defaults)
+        _validate_reserved_names(self.name, self.systems, self.parameter_defaults)
 
 
 @dataclass(frozen=True)
@@ -2312,6 +2314,25 @@ def _smesh_source_include_dirs(repo_root):
 def _validate_name(name):
     if not isinstance(name, str) or not name or not name.isidentifier():
         raise ValueError("material name must be a valid identifier")
+
+
+def _validate_reserved_names(name, systems, parameter_defaults):
+    """Refuse a material that declares a name the generator has claimed.
+
+    Checked here, once, at specification time -- not in a kernel, and not left to
+    coincidence.  The generator's own vocabulary and the material author's
+    overlap in exactly the places a physicist would reach for first: `T` is a
+    temperature and a template parameter, `S` a second Piola-Kirchhoff stress,
+    `G` a shear modulus.  `plans/conventions.py` keeps the generator off those,
+    and this makes the reservation real rather than a note in a document.
+    """
+    declared = [str(parameter) for parameter, _default in parameter_defaults]
+    for system in systems:
+        for field in getattr(system, "fields", ()) or ():
+            field_name = getattr(field, "name", None)
+            if field_name:
+                declared.append(str(field_name))
+    conventions.check_material(name, declared)
 
 
 def _validate_op(op_name, parameter_defaults):
