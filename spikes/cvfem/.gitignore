@@ -1,0 +1,16 @@
+# Build trees. Several names are in use because the job scripts distinguish the
+# configurations they build (build_alps, build_omp, build_cuda, build_blas, build_subpar);
+# the rsync to Alps excludes 'build*/' on the same convention.
+build*/
+
+# Profiling and performance captures. These are kept on disk but never tracked: they are
+# regenerable from scripts/profile_xctrace.sh and the jobs/ sbatch files, and a trace
+# bundle is hundreds of megabytes. What belongs in the repository is the script that
+# produces the capture and the distilled result (eval/*.csv, the reports in docs/).
+traces/
+*.tgz
+perf.data*
+
+__pycache__/
+*.py[cod]
+.DS_Store
